@@ -111,7 +111,7 @@ describe('datetime literals', () => {
     // stores several texts that never match each other — so these must fail, and fail here.
     //
     // ⚠️ Two spellings were admitted 2026-09-11 because `fetch.feature`'s Background writes them
-    // (ADR-055: the spec is a caller): fractional seconds, and a date-only literal — which is a
+    // (ADR-005: the spec is a caller): fractional seconds, and a date-only literal — which is a
     // DateLiteral, a different literal kind, not a datetime spelling. Both are pinned below. The
     // text-comparison caveat stands: `…:13` and `…:13.000` still never match each other.
     it('accepts fractional seconds, stored as written', () => {

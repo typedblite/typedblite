@@ -66,7 +66,7 @@ import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
 /**
  * Validation for what the grammar accepts but the runtime does not implement.
  *
- * 🔴 [ADR-018](../../../../docs/architecture/adr-018-typeql-engine-as-a-port.md) Decision 7:
+ * 🔴 [ADR-002](../../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 7:
  * unsupported TypeQLite fails loudly at three layers and **never silently succeeds**. Unknown syntax
  * is a parse error; syntax deliberately not implemented is reported here, naming the construct;
  * anything reaching the interpreter unhandled throws.
@@ -80,7 +80,7 @@ import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
  * ⚠️ **"Loudly" changed shape on 2026-09-11, by founder decision.** An unenforced annotation was
  * an *error* — the schema was refused. That refused every valid TypeDB schema that used one:
  * `downstream-store`'s could not be applied at all, and every Background in TypeDB's own behaviour
- * specification was turned away before a single semantic could be measured (ADR-055). It is now a
+ * specification was turned away before a single semantic could be measured (ADR-005). It is now a
  * diagnostic **below error severity**: `define` applies the schema and the runtime forwards the
  * diagnostic as a fact in its report, so the reader sees *"`@card` is parsed and not enforced"*
  * on every call. Not a refusal, not a silence. The conformance report card measures each

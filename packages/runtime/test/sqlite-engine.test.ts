@@ -45,7 +45,7 @@ describe('SqliteEngine', () => {
   });
 
   /**
-   * 🔴 **The report is returned, not swallowed** (ADR-021). This adapter is the only thing between
+   * 🔴 **The report is returned, not swallowed** (ADR-004). This adapter is the only thing between
    * the interpreter and every repository in the workspace, so dropping the report here would make
    * the diagnostics unreachable from the layer meant to decide what to do with them.
    */

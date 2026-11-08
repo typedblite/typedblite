@@ -28,7 +28,7 @@ const countsOf = (feature: string, results: ReadonlyArray<ScenarioResult>): Feat
 });
 
 /**
- * 🔴 The sum rule (ADR-055 D3). Four counts that do not sum to the total mean a scenario was lost —
+ * 🔴 The sum rule (ADR-005 D3). Four counts that do not sum to the total mean a scenario was lost —
  * and a lost scenario is the one that would have failed. The report refuses rather than scoring.
  */
 export const checkSums = (card: ReportCard): void => {
@@ -58,7 +58,7 @@ export type Baseline = Readonly<Record<string, number>>;
 export const loadBaseline = (path: string): Baseline => JSON.parse(readFileSync(path, 'utf8')) as Baseline;
 
 /**
- * ADR-055 D4: red when any feature's pass count is below its baseline — and when the baseline has
+ * ADR-005 D4: red when any feature's pass count is below its baseline — and when the baseline has
  * no entry for a feature that ran, because an absent entry is a zero nobody wrote down.
  */
 export const regressions = (card: ReportCard, baseline: Baseline): ReadonlyArray<string> => {

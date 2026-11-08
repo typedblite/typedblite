@@ -13,7 +13,7 @@ import { splitStatements, TypeDBLiteSession, type Outcome } from './session.js';
  * carry ours.
  *
  * 🔴 **The REPL reads raw TypeQLite, not an operation name, and that departs from
- * [ADR-018](../../../../docs/architecture/adr-018-typeql-engine-as-a-port.md) Decision 5's stated
+ * [ADR-002](../../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 5's stated
  * bias.** D5 leaned toward making this a Domain CQRS App on the grounds that the REPL is already
  * one of the four transports. Reading the shared runtime changed that: `completeReplLine`
  * tab-completes over a **fixed operation list**, which is an operation menu. TypeQLite is a language —

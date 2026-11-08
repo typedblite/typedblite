@@ -1,6 +1,6 @@
 # typedblite-cli
 
-Interactive REPL, file runner, and one-shot executor for TypeQLite.
+Interactive REPL, file runner, and one-shot executor for TypeDBLite.
 
 ## Installation
 

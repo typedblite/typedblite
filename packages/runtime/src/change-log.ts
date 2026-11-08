@@ -1,12 +1,12 @@
 // 🔴 **If you change the semantics in this file, re-run the parity oracle.**
-// CouchDB's revision-tree behaviour is kept here on purpose (ADR-020), and it was proven against
+// CouchDB's revision-tree behaviour is kept here on purpose (ADR-003), and it was proven against
 // real CouchDB 3.4.3 in TypeDBLite Sync Phase 03. That check is **no longer part of the routine
 // suite** — it skipped on every CI run for want of the stack, reporting nothing. Bring the stack up
 // and run `nx run typedblite-runtime:test-oracle`. Nothing else will tell you the semantics drifted.
 /**
  * The change log — TypeDBLite's record of what changed, in the order it committed.
  *
- * Implements [ADR-020](../../../../../docs/architecture/adr-020-typeqlite-change-log-and-sync-as-a-port.md)
+ * Implements [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
  * Decisions 1 and 2. The rows are written by `TypeDBLiteInterpreter` **inside its existing
  * transaction**, never after it — a row committed and then published loses the change entirely if
  * the process dies between the two.
@@ -68,7 +68,7 @@ export interface EntityIdentity {
  *
  * `key_attribute` exists separately rather than as a third `schema_element.kind` because that
  * table carries `CHECK (kind IN ('type', 'attribute'))`, and SQLite cannot alter a CHECK in place.
- * Additive is what keeps re-applying a schema safe, per ADR-018.
+ * Additive is what keeps re-applying a schema safe, per ADR-002.
  *
  * `pending_role` records an edge a projection could not draw because the player had not arrived
  * yet. Without it, "the relation reappears once the player's own revision arrives" is a promise
@@ -126,7 +126,7 @@ export class ChangeLog {
   /**
    * `CREATE TABLE IF NOT EXISTS` does nothing to a table that already exists, so a database written
    * by Phase 01 has no `state` column. Adding it is additive and safe to re-run — the same property
-   * that lets a schema be re-applied (ADR-018).
+   * that lets a schema be re-applied (ADR-002).
    */
   private migrate(): void {
     const columns = this.db
@@ -247,7 +247,7 @@ export class ChangeLog {
     return rows.map((row) => ({ rev: row.rev, deleted: row.deleted === 1 }));
   }
 
-  /** The winning leaf, by ADR-020 D3's total rule. */
+  /** The winning leaf, by ADR-003 D3's total rule. */
   public winnerOf(id: string): Leaf | undefined {
     return winnerOfLeaves(this.leavesOf(id));
   }
@@ -583,7 +583,7 @@ export class ChangeLog {
   /**
    * Drop revision history that nothing can read, keeping every leaf.
    *
-   * 🔴 **What it may never remove, and why.** [ADR-020](../../../../../docs/architecture/adr-020-typeqlite-change-log-and-sync-as-a-port.md)
+   * 🔴 **What it may never remove, and why.** [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
    * Decision 4 requires losing revisions to be *retained and enumerable* — `conflictsOf` is part of
    * the deliverable, not a convenience. So every **leaf** survives with its state: the winner and
    * every conflicting loser. Only revisions that are somebody's parent are candidates, and
@@ -592,7 +592,7 @@ export class ChangeLog {
    *
    * ⚠️ **This truncates replication history, and that is the point rather than a side effect.**
    * `since(0)` replays the log to build a peer from nothing; after compaction it replays leaves.
-   * CouchDB's own compaction has exactly this property. Nothing here has a peer — ADR-020 D5 is
+   * CouchDB's own compaction has exactly this property. Nothing here has a peer — ADR-003 D5 is
    * explicit that this cannot replicate with a real CouchDB — so the history being truncated is
    * history of a conversation that never happened.
    *

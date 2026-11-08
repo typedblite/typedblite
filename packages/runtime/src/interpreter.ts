@@ -459,7 +459,7 @@ export class TypeDBLiteInterpreter {
   };
 
   /**
-   * The change log (ADR-020 D1). Its rows are written inside `execute`'s existing transaction, so a
+   * The change log (ADR-003 D1). Its rows are written inside `execute`'s existing transaction, so a
    * write and its log entry commit or roll back together — never a commit followed by a publish
    * that a crash can lose.
    */
@@ -472,7 +472,7 @@ export class TypeDBLiteInterpreter {
   private tombstones: EntityIdentity[] = [];
 
   /**
-   * Diagnostics for the call in progress (ADR-021).
+   * Diagnostics for the call in progress (ADR-004).
    *
    * 🔴 Per call, not per interpreter. A report describes one statement; keeping it on the instance
    * would leak one caller's diagnostics into the next caller's report, which is the same
@@ -753,7 +753,7 @@ export class TypeDBLiteInterpreter {
       // first `define`, and a restated one over an owner holding no key value (which insert never
       // refused) would be refused as *data does not conform*. So the ownerships are derived NOW,
       // in memory, from what an older database does record — the key attribute types
-      // (`key_attribute`, kept since ADR-020 for identity) crossed with who owns them
+      // (`key_attribute`, kept since ADR-003 for identity) crossed with who owns them
       // (`schema_owns`) — and persisted by the first `define`, which creates the table. In memory
       // before that define, not after it: the first statement is the one that restates the keys,
       // and its rules run before its DDL (review, round 5 — the round-2 defect back by ordering).
@@ -940,7 +940,7 @@ export class TypeDBLiteInterpreter {
     });
     const { ddl, keys } = generateSchema(file);
     this.applySchemaDdl(ddl, file);
-    // Identity is the @key attribute's value (ADR-020 D3, canonical.ts). `loadSchema` restores only
+    // Identity is the @key attribute's value (ADR-003 D3, canonical.ts). `loadSchema` restores only
     // types and attributes, so without persisting these a reopened database could not tell which
     // attribute names an entity, and every entity would fall back to a node-local id.
     this.changeLog.ensureSchema();
@@ -1020,7 +1020,7 @@ export class TypeDBLiteInterpreter {
     );
     this.diagnostics.fact(
       DiagnosticCode.keysRegistered,
-      // Identity is the @key attribute's value (ADR-020 D3). A type that registered no key is
+      // Identity is the @key attribute's value (ADR-003 D3). A type that registered no key is
       // `local:` and is refused at the replication boundary, which is worth saying out loud.
       `Registered ${keys.length} key attribute(s).`,
       rangeOf(file),
@@ -1273,7 +1273,7 @@ export class TypeDBLiteInterpreter {
       this.diagnostics.fact(
         DiagnosticCode.wrote,
         // Counts, never lists. "What this write touched" is unbounded on a large write, and this
-        // report can travel in a replicated event payload (ADR-021 D5).
+        // report can travel in a replicated event payload (ADR-004 D5).
         `Wrote ${this.written.things} thing(s), ${this.written.attributes} attribute(s), ` +
           `${this.written.roles} role player(s).`,
         rangeOf(pipeline),
@@ -1538,13 +1538,13 @@ export class TypeDBLiteInterpreter {
     }
 
     // 🔴 The language's rules, run where the engine can act on them. An `error` here is a construct
-    // the grammar accepts and the runtime refuses — ADR-018 D7's middle layer, which had no teeth
+    // the grammar accepts and the runtime refuses — ADR-002 D7's middle layer, which had no teeth
     // for anything but an editor until this call existed.
     //
     // ⚠️ Anything BELOW error is forwarded as a fact, not dropped. Since 2026-09-11 an annotation
     // the runtime does not enforce (`@card`, `@unique`, `@independent`, …) is reported by the
     // validator at info severity and the schema is applied; dropping it here would turn the
-    // founder's "accept, and report" into "accept, silently" — the one outcome ADR-018 D7 forbids.
+    // founder's "accept, and report" into "accept, silently" — the one outcome ADR-002 D7 forbids.
     const reported = validateSync(TypeQLite, result.value);
     const problem = reported.find((diagnostic) => diagnostic.severity === 1);
     if (problem) {
@@ -1574,7 +1574,7 @@ export class TypeDBLiteInterpreter {
   // ── the schema re-check Phase 01 forced ───────────────────────────────────
 
   /**
-   * 🔴 ADR-018 Decision 7's third layer, and the backstop that must never become a no-op.
+   * 🔴 ADR-002 Decision 7's third layer, and the backstop that must never become a no-op.
    *
    * Phase 01 proved a standalone query cannot be validated against a schema that is not loaded —
    * repositories pass a query string with no schema document in scope — so this is the only place
@@ -2979,7 +2979,7 @@ export class TypeDBLiteInterpreter {
       // SQLite raises this; it has never seen the TypeQLite, and (measured 2026-08-29) names neither
       // the index nor the attribute. Pointing at a term we cannot actually locate would be worse
       // than pointing at the statement. The value being written is deliberately NOT quoted — this
-      // report can end up in a `DomainEvent` payload, which replicates (ADR-021 D4).
+      // report can end up in a `DomainEvent` payload, which replicates (ADR-004 D4).
       throw attachDiagnostic(
         translated,
         this.diagnostics.error(
@@ -3219,7 +3219,7 @@ function rolesOf(
  * 🔴 **The fallback throws; it used to return `''`.** Adding `DatetimeLiteral` and `BooleanLiteral`
  * to the grammar made the danger concrete: a literal kind the parser accepts and this function does
  * not know silently stored an **empty string**, so `has is-latest true` would have written `''` and
- * every later match on it would simply never fire. That is ADR-018 Decision 7 exactly — *a construct
+ * every later match on it would simply never fire. That is ADR-002 Decision 7 exactly — *a construct
  * that parses but is not implemented must be an error, not a silent success*.
  *
  * ⚠️ The same silent fallback existed in `sqlite-generator.ts`, returning `NULL`. That whole
@@ -3271,7 +3271,7 @@ function literalText(node: unknown): string {
   if (isBooleanLiteral(node)) return node.value;
   throw new Error(
     `TypeDBLite: unhandled literal kind '${String((node as { $type?: string })?.$type)}' — ` +
-      'the grammar accepts it and the interpreter cannot store it (ADR-018 D7)',
+      'the grammar accepts it and the interpreter cannot store it (ADR-002 D7)',
   );
 }
 

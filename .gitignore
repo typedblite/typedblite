@@ -29,3 +29,7 @@ yarn-error.log
 libs/**/src/**/*.d.ts
 apps/**/src/**/*.d.ts
 packages/**/src/**/*.d.ts
+
+.nx/polygraph
+.claude/worktrees
+.claude/settings.local.json

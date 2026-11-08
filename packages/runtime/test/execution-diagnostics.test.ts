@@ -23,9 +23,9 @@ beforeEach(() => {
 });
 
 /**
- * 🔴 ADR-021 Decision 3, and the assertion that guards it.
+ * 🔴 ADR-004 Decision 3, and the assertion that guards it.
  *
- * The guarantees ADR-014 and ADR-018 rest on are enforced by failures **propagating**. Replacing a
+ * The guarantees ADR-001 and ADR-002 rest on are enforced by failures **propagating**. Replacing a
  * throw with a diagnostic would downgrade a failure to a warning, and every one of those guarantees
  * would quietly stop holding while the suite stayed green.
  */
@@ -268,7 +268,7 @@ describe('execution facts', () => {
 });
 
 /**
- * 🔴 ADR-021 Decision 4. These reports travel into a `DomainEvent` payload, which replicates and is
+ * 🔴 ADR-004 Decision 4. These reports travel into a `DomainEvent` payload, which replicates and is
  * logged. A diagnostic that quoted the statement it came from would carry attribute VALUES with it.
  */
 describe('diagnostics do not leak written values', () => {

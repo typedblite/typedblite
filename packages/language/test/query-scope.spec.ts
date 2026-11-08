@@ -9,7 +9,7 @@ import { validate } from './parse.js';
  * would be unresolvable in the ordinary case and every real query would carry a spurious error.
  *
  * The schema check belongs to the interpreter, against the schema it has actually loaded — layer
- * three of ADR-018 Decision 7. Making it a resolution rule would be a validator that is wrong
+ * three of ADR-002 Decision 7. Making it a resolution rule would be a validator that is wrong
  * whenever it matters.
  */
 describe('a query validates standalone, without a schema in scope', () => {

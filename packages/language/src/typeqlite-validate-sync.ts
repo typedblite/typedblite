@@ -62,7 +62,7 @@ export class SyncValidationRegistry extends ValidationRegistry {
  * in `TypeQLiteValidator`, registered once, and serve the language server and the engine alike.
  *
  * ⚠️ **A check that returns a promise is refused, not awaited.** Silently ignoring one would mean a
- * rule that appears registered and never runs — the shape ADR-018 D7 exists to prevent. If a rule
+ * rule that appears registered and never runs — the shape ADR-002 D7 exists to prevent. If a rule
  * ever needs to be async, this function is what says so.
  */
 export function validateSync(

@@ -1,6 +1,6 @@
 {
   "name": "typedblite-conformance",
-  "description": "TypeDB's behaviour specification, vendored and run against TypeDBLite as a report card (ADR-055)",
+  "description": "TypeDB's behaviour specification, vendored and run against TypeDBLite as a report card (ADR-005)",
   "version": "0.0.1",
   "private": true,
   "type": "module",

@@ -3,7 +3,7 @@ import { DiagnosticSeverity, type Diagnostic, type Range } from 'vscode-language
 import { TypeQLiteValidationCode } from '@typedblite/language';
 
 /**
- * Execution diagnostics for TypeQLite — ADR-021.
+ * Execution diagnostics for TypeQLite — ADR-004.
  *
  * 🔴 **Returned, never emitted.** The engine has no dependency on `libs/core/events/domain` and
  * must not acquire one: `change-stream.ts` avoided even the *name* `EventSource` to stay clear of
@@ -17,7 +17,7 @@ import { TypeQLiteValidationCode } from '@typedblite/language';
 export const DIAGNOSTIC_SOURCE = 'typedblite';
 
 /**
- * The cap ADR-021 Decision 5 requires.
+ * The cap ADR-004 Decision 5 requires.
  *
  * Execution facts are counts rather than lists precisely so a large write cannot produce a large
  * payload — but a statement with hundreds of unknown attributes still could, so the collector stops
@@ -83,7 +83,7 @@ export const DiagnosticCode = {
   /** `person owns barcode @key;` when two products share a barcode — the data does not conform. */
   dataDoesNotConform: 'typedblite.data-does-not-conform',
   journalMode: 'typedblite.journal-mode',
-  /** A statement the grammar has and the engine does not — ADR-018 D7's third layer, named. */
+  /** A statement the grammar has and the engine does not — ADR-002 D7's third layer, named. */
   notImplemented: 'typedblite.not-implemented',
   // `undefine` and `redefine` — `schema-mutation.ts`, Phase 04 of the conformance feature.
   /** `redefine person sub x` on a parentless type; `undefine @card from …` where none is — "Try define instead" / "no defined". */
@@ -162,7 +162,7 @@ type WithDiagnostic = { diagnostic?: Diagnostic };
  * 🔴 Deliberately not a subclass. `isUniqueConstraintViolation` in
  * `@downstream/persistence-infrastructure` matches on the message text, and two production
  * repositories raise `PrincipalAlreadyExistsError` from it. A new error type here would break the
- * duplicate-registration guarantee in exactly the way ADR-021 Decision 3 exists to prevent.
+ * duplicate-registration guarantee in exactly the way ADR-004 Decision 3 exists to prevent.
  */
 export function attachDiagnostic<E>(error: E, diagnostic: Diagnostic): E {
   if (error && typeof error === 'object') {
@@ -181,7 +181,7 @@ export const diagnosticOf = (error: unknown): Diagnostic | undefined =>
  *
  * Severities follow LSP: `Error` for anything that also throws, `Information` for an execution
  * fact. There is no `Warning` tier on purpose — a thing either stopped execution or it did not, and
- * a middle category would invite exactly the "it's only a warning" reading that ADR-021 Decision 3
+ * a middle category would invite exactly the "it's only a warning" reading that ADR-004 Decision 3
  * forbids.
  */
 export class DiagnosticCollector {

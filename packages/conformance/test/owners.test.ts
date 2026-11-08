@@ -22,7 +22,7 @@ afterEach(() => {
 const repository = (withStore: boolean): string => {
   root = mkdtempSync(join(tmpdir(), 'conformance-owners-'));
   mkdirSync(join(root, 'docs', 'architecture'), { recursive: true });
-  writeFileSync(join(root, 'docs', 'architecture', 'adr-018-something.md'), '# ADR-018');
+  writeFileSync(join(root, 'docs', 'architecture', 'adr-002-something.md'), '# ADR-002');
   if (withStore) {
     mkdirSync(join(root, '.mvp', 'defects'), { recursive: true });
     const store = new TypeDBLiteInterpreter(join(root, '.mvp', 'defects', 'defects.db'));
@@ -36,7 +36,7 @@ const repository = (withStore: boolean): string => {
 describe('owner resolution', () => {
   it('resolves an ADR against the index, and refuses one that is not there', () => {
     const check = ownerCheck(repository(false));
-    assert.equal(check.resolves('adr-018'), true);
+    assert.equal(check.resolves('adr-002'), true);
     assert.equal(check.resolves('adr-999'), false);
     assert.equal(check.resolves('nonsense'), false);
   });

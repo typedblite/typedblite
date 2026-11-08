@@ -8,7 +8,7 @@
  * library — and `DocumentVersion` needs this generator. The `entityId` cases stayed behind, because
  * a `local:` id is a fact about TypeDBLite's storage rather than about content.
  *
- * ⚠️ **Semantics unchanged, deliberately.** ADR-020 D3's revision behaviour was proven against real
+ * ⚠️ **Semantics unchanged, deliberately.** ADR-003 D3's revision behaviour was proven against real
  * CouchDB 3.4.3, and `nx run typedblite-runtime:test-oracle` is what re-checks it. A move is not a
  * change, and these cases are the evidence it was not one.
  */

@@ -10,7 +10,7 @@ export interface EngineRow {
  *
  * 🔴 This deliberately does **not** import anything from `@downstream/persistence-infrastructure`,
  * and that package does not import this one. The port
- * ([ADR-018](../../../../docs/architecture/adr-018-typeql-engine-as-a-port.md) Decision 1) is
+ * ([ADR-002](../../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 1) is
  * structural: `TypeDBLiteDatabase.open({ engine })` accepts anything with these five methods. A direct
  * dependency either way would work and would quietly make SQLite *the* engine, which Decision 1
  * exists to prevent — this is the default adapter, and a TypeDB server over the network is another.
@@ -29,7 +29,7 @@ export class SqliteEngine {
    * This engine's change log.
    *
    * 🔴 **This does not widen the port.** `TypeDBLiteDatabase`'s five methods are the port
-   * ([ADR-018](../../../../docs/architecture/adr-018-typeql-engine-as-a-port.md) Decision 1) and
+   * ([ADR-002](../../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 1) and
    * they stay five — a TypeDB server over the network has no change log and must not be asked for
    * one. What this exposes is a *capability of this adapter*, reachable by whoever composed it.
    * The composition root holds the engine, so it can replicate; a consumer holding only the port
@@ -55,7 +55,7 @@ export class SqliteEngine {
   async execute(query: string): Promise<unknown> {
     // 🔴 Return the engine's report rather than swallowing it. This adapter is the only thing
     // between the interpreter and every repository in the workspace, so dropping the report here
-    // would make ADR-021 unreachable from the layer that is supposed to decide what to do with it.
+    // would make ADR-004 unreachable from the layer that is supposed to decide what to do with it.
     return this.interpreter.execute(query);
   }
 

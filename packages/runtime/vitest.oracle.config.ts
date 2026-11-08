@@ -11,7 +11,7 @@ import { swcDecoratorMetadata, testDefaults, workspaceAliases } from '../../../.
  * this repository — this config's `include` used to name it too. That suite checked a claim this
  * config's own history called load-bearing: that TypeDBLite's revision-tree conflict model
  * (multi-version winners, an edit beating a concurrent delete) agrees with real CouchDB's. **That
- * coverage is now gone, not superseded** — TypeDB conformance (ADR-055) checks TypeQL query
+ * coverage is now gone, not superseded** — TypeDB conformance (ADR-005) checks TypeQL query
  * execution, not replication/conflict semantics, so it does not stand in for what this suite
  * checked. Recorded as a real, disclosed loss in that phase's own summary.md, not silently dropped.
  */

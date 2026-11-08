@@ -37,7 +37,7 @@ Sorting is done in JavaScript. The consuming API is five methods: `define`, `exe
 
 1. **`TypeDbDatabase`'s five methods are a port, and every engine is an adapter behind it.**
 
-   > 🔴 **Amended 2026-08-29: the WASM adapter was removed, and TypeQLite is now the default.**
+   > 🔴 **Amended 2026-08-29: the WASM adapter was removed, and TypeDBLite is now the default.**
    > Founder decision, taken after Phase 03 demonstrated drop-in. That reverses the caution below
    > — *"No decision here makes SQLite the engine"* — **for the local path only**, and the caution
    > is left as written because it was right when written and is what forced the port to exist.
@@ -144,10 +144,10 @@ Sorting is done in JavaScript. The consuming API is five methods: `define`, `exe
 
 Phase 03 demonstrated drop-in for the consumer schemas. It did not, and could not, measure
 conformance to **TypeQL as TypeDB specifies it**: nothing here checked TypeQL semantics until
-[ADR-005](adr-005-typedb-s-behaviour-specification-is-typeqlite-s-conformance-oracle.md) adopted
+[ADR-005](adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md) adopted
 TypeDB's own behaviour specification as the oracle. 🔴 **Surveyed 2026-09-10, the honest score is
-0 of 791 language scenarios**, because every scenario's schema declares annotations TypeQLite
-refuses. From ADR-005's acceptance, any statement that TypeQLite is a drop-in TypeDB replacement
+0 of 791 language scenarios**, because every scenario's schema declares annotations TypeDBLite
+refuses. From ADR-005's acceptance, any statement that TypeDBLite is a drop-in TypeDB replacement
 cites a conformance run and its number. Nothing above is rewritten: it was right about the port and
 right about the repositories, and it never claimed the language.
 
@@ -164,5 +164,5 @@ and it survived one round of scrutiny only after failing it.
 ## References
 
 - [ADR-001](adr-001-typedb-for-graph-persistence.md) — amended by Decision 2
-- [ADR-005](adr-005-typedb-s-behaviour-specification-is-typeqlite-s-conformance-oracle.md) — the
+- [ADR-005](adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md) — the
   conformance oracle this amendment defers to

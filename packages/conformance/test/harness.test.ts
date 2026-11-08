@@ -426,7 +426,7 @@ describe('the four outcomes', () => {
     scenario('fails by design', [...open('schema'), step('typeql schema query; fails', { docString: SCHEMA })]);
 
   it('a declared deviation with a resolving owner is a deviation; without one it is a fail', () => {
-    const deviation = { feature: 'query/language/probe.feature', scenario: 'fails by design', reason: 'r', owner: 'adr-018' };
+    const deviation = { feature: 'query/language/probe.feature', scenario: 'fails by design', reason: 'r', owner: 'adr-002' };
     const [resolved] = runFeature(feature(failing()), { deviations: [deviation], notApplicable: [], ownerResolves: () => true });
     const [unresolved] = runFeature(feature(failing()), { deviations: [deviation], notApplicable: [], ownerResolves: () => false });
     assert.equal(resolved.outcome, 'deviation');
@@ -435,7 +435,7 @@ describe('the four outcomes', () => {
 
   it('a deviation that passes is reported as now passing', () => {
     const passing = scenario('fails by design', [...open('schema'), step('typeql schema query', { docString: SCHEMA })]);
-    const deviation = { feature: 'query/language/probe.feature', scenario: 'fails by design', reason: 'r', owner: 'adr-018' };
+    const deviation = { feature: 'query/language/probe.feature', scenario: 'fails by design', reason: 'r', owner: 'adr-002' };
     const [result] = runFeature(feature(passing), { deviations: [deviation], notApplicable: [], ownerResolves: () => true });
     assert.equal(result.outcome, 'pass');
     assert.equal(result.deviationNowPassing, true);
@@ -443,7 +443,7 @@ describe('the four outcomes', () => {
 
   it('a deviation must name a scenario that exists, unambiguously', () => {
     const twice = feature(failing(), failing());
-    const entry = { feature: 'query/language/probe.feature', scenario: 'fails by design', reason: 'r', owner: 'adr-018' };
+    const entry = { feature: 'query/language/probe.feature', scenario: 'fails by design', reason: 'r', owner: 'adr-002' };
     assert.throws(() => validateDeviations([twice], [entry]), /names 2 scenarios/);
     assert.throws(
       () => validateDeviations([twice], [{ ...entry, scenario: 'no such scenario' }]),

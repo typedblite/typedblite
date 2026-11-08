@@ -485,7 +485,7 @@ export function compare(comparator: string, left: ValueBinding, right: Value, re
   } else if (TEMPORAL_TYPES.has(left.valueType) || TEMPORAL_TYPES.has(right.valueType)) {
     // A temporal comparison is refused by NAME, equality included: `2020-01-01T00:00:00` and
     // `…:00.000` are one instant and two texts, and a text equality answering nothing is the
-    // silent shape ADR-018 D7 forbids (review, round 11). Temporal values are Phase 07's.
+    // silent shape ADR-002 D7 forbids (review, round 11). Temporal values are Phase 07's.
     return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not compare ${TEMPORAL_TYPES.has(left.valueType) ? left.valueType : right.valueType} values yet.`, at);
   } else if (left.valueType === right.valueType && left.valueType === 'string') {
     order = compareStrings(left.value, right.text);

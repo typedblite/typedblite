@@ -7,7 +7,7 @@
 /**
  * The change log's guarantees, against real repository schemas rather than a fixture shaped to
  * pass. Each case is a claim
- * [ADR-020](../../../../../docs/architecture/adr-020-typeqlite-change-log-and-sync-as-a-port.md)
+ * [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
  * makes, or an edge Phase 00 found by reading `execute()`.
  *
  * 🔴 `tsx` with `node:test`, not Jest — `node:sqlite` is a builtin only under its prefixed name and

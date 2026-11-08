@@ -9,7 +9,7 @@ import { DiagnosticCode, diagnosticOf } from '../src/diagnostics.js';
  * acceptance suite, this is the unit suite that says which rule fired, by code.
  *
  * 🔴 Data is never cascaded (founder, 2026-09-11): a schema statement that removed rows would be
- * the silent success ADR-018 D7 forbids. Deleting data is a write's job.
+ * the silent success ADR-002 D7 forbids. Deleting data is a write's job.
  */
 const BACKGROUND = [
   'define',

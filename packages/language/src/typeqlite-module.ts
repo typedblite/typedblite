@@ -20,7 +20,7 @@ import { TypeQLiteScopeProvider } from './typeqlite-scope.js';
 import { TypeQLiteFormatter } from './typeqlite-formatter.js';
 import { TypeQLiteSemanticTokenProvider } from './typeqlite-semantic-tokens.js';
 
-/** Language-specific services — the seam ADR-018 Decision 7's middle layer lives in. */
+/** Language-specific services — the seam ADR-002 Decision 7's middle layer lives in. */
 export interface TypeQLiteAddedServices {
   validation: {
     TypeQLiteValidator: TypeQLiteValidator;

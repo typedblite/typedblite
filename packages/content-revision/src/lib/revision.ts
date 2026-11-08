@@ -1,12 +1,12 @@
 // 🔴 **If you change the semantics in this file, re-run the parity oracle.**
-// CouchDB's revision-tree behaviour is kept here on purpose (ADR-020), and it was proven against
+// CouchDB's revision-tree behaviour is kept here on purpose (ADR-003), and it was proven against
 // real CouchDB 3.4.3 in TypeDBLite Sync Phase 03. That check is **no longer part of the routine
 // suite** — it skipped on every CI run for want of the stack, reporting nothing. Bring the stack up
 // and run `nx run typedblite-runtime:test-oracle`. Nothing else will tell you the semantics drifted.
 /**
  * Revision identifiers for the change log.
  *
- * Implements [ADR-020](../../../../../docs/architecture/adr-020-typeqlite-change-log-and-sync-as-a-port.md)
+ * Implements [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
  * Decision 3: `rev` is `generation-digest`, and the digest is **derived** from the state rather than
  * randomised. That is what makes the same edit, applied to the same parent on two nodes, produce
  * the same revision — so independent identical edits converge instead of manufacturing a conflict
@@ -61,7 +61,7 @@ export function computeRevision(input: RevisionInput): Revision {
 }
 
 /**
- * The winner among an entity's leaves, per ADR-020 Decision 3. Total: live beats tombstone, then
+ * The winner among an entity's leaves, per ADR-003 Decision 3. Total: live beats tombstone, then
  * highest generation, then greatest digest. A tie at the last step would require equal digests,
  * which by derivation means the same revision rather than two distinct ones.
  *

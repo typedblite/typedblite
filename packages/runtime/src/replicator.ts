@@ -1,7 +1,7 @@
 /**
  * One-shot replication between two change logs.
  *
- * Implements [ADR-020](../../../../../docs/architecture/adr-020-typeqlite-change-log-and-sync-as-a-port.md)
+ * Implements [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
  * Decisions 5 and 6. Continuous replication is deliberately **not** here — it is a subscription
  * lifecycle with its own failure modes, and folding it in behind a `live` flag would let it be
  * called done when the happy path emits one event.

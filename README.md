@@ -157,10 +157,10 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 |---|---|
 | [ADR-001](docs/architecture/adr-001-typedb-for-graph-persistence.md) | TypeDB for Graph Persistence |
 | [ADR-002](docs/architecture/adr-002-typeql-engine-as-a-port.md) | TypeQL Engine as a Port |
-| [ADR-003](docs/architecture/adr-003-typeqlite-change-log-and-sync-as-a-port.md) | TypeQLite Change Log and Sync as a Port |
-| [ADR-004](docs/architecture/adr-004-typeqlite-execution-diagnostics-as-a-returned-report.md) | TypeQLite Execution Diagnostics as a Returned Report |
-| [ADR-005](docs/architecture/adr-005-typedb-s-behaviour-specification-is-typeqlite-s-conformance-oracle.md) | TypeDB's Behaviour Specification is TypeQLite's Conformance Oracle |
+| [ADR-003](docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md) | TypeDBLite Change Log and Sync as a Port |
+| [ADR-004](docs/architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md) | TypeDBLite Execution Diagnostics as a Returned Report |
+| [ADR-005](docs/architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md) | TypeDB's Behaviour Specification is TypeDBLite's Conformance Oracle |
 
-**Standard:** [TypeQLite Conformance Standard](docs/standards/governance/typeqlite-conformance-standard.md)
+**Standard:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md)
 
 References in source code link to `docs/architecture/adr-NNN-*.md` using relative paths — they resolve to this repo's `docs/` tree. The ADRs contain cross-references to general platform decisions in the parent monorepo that are not mirrored here.

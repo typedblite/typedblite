@@ -10,7 +10,7 @@ operationalises: [adr-005]
 > **Status:** Active · **Created:** 2026-09-11 · **Accepted:** 2026-09-11, with ADR-005 · **Applies to:** the TypeDBLite conformance
 > project (`libs/core/typedblite/conformance`) and every document that claims TypeQLite compatibility.
 >
-> Operationalises [ADR-005](../../architecture/adr-005-typedb-s-behaviour-specification-is-typeqlite-s-conformance-oracle.md).
+> Operationalises [ADR-005](../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md).
 > 🔴 **The ADR decides; this standard is how the decision is met.** Where the two disagree, the ADR
 > wins and this standard has the bug.
 >

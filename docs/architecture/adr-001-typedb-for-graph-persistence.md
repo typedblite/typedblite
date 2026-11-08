@@ -4,7 +4,7 @@
 - **Date:** 2026-08-28
 - **Decision owners:** TypeDBLite maintainers
 - **Amended by:** [ADR-002](adr-002-typeql-engine-as-a-port.md) — what this ADR depends on is TypeQL and its guarantees, not the TypeDB product; the engine becomes a port
-- **Engine replaced 2026-08-29** — `@downstream/typedb-wasm` removed; TypeQLite is the engine. Decisions 1 and 2 below are left as written and annotated
+- **Engine replaced 2026-08-29** — `@downstream/typedb-wasm` removed; TypeDBLite is the engine. Decisions 1 and 2 below are left as written and annotated
 
 ## Context
 
@@ -29,7 +29,7 @@ in-process, in ordinary `nx test`, with no container and no port.
 ## Decision
 
 > 🔴 **Decisions 1 and 2 were overtaken on 2026-08-29.** `@downstream/typedb-wasm` was removed and
-> **TypeQLite** — a TypeQL engine on SQLite — is now what `TypeDbDatabase.open` loads. The reasoning
+> **TypeDBLite** — a TypeQL engine on SQLite — is now what `TypeDbDatabase.open` loads. The reasoning
 > below is untouched and still holds: it argues for **embedded, in-process, no daemon, TypeQL with
 > store-level `@key` and relation guarantees**, and every word of that describes the replacement.
 > What changed is which embedded engine provides it, after the dependency turned out to be an
@@ -37,7 +37,7 @@ in-process, in ordinary `nx test`, with no container and no port.
 >
 > Two specifics below are now false, and are called out rather than edited away:
 >
-> - **Decision 2's `StorageAdapter` over snapshots is gone.** TypeQLite writes through to a SQLite
+> - **Decision 2's `StorageAdapter` over snapshots is gone.** TypeDBLite writes through to a SQLite
 >   file as it goes, so `storagePath` replaces it and the *"snapshot durability, not write-ahead
 >   durability"* caveat — which this ADR named as the thing to revisit before anything user-facing
 >   depended on it — no longer applies.
@@ -86,7 +86,7 @@ in-process, in ordinary `nx test`, with no container and no port.
 
 ## Deferred
 
-- **Write-ahead durability** (Decision 2) — superseded by TypeQLite's SQLite backing.
+- **Write-ahead durability** (Decision 2) — superseded by TypeDBLite's SQLite backing.
 - **A general graph repository adapter** — the TypeDB substrate is generic; application-specific
   schemas and repositories are out of scope for the engine itself.
 
@@ -96,7 +96,7 @@ The graph store gains database-enforced invariants. The constraint violation tha
 cannot reliably prevent under concurrency becomes impossible.
 
 The cost is a WASM binary loaded at boot and a fetch shim to load it, because the module resolves
-its `.wasm` through `fetch` even in Node. Both are gone in the TypeQLite replacement.
+its `.wasm` through `fetch` even in Node. Both are gone in the TypeDBLite replacement.
 
 ## Rejected alternatives
 

@@ -8,7 +8,7 @@ import { parse } from './parse.js';
  * for TypeDBLite Conformance Phase 01.
  *
  * 🔴 The grammar's own rule is that a construct is added when a caller needs it. The caller is
- * `typedb/typedb-behaviour` at the pin (ADR-055): 1,632 of 1,756 scenarios stopped in their
+ * `typedb/typedb-behaviour` at the pin (ADR-005): 1,632 of 1,756 scenarios stopped in their
  * Background on 2026-09-11, every one at a construct this grammar lacked — an annotation on an
  * `attribute` definition, `@independent`, a trait list with no comma after the label, a double or
  * a date literal in an insert. Parsing is the whole claim here; what the annotations *mean* is

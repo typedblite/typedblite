@@ -168,7 +168,7 @@ describe('Skills projection flows', () => {
 });
 
 describe('unsupported TypeQLite throws rather than silently succeeding', () => {
-  // 🔴 ADR-018 Decision 7's third layer. The Langium validator runs from the interpreter, because
+  // 🔴 ADR-002 Decision 7's third layer. The Langium validator runs from the interpreter, because
   // nothing forces a caller to run it — a repository hands the interpreter a string. A validator
   // ERROR throws here. ⚠️ `@card` and `@unique` were this block's first two cases, as refusals;
   // since 2026-09-11 an unenforced annotation is applied and REPORTED instead —
@@ -194,7 +194,7 @@ describe('correctness details the flows above do not reach', () => {
     db.define(
       'define attribute doc-id, value string; entity doc, owns doc-id @key; entity adr sub doc;',
     );
-    db.execute('insert $a isa adr, has doc-id "adr-018";');
+    db.execute('insert $a isa adr, has doc-id "adr-002";');
     const asAdr = db.query('match $a isa adr, has doc-id $id;\nselect $id;');
     const asDoc = db.query('match $d isa doc, has doc-id $id;\nselect $id;');
     assert.equal(asAdr.rows.length, 1);

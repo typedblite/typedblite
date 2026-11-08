@@ -60,7 +60,7 @@ describe('production TypeQLite parses', () => {
   });
 
   // Stronger than parsing: the schemas this repository owns must also validate cleanly, or the
-  // not-implemented checks (ADR-018 D7) have been written too aggressively.
+  // not-implemented checks (ADR-002 D7) have been written too aggressively.
   it.each([
     ['iam.schema.typeqlite', join(SCHEMAS, 'iam.schema.typeqlite')],
     ['skills.schema.typeqlite', join(SCHEMAS, 'skills.schema.typeqlite')],

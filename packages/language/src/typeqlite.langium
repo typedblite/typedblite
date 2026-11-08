@@ -12,7 +12,7 @@ import './terminals';
 // structs — is absent because no caller writes it, not because it was too hard. Adding a
 // construct starts by finding a caller that needs it.
 //
-// 🔴 The caller is now also `typedb/typedb-behaviour` (ADR-055), vendored under
+// 🔴 The caller is now also `typedb/typedb-behaviour` (ADR-005), vendored under
 // `libs/core/typedblite/conformance/spec/`. Its `query/language/` Backgrounds are the acceptance
 // test for this file — `test/spec-backgrounds.spec.ts` — and what they use decides what is here.
 // Parsing a construct is one claim; enforcing what it means is the interpreter's, and the
@@ -89,7 +89,7 @@ TypeExtensionDef:
 
 // ── undefine ────────────────────────────────────────────────────────────────
 //
-// Phase 04 of the conformance feature (ADR-055). 🔴 `undefine` is NOT `define` with a different
+// Phase 04 of the conformance feature (ADR-005). 🔴 `undefine` is NOT `define` with a different
 // keyword: TypeDB's grammar admits only the targeted forms — a bare type name, and `<what> from
 // <type> [<capability>]` — and the behaviour spec calls every define-like form a PARSING failure
 // (`undefine entity person;`, `undefine person owns name;`, `undefine name value string;` —

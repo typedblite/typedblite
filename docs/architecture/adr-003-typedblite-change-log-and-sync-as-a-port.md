@@ -5,7 +5,7 @@
 - **Decision owners:** TypeDBLite maintainers
 - **Extends:** [ADR-002](adr-002-typeql-engine-as-a-port.md) — the engine gains a change log; the
   port boundary it established is unchanged
-- **Feature:** [TypeQLite Sync](../planning/typeqlite-sync/typeqlite-sync.feature.md)
+- **Feature:** [TypeDBLite Sync](../planning/typeqlite-sync/typeqlite-sync.feature.md)
 - **Amended by:** **Amendment from Phase 07 below**, 2026-09-04. Decision 3's
   revision generator has a **second consumer outside this engine**, and therefore no longer lives in
   it: `computeRevision` and the canonical encoding moved to `@typedblite/content-revision`. The
@@ -151,7 +151,7 @@ message, because each changes what the decisions above mean.
 
 ## Amendment — Decision 5's premise no longer holds; the wire protocol is back in scope (2026-09-09)
 
-**Founder direction, 2026-09-09:** make TypeQLite a drop-in replacement not only for
+**Founder direction, 2026-09-09:** make TypeDBLite a drop-in replacement not only for
 TypeDB/TypeQL but also for **CouchDB/PouchDB** — replicating the `_changes` feed and, where it
 earns its place, the HTTP API.
 
@@ -208,9 +208,9 @@ must cite a run in which the oracle was up.**
   feed already exists behind it; `_revs_diff` and `_bulk_get` are replication-protocol surface and
   only pay off if a real PouchDB is to replicate against us. That scoping is a feature's, not this
   ADR's.
-- ⛔ **Whether TypeQLite serves HTTP itself**, or a separate app puts a facade in front of the
+- ⛔ **Whether TypeDBLite serves HTTP itself**, or a separate app puts a facade in front of the
   runtime.
-- ⛔ **Attachments.** TypeQLite has no attachment support at all. It is new work.
+- ⛔ **Attachments.** TypeDBLite has no attachment support at all. It is new work.
 
 ## Alternatives considered
 

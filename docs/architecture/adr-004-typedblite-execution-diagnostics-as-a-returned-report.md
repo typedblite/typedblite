@@ -1,4 +1,4 @@
-# ADR-004: TypeQLite Execution Diagnostics Are a Returned Report, Not an Emitted Event
+# ADR-004: TypeDBLite Execution Diagnostics Are a Returned Report, Not an Emitted Event
 
 - **Status:** Accepted
 - **Date:** 2026-08-31
@@ -20,14 +20,14 @@
 
 ## Context
 
-TypeQLite execution has no observability. `interpreter.ts` (now in typedblite sibling repo: `packages/runtime/src/`)
+TypeDBLite execution has no observability. `interpreter.ts` (now in typedblite sibling repo: `packages/runtime/src/`)
 exposes `define()` for DDL, `execute()` for writes and `query()` for reads, and every failure leaves
 through one of six `throw new Error` sites carrying **a string and no source position**. A statement
 that succeeds but does the wrong thing — a `define` that re-applied as a no-op, a `match` whose
 candidate set was empty — says nothing at all.
 
-This mattered less when TypeQLite was a parser. It matters now: since
-[ADR-003](adr-003-typeqlite-change-log-and-sync-as-a-port.md) the engine holds real data,
+This mattered less when TypeDBLite was a parser. It matters now: since
+[ADR-003](adr-003-typedblite-change-log-and-sync-as-a-port.md) the engine holds real data,
 replicates it, and searches it.
 
 **A source-mapped debugger was the first answer, and was cut.** It was scoped as three phases —
@@ -109,8 +109,8 @@ reference-implementation rule, upstream's shape is the specification.
 
 ## References
 
-- [ADR-002 — The TypeQLite engine as a port](adr-002-typeql-engine-as-a-port.md)
-- [ADR-003 — A change log belongs to the engine, and sync is a port](adr-003-typeqlite-change-log-and-sync-as-a-port.md)
+- [ADR-002 — The TypeDBLite engine as a port](adr-002-typeql-engine-as-a-port.md)
+- [ADR-003 — A change log belongs to the engine, and sync is a port](adr-003-typedblite-change-log-and-sync-as-a-port.md)
 - [TypeQLite Language Tooling feature doc](../planning/typeqlite-language-tooling/typeqlite-language-tooling.feature.md)
 - [Multi-Phase Lifecycle Standard](../standards/governance/multi-phase-lifecycle-standard.md)
 - [Langium](https://github.com/eclipse-langium/langium) at `v4.3.0` — the reference implementation

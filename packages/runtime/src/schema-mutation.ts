@@ -448,7 +448,7 @@ function renameType(name: string, kind: Kind, newLabel: string, node: RedefineTy
     );
   }
   // 🔴 A TypeDBLite limit, and a declared one. TypeDB renames a type with instances because its
-  // identities are iids; here an entity's replicated identity is `<type>/<key>` (ADR-020 D3),
+  // identities are iids; here an entity's replicated identity is `<type>/<key>` (ADR-003 D3),
   // hash-chained in `change_log` and already held by every follower. Rewriting it would make the
   // old id a phantom and the next write a duplicate (review, round 1); leaving it would split one
   // entity across two names. So a type with instances — or with any history in the log — keeps
@@ -458,7 +458,7 @@ function renameType(name: string, kind: Kind, newLabel: string, node: RedefineTy
     refuse(
       DiagnosticCode.hasInstances,
       `'${name}' cannot be renamed: it has instances or replicated history, and an entity's identity ` +
-        `is '${name}/<key>' (ADR-020). Delete them first, or keep the label.`,
+        `is '${name}/<key>' (ADR-003). Delete them first, or keep the label.`,
       rangeOf(node),
     );
   }

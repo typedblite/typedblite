@@ -4,7 +4,7 @@ import { runConformance } from '../src/conformance.js';
 import { renderCard, renderFailureDigest } from '../src/report.js';
 
 /**
- * The report card, as a test. It asserts two things of the score — ADR-055 D4: no feature's pass
+ * The report card, as a test. It asserts two things of the score — ADR-005 D4: no feature's pass
  * count is below its baseline, and none is above it unraised — plus the two things that keep the
  * score honest: every
  * scenario is accounted for (the sum rule, thrown by `reportCard` itself), and every declared

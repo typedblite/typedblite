@@ -1,7 +1,7 @@
 /**
  * 🔴 **Moved to [`@typedblite/content-revision`](../../content-revision/src/lib/revision.ts).**
  *
- * ADR-020 D3's `generation-digest` is content addressing, and a downstream feature's `DocumentVersion`
+ * ADR-003 D3's `generation-digest` is content addressing, and a downstream feature's `DocumentVersion`
  * needs it from a `type:domain` library — which the boundary rules forbid depending on this
  * `type:infrastructure` one. Re-exported here so every existing consumer of this engine's barrel is
  * unaffected, and so nobody writes a second implementation.

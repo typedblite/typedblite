@@ -4,20 +4,20 @@ status: accepted
 date: 2026-09-11
 decision-owners: [TypeDBLite maintainers]
 extends: [adr-002, adr-003]
-operationalised-by: [typeqlite-conformance-standard]
+operationalised-by: [typedblite-conformance-standard]
 ---
 
-# ADR-005: TypeDB's behaviour specification is TypeQLite's conformance oracle
+# ADR-005: TypeDB's behaviour specification is TypeDBLite's conformance oracle
 
 - **Status:** Accepted — by the founder (Dave Jackson), 2026-09-11, with Phases 00–03 of the conformance
   feature closed and the card at 416 of 1,756
 - **Date:** 2026-09-11
 - **Decision owners:** Founder; TypeDBLite maintainers
 - **Extends:** [ADR-002](adr-002-typeql-engine-as-a-port.md), whose "drop-in TypeDB replacement"
-  this makes a measured claim; [ADR-003](adr-003-typeqlite-change-log-and-sync-as-a-port.md), whose
+  this makes a measured claim; [ADR-003](adr-003-typedblite-change-log-and-sync-as-a-port.md), whose
   CouchDB differential oracle is the same technique aimed at a different question
 - **Operationalised by:** the
-  [TypeQLite Conformance Standard](../standards/governance/typeqlite-conformance-standard.md) —
+  [TypeDBLite Conformance Standard](../standards/governance/typedblite-conformance-standard.md) —
   the baseline and deviation rules below are recurring obligations, and the procedure lives there
 
 > ✅ **Accepted 2026-09-11 by the founder**, four phases in — after the oracle had printed 0, 140,
@@ -31,7 +31,7 @@ operationalised-by: [typeqlite-conformance-standard]
 ## Context
 
 Nothing in this repository checks TypeQL semantics. Both existing oracle suites —
-`oracle-parity.test.ts` and `couchdb-oracle.test.ts`, established by ADR-003 — compare TypeQLite
+`oracle-parity.test.ts` and `couchdb-oracle.test.ts`, established by ADR-003 — compare TypeDBLite
 against CouchDB's replication conflict model; neither asks what a TypeQL query *answers*. Every
 evaluation semantic in the interpreter has therefore been a guess, and on 2026-09-10 a code review
 caught those guesses one at a time: sixteen rounds on `defect/typeqlite-select-entity-variable`,
@@ -39,7 +39,7 @@ against a gate whose own `MAX_REVIEW_ROUNDS` is 3, before four semantics were se
 running the same queries against a live TypeDB 3. The relation-matching rewrite is parked on that
 finding, and the gap now blocks the repository's top-priority work.
 
-ADR-002 commits TypeQLite to being a drop-in TypeDB replacement, and ADR-003's amendment extends
+ADR-002 commits TypeDBLite to being a drop-in TypeDB replacement, and ADR-003's amendment extends
 that to CouchDB/PouchDB. **The TypeDB half of that claim has never been measured.** TypeDB publishes
 the measurement: [`typedb/typedb-behaviour`](https://github.com/typedb/typedb-behaviour) (MPL-2.0)
 is the Cucumber specification that every official driver and the server itself run —
@@ -48,9 +48,9 @@ fifteen step patterns. Surveyed 2026-09-10 at `master` (`7d35851`) against the l
 `typedb/typedb:3.10.4`:
 
 - **Every scenario's Background declares `@card(0..)`, `@independent` and `@unique`**, which
-  TypeQLite refuses at `define` — so the honest starting score is **0 of 791**.
+  TypeDBLite refuses at `define` — so the honest starting score is **0 of 791**.
 - `match $x isa writer;` answers *things*, identified in the answer tables by their `@key` — the
-  projection TypeQLite deliberately refuses (`defect/typeqlite-select-refusal`, merged 2026-09-11).
+  projection TypeDBLite deliberately refuses (`defect/typeqlite-select-refusal`, merged 2026-09-11).
 
 A suite that starts almost entirely red cannot be a gate — it would be waived on day one. A suite
 whose score is never read is not an oracle either. The decision is how to bring the specification
@@ -60,17 +60,17 @@ in, and what rule makes its number binding.
 
 ### 1. `typedb-behaviour` is the oracle for TypeQL semantics, and it is vendored at a pinned commit
 
-The feature files are copied into this repository under the TypeQLite conformance project, **with
+The feature files are copied into this repository under the TypeDBLite conformance project, **with
 their MPL-2.0 headers intact and the licence file alongside**, from one recorded commit of
 `typedb/typedb-behaviour`. A `PIN` file records the commit, the date, and the TypeDB server version
 the survey was made against. The pin moves only by a deliberate commit that re-baselines
 (Decision 4).
 
 **Scope at adoption is `query/language/`.** `concept/`, `connection/` and `driver/` specify a
-driver API surface TypeQLite has no equivalent of; they may be added later by the same mechanism,
+driver API surface TypeDBLite has no equivalent of; they may be added later by the same mechanism,
 and are not pretended to apply now.
 
-### 2. TypeQLite runs the specification as one more driver would
+### 2. TypeDBLite runs the specification as one more driver would
 
 Step definitions bind the specification's own vocabulary — `typeql schema query`, `get answers of
 typeql read query`, `uniquely identify answer concepts`, `… fails with a message containing` — to
@@ -79,7 +79,7 @@ deterministic, it needs nothing running, and a scenario is exactly as expensive 
 
 ⚠️ **The step semantics are TypeDB's, not ours.** Where a step's meaning is unclear the reference is
 the server's own implementation (`typedb/typedb` `tests/behaviour/`), not a reading that happens to
-make TypeQLite pass.
+make TypeDBLite pass.
 
 ### 3. 🔴 The suite is a report card, not a gate — and every scenario has one of four outcomes
 
@@ -87,7 +87,7 @@ Every scenario runs, every time. Each ends as exactly one of:
 
 | Outcome | Meaning |
 | ------- | ------- |
-| **pass** | TypeQLite answered what TypeDB specifies |
+| **pass** | TypeDBLite answered what TypeDB specifies |
 | **fail** | It did not, and nothing claims otherwise |
 | **deviation** | It did not, **on purpose**, and a record says why (Decision 5) |
 | **not-applicable** | A step names capability outside the engine's contract (a user, a cluster, a driver object) |
@@ -107,7 +107,7 @@ progress in `match`.
 
 ### 5. A known deviation is declared, not silently failed
 
-A scenario TypeQLite fails *by design* is listed in a deviations file with the scenario, the reason,
+A scenario TypeDBLite fails *by design* is listed in a deviations file with the scenario, the reason,
 and **the record that owns it** — an ADR decision, or an open defect record. A deviation with no
 owner is a **fail**. The select-refusal is the first entry: a knowing departure from TypeDB, decided
 on `defect/typeqlite-select-refusal` and recorded on the parking lot as a conformance gap.
@@ -140,7 +140,7 @@ requires of CouchDB compatibility. A claim without a cited run is prose.
 
 ### Negative / Constraints
 
-- **The corpus is TypeDB 3.x's.** TypeQLite implements the 3.x language (ADR-002), so that is the
+- **The corpus is TypeDB 3.x's.** TypeDBLite implements the 3.x language (ADR-002), so that is the
   right target, but every pin move may change scenarios under us; re-baselining is real work.
 - **Licence obligation.** MPL-2.0 files are file-scoped copyleft: they stay under MPL with headers
   intact, and modifications to *those files* are MPL. Our step definitions are ours. The vendored
@@ -175,5 +175,5 @@ requires of CouchDB compatibility. A claim without a cited run is prose.
 - [`typedb/typedb` `tests/behaviour/`](https://github.com/typedb/typedb/tree/master/tests/behaviour)
   — the server's own step implementations, the reference for step meaning
 - [ADR-002](adr-002-typeql-engine-as-a-port.md) — the drop-in claim this measures
-- [ADR-003](adr-003-typeqlite-change-log-and-sync-as-a-port.md) — the CouchDB oracle, and the rule
+- [ADR-003](adr-003-typedblite-change-log-and-sync-as-a-port.md) — the CouchDB oracle, and the rule
   that a compatibility claim cites a run

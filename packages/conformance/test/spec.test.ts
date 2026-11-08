@@ -33,7 +33,7 @@ describe('outline pickles', () => {
       assert.equal(feature.scenarios.length, 2);
       const lines = feature.scenarios.map((s) => s.line);
       assert.notEqual(lines[0], lines[1], `both pickles carry line ${lines[0]}`);
-      const entry = { feature: 'query/language/outline.feature', scenario: 'the same name for every row', reason: 'r', owner: 'adr-018' };
+      const entry = { feature: 'query/language/outline.feature', scenario: 'the same name for every row', reason: 'r', owner: 'adr-002' };
       assert.throws(() => validateDeviations([feature], [entry]), /names 2 scenarios/);
       assert.doesNotThrow(() => validateDeviations([feature], [{ ...entry, line: lines[0] }]));
     } finally {

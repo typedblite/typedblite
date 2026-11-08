@@ -1,5 +1,5 @@
 /**
- * Change-log compaction — ADR-020 Decision 4 is the constraint, not an afterthought.
+ * Change-log compaction — ADR-003 Decision 4 is the constraint, not an afterthought.
  *
  * The log retains every revision for replication. This repository has one node, and its store had
  * grown to eighteen times the corpus it mirrors: 60 MB of database for 3.3 MB of documents, because
@@ -7,7 +7,7 @@
  *
  * 🔴 The assertions that matter are the ones about what compaction **refuses** to remove. Dropping
  * a conflicting leaf would satisfy every size expectation here and quietly break the guarantee
- * ADR-020 D4 calls part of the deliverable.
+ * ADR-003 D4 calls part of the deliverable.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
@@ -89,7 +89,7 @@ describe('ChangeLog.compact', () => {
   });
 
   /**
-   * 🔴 ADR-020 Decision 4. A conflicting loser is a leaf, and losing it would take `conflictsOf`
+   * 🔴 ADR-003 Decision 4. A conflicting loser is a leaf, and losing it would take `conflictsOf`
    * with it — the guarantee the ADR calls part of the deliverable rather than a convenience.
    */
   it('keeps every conflicting leaf, not only the winner', () => {

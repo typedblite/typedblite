@@ -5,7 +5,7 @@ import { TypeQLiteValidationCode } from '../src/typeqlite-validation-codes.js';
 /**
  * An annotation the grammar parses and the runtime does not enforce is REPORTED, not refused.
  *
- * 🔴 This file used to assert the opposite — `@card` and `@unique` were errors, on ADR-018 D7's
+ * 🔴 This file used to assert the opposite — `@card` and `@unique` were errors, on ADR-002 D7's
  * rule that unsupported TypeQLite never silently succeeds. That rule stands; what changed is the
  * shape of "not silently" (founder decision 2026-09-11, TypeDBLite Conformance Phase 01). Refusing
  * a valid TypeDB schema was the wrong side of it: `downstream-store`'s schema could not be applied at

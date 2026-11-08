@@ -5,7 +5,7 @@ import { findStep, UndefinedStep } from './steps.js';
 import { World } from './world.js';
 
 /**
- * ADR-055 D3: every scenario ends as exactly one of four outcomes, and they sum to the total.
+ * ADR-005 D3: every scenario ends as exactly one of four outcomes, and they sum to the total.
  *
  * - `pass` — every step ran and none threw.
  * - `fail` — a step threw, or had no definition, and nothing claims otherwise.
