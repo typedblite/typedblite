@@ -22,3 +22,7 @@
 
 
 <!-- nx configuration end-->
+
+---
+
+> **Project guidance lives in [AGENTS.md](AGENTS.md).** That file is the canonical reference for repository layout, invariants, build commands, testing conventions, and everything else an agent needs to work here. This file exists only to carry the Nx auto-update block above.
