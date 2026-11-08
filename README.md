@@ -162,7 +162,7 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 | [ADR-001](docs/architecture/adr-001-typedb-for-iam-persistence.md) | TypeDB for IAM Persistence |
 | [ADR-002](docs/architecture/adr-002-typeql-engine-as-a-port.md) | TypeQL Engine as a Port |
 | [ADR-003](docs/architecture/adr-003-typeqlite-change-log-and-sync-as-a-port.md) | TypeQLite Change Log and Sync as a Port |
-| [ADR-004](docs/architecture/adr-004-typeql-execution-diagnostics-as-a-returned-report.md) | TypeQL Execution Diagnostics as a Returned Report |
+| [ADR-004](docs/architecture/adr-004-typeqlite-execution-diagnostics-as-a-returned-report.md) | TypeQLite Execution Diagnostics as a Returned Report |
 | [ADR-005](docs/architecture/adr-005-typedb-s-behaviour-specification-is-typeqlite-s-conformance-oracle.md) | TypeDB's Behaviour Specification is TypeQLite's Conformance Oracle |
 
 **Standard:** [TypeQLite Conformance Standard](docs/standards/governance/typeqlite-conformance-standard.md)
