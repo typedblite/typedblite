@@ -8,7 +8,7 @@ operationalises: [adr-005]
 # TypeDBLite Conformance Standard
 
 > **Status:** Active · **Created:** 2026-09-11 · **Accepted:** 2026-09-11, with ADR-005 · **Applies to:** the TypeDBLite conformance
-> project (`packages/conformance`) and every document that claims TypeQLite compatibility.
+> project (`libs/conformance`) and every document that claims TypeQLite compatibility.
 >
 > Operationalises [ADR-005](../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md).
 > 🔴 **The ADR decides; this standard is how the decision is met.** Where the two disagree, the ADR
@@ -27,7 +27,7 @@ baseline.** Nothing else about the score is asserted, and nothing about it is wa
 ## The layout
 
 ```
-packages/conformance/
+libs/conformance/
   spec/                      # vendored from typedb/typedb-behaviour — MPL-2.0, headers intact
     LICENSE                  # the MPL-2.0 text, verbatim
     PIN                      # commit, date, and the TypeDB server version surveyed against

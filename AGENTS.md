@@ -8,7 +8,7 @@ This file is for AI agents and automated tools working in this repository. It de
 
 ```
 typedblite/
-├── packages/
+├── libs/
 │   ├── language/          @typedblite/language   — grammar, AST, language services
 │   ├── runtime/           @typedblite/runtime     — interpreter, SQLite generator, change log
 │   ├── content-revision/  @typedblite/content-revision — revision identifiers
@@ -67,18 +67,18 @@ Coverage is enabled only on CI (`CI=true`). Test suites time out at 30 seconds p
 
 ## Language and grammar
 
-The TypeQLite grammar is in [packages/language/src/typeqlite.langium](packages/language/src/typeqlite.langium). It is a [Langium](https://langium.org) grammar.
+The TypeQLite grammar is in [libs/language/src/typeqlite.langium](libs/language/src/typeqlite.langium). It is a [Langium](https://langium.org) grammar.
 
 **To regenerate the AST after a grammar change:**
 
 ```bash
-cd packages/language
+cd libs/language
 npm run langium:generate
 ```
 
 This regenerates `src/generated/ast.ts`, `src/generated/grammar.ts`, and `src/generated/module.ts`. Commit the regenerated files alongside the grammar change.
 
-**Grammar scope discipline.** A construct is added to the grammar only when a real caller needs it. The rule is "find the caller first". The TypeDB behaviour spec (`packages/conformance/spec/`) is a first-class caller — if the spec's Background steps require a construct, add it.
+**Grammar scope discipline.** A construct is added to the grammar only when a real caller needs it. The rule is "find the caller first". The TypeDB behaviour spec (`libs/conformance/spec/`) is a first-class caller — if the spec's Background steps require a construct, add it.
 
 **Annotation admissibility.** Which annotations are valid on which positions is tracked in the validator's admissibility table (`typeqlite-annotations.ts`). `@key` is enforced at write time by the runtime. All other annotations parse successfully, but their runtime semantics are tracked scenario-by-scenario on the conformance report card.
 
@@ -88,7 +88,7 @@ This regenerates `src/generated/ast.ts`, `src/generated/grammar.ts`, and `src/ge
 
 ### SQLite binding contract
 
-The interpreter works through a `SqliteDatabase` interface (`packages/runtime/src/sqlite-database.ts`), not against `node:sqlite` directly. Only `node-sqlite.ts` imports `node:sqlite`. When adding a new SQLite operation, add it to the interface and implement it in `node-sqlite.ts`.
+The interpreter works through a `SqliteDatabase` interface (`libs/runtime/src/sqlite-database.ts`), not against `node:sqlite` directly. Only `node-sqlite.ts` imports `node:sqlite`. When adding a new SQLite operation, add it to the interface and implement it in `node-sqlite.ts`.
 
 Key constraints:
 - **Synchronous**. The interpreter runs ~250 SQLite calls inside transactions. No async binding satisfies the interface.
@@ -114,7 +114,7 @@ The hub exposes Server-Sent Events for spokes to subscribe to. The `ChangeStream
 
 ## Conformance
 
-`packages/conformance/` vendors the TypeDB behaviour specification as Cucumber `.feature` files under `spec/`. The test suite (`test/conformance.test.ts`) runs every scenario and compares against `baseline.json`.
+`libs/conformance/` vendors the TypeDB behaviour specification as Cucumber `.feature` files under `spec/`. The test suite (`test/conformance.test.ts`) runs every scenario and compares against `baseline.json`.
 
 ### Deviations
 
@@ -137,8 +137,8 @@ nx run typedblite-conformance:cli -- --update-baseline
 
 ## Testing conventions
 
-- Test files for `packages/language` live in `packages/language/test/` with `.spec.ts` extension.
-- Test files for `packages/runtime` live in `packages/runtime/test/` with `.test.ts` extension.
+- Test files for `libs/language` live in `libs/language/test/` with `.spec.ts` extension.
+- Test files for `libs/runtime` live in `libs/runtime/test/` with `.test.ts` extension.
 - Test files for `apps/cli` live in `apps/cli/test/` with `.test.mts` extension.
 - Shared TypeQLite schema fixtures used by multiple suites live in `test-fixtures/schemas/`.
 - The runtime has an optional oracle test suite (`vitest.oracle.config.ts`) and a WASM test suite (`vitest.wasm.config.ts`), both off by default. Run them explicitly when changing the SQLite binding or the revision algorithm.
@@ -158,13 +158,13 @@ nx run typedblite-conformance:cli -- --update-baseline
 
 ## Adding a new TypeQLite construct
 
-1. Add the production rule to `packages/language/src/typeqlite.langium`.
-2. Run `npm run langium:generate` inside `packages/language/`.
+1. Add the production rule to `libs/language/src/typeqlite.langium`.
+2. Run `npm run langium:generate` inside `libs/language/`.
 3. Update the admissibility table in `typeqlite-annotations.ts` if the construct accepts annotations.
 4. Add validation in `typeqlite-validator.ts` if the construct has parse-time constraints.
-5. Add SQLite generation in `packages/runtime/src/sqlite-generator.ts`.
-6. Add interpreter handling in `packages/runtime/src/interpreter.ts`.
-7. Add tests in `packages/runtime/test/` covering the new behaviour.
+5. Add SQLite generation in `libs/runtime/src/sqlite-generator.ts`.
+6. Add interpreter handling in `libs/runtime/src/interpreter.ts`.
+7. Add tests in `libs/runtime/test/` covering the new behaviour.
 8. Run the full conformance suite to check for regressions: `nx run typedblite-conformance:test`.
 
 ---

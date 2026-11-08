@@ -1,7 +1,7 @@
 {
-  "name": "typedblite-conformance",
+  "name": "typedblite-runtime",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "packages/conformance/src",
+  "sourceRoot": "libs/runtime/src",
   "projectType": "library",
   "tags": [
     "scope:shared",
@@ -15,7 +15,7 @@
       ],
       "options": {
         "command": "tsc -b tsconfig.src.json",
-        "cwd": "packages/conformance"
+        "cwd": "libs/runtime"
       },
       "outputs": [
         "{projectRoot}/out"
@@ -24,7 +24,6 @@
     "test": {
       "executor": "nx:run-commands",
       "dependsOn": [
-        "typecheck",
         "^build"
       ],
       "parallelism": false,
@@ -33,25 +32,14 @@
       ],
       "options": {
         "command": "vitest run",
-        "cwd": "packages/conformance"
+        "cwd": "libs/runtime"
       }
     },
-    "typecheck": {
+    "test-oracle": {
       "executor": "nx:run-commands",
-      "cache": true,
       "options": {
-        "command": "tsc -p tsconfig.src.json --noEmit",
-        "cwd": "packages/conformance"
-      }
-    },
-    "report": {
-      "executor": "nx:run-commands",
-      "dependsOn": [
-        "^build"
-      ],
-      "options": {
-        "command": "tsx src/cli.ts",
-        "cwd": "packages/conformance"
+        "command": "vitest run --config vitest.oracle.config.ts",
+        "cwd": "libs/runtime"
       }
     }
   }

@@ -56,7 +56,7 @@ Language ID: `typeqlite`
 The generated files in `src/generated/` are outputs of `langium generate` and must be committed alongside any grammar change.
 
 ```bash
-cd packages/language
+cd libs/language
 npm run langium:generate
 # Commits: src/typeqlite.langium  +  src/generated/{ast,grammar,module}.ts
 ```

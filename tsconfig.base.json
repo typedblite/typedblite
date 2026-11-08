@@ -15,9 +15,9 @@
     "skipDefaultLibCheck": true,
     "strict": true,
     "paths": {
-      "@typedblite/language": ["./packages/language/src/index.ts"],
-      "@typedblite/content-revision": ["./packages/content-revision/src/index.ts"],
-      "@typedblite/runtime": ["./packages/runtime/src/index.ts"]
+      "@typedblite/language": ["./libs/language/src/index.ts"],
+      "@typedblite/content-revision": ["./libs/content-revision/src/index.ts"],
+      "@typedblite/runtime": ["./libs/runtime/src/index.ts"]
     }
   }
 }

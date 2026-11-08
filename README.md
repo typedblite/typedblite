@@ -10,10 +10,10 @@ TypeDB's native server is a standalone Rust binary. TypeDBLite brings the same p
 
 | Package | Description |
 |---|---|
-| [`@typedblite/language`](packages/language/) | Langium grammar, generated AST, and language services for TypeQLite. Parsing, validation, formatting, semantic tokens, and scope resolution live here. |
-| [`@typedblite/runtime`](packages/runtime/) | SQLite generator, query interpreter, schema mutation engine, change log, replication, and the `TypeDBLiteDatabase` adapter. The working database lives here. |
-| [`@typedblite/content-revision`](packages/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
-| [`typedblite-conformance`](packages/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
+| [`@typedblite/language`](libs/language/) | Langium grammar, generated AST, and language services for TypeQLite. Parsing, validation, formatting, semantic tokens, and scope resolution live here. |
+| [`@typedblite/runtime`](libs/runtime/) | SQLite generator, query interpreter, schema mutation engine, change log, replication, and the `TypeDBLiteDatabase` adapter. The working database lives here. |
+| [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
+| [`typedblite-conformance`](libs/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
 | [`typedblite-cli`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
 
 ## Quick start
@@ -47,7 +47,7 @@ node apps/cli/out/main.js --file schema.typeqlite --database my.db
 
 ## TypeQLite language
 
-TypeQLite 3.x implements the TypeQL subset that real production schemas and the TypeDB behaviour specification require. The grammar lives at [packages/language/src/typeqlite.langium](packages/language/src/typeqlite.langium).
+TypeQLite 3.x implements the TypeQL subset that real production schemas and the TypeDB behaviour specification require. The grammar lives at [libs/language/src/typeqlite.langium](libs/language/src/typeqlite.langium).
 
 ### Schema DDL
 
@@ -103,7 +103,7 @@ Annotations that are parsed but not yet enforced are reported by `define` as a d
 
 ## SQLite binding
 
-The runtime depends on a `SqliteDatabase` interface rather than `node:sqlite` directly. `node-sqlite.ts` satisfies it for Node.js ≥ 22.12. A WASM SQLite binding running inside a Web Worker satisfies the same interface as long as it is synchronous within the worker. See [`packages/runtime/src/sqlite-database.ts`](packages/runtime/src/sqlite-database.ts) for the full contract.
+The runtime depends on a `SqliteDatabase` interface rather than `node:sqlite` directly. `node-sqlite.ts` satisfies it for Node.js ≥ 22.12. A WASM SQLite binding running inside a Web Worker satisfies the same interface as long as it is synchronous within the worker. See [`libs/runtime/src/sqlite-database.ts`](libs/runtime/src/sqlite-database.ts) for the full contract.
 
 ## Replication
 
@@ -122,7 +122,7 @@ The `typedblite-conformance` package vendors TypeDB's own behaviour specificatio
 nx run typedblite-conformance:test
 ```
 
-Intentional gaps are declared in [`packages/conformance/deviations.yaml`](packages/conformance/deviations.yaml) with an owner (an ADR number or defect record). Undeclared failures are plain failures.
+Intentional gaps are declared in [`libs/conformance/deviations.yaml`](libs/conformance/deviations.yaml) with an owner (an ADR number or defect record). Undeclared failures are plain failures.
 
 ## Development
 

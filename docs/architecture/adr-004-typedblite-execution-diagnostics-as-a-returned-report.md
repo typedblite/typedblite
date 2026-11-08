@@ -19,7 +19,7 @@
 
 ## Context
 
-TypeDBLite execution has no observability. `interpreter.ts` (`packages/runtime/src/interpreter.ts`)
+TypeDBLite execution has no observability. `interpreter.ts` (`libs/runtime/src/interpreter.ts`)
 exposes `define()` for DDL, `execute()` for writes and `query()` for reads, and every failure leaves
 through one of six `throw new Error` sites carrying **a string and no source position**. A statement
 that succeeds but does the wrong thing — a `define` that re-applied as a no-op, a `match` whose
@@ -71,7 +71,7 @@ reference-implementation rule, upstream's shape is the specification.
 
 - **The engine publishes `DomainEvent`s itself.** Fewer moving parts, and no caller has to opt in.
   Rejected because it reverses a boundary the runtime was built to hold —
-  `change-stream.ts` (`packages/runtime/src/change-stream.ts`) records that it
+  `change-stream.ts` (`libs/runtime/src/change-stream.ts`) records that it
   avoided even the *name* `EventSource` to stay clear of the events domain — and because it would
   make every repository an event publisher, which is the application layer's job.
 - **A `DiagnosticSink` port.** Keeps the boundary and adds push semantics. Rejected as a third
