@@ -1,7 +1,6 @@
 {
   "extends": "./tsconfig.src.json",
   "compilerOptions": {
-    "outDir": "../../dist/out-tsc",
     "composite": false, "isolatedModules": true, "rootDir": ".",
     "types": ["vitest/globals", "node"]
   },
