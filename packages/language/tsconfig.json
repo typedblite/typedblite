@@ -1,0 +1,2 @@
+// this file is required for VSCode to work properly
+{ "files": [], "references": [{ "path": "./tsconfig.src.json" }] }

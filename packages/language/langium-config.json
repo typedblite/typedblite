@@ -1,0 +1,12 @@
+{
+  "projectName": "TypeQLite",
+  "languages": [
+    {
+      "id": "typeqlite",
+      "grammar": "src/typeqlite.langium",
+      "fileExtensions": [".typeqlite", ".tql"],
+      "textMate": { "out": "syntaxes/typeqlite.tmLanguage.json" }
+    }
+  ],
+  "out": "src/generated"
+}

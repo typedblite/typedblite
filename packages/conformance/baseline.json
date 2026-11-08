@@ -1,0 +1,21 @@
+{
+  "define": 414,
+  "delete": 5,
+  "disjunction": 0,
+  "expression": 91,
+  "fetch": 2,
+  "given": 0,
+  "insert": 30,
+  "match": 34,
+  "metadata": 0,
+  "modifiers": 1,
+  "negation": 0,
+  "optional": 0,
+  "pipelines": 2,
+  "put": 0,
+  "redefine": 154,
+  "reduce": 33,
+  "undefine": 131,
+  "update": 1,
+  "variables": 2
+}

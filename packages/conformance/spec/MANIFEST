@@ -1,0 +1,21 @@
+# git blob ids of every vendored file at the pinned commit — `test/vendored.test.ts` checks them
+d0a1fa1482eea82e19510e7920cbe3a03e41f691  LICENSE
+9fe2a0b5ffbd641a0e353e8f0dd703eb1d0a7945  query/language/define.feature
+17be0cda50008976f19422b312f23db65d9f7ad6  query/language/delete.feature
+ac551cc9681ce65c98dd023030726c9fd2f11f88  query/language/disjunction.feature
+5aeaf75de06b238ab8724907ee63c2f85faae52d  query/language/expression.feature
+48efccefc0e5ccfa01f8bbd6ca92c67e06c32715  query/language/fetch.feature
+0eb0da9f51fe73b94188dbcd536d47ab393aafc1  query/language/given.feature
+cf6969c1ac667353e160700edd7db8363826de4d  query/language/insert.feature
+73d3e53170b360a8f17495f95cbfbcf2bb6f0a5a  query/language/match.feature
+c0872a689c4a4787e46806439757027aa153ae88  query/language/metadata.feature
+76d5ea2bec936dc4b161febafabdac0a93342663  query/language/modifiers.feature
+f1adfe123538ce80cdded61211bb48c5ad7cfbfb  query/language/negation.feature
+2ecfff4cfa1dd0257243f2fc53c08fd527830931  query/language/optional.feature
+17aad388bf3bb074dbc9bbfcd0d0d8acc5343628  query/language/pipelines.feature
+4154c404c0af3abaa600c413d2c8286a06b0be57  query/language/put.feature
+8bfed2c15168f31d20efd3b6c10dc2c87d152815  query/language/redefine.feature
+31711b6ffe25ec8a1321834e8037c8650c323990  query/language/reduce.feature
+821e6166705b882b295236fc84118d887dd60a2c  query/language/undefine.feature
+018b03f65a1a7ee67d2d67386c0663a78cc4ec82  query/language/update.feature
+d3f4a4bff909dfe98ad45ee85aab4d1c6354f917  query/language/variables.feature

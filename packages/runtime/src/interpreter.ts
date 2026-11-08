@@ -1,0 +1,3301 @@
+import { openNodeSqlite } from './node-sqlite.js';
+import type { SqliteDatabase, SqliteOpener } from './sqlite-database.js';
+import { EmptyFileSystem } from 'langium';
+import {
+  createTypeQLiteServices,
+  validateSync,
+  isAbstractAnnotation,
+  isAnonRelationPattern,
+  isAttributeDef,
+  isDefineClause,
+  isEntityDef,
+  isKeyAnnotation,
+  isOwnsTrait,
+  isRelatesTrait,
+  isHasProperty,
+  isBooleanLiteral,
+  isDateLiteral,
+  isDatetimeLiteral,
+  isDatetimeTzLiteral,
+  isDecimalLiteral,
+  isDoubleLiteral,
+  isIntLiteral,
+  isIsaProperty,
+  isComparisonPattern,
+  isKindPattern,
+  isLetPattern,
+  literalFits,
+  literalKind,
+  isLinksProperty,
+  isRelationDef,
+  isTypeExtensionDef,
+  isPlaysTrait,
+  isStringLiteral,
+  isThingPattern,
+  type Annotation,
+  type Definition,
+  type Literal,
+  type Pattern,
+  type ReduceStage,
+  type Pipeline,
+  type RedefineClause,
+  type RolePlayers,
+  type TypeQLiteFile,
+  type UndefineClause,
+} from '@typedblite/language';
+import type { Range } from 'vscode-languageserver';
+import {
+  attachDiagnostic,
+  type DiagnosticCodeValue,
+  DIAGNOSTIC_SOURCE,
+  DiagnosticCode,
+  DiagnosticCollector,
+  rangeFromOffset,
+  rangeOf,
+  type ExecutionReport,
+} from './diagnostics.js';
+import { generateSchema } from './sqlite-generator.js';
+import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
+import { applyRedefine, applyUndefine } from './schema-mutation.js';
+import { applyValueStatements, inferValueType, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
+import { applyReduce, checkReduce } from './reduce.js';
+import { isTypeHead, solveTypes, typeConstraintsOf, type Binding } from './type-patterns.js';
+import {
+  ownsKey,
+  playsSubject,
+  recordCategory,
+  recordText,
+  roleRef,
+  subSubject,
+  traitSubject,
+  typeSubject,
+  valueSubject,
+} from './schema-subjects.js';
+import { ChangeLog, type EntityIdentity } from './change-log.js';
+
+const { TypeQLite } = createTypeQLiteServices(EmptyFileSystem);
+
+/** What a row cell can be — the driver's `Concept` kinds TypeDBLite answers with. */
+export type ConceptKind = 'entity' | 'relation' | 'attribute' | 'value' | 'type';
+
+/**
+ * A result cell — a concept, the way the TypeDB driver hands one back.
+ *
+ * 🔴 **A cell was a string, and only a string, until Phase 02 of the conformance feature.** The
+ * projection emitted one column per `has` binding and nothing else, so a thing variable contributed
+ * nothing to its row and the empty row was dropped — `match $x isa person;` answered zero rows at
+ * exit 0 (`d-20260911-a-match-pipeline-with-no-select`). A cell now carries what it is:
+ *
+ * - an **entity** or **relation**: its `iid` and its actual `type` — `writer`, not the `person` the
+ *   query wrote, because TypeDB answers the instance's own type;
+ * - an **attribute**: its actual `type` and its value;
+ * - a **value**: a value type and a value (an expression's or a reducer's result);
+ * - a **type** (Phase 05): a schema type by its label — `person`, or a role type as
+ *   `employment:employee` — what `match $x sub person;` answers. No iid, no value.
+ *
+ * The three `as…()` readers work on an attribute or value cell and **throw on a thing or a
+ * type**, with the driver's own message shape. The repositories only ever read attribute cells,
+ * so they are untouched; a repository that projects a thing reads `iid` and `type` and nothing else.
+ */
+export class TypeDBLiteValue {
+  private constructor(
+    private readonly kind: ConceptKind,
+    /** The type label: a thing's type, an attribute's type, or a value's value type. */
+    public readonly type: string,
+    private readonly raw: string,
+    private readonly id: number | undefined,
+  ) {}
+
+  static entity(iid: number, type: string): TypeDBLiteValue {
+    return new TypeDBLiteValue('entity', type, '', iid);
+  }
+
+  static relation(iid: number, type: string): TypeDBLiteValue {
+    return new TypeDBLiteValue('relation', type, '', iid);
+  }
+
+  static attribute(type: string, value: string): TypeDBLiteValue {
+    return new TypeDBLiteValue('attribute', type, value, undefined);
+  }
+
+  static value(valueType: string, value: string): TypeDBLiteValue {
+    return new TypeDBLiteValue('value', valueType, value, undefined);
+  }
+
+  /** A schema type, by label — `person`, or a role type as `relation:role`. */
+  static type(label: string): TypeDBLiteValue {
+    return new TypeDBLiteValue('type', label, '', undefined);
+  }
+
+  isType(): boolean {
+    return this.kind === 'type';
+  }
+
+  /** The type cell's label. Throws on any other kind — a thing has a `type`, not a `label`. */
+  get label(): string {
+    if (this.kind !== 'type') throw new Error(`Cannot extract label from ${this.kind}('${this.type}')`);
+    return this.type;
+  }
+
+  isEntity(): boolean {
+    return this.kind === 'entity';
+  }
+
+  isRelation(): boolean {
+    return this.kind === 'relation';
+  }
+
+  isThing(): boolean {
+    return this.id !== undefined;
+  }
+
+  isAttribute(): boolean {
+    return this.kind === 'attribute';
+  }
+
+  isValue(): boolean {
+    return this.kind === 'value';
+  }
+
+  /** A thing's internal id. Throws on an attribute or value cell, which have none. */
+  get iid(): number {
+    if (this.id === undefined) {
+      throw new Error(`Cannot extract iid from ${this.kind}('${this.raw}')`);
+    }
+    return this.id;
+  }
+
+  /** 🔴 A thing, or a type, has no string value. Reading one as a string is the driver's error, not `''`. */
+  private valueOrThrow(as: string): string {
+    if (this.id !== undefined || this.kind === 'type') {
+      throw new Error(`Cannot extract ${as} from ${this.kind}('${this.type}')`);
+    }
+    return this.raw;
+  }
+
+  asString(): string {
+    return this.valueOrThrow('string');
+  }
+
+  /**
+   * 🔴 Throws rather than coercing, matching the driver. `rowString` cannot read a numeric
+   * attribute because `asString()` throws there; `rowNumber` tries `asInteger` first and falls
+   * through to `asDouble`. Coercing here would make `rowNumber` return a number for a genuinely
+   * non-numeric attribute and quietly break that distinction — found by the Skills schema's
+   * `ordinal`.
+   */
+  asInteger(): number {
+    const raw = this.valueOrThrow('integer');
+    if (!/^-?\d+$/.test(raw)) {
+      throw new Error(`Cannot extract integer from attribute('${raw}')`);
+    }
+    return Number.parseInt(raw, 10);
+  }
+
+  asDouble(): number {
+    const raw = this.valueOrThrow('double');
+    const value = Number.parseFloat(raw);
+    if (Number.isNaN(value)) {
+      throw new Error(`Cannot extract double from attribute('${raw}')`);
+    }
+    return value;
+  }
+
+  /** A stable rendering for every kind — what a shell prints and a set comparison keys on. */
+  toString(): string {
+    if (this.kind === 'type') return `type:${this.type}`;
+    return this.id === undefined ? this.raw : `${this.kind}:${this.type}:#${this.id}`;
+  }
+}
+
+export interface TypeDBLiteSchemaSnapshot {
+  readonly types: readonly string[];
+  readonly relations: readonly string[];
+  readonly attributes: readonly string[];
+  readonly owns: readonly { readonly owner: string; readonly attribute: string }[];
+  readonly parents: readonly { readonly type: string; readonly parent: string }[];
+  readonly valueTypes: readonly { readonly attribute: string; readonly valueType: string }[];
+  readonly roles: readonly { readonly relation: string; readonly role: string }[];
+  readonly plays: readonly { readonly player: string; readonly role: string }[];
+  readonly annotations: readonly { readonly subject: string; readonly category: string; readonly text: string }[];
+}
+
+/**
+ * What `define` applied, so a query can be checked against it. The `SchemaFacts` view of it is
+ * what `schema-rules.ts` reads; this is the mutable whole the interpreter maintains.
+ */
+interface SchemaModel extends SchemaFacts {
+  readonly types: Set<string>;
+  /**
+   * Which of `types` are relations. `schema_element` cannot say — its `kind` CHECK admits `type`
+   * and `attribute` only, and SQLite cannot alter a CHECK in place — so this is read from the
+   * additive `schema_relation` table, the way `key_attribute` is. A thing whose type is not here
+   * projects as an entity.
+   */
+  readonly relations: Set<string>;
+  readonly attributes: Set<string>;
+  /**
+   * Which type owns which attribute — `"node\u0000edge-id"`.
+   *
+   * 🔴 This was missing, and its absence was mistaken for an impossibility. With only the two sets
+   * above, `checkKnown` could say `edge-id` is a known attribute and nothing more, so
+   * `match $n isa node, has edge-id $e;` answered zero rows and the diagnostic had no way to say
+   * why. Two attempts to infer it from candidate counts were wrong in different ways before the
+   * inference was deleted as underivable — which it was, from *these* sets. The schema AST always
+   * carried it; nothing had ever written it down.
+   */
+  readonly owns: Set<string>;
+  /**
+   * Each type's direct supertype, in memory.
+   *
+   * ⚠️ **Not a query.** The first version of the ownership check walked `type_parent` with a
+   * recursive CTE per constraint, inside `execute`'s transaction — and the concurrent-writer
+   * durability test failed with `database is locked`. A check that makes writes contend is not
+   * worth the diagnostic; the parent chain is small, fixed by `define`, and belongs beside the
+   * other schema facts.
+   */
+  readonly parents: Map<string, string>;
+  /**
+   * Each attribute type's declared value type, from `schema_value_type`. A subtype declaring none
+   * inherits — `valueTypeOf` in `schema-rules.ts` walks `parents` for it.
+   */
+  readonly valueTypes: Map<string, string>;
+  /** Each relation's declared roles, from `schema_relates`. Inherited roles are the parent's. */
+  readonly roles: Map<string, Set<string>>;
+  /** Types declared `@abstract`, from `schema_abstract`. An insert of one is refused. */
+  readonly abstracts: Set<string>;
+  /** Ownerships declared `@key`, from `schema_key_owns`, as `ownsKey(owner, attribute)`. */
+  readonly keyOwnerships: Set<string>;
+  /** Every annotation per subject, from `schema_annotation` — category → text as written. */
+  readonly annotations: Map<string, Map<string, string>>;
+  /** Which types play which roles, from `schema_plays`, as `playsSubject`-shaped `type\u0000plays\u0000rel:role`. */
+  readonly plays: Set<string>;
+}
+
+/**
+ * The subtype closure of one label, as a SQL subquery taking the label as its single parameter.
+ * `type_parent` carries thing types and attribute types alike, so the same closure answers
+ * `isa doc` with an `adr` and `has name` with a `first-name`.
+ */
+const SUBTYPES_OF =
+  '(WITH RECURSIVE sub(x) AS (SELECT ? UNION SELECT type FROM type_parent, sub WHERE parent = sub.x) SELECT x FROM sub)';
+
+/**
+ * What the engine did for ONE `query()` call — counts, never times, so a regression test can
+ * assert that a join is not a cartesian product (the Skills-catalog performance defect: one
+ * `subSkillsIn` call evaluated ~211,000 combinations and took 32 s).
+ *
+ * Off by default and then costs nothing: no proxy wraps the database and every hook is a single
+ * `undefined` check. Enabled by the `trace` constructor option or `TYPEDBLITE_TRACE=1`, and read
+ * with `lastQueryTrace()` — nothing is printed.
+ */
+export interface QueryTrace {
+  /** Output size of each stage of `combinations()`, in the order the stages ran. */
+  readonly stages: Array<{ stage: string; combinations: number }>;
+  /** The sum of every stage's output: the combinations the engine built. */
+  combinationsCreated: number;
+  /** `relationHolds` evaluations, early (pushed-down) and final alike. */
+  relationHoldsCalls: number;
+  /** `findRelations` evaluations, `relationHolds` and named-relation expansion alike. */
+  findRelationsCalls: number;
+  /** `candidates()` lookups, and the rows they returned. */
+  candidatesCalls: number;
+  candidateRows: number;
+  /** SQLite statements prepared and executed (`all`/`get`/`run`/`exec`) during the query. */
+  statementsPrepared: number;
+  statementsExecuted: number;
+}
+
+export interface TypeDBLiteOptions {
+  /** Record a `QueryTrace` per `query()`; defaults to `TYPEDBLITE_TRACE` being set to a truthy value. */
+  trace?: boolean;
+  /**
+   * Plan joins: apply a relation constraint as soon as its role players are bound, and draw a role
+   * player's candidates from the relation's `role_player` rows. `true` by default. `false` is the
+   * original engine -- every thing variable bound as a cartesian product, relations filtered
+   * afterwards -- kept so a differential test can prove the two agree row for row, in order.
+   */
+  planJoins?: boolean;
+  /**
+   * How to open the database. Defaults to `node:sqlite`. Pass another binding (a WASM SQLite in a
+   * worker) to run the interpreter where Node's built-ins do not exist; see `sqlite-database.ts` for
+   * what a binding must honour.
+   */
+  openDatabase?: SqliteOpener;
+}
+
+const newTrace = (): QueryTrace => ({
+  stages: [],
+  combinationsCreated: 0,
+  relationHoldsCalls: 0,
+  findRelationsCalls: 0,
+  candidatesCalls: 0,
+  candidateRows: 0,
+  statementsPrepared: 0,
+  statementsExecuted: 0,
+});
+
+/** The database behind a proxy that counts statements into whichever trace is current. */
+function tracingDatabase(raw: SqliteDatabase, current: () => QueryTrace | undefined): SqliteDatabase {
+  const countingStatement = (statement: object): object =>
+    new Proxy(statement, {
+      get(target, property) {
+        const value = Reflect.get(target, property, target) as unknown;
+        if (typeof value !== 'function') return value;
+        if (property === 'all' || property === 'get' || property === 'run' || property === 'iterate') {
+          return (...args: unknown[]) => {
+            const trace = current();
+            if (trace) trace.statementsExecuted++;
+            return (value as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        }
+        return (value as (...a: unknown[]) => unknown).bind(target);
+      },
+    });
+  return new Proxy(raw, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target) as unknown;
+      if (typeof value !== 'function') return value;
+      if (property === 'prepare') {
+        return (sql: string) => {
+          const trace = current();
+          if (trace) trace.statementsPrepared++;
+          return countingStatement(target.prepare(sql));
+        };
+      }
+      if (property === 'exec') {
+        return (sql: string) => {
+          const trace = current();
+          if (trace) trace.statementsExecuted++;
+          return target.exec(sql);
+        };
+      }
+      return (value as (...a: unknown[]) => unknown).bind(target);
+    },
+  });
+}
+
+
+/**
+ * 🔴 Every entry carries the range of the AST node it came from — the provenance Phase 00 measured
+ * as the single reason two throw sites had no source position.
+ *
+ * `constraintsOf()` is where the AST link was dropped: it converts `Pattern`s into plain
+ * `{ attribute, value }` / `{ role, player }` objects, and every downstream throw inherited that
+ * loss. Carrying a `Range` costs one field and is why this phase needed no reshape of execution.
+ */
+/** Which statement a constraint came from — the ownership refusal is worded by it. */
+type OwnershipStatement = 'match' | 'write';
+
+/** One `isa`: a written type or a type variable, exact (`isa!`) or through the subtypes. */
+interface Isa {
+  readonly type?: string;
+  /** `$x isa $t` — bound by a type pattern, or by the thing's own type (Phase 05). */
+  readonly typeVariable?: string;
+  readonly exact: boolean;
+}
+
+interface ThingConstraint {
+  variable: string;
+  /**
+   * The first WRITTEN type — what the ownership check, the diagnostics and an insert read when
+   * they want one label. Derived from `isas`; never set apart from it.
+   */
+  type?: string;
+  /**
+   * Every `isa` on the variable, in one pattern or across patterns, each its own filter or
+   * binding. 🔴 Three review rounds of Phase 05 patched a `type`/`exact`/`typeVariable` triple
+   * plus an overflow list; the triple could not hold two of anything, and every reader that
+   * looked at one field missed the others. One list, read whole.
+   */
+  isas: Isa[];
+  /** Where the pattern that introduced this constraint sits in the source. */
+  range?: Range;
+  /** `has skill-id "x"` — narrows the candidates. */
+  literals: Array<{
+    attribute: string;
+    value: string;
+    range?: Range;
+    /**
+     * `has measure 60` where `measure` is abstract with no value type: the literal spelt per
+     * concrete subtype that can read it — `height` as `60`, `weight` as `60.0` — because
+     * `attr.value` is compared as text in each subtype's own spelling (review, round 16).
+     */
+    alternatives?: Array<{ type: string; value: string }>;
+  }>;
+  /** `has skill-name $n` — projected into the result. */
+  bindings: Array<{ attribute: string; variable: string; range?: Range }>;
+  /** `$r isa step-dependency (dependent: $d, ...)` — the relation's own role players. */
+  roles: Array<{
+    role: string;
+    player: string;
+    /** Which `links (...)` list this slot was written in — see `rolesOf`. */
+    statement: number;
+    range?: Range;
+  }>;
+}
+
+/**
+ * Executes TypeQLite against SQLite.
+ *
+ * Deliberately an **interpreter, not a SQL generator**: bindings are resolved by executing, so a
+ * failing statement can say which one it was and a constraint violation knows which attribute it
+ * was writing. That last point is not a nicety — see `translateConstraintError`.
+ */
+export class TypeDBLiteInterpreter {
+  private readonly db: SqliteDatabase;
+  private schema: SchemaModel = {
+    types: new Set(),
+    relations: new Set(),
+    attributes: new Set(),
+    owns: new Set(),
+    parents: new Map(),
+    valueTypes: new Map(),
+    roles: new Map(),
+    abstracts: new Set(),
+    keyOwnerships: new Set(),
+    annotations: new Map(),
+    plays: new Set(),
+  };
+
+  /**
+   * The change log (ADR-020 D1). Its rows are written inside `execute`'s existing transaction, so a
+   * write and its log entry commit or roll back together — never a commit followed by a publish
+   * that a crash can lose.
+   */
+  public readonly changeLog: ChangeLog;
+
+  /** Things written during the current pipeline. Reset per pipeline, because each has its own transaction. */
+  private touched = new Set<number>();
+
+  /** Identities captured *before* a delete runs — afterwards there is nothing left to read. */
+  private tombstones: EntityIdentity[] = [];
+
+  /**
+   * Diagnostics for the call in progress (ADR-021).
+   *
+   * 🔴 Per call, not per interpreter. A report describes one statement; keeping it on the instance
+   * would leak one caller's diagnostics into the next caller's report, which is the same
+   * cross-contamination `touched` is reset per pipeline to avoid.
+   */
+  private diagnostics = new DiagnosticCollector();
+
+  /** Counts for the `wrote` execution fact. Counts, never lists — payloads replicate. */
+  private written = { things: 0, attributes: 0, roles: 0 };
+
+  /** A constructor-time warning, waiting for a report that will actually be read. */
+  private startupFact: string | undefined;
+
+  /** The trace being filled, only while a traced `query()` runs. */
+  private trace: QueryTrace | undefined;
+  private lastTrace: QueryTrace | undefined;
+  private readonly tracing: boolean;
+  private readonly planJoins: boolean;
+
+  constructor(location = ':memory:', busyTimeoutMs = 5000, options: TypeDBLiteOptions = {}) {
+    const raw = (options.openDatabase ?? openNodeSqlite)(location);
+    // `process` does not exist in a browser or a WebView; there the environment switches are off.
+    const processEnv = typeof process === 'undefined' ? {} : process.env;
+    const env = processEnv['TYPEDBLITE_TRACE'];
+    // `TYPEDBLITE_PLAN_JOINS=0` restores the original engine for a whole process (bisecting, and
+    // the conformance suite's before/after comparison).
+    this.planJoins = options.planJoins ?? processEnv['TYPEDBLITE_PLAN_JOINS'] !== '0';
+    this.tracing = options.trace ?? (env !== undefined && env !== '' && env !== '0' && env !== 'false');
+    this.db = this.tracing ? tracingDatabase(raw, () => this.trace) : raw;
+    // 🔴 SQLite permits one writer at a time, and `node:sqlite` sets **no busy timeout** — so a
+    // second process attempting a write fails immediately with SQLITE_BUSY rather than waiting for
+    // the lock. Found by making a concurrency test genuinely concurrent: an earlier version used
+    // `spawnSync` in a `map`, which runs each child to completion before the next starts, so three
+    // "concurrent" writers never contended and this was invisible.
+    //
+    // Replication is a multi-process design by definition — a hub and its spokes, and the
+    // Phase 01 durability suite — so waiting is the correct behaviour, not an optimisation.
+    this.db.exec(`PRAGMA busy_timeout = ${Number(busyTimeoutMs)}`);
+    // 🔴 SQLite's `LIKE` folds ASCII case by default, and TypeQLite labels are case-sensitive:
+    // `undefine foo;` deleted `Foo`'s annotation rows (Phase 04 review, round 2). No reader in
+    // this engine wants the folding — the only `LIKE`s are `schema-mutation.ts`'s, on labels.
+    this.db.exec('PRAGMA case_sensitive_like = ON');
+
+    // 🔴 WAL, so a reader does not block the writer and the writer does not block readers.
+    //
+    // The default rollback journal takes an exclusive lock for the whole write, so every read in
+    // another process waits for it and the writer waits for every open read. That is the shape
+    // replication has by design — a hub and its spokes, the durability suite's concurrent writers —
+    // and it is what surfaced as `database is locked` the moment a per-constraint lookup was added
+    // inside `execute`'s transaction.
+    //
+    // ⚠️ **WAL does not make writes parallel.** SQLite still permits one writer at a time; what
+    // changes is that readers no longer contend with it. `busy_timeout` above remains required, and
+    // is what makes a second writer wait rather than fail.
+    //
+    // ⚠️ **It is a property of the DATABASE FILE, not the connection** — persisted in the header, so
+    // it survives reopening and every later process inherits it. Setting it here rather than in the
+    // schema prelude is deliberate: it must apply to a database that has never had `define` run.
+    this.applyJournalMode(location);
+
+    this.changeLog = new ChangeLog(this.db);
+    this.changeLog.ensureSchema();
+    this.loadSchema();
+    this.ensureRolePlayerIndex();
+  }
+
+  /**
+   * A store created before `role_player_by_player` existed has the table without it, and `define` is not re-run on
+   * open. Adding it is idempotent and only a lookup path (it changes no row, no rule and no answer), so a failure
+   * to add one (a read-only file, a contended lock) is not a reason to refuse to open: the lookup is merely slower.
+   */
+  private ensureRolePlayerIndex(): void {
+    try {
+      const table = this.db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'role_player'").get();
+      if (table !== undefined) this.db.exec('CREATE INDEX IF NOT EXISTS role_player_by_player ON role_player(player, role, rel)');
+    } catch {
+      /* slower, not wrong */
+    }
+  }
+
+  /**
+   * Put a file-backed database into WAL, and say so if it refuses.
+   *
+   * 🔴 **`:memory:` cannot do WAL and does not error** — it reports `memory` and carries on, which
+   * is correct and is why this is not treated as a failure. Every test using `:memory:` therefore
+   * runs under the default journal, so **WAL is only exercised by the file-backed suites** — the
+   * durability and replication ones. A green `:memory:` suite says nothing about it.
+   *
+   * ⚠️ A file-backed database that answers anything other than `wal` is reported rather than
+   * ignored: the filesystem may not support the shared-memory file WAL needs, and silently running
+   * with the concurrency this was added to fix would be the failure mode, not the fix.
+   */
+  private applyJournalMode(location: string): void {
+    if (location === ':memory:') return;
+
+    // 🔴 A failure to enable WAL must not stop the database opening.
+    //
+    // The PRAGMA does not merely answer a different mode when it cannot switch — it **throws**:
+    // `database is locked`, if another connection holds a read open at that moment. Left
+    // uncaught, a *contended* database could not be opened at all, and the engine would be less
+    // available than before WAL was added to make it more so. Failing to optimise the journal is
+    // not a reason to refuse the store.
+    let mode: string | undefined;
+    try {
+      const rows = this.db.prepare('PRAGMA journal_mode = WAL').all() as Array<{
+        journal_mode?: string;
+      }>;
+      mode = rows[0]?.journal_mode?.toLowerCase();
+    } catch (error) {
+      mode = error instanceof Error ? `refused (${error.message})` : 'refused';
+    }
+
+    if (mode !== 'wal') {
+      // 🔴 Held, not reported here. `define`, `execute` and `query` each REPLACE `this.diagnostics`
+      // with a fresh collector, so a fact written in the constructor is discarded before anything
+      // can read it — a warning nobody could ever see, which is the same dead-guard shape as an
+      // ownership set that is never populated. It is emitted on the first report instead.
+      this.startupFact =
+        `Could not enable WAL on '${location}': SQLite reports journal_mode='${mode}'. ` +
+        'Readers and writers will contend as they did before. This usually means the filesystem ' +
+        'cannot host the -shm file WAL requires.';
+    }
+  }
+
+  /**
+   * A fresh collector for one call, carrying any constructor-time warning forward exactly once.
+   *
+   * The three entry points each reset diagnostics, which is deliberate — a report describes one
+   * statement — but it also meant nothing written before the first call could survive to be read.
+   */
+  /** Below-error validator diagnostics from the last `parse()`, flushed after the call's own facts. */
+  private deferredFacts: ReadonlyArray<{ code?: string | number; message: string; range: Range }> = [];
+
+  private flushDeferredFacts(): void {
+    for (const diagnostic of this.deferredFacts) {
+      this.diagnostics.fact(
+        String(diagnostic.code) as DiagnosticCodeValue,
+        diagnostic.message,
+        diagnostic.range,
+      );
+    }
+    this.deferredFacts = [];
+  }
+
+  private freshDiagnostics(): DiagnosticCollector {
+    const collector = new DiagnosticCollector();
+    if (this.startupFact !== undefined) {
+      collector.fact(DiagnosticCode.journalMode, this.startupFact);
+      this.startupFact = undefined;
+    }
+    return collector;
+  }
+
+  /** Whether a schema has been applied — to THIS database, not this process. */
+  get hasSchema(): boolean {
+    return this.schema.types.size > 0 || this.schema.attributes.size > 0;
+  }
+
+  schemaSnapshot(): TypeDBLiteSchemaSnapshot {
+    return {
+      types: [...this.schema.types].sort(),
+      relations: [...this.schema.relations].sort(),
+      attributes: [...this.schema.attributes].sort(),
+      owns: [...this.schema.owns].map((key) => {
+        const [owner, attribute] = key.split('\u0000');
+        return { owner, attribute };
+      }).sort((left, right) => `${left.owner}:${left.attribute}`.localeCompare(`${right.owner}:${right.attribute}`)),
+      parents: [...this.schema.parents.entries()].map(([type, parent]) => ({ type, parent }))
+        .sort((left, right) => `${left.type}:${left.parent}`.localeCompare(`${right.type}:${right.parent}`)),
+      valueTypes: [...this.schema.valueTypes.entries()].map(([attribute, valueType]) => ({ attribute, valueType }))
+        .sort((left, right) => `${left.attribute}:${left.valueType}`.localeCompare(`${right.attribute}:${right.valueType}`)),
+      roles: [...this.schema.roles.entries()].flatMap(([relation, roles]) =>
+        [...roles].map((role) => ({ relation, role })),
+      ).sort((left, right) => `${left.relation}:${left.role}`.localeCompare(`${right.relation}:${right.role}`)),
+      plays: [...this.schema.plays].map((key) => {
+        const [player, , role] = key.split('\u001f');
+        return { player, role };
+      }).sort((left, right) => `${left.player}:${left.role}`.localeCompare(`${right.player}:${right.role}`)),
+      annotations: [...this.schema.annotations.entries()].flatMap(([subject, values]) =>
+        [...values.entries()].map(([category, text]) => ({
+          subject: subject.split('\u001f').join('/'),
+          category,
+          text,
+        })),
+      ).sort((left, right) => `${left.subject}:${left.category}`.localeCompare(`${right.subject}:${right.category}`)),
+    };
+  }
+
+  /**
+   * 🔴 Reload the applied vocabulary from the database on open.
+   *
+   * Without this the type list lives only in the process that ran `define`, so a fresh process
+   * against a file-backed database believes no schema exists — `--database` would persist data
+   * that nothing could then query, and `checkKnown` would silently check nothing.
+   */
+  private loadSchema(): void {
+    try {
+      const rows = this.db
+        .prepare('SELECT kind, name FROM schema_element')
+        .all() as Array<{ kind: string; name: string }>;
+      for (const row of rows) {
+        if (row.kind === 'type') this.schema.types.add(row.name);
+        else this.schema.attributes.add(row.name);
+      }
+    } catch {
+      // No `schema_element` table: an empty database that has never had `define` run against it.
+    }
+    try {
+      const rows = this.db.prepare('SELECT name FROM schema_relation').all() as Array<{ name: string }>;
+      for (const row of rows) this.schema.relations.add(row.name);
+    } catch {
+      // A database defined before `schema_relation` existed. `define` cannot recover the kinds by
+      // being re-applied: the kind rule reads them from here and would refuse `relation x` as an
+      // entity becoming a relation. A relation that has instances is recorded in the data itself —
+      // its things own `role_player` rows — so those kinds are derived now, in memory, and
+      // persisted by the first `define`, which creates the table. A relation with NO instance
+      // leaves nothing to tell it from an entity, so it stays an entity here and the kind rule
+      // stays strict for it: guessing would convert real entities, and the rule is not relaxed.
+      this.deriveRelationsFromData();
+    }
+    try {
+      const rows = this.db
+        .prepare('SELECT type, attribute FROM schema_owns')
+        .all() as Array<{ type: string; attribute: string }>;
+      for (const row of rows) this.schema.owns.add(ownsKey(row.type, row.attribute));
+    } catch {
+      // A database defined before `schema_owns` existed. The ownership check degrades to silence
+      // rather than to a false accusation — see `checkOwns`.
+    }
+    try {
+      const rows = this.db
+        .prepare('SELECT type, parent FROM type_parent')
+        .all() as Array<{ type: string; parent: string }>;
+      for (const row of rows) this.schema.parents.set(row.type, row.parent);
+    } catch {
+      // No `type_parent` table yet; an empty database.
+    }
+    try {
+      const rows = this.db
+        .prepare('SELECT attribute, value_type FROM schema_value_type')
+        .all() as Array<{ attribute: string; value_type: string }>;
+      for (const row of rows) this.schema.valueTypes.set(row.attribute, row.value_type);
+    } catch {
+      // A database defined before `schema_value_type` existed. The value-type rules see no
+      // declared type and refuse nothing — silence, never a false refusal — until `define` is
+      // re-applied, which every repository does on open.
+    }
+    try {
+      const rows = this.db
+        .prepare('SELECT relation, role FROM schema_relates')
+        .all() as Array<{ relation: string; role: string }>;
+      for (const row of rows) this.rememberRole(row.relation, row.role);
+    } catch {
+      // A database defined before `schema_relates` existed — the same degradation as above.
+    }
+    try {
+      // A table written on this phase's branch between two review rounds carried an `abstract`
+      // column, with `0` rows that `SELECT name` would read as abstract. Dropped; the next
+      // `define` — every repository's first call — recreates it in the shape that stayed.
+      const columns = this.db
+        .prepare("SELECT name FROM pragma_table_info('schema_abstract')")
+        .all() as Array<{ name: string }>;
+      if (columns.some((column) => column.name === 'abstract')) this.db.exec('DROP TABLE schema_abstract');
+      const rows = this.db.prepare('SELECT name FROM schema_abstract').all() as Array<{ name: string }>;
+      for (const row of rows) this.schema.abstracts.add(row.name);
+    } catch {
+      // Before `schema_abstract`: no type is known abstract, so no insert is refused for it until
+      // `define` is re-applied — which every repository does on open. Silence, never a false
+      // refusal, as the tables above degrade.
+    }
+    try {
+      const rows = this.db
+        .prepare('SELECT type, attribute FROM schema_key_owns')
+        .all() as Array<{ type: string; attribute: string }>;
+      for (const row of rows) this.schema.keyOwnerships.add(ownsKey(row.type, row.attribute));
+    } catch {
+      // Before `schema_key_owns`: every `@key` this database already has would look new on the
+      // first `define`, and a restated one over an owner holding no key value (which insert never
+      // refused) would be refused as *data does not conform*. So the ownerships are derived NOW,
+      // in memory, from what an older database does record — the key attribute types
+      // (`key_attribute`, kept since ADR-020 for identity) crossed with who owns them
+      // (`schema_owns`) — and persisted by the first `define`, which creates the table. In memory
+      // before that define, not after it: the first statement is the one that restates the keys,
+      // and its rules run before its DDL (review, round 5 — the round-2 defect back by ordering).
+      // Once, not on every open: the derivation is per attribute, and taken every time it would
+      // read every owner of an already-keyed attribute as keyed, which skipped the second-owner
+      // check after a reopen (round 4). ⚠️ Coarse in that direction for the one database it
+      // migrates: an attribute keyed by one owner reads as keyed by every owner it had, and that
+      // is persisted — a check skipped for those ownerships, never a schema refused. The same
+      // migrate-once shape as `ChangeLog.migrate()`.
+      for (const key of this.changeLog.keyTypes()) {
+        for (const owns of this.schema.owns) {
+          if (owns.endsWith(`\u0000${key}`)) this.schema.keyOwnerships.add(owns);
+        }
+      }
+      this.persistKeyOwnerships = true;
+    }
+    this.loadRecords();
+  }
+
+  /** Set when `schema_relation` was absent at open — see `loadSchema`; cleared by the first `define`. */
+  private persistRelations = false;
+
+  /**
+   * Types in `schema_element` that are the type of some relation instance, i.e. of a thing with
+   * `role_player` rows, and every ancestor of one: a subtype of a relation is a relation, and the data
+   * of a relation that has instances only of its subtype says nothing about the parent itself.
+   */
+  private deriveRelationsFromData(): void {
+    const present = (name: string): boolean =>
+      this.db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) !== undefined;
+    if (!present('thing') || !present('role_player')) return;
+    const rows = this.db
+      .prepare('SELECT DISTINCT t.type AS type FROM thing t JOIN role_player rp ON rp.rel = t.iid')
+      .all() as Array<{ type: string }>;
+    const parents = new Map<string, string>();
+    if (present('type_parent')) {
+      const links = this.db.prepare('SELECT type, parent FROM type_parent').all() as Array<{ type: string; parent: string }>;
+      for (const link of links) parents.set(link.type, link.parent);
+    }
+    for (const row of rows) {
+      // The visited set bounds the climb if the persisted hierarchy is cyclic.
+      const seen = new Set<string>();
+      for (let type: string | undefined = row.type; type !== undefined && !seen.has(type); type = parents.get(type)) {
+        seen.add(type);
+        if (this.schema.types.has(type)) this.schema.relations.add(type);
+      }
+    }
+    // A subtype of a relation is a relation, whether or not it has an instance of its own.
+    for (const start of parents.keys()) {
+      const seen = new Set<string>();
+      for (let type: string | undefined = parents.get(start); type !== undefined && !seen.has(type); type = parents.get(type)) {
+        seen.add(type);
+        if (this.schema.relations.has(type)) {
+          if (this.schema.types.has(start)) this.schema.relations.add(start);
+          break;
+        }
+      }
+    }
+    this.persistRelations = this.schema.relations.size > 0;
+  }
+
+  /** Set when `schema_key_owns` was absent at open — see `loadSchema`; cleared by the first `define`. */
+  private persistKeyOwnerships = false;
+
+  /**
+   * Whether a caller-held transaction is open on this handle ([ADR-069](../../../../docs/architecture/adr-069-domain-events-contract-is-a-shared-kernel.md) D7).
+   *
+   * 🔴 While it is, `execute` must not issue its own `BEGIN`: SQLite rejects a nested one, so each
+   * write pipeline takes a `SAVEPOINT` instead, and a failing pipeline rolls back to it without
+   * ending the transaction around it.
+   */
+  private transactionOpen = false;
+  private savepointSeq = 0;
+
+  private loadRecords(): void {
+    try {
+      const rows = this.db
+        .prepare('SELECT subject, category, text FROM schema_annotation')
+        .all() as Array<{ subject: string; category: string; text: string }>;
+      for (const row of rows) this.rememberAnnotation(row.subject, row.category, row.text);
+    } catch {
+      // Before `schema_annotation`: no annotation is known, so `undefine @card from …` reports
+      // it as not defined until `define` is re-applied — which every repository does on open.
+    }
+    try {
+      const rows = this.db.prepare('SELECT type, role FROM schema_plays').all() as Array<{ type: string; role: string }>;
+      for (const row of rows) this.schema.plays.add(playsSubject(row.type, row.role));
+    } catch {
+      // Before `schema_plays` — the same degradation.
+    }
+  }
+
+  private rememberAnnotation(subject: string, category: string, text: string): void {
+    const bySubject = this.schema.annotations.get(subject) ?? new Map<string, string>();
+    bySubject.set(category, text);
+    this.schema.annotations.set(subject, bySubject);
+  }
+
+  /** What `define` records for one definition's annotations and traits — the same rows the DDL writes. */
+  private recordDefinition(name: string, definition: Definition): void {
+    const record = (subject: string, list: readonly Annotation[]): void => {
+      for (const annotation of list) this.rememberAnnotation(subject, recordCategory(annotation), recordText(annotation));
+    };
+    record(typeSubject(name), definition.annotations);
+    record(subSubject(name), definition.subAnnotations);
+    record(valueSubject(name), definition.valueAnnotations);
+    if (isAttributeDef(definition)) return;
+    for (const trait of definition.traits) {
+      record(traitSubject(name, trait).subject, trait.annotations);
+      if (isPlaysTrait(trait)) {
+        this.schema.plays.add(playsSubject(name, roleRef(trait.role.relation.$refText, trait.role.role.$refText)));
+      }
+    }
+  }
+
+  /**
+   * The model, rebuilt from the tables. `undefine` and `redefine` change the tables and never the
+   * maps: a mirror patched alongside a removal or a rename drifts silently, and the rules would
+   * read a schema that is not the one applied.
+   */
+  private reloadSchema(): void {
+    for (const set of [this.schema.types, this.schema.relations, this.schema.attributes, this.schema.owns, this.schema.abstracts, this.schema.keyOwnerships, this.schema.plays]) set.clear();
+    for (const map of [this.schema.parents, this.schema.valueTypes, this.schema.roles, this.schema.annotations]) map.clear();
+    this.loadSchema();
+  }
+
+  private rememberRole(relation: string, role: string): void {
+    const roles = this.schema.roles.get(relation) ?? new Set<string>();
+    roles.add(role);
+    this.schema.roles.set(relation, roles);
+  }
+
+  /** Apply a schema. Re-applying is normal — a projector replays, and `IF NOT EXISTS` carries it. */
+  define(text: string): ExecutionReport {
+    if (this.transactionOpen) {
+      // DDL runs in its own `BEGIN IMMEDIATE` (applySchemaDdl) and a producer's state-plus-event
+      // write has no business changing the schema, so this is refused rather than nested.
+      throw new Error('define() cannot run inside a transaction: the schema changes in its own.');
+    }
+    this.diagnostics = this.freshDiagnostics();
+    // 🔴 No second `@card`/`@unique` walk here. `parse()` runs `TypeQLiteValidator`, which owns
+    // those rules — they were defined twice, with two different diagnostic codes.
+    const file = this.parse(text);
+    // `undefine` and `redefine` — Phase 04 of the conformance feature — are applied by
+    // `schema-mutation.ts`, one clause at a time, each in its own transaction, the model reloaded
+    // from the tables after each. A statement mixing them with `define` is refused: nothing in
+    // TypeDB's specification writes one, and applying the stages in text order would need the
+    // define half re-run against a model the mutation half just changed.
+    const mutations = file.clauses.filter(
+      (clause): clause is UndefineClause | RedefineClause =>
+        clause.$type === 'UndefineClause' || clause.$type === 'RedefineClause',
+    );
+    if (mutations.length > 0) {
+      if (file.clauses.some(isDefineClause)) {
+        const message = 'A statement mixes `define` with `undefine`/`redefine`; send them separately.';
+        throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.notImplemented, message, rangeOf(file)));
+      }
+      const refuse: Refuse = (code, message, range) => {
+        throw attachDiagnostic(new Error(message), this.diagnostics.error(code, message, range));
+      };
+      let changed = 0;
+      for (const clause of mutations) {
+        const context = { db: this.db, schema: this.schema, data: this.dataFacts(), refuse, reload: () => this.reloadSchema() };
+        if (clause.$type === 'UndefineClause') {
+          applyUndefine(clause, context);
+          changed += clause.undefinitions.length;
+        } else {
+          applyRedefine(clause, context);
+          changed += clause.redefinition === undefined ? 0 : 1;
+        }
+        this.reloadSchema();
+      }
+      this.diagnostics.fact(
+        DiagnosticCode.schemaChanged,
+        `\`${mutations[0].$type === 'UndefineClause' ? 'undefine' : 'redefine'}\` applied ${changed} change(s).`,
+        rangeOf(file),
+      );
+      this.flushDeferredFacts();
+      return this.diagnostics.report();
+    }
+    this.checkSupertypesExist(file);
+    checkSchemaRules(file, this.schema, this.dataFacts(), (code, message, range) => {
+      throw attachDiagnostic(new Error(message), this.diagnostics.error(code, message, range));
+    });
+    const { ddl, keys } = generateSchema(file);
+    this.applySchemaDdl(ddl, file);
+    // Identity is the @key attribute's value (ADR-020 D3, canonical.ts). `loadSchema` restores only
+    // types and attributes, so without persisting these a reopened database could not tell which
+    // attribute names an entity, and every entity would fall back to a node-local id.
+    this.changeLog.ensureSchema();
+    this.changeLog.rememberKeys(keys);
+
+    let declared = 0;
+    let alreadyPresent = 0;
+    for (const clause of file.clauses) {
+      if (!isDefineClause(clause)) continue;
+      for (const definition of clause.definitions) {
+        const name = 'name' in definition ? definition.name : undefined;
+        if (name === undefined) continue;
+        declared += 1;
+        if (this.schema.types.has(name) || this.schema.attributes.has(name)) {
+          alreadyPresent += 1;
+        }
+      }
+    }
+
+    for (const clause of file.clauses) {
+      if (!isDefineClause(clause)) continue;
+      for (const definition of clause.definitions) {
+        if (isEntityDef(definition) || isRelationDef(definition) || isTypeExtensionDef(definition)) {
+          // A re-open names an existing type; its traits register as a definition's do.
+          const name = isTypeExtensionDef(definition) ? definition.type : definition.name;
+          if (!isTypeExtensionDef(definition)) this.schema.types.add(definition.name);
+          if (isRelationDef(definition)) this.schema.relations.add(definition.name);
+          // 🔴 Ownership and the parent chain, in the SAME process that ran `define`.
+          //
+          // `loadSchema` reads them from the database, and it runs only in the constructor — so
+          // populating them there alone left `schema.owns` empty for the whole life of the process
+          // that applied the schema, and `checkOwns` returned early on an empty set every time. The
+          // check looked active and did nothing until a reopen. Found by the test written for the
+          // *other* branch of that early return.
+          // A definition's parent is a cross-reference; a re-open's is a plain name. Both are the
+          // type's parent once applied.
+          const superType = isTypeExtensionDef(definition)
+            ? definition.superType
+            : definition.superType?.$refText;
+          if (superType) this.schema.parents.set(name, superType);
+          if (isTypeExtensionDef(definition) && definition.valueType) {
+            this.schema.valueTypes.set(name, definition.valueType);
+          }
+          if (definition.annotations.some(isAbstractAnnotation)) this.schema.abstracts.add(name);
+          this.recordDefinition(name, definition);
+          for (const trait of definition.traits) {
+            if (isOwnsTrait(trait)) {
+              this.schema.owns.add(ownsKey(name, trait.attribute.$refText));
+              if (trait.annotations.some(isKeyAnnotation)) {
+                this.schema.keyOwnerships.add(ownsKey(name, trait.attribute.$refText));
+              }
+            }
+            if (isRelatesTrait(trait)) this.rememberRole(name, trait.name);
+          }
+        } else if (isAttributeDef(definition)) {
+          this.schema.attributes.add(definition.name);
+          // 🔴 An attribute's `sub` is a sub. This branch recorded the name and nothing else, so
+          // `first-name sub name` was accepted and forgotten — no parent, no closure, `has name $n`
+          // answering nothing for a first-name (`d-20260911-an-attribute-subtype-is-accepted-by`).
+          const superType = definition.superType?.$refText;
+          if (superType) this.schema.parents.set(definition.name, superType);
+          if (definition.valueType) this.schema.valueTypes.set(definition.name, definition.valueType);
+          if (definition.annotations.some(isAbstractAnnotation)) this.schema.abstracts.add(definition.name);
+          this.recordDefinition(definition.name, definition);
+        }
+      }
+    }
+
+    // 🔴 Re-applying a schema is normal — a projector replays and `IF NOT EXISTS` carries it — so
+    // a `define` that changed nothing is today indistinguishable from one that did. That is the
+    // fact worth reporting, not the success.
+    const applied = declared - alreadyPresent;
+    this.diagnostics.fact(
+      DiagnosticCode.schemaApplied,
+      `\`define\` applied ${applied} new definition(s); ${alreadyPresent} already present.`,
+      rangeOf(file),
+    );
+    this.diagnostics.fact(
+      DiagnosticCode.keysRegistered,
+      // Identity is the @key attribute's value (ADR-020 D3). A type that registered no key is
+      // `local:` and is refused at the replication boundary, which is worth saying out loud.
+      `Registered ${keys.length} key attribute(s).`,
+      rangeOf(file),
+    );
+    this.flushDeferredFacts();
+    return this.diagnostics.report();
+  }
+
+  /** The one way this engine refuses: a diagnostic on the report, attached to the error thrown. */
+  private readonly refuse: Refuse = (code, message, range) => {
+    throw attachDiagnostic(new Error(message), this.diagnostics.error(code, message, range));
+  };
+
+  /** What the schema rules ask of the data — one count per question, outside any transaction. */
+  private dataFacts(): DataFacts {
+    return {
+      instancesOf: (type: string): number => {
+        const table = this.schema.attributes.has(type) ? 'attr' : 'thing';
+        try {
+          const row = this.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE type = ?`).get(type) as
+            | { n: number }
+            | undefined;
+          return Number(row?.n ?? 0);
+        } catch {
+          // The first `define` on an empty database: the prelude has not created the tables yet,
+          // and a database with no tables has no instances.
+          return 0;
+        }
+      },
+      ownersWithoutExactlyOne: (owner: string, attribute: string): number => {
+        try {
+          const row = this.db
+            .prepare(
+              `SELECT COUNT(*) AS n FROM thing t WHERE t.type IN ${SUBTYPES_OF} ` +
+                'AND (SELECT COUNT(*) FROM attr a WHERE a.owner = t.iid AND a.type = ?) <> 1',
+            )
+            .get(owner, attribute) as { n: number } | undefined;
+          return Number(row?.n ?? 0);
+        } catch {
+          return 0; // As above: no tables, no data.
+        }
+      },
+      repeatedValueOf: (attribute: string): string | undefined => {
+        try {
+          const row = this.db
+            .prepare('SELECT value FROM attr WHERE type = ? GROUP BY value HAVING COUNT(*) > 1 LIMIT 1')
+            .get(attribute) as { value: string } | undefined;
+          return row === undefined ? undefined : JSON.stringify(String(row.value));
+        } catch {
+          return undefined; // As above: no tables, no data.
+        }
+      },
+    };
+  }
+
+  /**
+   * The DDL, in one transaction, so a refused statement leaves nothing behind.
+   *
+   * 🔴 A `@key` or `@unique` on an ownership whose data repeats is refused before this by
+   * `schema-rules.ts`, naming the attribute; the UNIQUE index failing to build is the backstop.
+   * Before the transaction that failure came after the `schema_*` rows were already inserted, so
+   * the schema was half-applied, and it surfaced as SQLite's own message with no diagnostic. The
+   * pragma runs first because it is a no-op inside a transaction, and the prelude's copy of it
+   * then is.
+   *
+   * ⚠️ `BEGIN IMMEDIATE`, not `BEGIN`. The DDL reads the schema (`IF NOT EXISTS`) before it
+   * writes, and a deferred transaction that upgrades from read to write while another process
+   * holds the write lock gets SQLITE_BUSY at once — `busy_timeout` does not apply to an upgrade.
+   * Three spoke processes each running `define` on open found it. Taking the write lock up front
+   * waits instead.
+   */
+  private applySchemaDdl(ddl: string, file: TypeQLiteFile): void {
+    this.db.exec('PRAGMA foreign_keys = ON');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.exec(ddl);
+      if (this.persistKeyOwnerships) {
+        // The DDL just created `schema_key_owns`; write down what `loadSchema` derived, so the
+        // next open reads it from the table like any other. 🔴 Inside the same transaction as the
+        // CREATE TABLE: a kill between the two would leave the table present and empty, and a
+        // present table is never re-derived — that database would be locked out of restating its
+        // keys on every later open (review, round 6).
+        const insert = this.db.prepare('INSERT OR IGNORE INTO schema_key_owns(type, attribute) VALUES (?, ?)');
+        for (const owns of this.schema.keyOwnerships) {
+          const [type, attribute] = owns.split('\u0000');
+          insert.run(type, attribute);
+        }
+      }
+      if (this.persistRelations) {
+        // Same transaction as the CREATE TABLE, for the reason above: a present table is never re-derived.
+        const insert = this.db.prepare('INSERT OR IGNORE INTO schema_relation(name) VALUES (?)');
+        for (const name of this.schema.relations) insert.run(name);
+      }
+      this.db.exec('COMMIT');
+      this.persistKeyOwnerships = false;
+      this.persistRelations = false;
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      const text = error instanceof Error ? error.message : String(error);
+      if (!/UNIQUE constraint failed/.test(text)) throw error;
+      // The rule in `schema-rules.ts` names the attribute before the DDL runs; this is the backstop
+      // for a database whose rows changed between the check and the index, and it cannot name it.
+      const message =
+        'The existing data does not conform: an attribute has repeated values among existing ' +
+        'instances, so it cannot be made @key or @unique. Remove the duplicates first.';
+      throw attachDiagnostic(
+        new Error(message),
+        this.diagnostics.error(DiagnosticCode.dataDoesNotConform, message, rangeOf(file)),
+      );
+    }
+  }
+
+  /**
+   * Run a write pipeline: `insert`, `put`, or `delete`, optionally preceded by a `match`.
+   *
+   * 🔴 Each pipeline runs in a transaction. TypeDB's `execute` is atomic per statement, and here
+   * one TypeQLite insert becomes several SQL statements — the thing, then each attribute, then each
+   * role. Without this, a `@key` violation on the second attribute leaves the thing row behind:
+   * an attribute-less thing, **invisible to every TypeQLite query** because they all filter on an
+   * attribute, and therefore accumulating unnoticed. Unobservable is not the same as harmless.
+   */
+  execute(text: string): ExecutionReport {
+    this.diagnostics = this.freshDiagnostics();
+    this.written = { things: 0, attributes: 0, roles: 0 };
+    for (const pipeline of this.pipelines(text)) {
+      const write = pipeline.write;
+      if (!write) continue;
+
+      let bindings = new Map<string, number[]>();
+      // 🔴 Hoisted, because the write dispatch below is quantified over these and not only over
+      // `bindings`: an insert runs once per combination, and a combination is what tells it which
+      // iid each variable holds on that run.
+      let combinations: readonly Record<string, Binding>[] = [];
+      // `match …; insert …; reduce …;` parses, and a write reports what it wrote, not rows — the
+      // stage after the write is refused by name rather than dropped (review, round 7), and
+      // BEFORE the match runs, so an empty match does not turn the refusal into a success (round 8).
+      if (pipeline.reduce !== undefined) {
+        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate a `reduce` after a write stage yet.', rangeOf(pipeline.reduce));
+      }
+      // `insert $p has nick $zz` with nothing binding `$zz`: refused before the match runs, so an
+      // empty match does not turn it into a success (review, round 11).
+      this.checkWriteStage(pipeline, write);
+      if (pipeline.match) {
+        // 🔴 An empty match means the write runs ZERO times — it is not an error.
+        //
+        // TypeQLite's `match … insert …` is quantified over the match's results, so no results means
+        // nothing is inserted and the statement succeeds. Throwing here instead pre-empted the
+        // caller's own check with a lower-level message: `TypeDBLiteSkillRepository.linkDependency`
+        // does exactly this, relies on the no-op, and then reports *"Refusing a dangling
+        // dependency … One or both steps do not exist"* — which is the message a user should see,
+        // and which this was hiding.
+        // 🔴 One write per distinct assignment of CONCEPTS — and of the VALUES the write reads.
+        // Since Phase 06 a combination is one per attribute value, so `match $x has name $n;
+        // insert $x has nick "z";` over a person with two names would write `nick "z"` twice
+        // (review, round 3); but `insert $x has age $v` and `delete $n of $p` read a value, and
+        // for those the value is part of what makes a combination distinct (round 5).
+        combinations = uniqueByConcepts(this.combinations(pipeline), valueVariablesReadBy(write));
+        if (combinations.length === 0) {
+          // 🔴 The most valuable fact this phase reports, and the one that was entirely silent.
+          //
+          // `match … insert` is quantified over the match, so an empty match is a SUCCESS that
+          // writes nothing. Nothing throws, nothing logs, and the caller cannot tell this apart
+          // from a write that happened — see the comment above, where throwing here was tried and
+          // was worse.
+          this.diagnostics.fact(
+            DiagnosticCode.emptyMatch,
+            '`match` bound 0 combinations, so the write ran 0 times.',
+            rangeOf(pipeline.match),
+          );
+          continue;
+        }
+        // 🔴 **Every write is quantified over EVERY combination.** That is what `match … write`
+        // means: the write runs once per result, which this interpreter already acknowledged at
+        // zero — an empty match makes the write run zero times, a few lines above — and then
+        // silently dropped above one.
+        //
+        // Both halves were found by the defect gate and fixed one at a time:
+        // `d-20260905-match-delete-removes-one-match-of` (a delete removed one row of three and
+        // reported `ok`) and `d-20260905-match-insert-writes-to-one-match` (an insert wrote the
+        // attribute to one owner of three).
+        //
+        // ⚠️ **Both were latent for months and safe only by accident.** All twelve `match`-then-write
+        // statements in this repository bind on a `@key`, so every match was a single row. The gate's
+        // own claim store was the first caller to write over a non-key attribute, and it lost two of
+        // three claims immediately.
+        bindings = resolveEveryMatch(combinations);
+      }
+
+      this.touched = new Set();
+      this.tombstones = [];
+
+      if (this.transactionOpen && this.sqliteTransactionIsAlive() === false) {
+        // The engine ended the transaction under the caller (SQLITE_FULL, SQLITE_IOERR) and the work
+        // carried on. A write now would autocommit outside it, so the atomicity the caller asked for
+        // is already lost; refuse loudly and let the transaction's own COMMIT or ROLLBACK report it.
+        throw new Error(
+          'The transaction was ended by the database (for example a full disk); nothing more can be written inside it.',
+        );
+      }
+      const savepoint = this.transactionOpen ? `write_${(this.savepointSeq += 1)}` : null;
+      this.db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN');
+      try {
+        if (write.$type === 'DeleteStage') {
+          this.runDeletes(pipeline, bindings, combinations);
+        } else {
+          // 🔴 **Once per combination, not once.** `runInsert` reads one binding per variable, so
+          // quantifying means running it per combination rather than handing it every iid — the
+          // insert path builds *new* things against the bound ones, and a variable holding three
+          // iids would give it no way to say which.
+          for (const combination of combinations.length > 0 ? combinations : [null]) {
+            const scoped =
+              combination === null ? bindings : singleBinding(combination);
+            const values = combination === null ? new Map<string, ValueBinding>() : valueBindingsOf(combination);
+            for (const pattern of write.patterns) {
+              this.runInsert(pattern, scoped, values, write.$type === 'PutStage');
+            }
+          }
+        }
+        // 🔴 Inside the transaction, before COMMIT. This is the whole point of attaching the log
+        // here rather than in `SqliteEngine`, which wraps this method and could only act once the
+        // transaction had already closed.
+        for (const identity of this.tombstones) {
+          this.changeLog.recordTombstone(identity);
+        }
+        for (const iid of this.touched) {
+          this.changeLog.recordWrite(iid);
+        }
+        this.db.exec(savepoint ? `RELEASE ${savepoint}` : 'COMMIT');
+      } catch (error) {
+        if (savepoint) {
+          // Undo this pipeline only; the transaction around it stays open and usable.
+          try {
+            this.db.exec(`ROLLBACK TO ${savepoint}`);
+            this.db.exec(`RELEASE ${savepoint}`);
+          } catch (unwindError) {
+            // Swallow ONLY when SQLite already ended the transaction (SQLITE_FULL, SQLITE_IOERR):
+            // the savepoint went with it, and the pipeline's own error is the one to report. If the
+            // transaction is still alive the rollback genuinely failed, the pipeline's writes may
+            // survive, and that must not be hidden.
+            if (this.sqliteTransactionIsAlive() !== false && !/no such savepoint/i.test(String(unwindError))) {
+              throw unwindError;
+            }
+          }
+        } else {
+          this.db.exec('ROLLBACK');
+        }
+        throw error;
+      }
+
+      this.diagnostics.fact(
+        DiagnosticCode.wrote,
+        // Counts, never lists. "What this write touched" is unbounded on a large write, and this
+        // report can travel in a replicated event payload (ADR-021 D5).
+        `Wrote ${this.written.things} thing(s), ${this.written.attributes} attribute(s), ` +
+          `${this.written.roles} role player(s).`,
+        rangeOf(pipeline),
+      );
+      if (this.tombstones.length > 0) {
+        this.diagnostics.fact(
+          DiagnosticCode.tombstones,
+          // A delete that matched nothing produces no tombstone, so no replica learns of it.
+          `Recorded ${this.tombstones.length} tombstone(s).`,
+          rangeOf(pipeline),
+        );
+      }
+    }
+    this.flushDeferredFacts();
+    return this.diagnostics.report();
+  }
+
+  /** The counts of the most recent `query()`, or `undefined` when tracing is off. */
+  lastQueryTrace(): Readonly<QueryTrace> | undefined {
+    return this.lastTrace;
+  }
+
+  /** Run a read pipeline and project its `select`. */
+  query(text: string): {
+    rows: Array<Record<string, TypeDBLiteValue>>;
+    diagnostics: ExecutionReport['diagnostics'];
+  } {
+    if (!this.tracing) return this.runQuery(text);
+    this.trace = newTrace();
+    this.lastTrace = this.trace;
+    try {
+      return this.runQuery(text);
+    } finally {
+      this.trace = undefined;
+    }
+  }
+
+  private runQuery(text: string): {
+    rows: Array<Record<string, TypeDBLiteValue>>;
+    diagnostics: ExecutionReport['diagnostics'];
+  } {
+    this.diagnostics = this.freshDiagnostics();
+    const rows: Array<Record<string, TypeDBLiteValue>> = [];
+    const pipelines = this.pipelines(text);
+    // 🔴 `match …; select $a; match let $y = $x + 2;` is ONE pipeline of two stages on TypeDB, and
+    // the second stage sees what the first selected. Here each `match` would evaluate alone — and
+    // `$x` would be "unbound" for the wrong reason, a pass by coincidence (variables.feature L38,
+    // Phase 06 audit). Refused by name until stages are chained.
+    if (pipelines.length > 1) {
+      this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate a multi-stage read pipeline yet: each `match` here would be answered alone.', rangeOf(pipelines[1]));
+    }
+    for (const pipeline of pipelines) {
+      // 🔴 Every read pipeline is evaluated — a `match` with no `select` projects every variable it
+      // names, as TypeDB does. This loop used to `continue` past a select-less pipeline, and with
+      // it past `checkKnown`: an unknown type answered zero rows at exit 0
+      // (`d-20260911-a-match-pipeline-with-no-select`).
+      //
+      // No projectability check here. `TypeQLiteValidator.checkSelectProjectsVariables` owns it
+      // and `parse()` runs it, so the rule has one definition serving the editor and the engine.
+      const projected = pipeline.reduce === undefined ? this.project(pipeline) : this.reduce(pipeline, pipeline.reduce);
+      rows.push(...projected);
+
+      // 🔴 Diagnosed only when the projection came back EMPTY, and that is not a nicety.
+      //
+      // Running a candidate lookup per constraint on every query doubled the work the engine does
+      // to read, and hung the replication and oracle suites — thousands of queries, each paying for
+      // a diagnosis of a result that was fine. It is also the only case where the fact means
+      // anything: when rows came back, "no candidates" cannot be true.
+      if (projected.length === 0) {
+        // Distinguishes "nothing of this type exists" from "the constraints excluded everything" —
+        // a schema problem from a data problem. Neither is recoverable from an empty row set.
+        const constraints = this.constraintsOf(pipeline.match?.patterns ?? []);
+        for (const constraint of constraints) {
+          if (!constraint.type) continue;
+          const withoutRoles = this.candidates(constraint).length;
+          if (withoutRoles !== 0) {
+            // 🔴 Type and attributes alone find candidates — for a relation, that leaves exactly
+            // one thing left that could have excluded every row: its OWN role constraints, which
+            // `candidates()` never reads (d-20260912-an-empty-result-caused-only-by).
+            // `relationBindings` applies three rules `candidates()` cannot see — same-role
+            // distinctness, the already-bound-relation pin, and the subtype closure on the
+            // relation's own `isa` — any of which can silently zero out a relation `candidates()`
+            // finds fine. Probed with an EMPTY combination: no outer pattern's binding is assumed,
+            // so a zero here is provably the relation's own doing, not a guess about one.
+            if (constraint.roles.length === 0) continue;
+            // 🔴 …except when this relation's own variable is ITSELF a role player of another
+            // relation in the same match (`relation-plays-a-role.test.ts`'s shape). An empty-
+            // combination probe cannot know which instance the outer pattern actually pinned it
+            // to — and an unrelated relation of the same type elsewhere in the store can satisfy
+            // the probe while the pinned instance is the one that was excluded, suppressing the
+            // diagnostic for exactly the row that needed it (QA, adversarial pass). Declining to
+            // guess preserves the pre-existing silence there rather than risking a wrong answer.
+            const boundByOuterRelation = constraints.some(
+              (other) => other.variable !== constraint.variable && other.roles.some((role) => role.player === constraint.variable),
+            );
+            if (boundByOuterRelation) continue;
+            if (this.relationBindings({ ...constraint, isas: resolveIsas(constraint.isas, {}) }, {}).length !== 0) continue;
+            this.diagnostics.fact(
+              DiagnosticCode.noCandidates,
+              `\`${constraint.isas.filter((isa) => isa.type !== undefined).map((isa) => `isa${isa.exact ? '!' : ''} ${isa.type}`).join(', ')}\` matched ${withoutRoles} candidate(s) before ` +
+                `${constraint.variable.startsWith('__anon') ? 'its role constraints' : `the role constraints on '${constraint.variable}'`}` +
+                `, and 0 after.`,
+              constraint.range,
+            );
+            continue;
+          }
+
+          // 🔴 `candidates()` applies the literals AND the bindings, so its zero cannot say which
+          // half was responsible — and this block exists for nothing else. Saying "before
+          // constraints were applied" over a store that holds the type sends a reader to the
+          // schema for a fault in the data. The type-only count is what separates them.
+          //
+          // The extra lookup is affordable because it is reached only when the projection came
+          // back empty *and* the constrained count was already zero — never on a query that
+          // answered.
+          // Skipped when the pattern carries neither, because the query would be byte-identical
+          // to the one that just returned 0. That is ALL it does — keeping `__anonN` out of the
+          // message is the job of the ternary in the message below, and an earlier version of this
+          // comment claimed the skip handled it.
+          const constrained =
+            constraint.literals.length > 0 || constraint.bindings.length > 0;
+          const ofType = constrained
+            ? this.candidates({ ...constraint, literals: [], bindings: [] }).length
+            : 0;
+
+          // 🔴 Two counts, and no interpretation of them. Earlier revisions tried to name WHICH
+          // fault produced the zero — a literal that excluded the rows, or a binding on an
+          // attribute the type does not own — and each attempt was wrong in a new way, because
+          // **`SchemaModel` records `types` and `attributes` as two flat sets and never which type
+          // owns which attribute.** Ownership cannot be derived from candidate counts: the outer
+          // zero only says no candidate satisfied *all* the constraints, never which one failed,
+          // nor for how many. Four review rounds went into successive guesses at it.
+          //
+          // ⚠️ Phrased as the constraints on the VARIABLE, not on "this pattern": `constraintsOf`
+          // merges every pattern naming the same variable into one constraint, while
+          // `constraint.range` points at the first of them. `match $n isa node, has node-id "a";
+          // $n has edge-id $x;` would otherwise blame a pattern that matches a row.
+          //
+          // 🔴 …except for an anonymous relation, whose variable is the synthetic `__anonN` that
+          // `constraintsOf` invented. Naming it tells the reader to look for a variable that is
+          // not in their query, so the ternary below substitutes a neutral phrase.
+          //
+          // So the fact states what it can prove and lets the reader draw the inference. The two
+          // numbers already separate the schema case from the data case, which is all this block
+          // was ever for: `0 … 0` means nothing of the type exists, `5 … 0` means this pattern
+          // excluded them. Naming the culprit needs per-type ownership in the schema model — a
+          // real change, not a better sentence.
+          this.diagnostics.fact(
+            DiagnosticCode.noCandidates,
+            `\`${constraint.isas.filter((isa) => isa.type !== undefined).map((isa) => `isa${isa.exact ? '!' : ''} ${isa.type}`).join(', ')}\` matched ${ofType} candidate(s) before ` +
+              `${constraint.variable.startsWith('__anon') ? 'its constraints' : `the constraints on '${constraint.variable}'`}` +
+              `, and 0 after.`,
+            constraint.range,
+          );
+        }
+      }
+      this.diagnostics.fact(
+        DiagnosticCode.projected,
+        // Kept as a count of what a *successful* projection returned. It used to be the only signal
+        // that a `select` named a variable the `match` never bound; that is now
+        // `TypeQLiteValidator.checkSelectProjectsVariables`, run by `parse()` — so an unbound
+        // variable throws before this line is reached, and from a different layer entirely.
+        `Matched ${projected.length} row(s); ` +
+          (pipeline.select
+            ? `\`select\` names ${pipeline.select.variables.length} variable(s).`
+            : 'no `select`, so every named variable is projected.'),
+        rangeOf(pipeline.select ?? pipeline),
+      );
+    }
+    this.flushDeferredFacts();
+    return { rows, diagnostics: this.diagnostics.report().diagnostics };
+  }
+
+  /**
+   * Whether SQLite still has a transaction open on this handle: `undefined` where this Node has no
+   * `DatabaseSync.isTransaction` (added in 22.16 and 24.0). The tracing wrapper forwards it.
+   */
+  private sqliteTransactionIsAlive(): boolean | undefined {
+    const flag = (this.db as unknown as { isTransaction?: unknown }).isTransaction;
+    return typeof flag === 'boolean' ? flag : undefined;
+  }
+
+  /**
+   * Open a caller-held transaction: `BEGIN IMMEDIATE`, the write lock up front, for the reason
+   * `applySchemaDdl` gives (a deferred transaction that upgrades while another process holds the
+   * lock gets SQLITE_BUSY at once, and `busy_timeout` does not apply to an upgrade).
+   */
+  beginTransaction(): void {
+    if (this.transactionOpen) throw new Error('A transaction is already open on this handle.');
+    this.db.exec('BEGIN IMMEDIATE');
+    this.transactionOpen = true;
+  }
+
+  commitTransaction(): void {
+    try {
+      this.db.exec('COMMIT');
+    } finally {
+      this.transactionOpen = false;
+    }
+  }
+
+  /** Never throws: a rollback that fails after the engine already ended the transaction is moot. */
+  rollbackTransaction(): void {
+    try {
+      this.db.exec('ROLLBACK');
+    } catch {
+      // SQLite has already rolled back (for example after SQLITE_FULL); nothing is left to undo.
+    } finally {
+      this.transactionOpen = false;
+    }
+  }
+
+  close(): void {
+    this.db.close();
+  }
+
+  // ── parsing ───────────────────────────────────────────────────────────────
+
+  /**
+   * Parse, then run the language's OWN validators over the AST.
+   *
+   * 🔴 **The validators used not to run at all here.** This called `LangiumParser.parse` and looked
+   * only at lexer and parser errors, so every rule in `TypeQLiteValidator` — `@card`, `@unique`,
+   * duplicate labels, reserved keywords, `@key` on a role, duplicate `owns` — fired in an editor
+   * and never for anything the engine executed. `rejectUnimplemented` then hand-rolled two of those
+   * rules again in this file, so `@card` had two definitions and only one of them guarded a real
+   * write.
+   *
+   * ⚠️ **And queries here are TypeScript string literals, not `.typeqlite` documents**, so no editor
+   * ever sees them. Running validation on the AST the interpreter just built is what makes the
+   * language layer authoritative for both: one rule, registered once, enforced wherever TypeQLite
+   * arrives from.
+   *
+   * `validateSync` is Langium's own `validateAstNodes` loop without the `await` — see its header for
+   * why the async `DocumentValidator` is not usable from a synchronous engine.
+   */
+  private parse(text: string): TypeQLiteFile {
+    const result = TypeQLite.parser.LangiumParser.parse<TypeQLiteFile>(text);
+    const errors = [...result.lexerErrors, ...result.parserErrors];
+    if (errors.length > 0) {
+      const message = `TypeQLite could not be parsed: ${errors
+        .map((e) => e.message)
+        .join('; ')}`;
+      // 🔴 There is no AST here — parsing is what failed — so the range cannot come from a
+      // `CstNode`. Chevrotain carries its own offsets on both error kinds, under different shapes:
+      // a lexer error has `offset`/`length`, a parser error carries the offending `token`.
+      const first = errors[0] as {
+        offset?: number;
+        length?: number;
+        token?: { startOffset?: number; image?: string };
+      };
+      const offset = first.offset ?? first.token?.startOffset ?? 0;
+      const length = first.length ?? first.token?.image?.length ?? 1;
+      throw attachDiagnostic(
+        new Error(message),
+        this.diagnostics.error(
+          DiagnosticCode.parseFailed,
+          message,
+          rangeFromOffset(text, offset, length),
+        ),
+      );
+    }
+
+    // 🔴 The language's rules, run where the engine can act on them. An `error` here is a construct
+    // the grammar accepts and the runtime refuses — ADR-018 D7's middle layer, which had no teeth
+    // for anything but an editor until this call existed.
+    //
+    // ⚠️ Anything BELOW error is forwarded as a fact, not dropped. Since 2026-09-11 an annotation
+    // the runtime does not enforce (`@card`, `@unique`, `@independent`, …) is reported by the
+    // validator at info severity and the schema is applied; dropping it here would turn the
+    // founder's "accept, and report" into "accept, silently" — the one outcome ADR-018 D7 forbids.
+    const reported = validateSync(TypeQLite, result.value);
+    const problem = reported.find((diagnostic) => diagnostic.severity === 1);
+    if (problem) {
+      const message = problem.message;
+      throw attachDiagnostic(new Error(message), {
+        range: problem.range,
+        severity: 1,
+        code: problem.code,
+        message,
+        source: DIAGNOSTIC_SOURCE,
+      });
+    }
+    // Deferred, not pushed: the collector caps facts, and a define with fifty annotations would
+    // otherwise push fifty "not enforced" facts BEFORE the two that say what the call did. Each
+    // entry point flushes these after its own facts, so what happened survives the cap and the
+    // annotations are what get truncated.
+    this.deferredFacts = reported.filter((diagnostic) => diagnostic.severity !== 1);
+    return result.value;
+  }
+
+  private pipelines(text: string): Pipeline[] {
+    return this.parse(text).clauses.filter(
+      (clause): clause is Pipeline => clause.$type === 'Pipeline',
+    );
+  }
+
+  // ── the schema re-check Phase 01 forced ───────────────────────────────────
+
+  /**
+   * 🔴 ADR-018 Decision 7's third layer, and the backstop that must never become a no-op.
+   *
+   * Phase 01 proved a standalone query cannot be validated against a schema that is not loaded —
+   * repositories pass a query string with no schema document in scope — so this is the only place
+   * the check can be sound: against the schema this interpreter actually applied.
+   */
+  /**
+   * Every `sub <parent>` names a type the schema knows — as TypeDB refuses `[SYR1] The type … was
+   * not found`. 🔴 It was applied silently: the interpreter parses without linking, so the parent
+   * was only ever a string, recorded into `schema.parents` and `type_parent` unchecked, and every
+   * later `isa` on the child resolved through a parent that did not exist
+   * (`d-20260911-define-accepts-a-supertype-that-does`).
+   *
+   * **And every re-open names a type the schema knows.** `nobody owns ref @key;` — a
+   * `TypeExtensionDef` on a type never defined — was applied too, writing `schema_owns` and a
+   * UNIQUE index for a type that did not exist; found by the Phase 01 review. Same check, same
+   * refusal.
+   *
+   * ⚠️ Checked BEFORE the DDL runs, and against the names this define declares plus those already
+   * applied — a parent or a re-opened type defined later in the same statement is fine, as it is
+   * on TypeDB.
+   */
+  private checkSupertypesExist(file: TypeQLiteFile): void {
+    const types = new Set(this.schema.types);
+    const attributes = new Set(this.schema.attributes);
+    for (const clause of file.clauses) {
+      if (!isDefineClause(clause)) continue;
+      for (const definition of clause.definitions) {
+        if (isEntityDef(definition) || isRelationDef(definition)) types.add(definition.name);
+        if (isAttributeDef(definition)) attributes.add(definition.name);
+      }
+    }
+    for (const clause of file.clauses) {
+      if (!isDefineClause(clause)) continue;
+      for (const definition of clause.definitions) {
+        if (isTypeExtensionDef(definition)) {
+          // An attribute is a type too: `name @abstract;`, `email @independent;` re-open one — with
+          // annotations only. A trait on an attribute (`email owns name @key;`) is refused, as
+          // TypeDB refuses it; admitting it wrote a UNIQUE index on `name` from a statement no
+          // schema should accept (Phase 01 review, round 3).
+          if (attributes.has(definition.type) && !types.has(definition.type)) {
+            const parent = definition.superType;
+            if (parent !== undefined && !attributes.has(parent)) {
+              const message =
+                `Unknown attribute '${parent}': '${definition.type} sub ${parent}' names a parent that is ` +
+                `neither defined here nor already applied. The applied schema defines: ` +
+                `${[...attributes].sort().join(', ') || '(nothing)'}`;
+              throw attachDiagnostic(
+                new Error(message),
+                this.diagnostics.error(DiagnosticCode.unknownAttribute, message, rangeOf(definition)),
+              );
+            }
+            if (definition.traits.length === 0) continue;
+            const message =
+              `attribute '${definition.type}' cannot own, relate or play: an attribute re-open ` +
+              `takes annotations only.`;
+            throw attachDiagnostic(
+              new Error(message),
+              // Its own code: the attribute IS known, so `unknownType` would steer a consumer
+              // toward defining it when the remedy is to drop the trait (review, round 4).
+              this.diagnostics.error(DiagnosticCode.traitOnAttribute, message, rangeOf(definition)),
+            );
+          }
+          if (types.has(definition.type)) {
+            // `person sub parent;` — a re-open assigning a parent. The parent is a plain name in
+            // the AST (the re-opened type's kind is not in the text); it must be a thing type
+            // the schema knows, as an entity's `sub` must.
+            const parent = definition.superType;
+            if (parent !== undefined && !types.has(parent)) {
+              const message =
+                `Unknown type '${parent}': '${definition.type} sub ${parent}' names a parent that is ` +
+                `neither defined here nor already applied. The applied schema defines: ` +
+                `${[...types].sort().join(', ') || '(nothing)'}`;
+              throw attachDiagnostic(
+                new Error(message),
+                this.diagnostics.error(DiagnosticCode.unknownType, message, rangeOf(definition)),
+              );
+            }
+            continue;
+          }
+          const message =
+            `Unknown type '${definition.type}': it is re-opened here but neither defined here nor ` +
+            `already applied. The applied schema defines: ` +
+            `${[...types, ...attributes].sort().join(', ') || '(nothing)'}`;
+          throw attachDiagnostic(
+            new Error(message),
+            this.diagnostics.error(DiagnosticCode.unknownType, message, rangeOf(definition)),
+          );
+        }
+        const parent = definition.superType?.$refText;
+        if (parent === undefined) continue;
+        const known = isAttributeDef(definition) ? attributes : types;
+        if (known.has(parent)) continue;
+        const kind = isAttributeDef(definition) ? 'attribute' : 'type';
+        const message =
+          `Unknown ${kind} '${parent}': '${definition.name} sub ${parent}' names a parent that is ` +
+          `neither defined here nor already applied. The applied schema defines: ` +
+          `${[...known].sort().join(', ') || '(nothing)'}`;
+        throw attachDiagnostic(
+          new Error(message),
+          this.diagnostics.error(
+            kind === 'type' ? DiagnosticCode.unknownType : DiagnosticCode.unknownAttribute,
+            message,
+            rangeOf(definition),
+          ),
+        );
+      }
+    }
+  }
+
+  private checkKnown(
+    kind: 'type' | 'attribute',
+    name: string,
+    at?: Range,
+  ): void {
+    const known =
+      kind === 'type' ? this.schema.types : this.schema.attributes;
+    if (known.size === 0) return; // No schema applied yet; `define` has not run.
+    if (!known.has(name)) {
+      const message =
+        `Unknown ${kind} '${name}'. The applied schema defines: ` +
+        `${[...known].sort().join(', ')}`;
+      throw attachDiagnostic(
+        new Error(message),
+        this.diagnostics.error(
+          kind === 'type'
+            ? DiagnosticCode.unknownType
+            : DiagnosticCode.unknownAttribute,
+          message,
+          at,
+        ),
+      );
+    }
+  }
+
+  // ── matching ──────────────────────────────────────────────────────────────
+
+  private constraintsOf(
+    patterns: readonly Pattern[],
+    statement: OwnershipStatement = 'match',
+  ): ThingConstraint[] {
+    const constraints: ThingConstraint[] = [];
+    // A variable that heads a type pattern in one place and a thing pattern in another is refused,
+    // as one pattern mixing both is — `$x sub person; $x has ref $r;` (review, round 1).
+    const typeHeads = new Set<string>();
+    const thingHeads = new Map<string, Pattern>();
+    for (const pattern of patterns) {
+      if (isThingPattern(pattern) && !isTypeHead(pattern, this.refuse)) {
+        thingHeads.set(pattern.variable, pattern);
+        // `$x isa $t` uses `$t` as a type (review, round 2).
+        for (const property of pattern.properties) {
+          if (isIsaProperty(property) && property.typeVariable !== undefined) typeHeads.add(property.typeVariable);
+        }
+        continue;
+      }
+      if (isThingPattern(pattern) || isKindPattern(pattern)) typeHeads.add(pattern.variable);
+    }
+    for (const variable of typeHeads) {
+      const conflicting = thingHeads.get(variable);
+      if (conflicting !== undefined) {
+        this.refuse(
+          DiagnosticCode.mixedPattern,
+          `'${variable}' is used as a type in one pattern and as a thing in another; a variable is one or the other.`,
+          rangeOf(conflicting),
+        );
+      }
+    }
+    if (statement === 'write') {
+      for (const pattern of patterns) {
+        const typed = isTypeHead(pattern, this.refuse) || (isThingPattern(pattern) && pattern.properties.some((p) => isIsaProperty(p) && p.typeVariable !== undefined));
+        if (typed) {
+          // `insert $x isa $t` / `insert $x sub person;` — a write cannot hold a type variable here (review, round 1).
+          this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not write through a type variable: an insert names its type.', rangeOf(pattern));
+        }
+        // `insert $x isa person, isa writer;` — a write names ONE type (review, round 4): the
+        // match side ANDs every `isa`, and an insert can only write one.
+        if (isThingPattern(pattern) && pattern.properties.filter(isIsaProperty).length > 1) {
+          this.refuse(DiagnosticCode.mixedPattern, `'${pattern.variable}' names more than one type in a write; an insert or put names exactly one.`, rangeOf(pattern));
+        }
+      }
+    }
+    for (const pattern of patterns) {
+      // A `let` or a comparison is `orderValueStatements`'s — see `expressions.ts`.
+      if (isLetPattern(pattern) || isComparisonPattern(pattern)) continue;
+      // A type pattern is `typeConstraintsOf`'s — see `type-patterns.ts`; a mixed head is refused there.
+      if (isTypeHead(pattern, this.refuse)) continue;
+      if (isAnonRelationPattern(pattern)) {
+        this.checkKnown('type', pattern.type, rangeOf(pattern));
+        constraints.push({
+          variable: `__anon${constraints.length}`,
+          type: pattern.type,
+          isas: [{ type: pattern.type, exact: false }],
+          range: rangeOf(pattern),
+          literals: [],
+          bindings: [],
+          roles: rolesOf(pattern.players, (patternCounter += 1)),
+        });
+        continue;
+      }
+      if (!isThingPattern(pattern)) continue;
+
+      const constraint: ThingConstraint = {
+        variable: pattern.variable,
+        range: rangeOf(pattern),
+        literals: [],
+        bindings: [],
+        roles: [],
+        isas: [],
+      };
+      // One id for the whole pattern, so its `isa (...)` list and its `links (...)` list are the
+      // same statement — they are written together and mean one thing.
+      const statement = (patternCounter += 1);
+      for (const property of pattern.properties) {
+        if (isIsaProperty(property)) {
+          if (property.type !== undefined) this.checkKnown('type', property.type, rangeOf(property));
+          // Every `isa` is kept — two in one pattern, `isa! writer, isa person`, are two filters.
+          constraint.isas.push({ type: property.type, typeVariable: property.typeVariable, exact: property.exact === true });
+          constraint.type ??= property.type;
+          if (property.players) constraint.roles.push(...rolesOf(property.players, statement));
+        } else if (isLinksProperty(property)) {
+          constraint.roles.push(...rolesOf(property.players, statement));
+        } else if (isHasProperty(property)) {
+          this.checkKnown('attribute', property.attribute, rangeOf(property));
+          if (property.value) {
+            constraint.literals.push({
+              attribute: property.attribute,
+              value: this.checkedLiteralText(property.value, property.attribute, rangeOf(property)),
+              range: rangeOf(property),
+              alternatives: this.literalAlternatives(property.value, property.attribute, rangeOf(property)),
+            });
+          } else if (property.valueVariable) {
+            constraint.bindings.push({
+              attribute: property.attribute,
+              variable: property.valueVariable,
+              range: rangeOf(property),
+            });
+          }
+        }
+      }
+      // (Phase 05) `isa $t` and `isa!` merge too — a later pattern's `isa` is not dropped.
+      // 🔴 A variable repeated across patterns NARROWS; it does not start again.
+      //
+      // `TypeDBLitePrincipalRepository.findById` writes exactly this:
+      //
+      //     match $p isa principal, has principal-id "s";
+      //           $p has principal-id $id, has principal-type $type;
+      //
+      // Two patterns, one `$p`. Treating them as separate constraints let the second — which has
+      // no `isa` and no literal, so it matches every principal — overwrite the first, and
+      // `findById('s')` returned whichever principal came first. Merging by variable is what makes
+      // the second pattern a projection of the thing the first one found.
+      const existing = constraints.find((c) => c.variable === constraint.variable);
+      if (existing) {
+        existing.isas.push(...constraint.isas);
+        existing.type ??= constraint.type;
+        existing.literals.push(...constraint.literals);
+        existing.bindings.push(...constraint.bindings);
+        existing.roles.push(...constraint.roles);
+        continue;
+      }
+      constraints.push(constraint);
+    }
+    // 🔴 After merging, not during. `constraintsOf` folds every pattern naming a variable into one
+    // constraint, and the `isa` may arrive in a later pattern than the `has` — checking mid-walk
+    // would accuse `$p has principal-type "user";` of naming an unowned attribute purely because
+    // its type had not been seen yet.
+    for (const constraint of constraints) this.checkOwns(constraint, statement);
+    return constraints;
+  }
+
+  /**
+   * Refuse a pattern that constrains an attribute its type does not own.
+   *
+   * 🔴 `match $n isa node, has edge-id $e;` can never match, however the data changes — `node` does
+   * not own `edge-id`. It answered **zero rows at exit code 0**, and the `noCandidates` fact could
+   * not say so: two attempts to derive it from candidate counts reported a *data* problem for a
+   * *schema* fault, in different wrong ways, before the inference was deleted. The fault was that
+   * `SchemaModel` recorded no ownership, not that the question was underivable.
+   *
+   * ⚠️ **Silent when the schema predates `schema_owns`**, rather than accusing every pattern of
+   * naming an unowned attribute. An empty ownership set means "not recorded", never "owns nothing"
+   * — the distinction that makes this safe to add to a database written by an older build.
+   *
+   * ⚠️ **Both directions of the hierarchy count** — see `typeFamily`. `isa doc` may be answered by
+   * an `adr` that owns more than `doc` does, and an `adr` inherits what `doc` owns.
+   *
+   * ⚠️ **A write is refused for the same reason, but not in the same words.** Nothing is being
+   * matched in `insert $n isa node, has edge-id "e";` — the fault is that the row it would write is
+   * one the engine could never read back, because every read of it is the refusal above.
+   *
+   * 🔴 **And a write's type is concrete, so only the inherited direction counts for it.** A row
+   * inserted as, or bound as, a `doc` *is* a `doc`; that `adr sub doc` owns `adr-status` says nothing
+   * about it. Walking downward on a write accepted a `doc` row carrying an attribute only `adr`
+   * owns — which the read side then refuses on `isa doc`.
+   */
+  private checkOwns(constraint: ThingConstraint, statement: OwnershipStatement = 'match'): void {
+    if (this.schema.owns.size === 0) return;
+    const named = [
+      ...constraint.literals.map((l) => ({ attribute: l.attribute, range: l.range })),
+      ...constraint.bindings.map((b) => ({ attribute: b.attribute, range: b.range })),
+    ];
+    if (named.length === 0) return;
+
+    // Every WRITTEN type on the variable is checked — `isa person, isa! vehicle, has ref $r` is
+    // refused whichever `isa` comes first (review, round 4). A type variable constrains nothing here.
+    const written = [...new Set(constraint.isas.flatMap((isa) => (isa.type === undefined ? [] : [isa.type])))];
+    for (const type of written) {
+      const family = statement === 'match' ? this.typeFamily(type) : this.typeFamily(type, 'inherited');
+      for (const { attribute, range } of named) {
+        if (family.some((t) => this.schema.owns.has(ownsKey(t, attribute)))) continue;
+        const consequence =
+          statement === 'match'
+            ? `\`${constraint.variable} isa ${type}, has ${attribute} …\` can never match.`
+            : `\`${constraint.variable} isa ${type}, has ${attribute} …\` could never be read back.`;
+        const message =
+          `'${type}' does not own '${attribute}', so ${consequence} ` +
+          `Declare \`owns ${attribute}\` on '${type}', or name an attribute it has.`;
+        throw attachDiagnostic(
+          new Error(message),
+          this.diagnostics.error(DiagnosticCode.unownedAttribute, message, range),
+        );
+      }
+    }
+  }
+
+  /**
+   * Every type an `isa` of this one could involve — **both** directions of the hierarchy.
+   *
+   * 🔴 Upward alone was wrong, and wrongly refused a valid query. `adr sub doc, owns adr-status`
+   * makes `match $d isa doc, has adr-status $s;` legitimate: `isa doc` is satisfied by an `adr`, and
+   * the `adr` owns the attribute. Checking only `doc` and its supertypes threw on it —
+   * downstream-monorepo's `downstream-store.schema.typeqlite` has several subtype-owned attributes, so that was live
+   * for the corpus this engine targets, not hypothetical.
+   *
+   * - **Upward** (supertypes), because ownership declared on a parent is inherited: an `adr` owns
+   *   `doc-title` without redeclaring it.
+   * - **Downward** (subtypes), because `candidates()` resolves `isa` through the subtype closure, so
+   *   the thing that matched may own more than the named type does.
+   *
+   * Refusing only when NOTHING in that closure owns the attribute is the conservative reading, and
+   * conservative is the right bias: a false refusal breaks a working query, where a missed one
+   * merely leaves the old silence.
+   *
+   * Cycle-guarded — a malformed `sub` chain would otherwise spin here rather than report anything.
+   */
+  private typeFamily(type: string, direction: 'both' | 'inherited' = 'both'): string[] {
+    const family = new Set<string>([type]);
+
+    let current = this.schema.parents.get(type);
+    while (current && !family.has(current)) {
+      family.add(current);
+      current = this.schema.parents.get(current);
+    }
+    if (direction === 'inherited') return [...family];
+
+    // Descendants: repeated sweeps, because `parents` is child → parent and a chain may be listed
+    // in any order. The type count is small and fixed by `define`.
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const [child, parent] of this.schema.parents) {
+        if (family.has(parent) && !family.has(child)) {
+          family.add(child);
+          grew = true;
+        }
+      }
+    }
+    return [...family];
+  }
+
+  /**
+   * One thing constraint against one combination: its candidates, each extending the combination.
+   * `$x isa $t` with `$t` bound reads the label as the type; unbound, `$t` is bound to each
+   * candidate's own type (match.feature L842: `$x isa $y` answers `label:person` per person).
+   */
+  private bindThing(
+    constraint: ThingConstraint,
+    combination: Record<string, Binding>,
+    relations: readonly ThingConstraint[] = [],
+  ): Array<Record<string, Binding>> {
+    // Every `isa` whose type is known — written, or a type variable already bound — filters the
+    // candidates; the unbound type variables bind afterwards, from the candidate's own type.
+    const resolved = resolveIsas(constraint.isas, combination);
+    const unbound = resolved.filter((isa) => isa.typeVariable !== undefined && isa.type === undefined);
+    const seed = this.planJoins ? this.relationSeed(constraint.variable, relations, combination) : undefined;
+    return this.candidates({ ...constraint, isas: resolved }, seed).flatMap((iid) =>
+      unbound.length === 0
+        ? [{ ...combination, [constraint.variable]: iid }]
+        : this.bindTypeVariables(unbound, iid, { ...combination, [constraint.variable]: iid }),
+    );
+  }
+
+  /**
+   * Unbound type variables on a thing, bound from its own type: the type itself, and — for `isa`,
+   * not `isa!` — every ancestor, so that `$x isa $t` agrees with `$t sub worker; $x isa $t` on what
+   * `$t` can be (match.feature L146: each worker answers its own type and every type above it).
+   * `typeOfThing` is one SQL round-trip, taken only here (review, round 3).
+   */
+  private bindTypeVariables(unbound: readonly Isa[], iid: number, combination: Record<string, Binding>): Array<Record<string, Binding>> {
+    const own = this.typeOfThing(iid);
+    let rows: Array<Record<string, Binding>> = [combination];
+    for (const isa of unbound) {
+      const variable = isa.typeVariable as string;
+      const types = isa.exact ? [own] : [own, ...this.typeFamily(own, 'inherited').filter((t) => t !== own)];
+      rows = rows.flatMap((row) => {
+        // `$x isa $t; $x isa! $t;` — the second sees the first's binding (review, round 3).
+        const already = row[variable];
+        if (typeof already === 'string') return types.includes(already) ? [row] : [];
+        return types.map((type) => ({ ...row, [variable]: type }));
+      });
+    }
+    return rows;
+  }
+
+  /** Candidate row ids per variable, before relation constraints are applied. */
+  private candidates(constraint: ThingConstraint, seed?: { sql: string; params: Array<string | number> }): number[] {
+    if (this.trace) this.trace.candidatesCalls++;
+    const where: string[] = [];
+    const params: Array<string | number> = [];
+
+    for (const isa of constraint.isas) {
+      if (isa.type === undefined) continue;
+      if (isa.exact) {
+        // `isa!` — the type alone, no subtypes (match.feature L899).
+        where.push('t.type = ?');
+      } else {
+        // Subtype closure, so `isa doc` also matches `adr` (downstream-store's `entity adr sub doc`).
+        where.push(`t.type IN ${SUBTYPES_OF}`);
+      }
+      params.push(isa.type);
+    }
+    // 🔴 The same closure on the attribute type: `has name "Alice"` is satisfied by a `first-name`,
+    // as `isa doc` is by an `adr`. Exact matching here is what made an attribute subtype a subtype
+    // in the schema and nowhere else.
+    for (const literal of constraint.literals) {
+      if (literal.alternatives !== undefined) {
+        // An abstract attribute with no value type: one spelling per concrete subtype.
+        if (literal.alternatives.length === 0) {
+          where.push('0');
+          continue;
+        }
+        where.push(
+          `EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND (${literal.alternatives.map(() => '(a.type = ? AND a.value = ?)').join(' OR ')}))`,
+        );
+        for (const alternative of literal.alternatives) params.push(alternative.type, alternative.value);
+        continue;
+      }
+      where.push(
+        `EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type IN ${SUBTYPES_OF} AND a.value = ?)`,
+      );
+      params.push(literal.attribute, literal.value);
+    }
+    // A variable with a bound attribute must actually own that attribute.
+    for (const binding of constraint.bindings) {
+      where.push(`EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type IN ${SUBTYPES_OF})`);
+      params.push(binding.attribute);
+    }
+
+    // Candidates drawn from a relation's role players -- see `relationSeed`. `ORDER BY t.iid` is
+    // what the unseeded scan returns anyway (`thing` has no index but its rowid), stated so the
+    // seeded plan cannot reorder the rows.
+    if (seed !== undefined) {
+      where.push(`t.iid IN (${seed.sql})`);
+      params.push(...seed.params);
+    }
+    const sql = `SELECT t.iid FROM thing t${where.length ? ` WHERE ${where.join(' AND ')}` : ''}${seed !== undefined ? ' ORDER BY t.iid' : ''}`;
+    const found = this.db
+      .prepare(sql)
+      .all(...params)
+      .map((row: unknown) => Number((row as { iid: number }).iid));
+    if (this.trace) this.trace.candidateRows += found.length;
+    return found;
+  }
+
+  /** Resolve a match to one binding per variable, taking the first surviving combination. */
+  private resolveMatch(pipeline: Pipeline): Map<string, number[]> {
+    const combinations = this.combinations(pipeline);
+    const bindings = new Map<string, number[]>();
+    const first = combinations[0];
+    if (!first) return bindings;
+    for (const [variable, iid] of Object.entries(first)) {
+      if (typeof iid === 'number') bindings.set(variable, [iid]);
+    }
+    return bindings;
+  }
+
+  /**
+   * Every assignment of variables to row ids that satisfies the match.
+   *
+   * Cartesian across the thing variables, in the order they are written, pruned by relation
+   * constraints as early as their role players allow: a relation filters the moment every player is
+   * bound (`pushDownRelations`), and a role player's candidates come from the relation's
+   * `role_player` rows once the other players are bound (`relationSeed`). Neither changes a row or
+   * the order of rows -- `planJoins: false` is the original engine, and
+   * `relation-join-planning-differential.test.ts` holds the two to the same answers.
+   *
+   * Still no cost model: the order is the query's order, and a variable no relation reaches is
+   * enumerated whole. The Skills catalog's `subSkillsIn` was 211,000 combinations and 32 s before
+   * this; it is 59 combinations now (`relation-join-planning.test.ts` asserts the counts).
+   */
+  private combinations(pipeline: Pipeline): Array<Record<string, Binding>> {
+    const patterns = pipeline.match?.patterns ?? [];
+    const constraints = this.constraintsOf(patterns);
+    const things = constraints.filter((c) => c.roles.length === 0);
+    const relations = constraints.filter((c) => c.roles.length > 0);
+
+    // Type variables first — they are answered from the schema alone, and a thing pattern's
+    // `isa $t` reads the label they bound (Phase 05).
+    let combinations = solveTypes(typeConstraintsOf(patterns, this.refuse), this.schema, [{}], this.refuse);
+    const note = (stage: string): void => {
+      if (!this.trace) return;
+      this.trace.stages.push({ stage, combinations: combinations.length });
+      this.trace.combinationsCreated += combinations.length;
+    };
+    note('types');
+    // 🔴 A relation constraint is a FILTER that depends only on its role players (and its `isa`
+    // type variables), so it can run the moment they are bound instead of after every thing
+    // variable is. The combinations it drops are exactly the ones the final filter would drop --
+    // a filter keeps order, and the binding order of the thing variables is unchanged -- so the
+    // rows are the same rows in the same order. Without this, `$st isa skill-step; $child isa
+    // skill; $r isa sub-workflow (parent-step: $st, child-skill: $child)` was 1,209 x 175
+    // combinations, each its own SQL statement, to find nine rows.
+    const filtered = new Set<ThingConstraint>();
+    const pushDownRelations = (): void => {
+      if (!this.planJoins || combinations.length === 0) return;
+      const sample = combinations[0] as Record<string, Binding>;
+      for (const relation of relations) {
+        if (filtered.has(relation) || !this.relationBound(relation, sample)) continue;
+        filtered.add(relation);
+        combinations = combinations.filter((combination) =>
+          this.relationHolds({ ...relation, isas: resolveIsas(relation.isas, combination) }, combination),
+        );
+        note(`relation ${relation.variable} early filter`);
+      }
+    };
+    pushDownRelations();
+    for (const constraint of things) {
+      combinations = combinations.flatMap((combination) => this.bindThing(constraint, combination, relations));
+      note(`thing ${constraint.variable}`);
+      pushDownRelations();
+    }
+    // `$p isa person; $q has name $p` — a thing or a type as an attribute value, refused before a
+    // single combination exists, so an empty store refuses it too (review, round 12).
+    const kindOf = this.conceptKindOf(constraints, patterns);
+    for (const constraint of constraints) {
+      for (const binding of constraint.bindings) {
+        const kind = kindOf(binding.variable);
+        if (kind !== undefined) {
+          this.refuse(DiagnosticCode.mixedPattern, `'${binding.variable}' is bound as a ${kind} and cannot be an attribute value in \`has ${binding.attribute} ${binding.variable}\`.`, binding.range);
+        }
+      }
+    }
+    // Every `let` and comparison is checked before a single combination is evaluated — an unbound
+    // operand or a cycle fails a match with no answers too (expression.feature).
+    const attributeOf = new Map(constraints.flatMap((c) => c.bindings.map((b) => [b.variable, b.attribute] as const)));
+    const statements = orderValueStatements(
+      patterns,
+      this.conceptVariablesOf(constraints, patterns),
+      this.refuse,
+      this.conceptKindOf(constraints, patterns),
+      (variable) => {
+        const attribute = attributeOf.get(variable);
+        return attribute === undefined ? undefined : this.valueTypeOfAttribute(attribute);
+      },
+    );
+
+    // 🔴 A relation **binds** its role players; it does not merely check them.
+    //
+    // This used to filter the existing combinations and read `combination[player] ?? -1`, so a
+    // variable named only inside `links (...)` — never seeded above, because it produces no
+    // constraint of its own — joined on a player id of `-1` and matched nothing. The query then
+    // answered zero rows at exit code 0, with no diagnostic. Reading a relation to discover who
+    // plays its roles is the normal use of one, and it was the case that failed; every existing
+    // repository query happens to give each player its own `isa`, which is why the suite was green.
+    for (const relation of relations) {
+      // `$r isa $t (employee: $x)` — the relation's type through a type variable (review, round 1);
+      // every `isa` on it a filter or a binding, as for a thing (round 3).
+      const withTypes = (combination: Record<string, Binding>): ThingConstraint => ({ ...relation, isas: resolveIsas(relation.isas, combination) });
+      // An anonymous relation that was pushed down has no remaining variables to bind.
+      if (filtered.has(relation) && relation.variable.startsWith('__anon')) continue;
+      // Bind any remaining role players and named relation variable. A relation already pushed
+      // down was only checked, not expanded; named relations still need their ids.
+      combinations = combinations.flatMap((combination) =>
+        this.relationBindings(withTypes(combination), combination),
+      );
+      note(`relation ${relation.variable} bind`);
+    }
+
+    // 🔴 One combination per attribute VALUE, not per owner. An attribute may hold several values
+    // — a Skill step owning two `output-field`s is the live case — and TypeQLite yields a row for
+    // each. Until Phase 06 `project()` expanded them; a `let` reads them, so the combination
+    // carries them. A variable two patterns bind (`$x has name $n; $y has name $n`) joins on
+    // the value.
+    for (const constraint of constraints) {
+      for (const binding of constraint.bindings) {
+        combinations = combinations.flatMap((combination) => {
+          const owner = combination[constraint.variable];
+          if (typeof owner !== 'number') return [combination];
+          const already = combination[binding.variable];
+          return this.readAttributes(owner, binding.attribute).flatMap((value) => {
+            const bound: ValueBinding = { kind: 'attribute', attributeType: value.type, valueType: this.valueTypeOfAttribute(value.type) ?? 'string', value: value.value };
+            if (already !== undefined) {
+              // A thing or a type here was refused above, before any combination (rounds 9, 12).
+              if (typeof already !== 'object') return [];
+              // One variable is ONE attribute instance: a `name` and a `nick` of the same text
+              // are two, and `has name $n; … has nick $n` answers nothing (review, round 2).
+              return already.kind === 'attribute' && already.attributeType === bound.attributeType && already.value === bound.value
+                ? [combination]
+                : [];
+            }
+            return [{ ...combination, [binding.variable]: bound }];
+          });
+        });
+      }
+    }
+    // `let $v = $a * 2; $v > 10;` — evaluated per combination, binding the value variables and
+    // filtering (Phase 06).
+    if (statements.lets.length > 0 || statements.comparisons.length > 0) {
+      combinations = combinations.flatMap((combination) => {
+        const values = new Map<string, ValueBinding>();
+        for (const [variable, binding] of Object.entries(combination)) {
+          if (typeof binding === 'object') values.set(variable, binding);
+        }
+        const concept = (variable: string): 'thing' | 'type' | undefined => {
+          const binding = combination[variable];
+          return typeof binding === 'number' ? 'thing' : typeof binding === 'string' ? 'type' : undefined;
+        };
+        if (!applyValueStatements(statements, values, concept, this.refuse)) return [];
+        const extended: Record<string, Binding> = { ...combination };
+        for (const [variable, binding] of values) extended[variable] = binding;
+        return [extended];
+      });
+    }
+    return combinations;
+  }
+
+  /**
+   * 🔴 Everything a write stage can be refused for WITHOUT data, checked before the match runs —
+   * so an empty match does not turn a refusal into `emptyMatch` at exit 0 (review, rounds 11 and
+   * 14): a `let` or comparison in the stage, a literal the attribute cannot hold, a value nothing
+   * binds, a bound value whose inferred type the attribute cannot hold, and a `delete $v of $p`
+   * whose `$v` is not an attribute the match bound. `runInsert` repeats the literal checks per
+   * combination; this is the pass that does not depend on there being one.
+   */
+  private checkWriteStage(pipeline: Pipeline, write: NonNullable<Pipeline['write']>): void {
+    const matchPatterns = pipeline.match?.patterns ?? [];
+    const matchConstraints = this.constraintsOf(matchPatterns);
+    const attributeOf = new Map(matchConstraints.flatMap((c) => c.bindings.map((b) => [b.variable, b.attribute] as const)));
+    const lets = new Map(matchPatterns.filter(isLetPattern).map((p) => [p.variable, p.expression] as const));
+    const matchBinds = new Set([...this.conceptVariablesOf(matchConstraints, matchPatterns), ...lets.keys()]);
+    const typeOfVariable = (variable: string, seen: ReadonlySet<string> = new Set()): string | undefined => {
+      const attribute = attributeOf.get(variable);
+      if (attribute !== undefined) return this.valueTypeOfAttribute(attribute);
+      const expression = lets.get(variable);
+      if (expression === undefined || seen.has(variable)) return undefined;
+      return inferValueType(expression, (v) => typeOfVariable(v, new Set([...seen, variable])));
+    };
+    const kindOf = this.conceptKindOf(matchConstraints, matchPatterns);
+    if (write.$type === 'DeleteStage') {
+      for (const deletion of write.deletions) {
+        if (deletion.owner !== undefined) {
+          if (!attributeOf.has(deletion.target)) {
+            this.refuse(DiagnosticCode.mixedPattern, `'${deletion.target}' is not an attribute the \`match\` bound with \`has <attribute> ${deletion.target}\`; \`delete ${deletion.target} of ${deletion.owner}\` has nothing to remove.`, rangeOf(deletion));
+          }
+          // The owner is a thing the match bound — not a type, a value, or nothing (QA, F).
+          if (kindOf(deletion.owner) !== 'thing') {
+            this.refuse(DiagnosticCode.mixedPattern, `'${deletion.owner}' is not a thing the \`match\` bound; \`delete ${deletion.target} of ${deletion.owner}\` has no owner to remove from.`, rangeOf(deletion));
+          }
+        } else if (kindOf(deletion.target) !== 'thing') {
+          // `delete $v` of a value, a type, an attribute variable, or nothing at all (QA, F).
+          this.refuse(DiagnosticCode.mixedPattern, `'${deletion.target}' is not a thing the \`match\` bound; \`delete ${deletion.target}\` has nothing to remove.`, rangeOf(deletion));
+        }
+      }
+      return;
+    }
+    // The type each write variable already has from the match — `$c isa company` — so ownership
+    // is checked before the match runs (QA, A6).
+    // EVERY written `isa` of the variable, not the last (review, round 20): `isa! memo, isa doc`
+    // is refused by the `isa!` whichever comes first.
+    const matchIsasOf = new Map(matchConstraints.map((c) => [c.variable, c.isas.filter((isa) => isa.type !== undefined)] as const));
+    for (const pattern of write.patterns) {
+      if (isLetPattern(pattern) || isComparisonPattern(pattern)) {
+        this.refuse(DiagnosticCode.mixedPattern, 'A `let` or a comparison belongs to a `match`, not to a write stage.', rangeOf(pattern));
+      }
+      // The literal checks — kind, spelling, range — run here as they do per combination.
+      const [constraint] = this.constraintsOf([pattern], 'write');
+      if (!isThingPattern(pattern)) continue;
+      if (constraint !== undefined) {
+        // An abstract attribute has no values of its own (QA, A5), and the match's type owns what
+        // the write names (A6) — both before any combination.
+        for (const named of [...constraint.literals, ...constraint.bindings]) {
+          if (this.schema.abstracts.has(named.attribute)) {
+            this.refuse(DiagnosticCode.abstractType, `'${named.attribute}' is abstract and cannot have a value of its own. Write a concrete subtype.`, named.range);
+          }
+        }
+        // The match's `isa doc` may bind an `adr`, and `adr` owns what `doc` does not — so the
+        // static pass refuses only when NOTHING in the type's closure owns the attribute; which
+        // concrete type the match bound is the per-combination check's (review, round 18). An
+        // `isa!` binds the one type, and that type's own closure decides here (round 19).
+        if (constraint.type === undefined) {
+          for (const isa of matchIsasOf.get(constraint.variable) ?? []) {
+            const type = isa.type as string;
+            this.checkOwns({ ...constraint, type, isas: [{ type, exact: false }] }, isa.exact ? 'write' : 'match');
+          }
+        }
+      }
+      for (const property of pattern.properties) {
+        if (!isHasProperty(property) || !property.valueVariable) continue;
+        if (!matchBinds.has(property.valueVariable)) {
+          this.refuse(DiagnosticCode.unboundValue, `The variable '${property.valueVariable.slice(1)}' must be bound to a value before it's used in a write.`, rangeOf(property));
+        }
+        const from = typeOfVariable(property.valueVariable);
+        if (from !== undefined) this.checkValueFits(property.valueVariable, from, property.attribute, rangeOf(property));
+      }
+    }
+  }
+
+  /** A value of type `from` may be written to `attribute`: the same type, or an integer to a double or decimal. */
+  private checkValueFits(variable: string, from: string, attribute: string, at: Range | undefined): void {
+    const normalise = (t: string): string => (t === 'long' ? 'integer' : t);
+    const declared = this.valueTypeOfAttribute(attribute);
+    if (declared === undefined) return;
+    const to = normalise(declared);
+    const fits = normalise(from) === to || (normalise(from) === 'integer' && (to === 'double' || to === 'decimal'));
+    if (!fits) {
+      this.refuse(DiagnosticCode.valueTypeConflict, `'${variable}' is a ${normalise(from)} and '${attribute}' holds a ${to}; the value cannot be written.`, at);
+    }
+  }
+
+  /** Whether a variable is a thing or a type in this match — neither is a value an expression or a reducer can take. */
+  private conceptKindOf(constraints: readonly ThingConstraint[], patterns: readonly Pattern[]): (variable: string) => 'thing' | 'type' | undefined {
+    const typeVariables = new Set([
+      ...this.conceptVariablesOf([], patterns),
+      ...constraints.flatMap((c) => c.isas.flatMap((isa) => (isa.typeVariable === undefined ? [] : [isa.typeVariable]))),
+    ]);
+    const thingVariables = new Set(constraints.flatMap((c) => [c.variable, ...c.roles.map((r) => r.player)]));
+    return (variable) => (thingVariables.has(variable) ? 'thing' : typeVariables.has(variable) ? 'type' : undefined);
+  }
+
+  /** Every variable the match's concept patterns bind — a `let` may not reuse one, and may read one. */
+  private conceptVariablesOf(constraints: readonly ThingConstraint[], patterns: readonly Pattern[]): Set<string> {
+    return new Set([
+      ...constraints.flatMap((c) => [
+        c.variable,
+        ...c.isas.flatMap((isa) => (isa.typeVariable === undefined ? [] : [isa.typeVariable])),
+        ...c.bindings.map((b) => b.variable),
+        ...c.roles.map((r) => r.player),
+      ]),
+      ...typeConstraintsOf(patterns, this.refuse).flatMap((t) => [
+        t.variable,
+        ...t.subs.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+        ...t.owns.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+        ...t.plays.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+        ...t.relates.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+      ]),
+    ]);
+  }
+
+  /** The value type an attribute type carries, through its parent chain — `string` when unknown. */
+  private valueTypeOfAttribute(attribute: string): string | undefined {
+    let current: string | undefined = attribute;
+    while (current !== undefined) {
+      const valueType = this.schema.valueTypes.get(current);
+      if (valueType !== undefined) return valueType;
+      current = this.schema.parents.get(current);
+    }
+    // An abstract attribute with no value type anywhere in its chain — the schema admits one —
+    // has NO type to check against; `undefined` leaves every static check to evaluation, where
+    // the cells carry their real types (review, round 15). It used to be `'string'`, and every
+    // pre-data check ran against a fabricated type.
+    return undefined;
+  }
+
+  /**
+   * Is everything `relationHolds` reads already bound -- every role player a thing, every `isa`
+   * type variable a label? Then the filter answers now exactly what it would answer at the end.
+   */
+  private relationBound(relation: ThingConstraint, combination: Record<string, Binding>): boolean {
+    if (!relation.roles.every((role) => typeof combination[role.player] === 'number')) return false;
+    return relation.isas.every(
+      (isa) => isa.type !== undefined || isa.typeVariable === undefined || typeof combination[isa.typeVariable] === 'string',
+    );
+  }
+
+  /**
+   * Candidates for `variable` drawn from a relation it plays in, once that relation's OTHER role
+   * players are bound: the players of that role among the relation instances the bound players
+   * already select. A relation instance is a handful of `role_player` rows, where `thing` is every
+   * entity of every type.
+   *
+   * Only ever narrows: `candidates()` still applies the variable's own `isa`, literals and
+   * bindings, and the relation filter still runs once the variable is bound. So a seed that is too
+   * wide costs time and a seed that is absent costs nothing -- neither changes a row. The seed
+   * mirrors `relationBindings` (same role spelling, same type match, a variable in two roles must be
+   * the same player in both) and is `undefined` whenever it cannot be built that way.
+   */
+  private relationSeed(
+    variable: string,
+    relations: readonly ThingConstraint[],
+    combination: Record<string, Binding>,
+  ): { sql: string; params: Array<string | number> } | undefined {
+    for (const relation of relations) {
+      const mine = relation.roles.filter((role) => role.player === variable);
+      if (mine.length === 0) continue;
+      const others = relation.roles.filter((role) => role.player !== variable);
+      if (!others.every((role) => typeof combination[role.player] === 'number')) continue;
+
+      const resolved = resolveIsas(relation.isas, combination);
+      const params: Array<string | number> = [];
+      const joins: string[] = [];
+      mine.forEach((role, index) => {
+        joins.push(
+          index === 0
+            ? 'JOIN role_player rv0 ON rv0.rel = t.iid AND rv0.role = ?'
+            : `JOIN role_player rv${index} ON rv${index}.rel = t.iid AND rv${index}.role = ? AND rv${index}.player = rv0.player`,
+        );
+        params.push(role.role);
+      });
+      others.forEach((role, index) => {
+        joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid AND ro${index}.role = ? AND ro${index}.player = ?`);
+        params.push(role.role, combination[role.player] as number);
+      });
+      const typed: string[] = [];
+      for (const isa of resolved) {
+        if (isa.type === undefined) continue;
+        typed.push(isa.exact ? 't.type = ?' : `t.type IN ${SUBTYPES_OF}`);
+        params.push(isa.type);
+      }
+      const where = typed.length > 0 ? ` WHERE ${typed.join(' AND ')}` : '';
+      return { sql: `SELECT rv0.player FROM thing t ${joins.join(' ')}${where}`, params };
+    }
+    return undefined;
+  }
+
+  /**
+   * Every way `combination` can be extended so this relation holds — reading role players it does
+   * not already know and applying the relation's own attribute constraints, then (Phase 05)
+   * resolving an unbound type variable on the relation's own `isa` from each match found.
+   *
+   * Roles whose player is already bound constrain the join; roles whose player is not are read out
+   * of it and bound. Returning a list rather than one row is what makes a partially-constrained
+   * relation work — pinning one end and leaving the other free yields a row per link, where the
+   * removed `findRelation`'s trailing `[0]` silently kept the first.
+   */
+  private relationBindings(
+    relation: ThingConstraint,
+    combination: Record<string, Binding>,
+  ): Array<Record<string, Binding>> {
+    if (this.trace) this.trace.findRelationsCalls++;
+    const params: Array<string | number> = [];
+    // The most recent role each variable played, so a repeat joins to it instead of rebinding.
+    // Chained rather than all-to-first, which is equivalent: the equalities are transitive.
+    const seenAtRole = new Map<string, number>();
+    // Every slot already emitted, keyed by the STATEMENT it was written in plus the role name —
+    // the mirror case below needs all of them, and must not reach across merged statements.
+    const sameRoleSlots = new Map<string, Array<[number, string]>>();
+    const joins = relation.roles
+      .map((role, index) => {
+        const player = combination[role.player];
+        const boundPlayer = typeof player === 'number' ? player : undefined;
+        params.push(role.role);
+        let join = `JOIN role_player rp${index} ON rp${index}.rel = t.iid AND rp${index}.role = ?`;
+
+        // 🔴 One variable in two roles must be the SAME thing in both.
+        //
+        // `links (source: $x, target: $x)` was joined as two independent free roles and then bound
+        // twice, last one winning — so an a→b link answered a query for a self-link. That is a
+        // false positive, which this method's own comment rates worse than the zero-row class it
+        // was written to close.
+        const earlier = seenAtRole.get(role.player);
+        if (earlier !== undefined) {
+          join += ` AND rp${index}.player = rp${earlier}.player`;
+        } else if (boundPlayer !== undefined) {
+          join += ` AND rp${index}.player = ?`;
+          params.push(boundPlayer);
+        }
+        seenAtRole.set(role.player, index);
+
+        // 🔴 …and two slots of the same ROLE need two different players — the mirror case.
+        //
+        // `links (source: $x, source: $y)` asks for a link with two sources; both joins were free
+        // to match the same `role_player` row, so a link with ONE source answered it with `$x` and
+        // `$y` bound to that single player. `PRIMARY KEY (rel, role, player)` makes an edge unique
+        // per player, so distinct edges is distinct players here.
+        //
+        // ✅ Verified against real TypeDB 3, 2026-09-10: the same query against a one-source link
+        // answers zero rows there too.
+        //
+        // ⚠️ Against every earlier slot, not just the previous one — inequality is not transitive,
+        // so chaining `$z <> $y <> $x` would let `$x` and `$z` be the same thing.
+        //
+        // ⚠️ And only between slots written in the SAME `links (...)` list — `constraintsOf` merges
+        // roles across every pattern naming the variable, so two statements each mentioning one
+        // source must not be treated as one statement asking for two.
+        const key = role.statement + ' ' + role.role;
+        for (const [earlierIndex, earlierPlayer] of sameRoleSlots.get(key) ?? []) {
+          if (earlierPlayer === role.player) continue;
+          join += ` AND rp${index}.player <> rp${earlierIndex}.player`;
+        }
+        const slots = sameRoleSlots.get(key);
+        if (slots) slots.push([index, role.player]);
+        else sameRoleSlots.set(key, [[index, role.player]]);
+        return join;
+      })
+      .join(' ');
+
+    // 🔴 The relation's OWN attribute constraints, applied here because nothing else applies them.
+    //
+    // `candidates()` is the only place `literals` and `bindings` become SQL, and `combinations()`
+    // calls it on `things` alone — relations never reach it. So `has edge-id "absent"` was parsed,
+    // carried and ignored, and the match answered the link anyway.
+    const where: string[] = [];
+    // A typed relation matches its type and its subtypes, as a thing's `isa` does; `isa!` its type
+    // alone — the same closure `candidates()` applies to an entity, so `isa link` also matches a
+    // `strong-link` whether or not a role list is named (the exact `t.type = ?` this replaced
+    // silently narrowed the type the moment a role list was added).
+    for (const isa of relation.isas) {
+      if (isa.type === undefined) continue;
+      where.push(isa.exact ? 't.type = ?' : `t.type IN ${SUBTYPES_OF}`);
+      params.push(isa.type);
+    }
+    // 🔴 If the relation's own variable is already bound, pin it — reachable only because this
+    // method binds free players: a relation that plays a role is bound by whichever pattern names
+    // it first, and without this the second pattern re-queried every relation of the type and
+    // overwrote the binding with the last one found.
+    const already = combination[relation.variable];
+    if (typeof already === 'number') {
+      where.push('t.iid = ?');
+      params.push(already);
+    }
+    for (const literal of relation.literals) {
+      where.push('EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type = ? AND a.value = ?)');
+      params.push(literal.attribute, literal.value);
+    }
+    // A binding is an ownership requirement, not a value test — the same rule `candidates()`
+    // applies to an entity.
+    for (const binding of relation.bindings) {
+      where.push('EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type = ?)');
+      params.push(binding.attribute);
+    }
+
+    // 🔴 `t.iid` only when the relation has a name, and `DISTINCT` is why it matters — an anonymous
+    // relation is a test, not a binding: `(source: $s, target: $t) isa link` names no variable for
+    // the relation itself, so two links between the same pair are two ways of satisfying one
+    // indistinguishable condition, and TypeQLite answers it once. Selecting `t.iid` regardless made
+    // them distinct rows and doubled every downstream combination.
+    const named = !relation.variable.startsWith('__anon');
+    const columns = [
+      ...(named ? ['t.iid'] : []),
+      ...relation.roles.map((_, index) => `rp${index}.player AS p${index}`),
+    ].join(', ');
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT ${columns} FROM thing t ${joins}` +
+          `${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`,
+      )
+      .all(...params) as Array<Record<string, number>>;
+
+    // (Phase 05) `$r isa $t (employee: $x)` with `$t` unbound — every relation this found rebinds
+    // it, one row per candidate type, as `bindTypeVariables` does for an entity.
+    const unbound = relation.isas.filter((isa) => isa.typeVariable !== undefined && isa.type === undefined);
+
+    return rows.flatMap((row) => {
+      const next: Record<string, Binding> = { ...combination };
+      relation.roles.forEach((role, index) => {
+        next[role.player] = Number(row[`p${index}`]);
+      });
+      // A named relation variable binds too, so `$r isa step-dependency (...)` is usable later.
+      // The anonymous form has no name anybody wrote, so nothing should be able to select it — and
+      // `iid` is not in the row for it either, which is what keeps the answer from doubling.
+      if (!named) return [next];
+      const iid = Number(row['iid']);
+      const extended = { ...next, [relation.variable]: iid };
+      return unbound.length === 0 ? [extended] : this.bindTypeVariables(unbound, iid, extended);
+    });
+  }
+
+  private relationHolds(
+    relation: ThingConstraint,
+    combination: Record<string, Binding>,
+  ): boolean {
+    if (this.trace) this.trace.relationHoldsCalls++;
+    return this.relationBindings(relation, combination).length > 0;
+  }
+
+  // ── projection ────────────────────────────────────────────────────────────
+
+  private project(pipeline: Pipeline): Array<Record<string, TypeDBLiteValue>> {
+    const patterns = pipeline.match?.patterns ?? [];
+    const constraints = this.constraintsOf(patterns);
+    const selected = this.selectedOf(pipeline, constraints);
+    const rows: Array<Record<string, TypeDBLiteValue>> = [];
+
+    // A combination is one answer: a row per combination, a cell per selected variable. Attribute
+    // values are expanded in `combinations()` — one combination per value — so a `let` sees them.
+    for (const combination of this.combinations(pipeline)) {
+      const row: Record<string, TypeDBLiteValue> = {};
+      for (const [variable, binding] of Object.entries(combination)) {
+        if (!selected.has(variable)) continue;
+        // `select $x` — the caller reads `row.x`, without the `$`.
+        row[variable.slice(1)] = this.cellOf(binding);
+      }
+      if (Object.keys(row).length > 0) rows.push(row);
+    }
+    return rows;
+  }
+
+  /** The variables a pipeline's rows carry: the `select` list, or every variable the `match` names. */
+  private selectedOf(pipeline: Pipeline, constraints: readonly ThingConstraint[]): Set<string> {
+    const patterns = pipeline.match?.patterns ?? [];
+    // 🔴 No `select` projects every variable the `match` names — thing, attribute and type alike.
+    // An anonymous relation (`__anonN`) or a label-headed type pattern (`__typeN`) is not a
+    // variable the query wrote, and is never a column.
+    return pipeline.select
+      ? new Set(pipeline.select.variables)
+      : new Set([
+          ...constraints.flatMap((c) => [
+            ...(c.variable.startsWith('__anon') ? [] : [c.variable]),
+            ...c.isas.flatMap((isa) => (isa.typeVariable === undefined ? [] : [isa.typeVariable])),
+            ...c.bindings.map((b) => b.variable),
+          ]),
+          ...typeConstraintsOf(patterns, this.refuse).flatMap((t) => [
+            ...(t.variable.startsWith('__type') ? [] : [t.variable]),
+            ...t.subs.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+            ...t.owns.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+            ...t.plays.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+            ...t.relates.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+          ]),
+          ...patterns.flatMap((p) => (isLetPattern(p) ? [p.variable] : [])),
+        ]);
+  }
+
+  /**
+   * `reduce` — over the rows the stages before it answered, one row (or one per group) of value
+   * cells. Checked against what those stages bind BEFORE any row is read, so an empty answer set
+   * fails an unknown argument too (reduce.feature L376).
+   */
+  private reduce(pipeline: Pipeline, stage: ReduceStage): Array<Record<string, TypeDBLiteValue>> {
+    const patterns = pipeline.match?.patterns ?? [];
+    const constraints = this.constraintsOf(patterns);
+    // What a variable carries, from the schema and the `let`s' shapes: an attribute's declared
+    // value type, or a `let`'s inferred one — so the `sum` of an empty set of `$w * 2` over a
+    // double `weight` is `0.0`, not `0` (review, round 1).
+    const attributeOf = new Map(constraints.flatMap((c) => c.bindings.map((b) => [b.variable, b.attribute] as const)));
+    const lets = new Map(patterns.filter(isLetPattern).map((p) => [p.variable, p.expression] as const));
+    const valueTypeOf = (variable: string, seen: ReadonlySet<string> = new Set()): string | undefined => {
+      const attribute = attributeOf.get(variable);
+      if (attribute !== undefined) return this.valueTypeOfAttribute(attribute);
+      const expression = lets.get(variable);
+      if (expression === undefined || seen.has(variable)) return undefined;
+      return inferValueType(expression, (v) => valueTypeOf(v, new Set([...seen, variable])));
+    };
+    checkReduce(stage, this.selectedOf(pipeline, constraints), this.conceptKindOf(constraints, patterns), valueTypeOf, this.refuse);
+    return applyReduce(stage, this.project(pipeline), valueTypeOf, (attribute) => this.valueTypeOfAttribute(attribute), this.refuse);
+  }
+
+  /** A binding as a cell — a thing by iid, a type by label (Phase 05), a value by its type (Phase 06). */
+  private cellOf(binding: Binding): TypeDBLiteValue {
+    if (typeof binding === 'number') return this.thingCell(binding);
+    if (typeof binding === 'string') return TypeDBLiteValue.type(binding);
+    return binding.kind === 'attribute'
+      ? TypeDBLiteValue.attribute(binding.attributeType, binding.value)
+      : TypeDBLiteValue.value(binding.valueType, binding.value);
+  }
+
+  /**
+   * A literal as the attribute's value type spells it — see `canonicalValue`. Applied where a
+   * literal is read (`has weight 80` matches what `has weight 80.0` wrote) and where one is
+   * written, so `attr.value`, compared as text, has ONE text per value.
+   */
+  /**
+   * For an attribute with no value type of its own, the literal in each concrete subtype's
+   * spelling — the subtypes whose type can read it; `undefined` when the attribute has a type
+   * and the plain comparison applies.
+   */
+  private literalAlternatives(literal: Literal, attribute: string, at: Range | undefined): Array<{ type: string; value: string }> | undefined {
+    if (this.valueTypeOfAttribute(attribute) !== undefined) return undefined;
+    const text = literalText(literal);
+    const alternatives: Array<{ type: string; value: string }> = [];
+    const seen = new Set<string>();
+    let firstRefusal: { code: DiagnosticCodeValue; message: string } | undefined;
+    // A refusal that records nothing: a subtype that cannot read the text is skipped, and the
+    // report carries no error for it (review, round 17).
+    const silently: Refuse = (code, message) => {
+      throw new SilentRefusal(code, message);
+    };
+    for (const type of this.typeFamily(attribute)) {
+      // The subtype's value type through ITS chain — `tall-height sub height` inherits `height`'s
+      // (review, round 17).
+      const valueType = this.valueTypeOfAttribute(type);
+      if (valueType === undefined || this.schema.abstracts.has(type)) continue;
+      if (!literalFits(literal, valueType)) {
+        firstRefusal ??= { code: DiagnosticCode.valueTypeConflict, message: `'${type}' holds a ${valueType}, and this is ${literalKind(literal)}.` };
+        continue;
+      }
+      try {
+        const value = this.canonicalValue(type, text, at, silently);
+        if (!seen.has(`${type}:${value}`)) {
+          seen.add(`${type}:${value}`);
+          alternatives.push({ type, value });
+        }
+      } catch (error) {
+        if (!(error instanceof SilentRefusal)) throw error;
+        firstRefusal ??= { code: error.code, message: error.message };
+      }
+    }
+    // No subtype at all can read the literal: the refusal the typed form would give, not an
+    // empty answer (round 17). No typed subtype at all: nothing can match, and nothing is wrong.
+    if (alternatives.length === 0 && firstRefusal !== undefined) this.refuse(firstRefusal.code, firstRefusal.message, at);
+    return alternatives;
+  }
+
+  private checkedLiteralText(literal: Literal, attribute: string, at: Range | undefined): string {
+    // The literal's KIND fits the attribute's type, as `literalFits` says for an annotation: a
+    // `5dec` is a decimal and no integer or double attribute holds one (review, round 12).
+    const valueType = this.valueTypeOfAttribute(attribute);
+    if (valueType !== undefined && !literalFits(literal, valueType)) {
+      return this.refuse(DiagnosticCode.valueTypeConflict, `'${attribute}' holds a ${valueType}, and this is ${literalKind(literal)}.`, at);
+    }
+    return this.canonicalValue(attribute, literalText(literal), at);
+  }
+
+  /**
+   * 🔴 ONE stored spelling per (value type, value) — by the ATTRIBUTE's type, not the literal's
+   * syntax (review, round 10: `has price 1.0e2` on a decimal stored `100.0` beside `100dec`'s
+   * `100`; `has weight 80` stored `80` beside `80.0`; `has ref 001` stored `001` beside `1` and
+   * evaded the `@key`). `attr.value` is compared as text everywhere — candidates, joins, the
+   * UNIQUE index — so the text is decided here and nowhere else:
+   *
+   * - integer: the digits, no leading zeros, range-checked at 64 bits (`has age 99999999999999999999`
+   *   had stored what a `let` refuses);
+   * - double: `String(Number)`, `.0` on a whole number — what a computed double renders as;
+   * - decimal: no trailing zeros in the fraction — what a decimal literal renders as;
+   * - anything else: as written.
+   *
+   * A text the type cannot read is refused, as TypeDB refuses a string on an integer attribute.
+   */
+  private canonicalValue(attribute: string, text: string, at: Range | undefined, refuse: Refuse = this.refuse): string {
+    const valueType = this.valueTypeOfAttribute(attribute);
+    switch (valueType) {
+      case 'integer':
+      case 'long': {
+        if (!/^-?\d+$/.test(text)) return refuse(DiagnosticCode.valueTypeConflict, `'${text}' is not an integer, and '${attribute}' holds integers.`, at);
+        const value = BigInt(text);
+        if (value < INTEGER_MIN || value > INTEGER_MAX) return refuse(DiagnosticCode.valueOutOfRange, `Integer overflow: ${text} is outside the 64-bit range.`, at);
+        return value.toString();
+      }
+      case 'double': {
+        const value = Number(text);
+        if (!/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(text) || Number.isNaN(value)) {
+          return refuse(DiagnosticCode.valueTypeConflict, `'${text}' is not a double, and '${attribute}' holds doubles.`, at);
+        }
+        // An integer literal is a 64-bit integer wherever it is written (L656) — on a double
+        // attribute too (QA, B4).
+        if (/^-?\d+$/.test(text) && (BigInt(text) < INTEGER_MIN || BigInt(text) > INTEGER_MAX)) {
+          return refuse(DiagnosticCode.valueOutOfRange, `Integer overflow: ${text} is outside the 64-bit range.`, at);
+        }
+        if (!Number.isFinite(value)) return refuse(DiagnosticCode.valueOutOfRange, `Double overflow: ${text} is outside the 64-bit range.`, at);
+        return Number.isInteger(value) && Math.abs(value) < 1e21 ? `${value}.0` : String(value);
+      }
+      case 'decimal': {
+        const parsed = numericOf('decimal', text, refuse, at);
+        const { text: canonical } = valueOf(parsed);
+        return canonicalDecimal(canonical);
+      }
+      case 'datetime':
+      case 'datetime-tz': {
+        // A date on a datetime attribute is midnight of that day, in the datetime's one spelling
+        // (review, round 13): `2000-01-01` and `2000-01-01T00:00:00` are one stored text — and a
+        // fraction of zeros is no fraction: `…:00.000` is `…:00` (round 14).
+        const dated = /^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text;
+        const trimmed = dated.replace(/(\d{2}:\d{2}:\d{2})\.(\d*?)0*(?=$|[+\-Z ])/, (_m, time: string, fraction: string) => (fraction === '' ? time : `${time}.${fraction}`));
+        // One spelling per offset (QA, B1): `+00:00`, `+0000`, `-00:00` and `Z` are one, and every
+        // other offset carries its colon. A zone NAME is kept as written — an offset and a zone
+        // are two values on TypeDB. Two offsets naming one instant stay two texts.
+        return trimmed.replace(/([+-])(\d{2}):?(\d{2})$/, (_m, sign: string, hh: string, mm: string) => (hh === '00' && mm === '00' ? 'Z' : `${sign}${hh}:${mm}`));
+      }
+      default:
+        return text;
+    }
+  }
+
+  /** A bound thing as a cell — its own type, and whether that type is a relation. */
+  private thingCell(iid: number): TypeDBLiteValue {
+    const type = this.typeOfThing(iid);
+    return this.schema.relations.has(type)
+      ? TypeDBLiteValue.relation(iid, type)
+      : TypeDBLiteValue.entity(iid, type);
+  }
+
+  /**
+   * Every attribute of the given type a thing owns — the driver's `getHas`. The harness resolves a
+   * `key:ref:0` identifier through this rather than trusting anything the cell carries.
+   */
+  attributesOf(iid: number, attribute: string): ReadonlyArray<TypeDBLiteValue> {
+    return this.readAttributes(iid, attribute).map((v) => TypeDBLiteValue.attribute(v.type, v.value));
+  }
+
+  /** The type a bound thing was inserted as — what an attach-form write checks ownership against. */
+  private typeOfThing(iid: number): string {
+    const row = this.db.prepare('SELECT type FROM thing WHERE iid = ?').get(iid) as
+      | { type: string }
+      | undefined;
+    return String(row?.type ?? '');
+  }
+
+  /**
+   * Every value of an attribute on a thing — plural, because attributes can be, and through the
+   * subtype closure, because a `first-name` is a `name` — with the row's own type, so a cell says
+   * what it actually is rather than what the query asked for.
+   */
+  private readAttributes(owner: number, attribute: string): Array<{ type: string; value: string }> {
+    return this.db
+      .prepare(`SELECT type, value FROM attr WHERE owner = ? AND type IN ${SUBTYPES_OF} ORDER BY rowid`)
+      .all(owner, attribute)
+      .map((row: unknown) => {
+        const r = row as { type: string; value: string };
+        return { type: String(r.type), value: String(r.value) };
+      });
+  }
+
+  // ── writing ───────────────────────────────────────────────────────────────
+
+  private runInsert(
+    pattern: Pattern,
+    bindings: Map<string, number[]>,
+    values: ReadonlyMap<string, ValueBinding>,
+    isPut: boolean,
+  ): void {
+    // A `let` or a comparison belongs to a `match`; the grammar's `Pattern` admits them in a write
+    // stage and nothing here evaluates one (review, round 5).
+    if (isLetPattern(pattern) || isComparisonPattern(pattern)) {
+      this.refuse(DiagnosticCode.mixedPattern, 'A `let` or a comparison belongs to a `match`, not to a write stage.', rangeOf(pattern));
+    }
+    if (isAnonRelationPattern(pattern)) {
+      this.checkKnown('type', pattern.type, rangeOf(pattern));
+      const iid = this.insertThing(pattern.type, isPut, rangeOf(pattern));
+      this.insertRoles(iid, rolesOf(pattern.players, 0), bindings);
+      return;
+    }
+    if (!isThingPattern(pattern)) return;
+
+    const constraint = this.constraintsOf([pattern], 'write')[0];
+    if (!constraint?.type) {
+      // 🔴 Refused, not silently ignored — and deliberately not implemented.
+      //
+      // `insert $l links (source: $b);` against a matched relation took this branch, found no
+      // literals, and returned having written nothing while reporting
+      // `Wrote 0 thing(s), 0 attribute(s), 0 role player(s).` at exit code 0
+      // (d-20260910-insert-of-a-role-player-into-2).
+      //
+      // ⚠️ **Enabling it was worse than leaving it inert.** Nothing here knows the bound owner is a
+      // relation, so `insert $a links (source: $b);` with `$a` matched as an *entity* wrote a
+      // `role_player` row keyed on that entity and reported success — a corruption where there had
+      // only been a no-op. The role name was never checked against the schema either.
+      //
+      // The capability is not missing: naming every player in ONE `insert` writes them correctly,
+      // and that is what every caller does. Implementing the incremental form needs a relation
+      // check, `checkKnown` on the role, and an error path that does not report a foreign-key or
+      // busy failure as a duplicate edge. That is on the parking lot; until then this refuses,
+      // which is the same trade `select` takes on an unprojectable variable.
+      //
+      // ⚠️ **Checked before the unbound-owner guard, not after.** `if (owner === undefined) return;`
+      // used to run first, so the refusal never fired for an UNBOUND relation variable —
+      // `insert $nope links (source: $x);` still reported
+      // `Wrote 0 thing(s), 0 attribute(s), 0 role player(s).` at exit 0. A refusal reachable only
+      // on the half of the inputs that were already the safer half is not a refusal.
+      if (constraint?.roles.length) {
+        const message =
+          `Adding a role player to an existing relation is not supported: '${constraint.variable}' ` +
+          'has no `isa` here, so there is nothing to check the role against. Name every player in ' +
+          'one `insert` instead.';
+        throw attachDiagnostic(
+          new Error(message),
+          this.diagnostics.error(
+            DiagnosticCode.unsupportedIncrementalRole,
+            message,
+            constraint.roles[0]?.range,
+          ),
+        );
+      }
+
+      // `$p has principal-type "user"` with no `isa` — attach to the already-bound thing.
+      const owner = bindings.get(constraint?.variable ?? '')?.[0];
+      if (owner === undefined) return;
+      // 🔴 The check above saw no `isa`, so it saw no type and returned early — this form wrote
+      // attributes the type does not own, and every later read of them was the refusal. The type
+      // is on the bound thing; resolve it and check against the same ownership the `isa` form uses.
+      if (constraint) {
+        const type = this.typeOfThing(owner);
+        this.checkOwns({ ...constraint, type, isas: [{ type, exact: false }] }, 'write');
+      }
+      for (const literal of constraint?.literals ?? []) {
+        this.insertAttribute(owner, literal.attribute, literal.value, literal.range);
+      }
+      for (const binding of constraint?.bindings ?? []) {
+        this.insertAttribute(owner, binding.attribute, this.valueFor(binding.variable, binding.attribute, values, binding.range), binding.range);
+      }
+      return;
+    }
+
+    // `insert $x isa person; $x isa writer;`, or `match $x isa person; insert $x isa writer;` — an
+    // `isa` on a variable a match or an earlier pattern already bound would insert a SECOND thing
+    // under that name and rebind it; TypeDB refuses a re-typed variable (review, round 5).
+    if (bindings.has(constraint.variable)) {
+      this.refuse(
+        DiagnosticCode.mixedPattern,
+        `'${constraint.variable}' is already bound and cannot be inserted with \`isa ${constraint.type}\`; attach attributes to it without an \`isa\`.`,
+        constraint.range,
+      );
+    }
+
+    // `put` is match-or-insert: if a @key already matches, reuse it rather than inserting. A
+    // `has ref $a` looks up the VALUE the match bound, not any `ref` (review, round 10).
+    if (isPut) {
+      const bound = constraint.bindings.map((b) => ({ attribute: b.attribute, value: this.valueFor(b.variable, b.attribute, values, b.range), range: b.range }));
+      const existing = this.candidates({ ...constraint, literals: [...constraint.literals, ...bound], bindings: [] })[0];
+      if (existing !== undefined) {
+        bindings.set(constraint.variable, [existing]);
+        return;
+      }
+    }
+
+    const iid = this.insertThing(constraint.type, false, constraint.range);
+    for (const literal of constraint.literals) {
+      this.insertAttribute(iid, literal.attribute, literal.value, literal.range);
+    }
+    // `insert $x isa person, has age $v` — the value the match bound (review, round 5).
+    for (const binding of constraint.bindings) {
+      this.insertAttribute(iid, binding.attribute, this.valueFor(binding.variable, binding.attribute, values, binding.range), binding.range);
+    }
+    this.insertRoles(iid, constraint.roles, bindings);
+    bindings.set(constraint.variable, [iid]);
+  }
+
+  /**
+   * The value a write reads through `has <attribute> $v` — bound by the match, or refused; and of
+   * a type the attribute holds: an integer may be written to a double or decimal attribute, and
+   * nothing else crosses (review, round 6 — `let $v = 2.5; insert $p has age $v;` had stored
+   * `2.5` on an integer `age`).
+   */
+  private valueFor(variable: string, attribute: string, values: ReadonlyMap<string, ValueBinding>, at: Range | undefined): string {
+    const bound = values.get(variable);
+    if (bound === undefined) {
+      return this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used in a write.`, at);
+    }
+    this.checkValueFits(variable, bound.valueType, attribute, at);
+    // Stored as the attribute's type spells it — `canonicalValue` — so an integer `10` on a
+    // double attribute is `10.0` and a computed decimal `3.0` is `3` (review, rounds 7 and 10).
+    return this.canonicalValue(attribute, bound.value, at);
+  }
+
+  private insertThing(type: string, _isPut: boolean, at?: Range): number {
+    // 🔴 Enforced since Phase 03 of the conformance feature — it was parsed and reported as not
+    // enforced. An abstract type has no direct instances (`insert.feature` L199), and that is also
+    // what lets `define` convert a type to abstract by looking at its instances alone.
+    if (this.schema.abstracts.has(type)) {
+      const message = `'${type}' is abstract and cannot have an instance of its own. Insert a concrete subtype.`;
+      throw attachDiagnostic(
+        new Error(message),
+        this.diagnostics.error(DiagnosticCode.abstractType, message, at),
+      );
+    }
+    this.db.prepare('INSERT INTO thing(type) VALUES (?)').run(type);
+    const row = this.db.prepare('SELECT last_insert_rowid() AS iid').get() as {
+      iid: number;
+    };
+    const iid = Number(row.iid);
+    this.touched.add(iid);
+    this.written.things += 1;
+    return iid;
+  }
+
+  private insertAttribute(
+    owner: number,
+    attribute: string,
+    value: string,
+    at?: Range,
+  ): void {
+    this.checkKnown('attribute', attribute, at);
+    // An abstract attribute type has no values of its own, as an abstract entity has no instances.
+    if (this.schema.abstracts.has(attribute)) {
+      const message = `'${attribute}' is abstract and cannot have a value of its own. Write a concrete subtype.`;
+      throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.abstractType, message, at));
+    }
+    // An owner owns an attribute VALUE once, as on TypeDB — a second `has age 5` on the same
+    // thing is the same ownership, not a second row a `count` would see twice (QA, B5).
+    const owned = this.db
+      .prepare('SELECT 1 FROM attr WHERE owner = ? AND type = ? AND value = ?')
+      .get(owner, attribute, value);
+    if (owned !== undefined) return;
+    this.touched.add(owner);
+
+    try {
+      this.db
+        .prepare('INSERT INTO attr(owner, type, value) VALUES (?, ?, ?)')
+        .run(owner, attribute, value);
+      this.written.attributes += 1;
+    } catch (error) {
+      const translated = translateConstraintError(error, attribute);
+      // 🔴 The message is unchanged and the range is the STATEMENT, not the term.
+      //
+      // SQLite raises this; it has never seen the TypeQLite, and (measured 2026-08-29) names neither
+      // the index nor the attribute. Pointing at a term we cannot actually locate would be worse
+      // than pointing at the statement. The value being written is deliberately NOT quoted — this
+      // report can end up in a `DomainEvent` payload, which replicates (ADR-021 D4).
+      throw attachDiagnostic(
+        translated,
+        this.diagnostics.error(
+          DiagnosticCode.constraintViolated,
+          `[CNT9] Constraint '@unique' has been violated for attribute '${attribute}'.`,
+          at,
+        ),
+      );
+    }
+  }
+
+  private insertRoles(
+    relation: number,
+    roles: ReadonlyArray<{ role: string; player: string; range?: Range }>,
+    bindings: Map<string, number[]>,
+  ): void {
+    for (const role of roles) {
+      const player = bindings.get(role.player)?.[0];
+      if (player === undefined) {
+        const message =
+          `Refusing a dangling relation: '${role.player}' is not bound, so role '${role.role}' ` +
+          'has nothing to relate.';
+        throw attachDiagnostic(
+          new Error(message),
+          this.diagnostics.error(
+            DiagnosticCode.danglingRelation,
+            message,
+            role.range,
+          ),
+        );
+      }
+      // `touched` drives `changeLog.recordWrite`. Every caller of this method also creates the
+      // relation through `insertThing`, which already marks it — this is belt and braces, and the
+      // one path that did NOT create it is now refused above rather than left to skip the log.
+      this.touched.add(relation);
+      this.db
+        .prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?)')
+        .run(relation, role.role, player);
+      this.written.roles += 1;
+    }
+  }
+
+  private runDeletes(pipeline: Pipeline, bindings: Map<string, number[]>, combinations: readonly Record<string, Binding>[]): void {
+    const write = pipeline.write;
+    if (!write || write.$type !== 'DeleteStage') return;
+    const constraints = this.constraintsOf(pipeline.match?.patterns ?? []);
+
+    for (const deletion of write.deletions) {
+      if (deletion.owner) {
+        // `delete $old of $p` — the attribute TYPE is not in the delete clause; it is whatever
+        // bound `$old` in the match.
+        const attribute = constraints
+          .flatMap((c) => c.bindings)
+          .find((b) => b.variable === deletion.target)?.attribute;
+        if (attribute === undefined) {
+          // `delete $v of $p` with `$v` a `let` value or nothing at all — not an attribute the
+          // match bound; refused rather than a silent `Wrote 0` (review, round 10).
+          this.refuse(DiagnosticCode.mixedPattern, `'${deletion.target}' is not an attribute the \`match\` bound with \`has <attribute> ${deletion.target}\`; \`delete ${deletion.target} of ${deletion.owner}\` has nothing to remove.`, rangeOf(deletion));
+        }
+        // 🔴 **The VALUE the match bound, on every owner it bound.** A combination carries `$old`
+        // as one attribute value since Phase 06, and `$n == "Al"; delete $n of $p;` removes that
+        // value and not every `name` the owner has (review, round 5). A combination without the
+        // value — none here binds it — falls back to every value of the type, through the closure:
+        // `$n` bound by `has name $n` may be a `first-name`, and that is the row removed.
+        for (const combination of combinations) {
+          const owner = combination[deletion.owner];
+          if (typeof owner !== 'number') continue;
+          const value = combination[deletion.target];
+          if (typeof value === 'object' && value.kind === 'attribute') {
+            this.db.prepare('DELETE FROM attr WHERE owner = ? AND type = ? AND value = ?').run(owner, value.attributeType, value.value);
+          } else {
+            this.db.prepare(`DELETE FROM attr WHERE owner = ? AND type IN ${SUBTYPES_OF}`).run(owner, attribute);
+          }
+          // Removing an attribute changes the owner's state — an update, not a tombstone.
+          this.touched.add(owner);
+        }
+        continue;
+      }
+      // 🔴 **Every match, not the first.** This read `bindings.get(deletion.target)?.[0]` and
+      // deleted that one row, so `match $k isa kid, has tag "x"; delete $k;` over three matches
+      // deleted one and left two — succeeding, reporting `ok`, exiting 0. `delete` in TypeQLite applies
+      // to every match; `[0]` implemented an operation the language does not have.
+      //
+      // ⚠️ **Nothing in this repository had ever deleted over a set.** Both TypeDBLite callers match
+      // on a `@key`, so their matches are single rows and they were correct by accident. The defect
+      // gate's claim store was the first to delete over a non-key attribute, and it kept two of
+      // three claims — `d-20260905-match-delete-removes-one-match-of`.
+      for (const iid of unique(bindings.get(deletion.target) ?? [])) {
+        // 🔴 Identity must be captured *before* the rows go, and the cascade below deletes relations
+        // this thing plays in — each of those is an entity in its own right and needs its own
+        // tombstone, or a follower would keep a relation whose player is gone.
+        const cascaded = this.db
+          .prepare('SELECT rel FROM role_player WHERE player = ?')
+          .all(iid) as Array<{ rel: number }>;
+        for (const row of cascaded) {
+          const identity = this.changeLog.identify(Number(row.rel));
+          if (identity) this.tombstones.push(identity);
+        }
+        const own = this.changeLog.identify(iid);
+        if (own) this.tombstones.push(own);
+        // Relations this thing participates in go first: `role_player.player` has no ON DELETE
+        // CASCADE, so deleting a thing that still plays a role would be refused. TypeDB deletes the
+        // relation with it, and `skills-projection-target.ts` relies on exactly that when it
+        // delete-then-inserts an invocation.
+        this.db
+          .prepare(
+            'DELETE FROM thing WHERE iid IN (SELECT rel FROM role_player WHERE player = ?)',
+          )
+          .run(iid);
+        this.db.prepare('DELETE FROM thing WHERE iid = ?').run(iid);
+      }
+    }
+  }
+}
+
+// ── helpers ─────────────────────────────────────────────────────────────────
+
+/** Each `isa` with its type variable read from the combination when it is already bound. */
+function resolveIsas(isas: readonly Isa[], combination: Record<string, Binding>): Isa[] {
+  return isas.map((isa) => {
+    const bound = isa.typeVariable === undefined ? undefined : combination[isa.typeVariable];
+    return typeof bound === 'string' ? { ...isa, type: bound } : isa;
+  });
+}
+
+/**
+ * Every iid each variable bound, across every combination the match produced.
+ *
+ * 🔴 The counterpart to `resolveMatch`, which keeps the first combination only. A delete applies to
+ * all of them, and reading one binding was how three matching rows became one deleted row.
+ */
+function resolveEveryMatch(
+  combinations: readonly Record<string, Binding>[],
+): Map<string, number[]> {
+  const bindings = new Map<string, number[]>();
+  for (const combination of combinations) {
+    for (const [variable, iid] of Object.entries(combination)) {
+      // A type variable binds a label, which no write can hold.
+      if (typeof iid === 'number') bindings.set(variable, [...(bindings.get(variable) ?? []), iid]);
+    }
+  }
+  return bindings;
+}
+
+/**
+ * The combinations reduced to what a write reads — every thing and type, and the values of
+ * `keep` — one per distinct assignment of those.
+ */
+function uniqueByConcepts(combinations: readonly Record<string, Binding>[], keep: ReadonlySet<string>): Record<string, Binding>[] {
+  const seen = new Set<string>();
+  const distinct: Record<string, Binding>[] = [];
+  for (const combination of combinations) {
+    const read: Record<string, Binding> = {};
+    for (const [variable, binding] of Object.entries(combination)) {
+      if (typeof binding !== 'object' || keep.has(variable)) read[variable] = binding;
+    }
+    const key = Object.keys(read).sort().map((v) => {
+      const binding = read[v];
+      return `${v}=${typeof binding === 'object' ? `${binding.kind === 'attribute' ? binding.attributeType : binding.valueType}:${binding.value}` : String(binding)}`;
+    }).join(String.fromCharCode(30));
+    if (seen.has(key)) continue;
+    seen.add(key);
+    distinct.push(read);
+  }
+  return distinct;
+}
+
+/** The variables a write stage reads as values: `has <attribute> $v` in an insert, `delete $v of $p`. */
+function valueVariablesReadBy(write: NonNullable<Pipeline['write']>): Set<string> {
+  if (write.$type === 'DeleteStage') return new Set(write.deletions.filter((d) => d.owner !== undefined).map((d) => d.target));
+  return new Set(
+    write.patterns.flatMap((pattern) =>
+      isThingPattern(pattern) ? pattern.properties.flatMap((p) => (isHasProperty(p) && p.valueVariable ? [p.valueVariable] : [])) : [],
+    ),
+  );
+}
+
+/** The value bindings of one combination, by variable. */
+function valueBindingsOf(combination: Record<string, Binding>): Map<string, ValueBinding> {
+  const values = new Map<string, ValueBinding>();
+  for (const [variable, binding] of Object.entries(combination)) {
+    if (typeof binding === 'object') values.set(variable, binding);
+  }
+  return values;
+}
+
+/** One combination as a bindings map — what `runInsert` expects: one iid per variable. */
+function singleBinding(
+  combination: Record<string, Binding>,
+): Map<string, number[]> {
+  return new Map(
+    Object.entries(combination).flatMap(([variable, iid]) => (typeof iid === 'number' ? [[variable, [iid]] as const] : [])),
+  );
+}
+
+/**
+ * The distinct iids a variable bound, in match order.
+ *
+ * 🔴 A match can bind the same thing more than once — a conjunction over two attributes produces a
+ * row per combination — and deleting it twice would push a second tombstone for an identity that
+ * only died once.
+ */
+function unique(iids: readonly number[]): number[] {
+  return [...new Set(iids)];
+}
+
+let patternCounter = 0;
+
+function rolesOf(
+  players: RolePlayers,
+  statement: number,
+): Array<{ role: string; player: string; statement: number; range?: Range }> {
+  // 🔴 One id per PATTERN, not per role list.
+  //
+  // `constraintsOf` merges roles across every pattern naming a variable, so without this two
+  // statements each mentioning one source are indistinguishable from one statement asking for two,
+  // and `relationBindings`' same-role rule rejects a query TypeQLite answers.
+  //
+  // ⚠️ It was minted per `rolesOf` call, and one pattern can carry TWO role lists —
+  // `$l isa link (source: $x), links (source: $y)`. Those got different ids and escaped the rule
+  // entirely, so `$x` and `$y` bound to the same player: the exact false positive the rule exists
+  // to close, reintroduced through the fix for the opposite one.
+  return players.entries.map((entry) => ({
+    role: entry.role,
+    player: entry.player,
+    statement,
+    // The provenance that gives `insertRoles`'s refusal a source position — see ThingConstraint.
+    range: rangeOf(entry),
+  }));
+}
+
+/**
+ * 🔴 No `slice(1, -1)`. Langium's default value converter already strips the quotes from a
+ * `STRING` terminal, so trimming again turns `"s-1"` into `-`. Found by the interpreter tests;
+ * the same bug was latent in the generator, where nothing had exercised a literal yet.
+ *
+ * 🔴 **The fallback throws; it used to return `''`.** Adding `DatetimeLiteral` and `BooleanLiteral`
+ * to the grammar made the danger concrete: a literal kind the parser accepts and this function does
+ * not know silently stored an **empty string**, so `has is-latest true` would have written `''` and
+ * every later match on it would simply never fire. That is ADR-018 Decision 7 exactly — *a construct
+ * that parses but is not implemented must be an error, not a silent success*.
+ *
+ * ⚠️ The same silent fallback existed in `sqlite-generator.ts`, returning `NULL`. That whole
+ * function went with `generatePipeline`, which had no callers — so there is now **one** literal
+ * path, and it is this one.
+ */
+/** An `IntLiteral`'s digits as written — its `number` has already rounded past 2^53. */
+function integerDigits(node: { value: number; $cstNode?: { text: string } }): string {
+  const digits = /(\d+)\s*$/.exec(node.$cstNode?.text ?? '')?.[1];
+  return digits ?? String(node.value);
+}
+
+/** A refusal thrown to be caught, recording no diagnostic — `literalAlternatives`' probe of each subtype. */
+class SilentRefusal extends Error {
+  constructor(readonly code: DiagnosticCodeValue, message: string) {
+    super(message);
+  }
+}
+
+/** `5.0` → `5`, `-0.50` → `-0.5`, `007` → `7`: a decimal's one stored spelling. */
+function canonicalDecimal(text: string): string {
+  const match = /^(-?)(\d+)(?:\.(\d*))?$/.exec(text);
+  if (!match) return text;
+  const [, sign, whole, fraction = ''] = match;
+  const integer = whole.replace(/^0+(?=\d)/, '');
+  const trimmed = fraction.replace(/0+$/, '');
+  const zero = integer === '0' && trimmed === '';
+  return `${zero ? '' : sign}${integer}${trimmed === '' ? '' : `.${trimmed}`}`;
+}
+
+function literalText(node: unknown): string {
+  if (isStringLiteral(node)) return node.value;
+  // 🔴 From the literal's TEXT, not its `number`: `INT returns number`, and `has age
+  // 9223372036854775807` had stored `9223372036854776000` (review, round 2). Signed by the grammar,
+  // not the terminal (Phase 06): `has age -5` is `negative` + `5`, and the CST text carries both.
+  // The digits are the INT token's text — `has age - 5` has a space the CST text would keep
+  // (review, round 4) — and the sign is the flag's.
+  if (isIntLiteral(node)) return `${node.negative ? '-' : ''}${integerDigits(node)}`;
+  // The DATETIME terminal admits an optional fractional part; `canonicalValue` drops a fraction
+  // of zeros, so `…:13` and `…:13.000` are ONE stored text (Phase 06 review, round 14) and
+  // `…:13.999` keeps its digits.
+  if (isDatetimeLiteral(node)) return node.value;
+  if (isDatetimeTzLiteral(node)) return node.value;
+  // `61.8dec` is `61.8`: the suffix is the literal's, not the value's. The ONE stored spelling
+  // per value is `canonicalValue`'s, by the attribute's type (review, rounds 9 and 10).
+  if (isDecimalLiteral(node)) return `${node.negative ? '-' : ''}${node.value.slice(0, -3)}`;
+  if (isDateLiteral(node)) return node.value;
+  if (isDoubleLiteral(node)) return `${node.negative ? '-' : ''}${node.value}`;
+  if (isBooleanLiteral(node)) return node.value;
+  throw new Error(
+    `TypeDBLite: unhandled literal kind '${String((node as { $type?: string })?.$type)}' — ` +
+      'the grammar accepts it and the interpreter cannot store it (ADR-018 D7)',
+  );
+}
+
+/**
+ * 🔴 Translate a SQLite constraint failure into the message the repositories already match on.
+ *
+ * `isUniqueConstraintViolation(error, attribute)` in `@downstream/persistence-infrastructure`
+ * matches `[CNT9] Constraint '@unique' has been violated` **and** the attribute name, and two
+ * production repositories raise `PrincipalAlreadyExistsError` on it. Without this translation the
+ * match fails, the catch does not fire, and a duplicate registration stops being reported as a
+ * duplicate — the `hosted-app-ai-chat` failure of 2026-07-16, restored by its own replacement.
+ *
+ * Measured 2026-08-29: SQLite reports `UNIQUE constraint failed: attr.value` with `errcode` 2067
+ * and names **neither** the index nor the attribute. So the attribute cannot be recovered from the
+ * message — it has to come from the statement being executed, which is why this lives in the
+ * interpreter and not in an adapter wrapped around it.
+ */
+export function translateConstraintError(
+  error: unknown,
+  attribute: string,
+): unknown {
+  const code = (error as { errcode?: number } | undefined)?.errcode;
+  if (code !== 2067) return error;
+  return new Error(
+    `[CNT9] Constraint '@unique' has been violated for attribute '${attribute}'.`,
+  );
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@typedblite/content-revision",
+  "description": "Canonical state encoding and ADR-020 D3 generation-digest revisions, shared by TypeDBLite's change log and a downstream feature's DocumentVersion",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./out/index.js",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "default": "./out/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.src.json"
+  }
+}

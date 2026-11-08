@@ -1,0 +1,12 @@
+{
+  "name": "typedblite-cli",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "typedblite": "./out/main.js"
+  },
+  "dependencies": {
+    "@typedblite/runtime": "0.0.1"
+  }
+}

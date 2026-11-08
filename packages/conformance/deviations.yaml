@@ -1,0 +1,9 @@
+# Scenarios TypeDBLite fails BY DESIGN — TypeDBLite Conformance Standard, "Declaring a deviation".
+# Each needs an owner that resolves: an ADR number, or a defect record id. No owner: it is a fail.
+# An entry whose scenario starts passing is reported by the run; remove it in the same commit.
+#
+# ⚠️ As of the first report card (2026-09-11, 0 of 1756) no scenario reaches the step where a
+# deviation would show: every Background stops at `@card`. The select-refusal deviation ADR-055 D5
+# names is real, but declaring it against a scenario that fails three steps earlier would record a
+# reason that is not yet the reason. It is declared when it becomes the reason — Phase 02.
+[]

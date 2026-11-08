@@ -1,0 +1,482 @@
+grammar TypeQLite
+
+import './terminals';
+
+// TypeQLite 3.x — the subset actually used by the downstream application and downstream-store, and since 2026-09-11 what
+// TypeDB's own behaviour specification needs to get past its Backgrounds.
+//
+// Scope was measured, not guessed (2026-08-29): every TypeQLite string in
+// `downstream-app/libs/platform/{iam,skills}/infrastructure` and
+// `downstream-monorepo/tools/downstream-store/schema`. What is here is what those use. What TypeDB has and
+// this does not — rules/inference, aggregation, negation, `sort`/`limit`/`offset`, expressions,
+// structs — is absent because no caller writes it, not because it was too hard. Adding a
+// construct starts by finding a caller that needs it.
+//
+// 🔴 The caller is now also `typedb/typedb-behaviour` (ADR-055), vendored under
+// `libs/core/typedblite/conformance/spec/`. Its `query/language/` Backgrounds are the acceptance
+// test for this file — `test/spec-backgrounds.spec.ts` — and what they use decides what is here.
+// Parsing a construct is one claim; enforcing what it means is the interpreter's, and the
+// conformance report card measures that scenario by scenario.
+
+entry TypeQLiteFile:
+    clauses+=Clause*;
+
+Clause:
+    DefineClause | UndefineClause | RedefineClause | Pipeline;
+
+// ── Schema ──────────────────────────────────────────────────────────────────
+
+DefineClause:
+    'define' definitions+=Definition+;
+
+Definition:
+    EntityDef | RelationDef | AttributeDef | TypeExtensionDef;
+
+// `entity skill, owns skill-id @key, plays skill-composition:owner;`
+// `entity adr sub doc;`                     <- downstream-store's subtyping
+// `entity person plays employment:employee, owns name @card(0..);`  <- the spec's form
+// `entity abstract-type @abstract;`
+//
+// 🔴 The comma after the label is OPTIONAL. TypeDB 3.10.4 accepts `entity person, owns ref` and
+// `entity person owns ref` alike (verified on the live server 2026-09-11); this grammar required
+// the comma, and every Background in the behaviour spec is written without it —
+// `d-20260911-the-typeql-grammar-requires-a-comma`. Between traits the comma stays required.
+//
+// 🔴 **An annotation belongs to the thing it follows, and the AST says which.** `entity player
+// @abstract sub person` annotates the *type*; `entity player sub person @abstract` annotates the
+// *sub*, which TypeDB refuses — nothing but `@doc`/`@meta` may sit on a `sub`. One merged list
+// could not tell the two apart, so the validator's admissibility table had nothing to read
+// (Phase 03 of the conformance feature). `value` on an entity or relation parses because TypeQLite's
+// type-constraint grammar is kind-agnostic and TypeDB refuses it at `define`, not at parse —
+// `define.feature` L392 says `; fails`, not `parsing fails`.
+EntityDef:
+    'entity' name=ID annotations+=Annotation*
+    ('sub' superType=[EntityDef:ID] subAnnotations+=Annotation*)?
+    (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
+    (','? traits+=Trait (',' traits+=Trait)*)? ';';
+
+// `relation membership, relates member, relates org, owns membership-key @key;`
+RelationDef:
+    'relation' name=ID annotations+=Annotation*
+    ('sub' superType=[RelationDef:ID] subAnnotations+=Annotation*)?
+    (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
+    (','? traits+=Trait (',' traits+=Trait)*)? ';';
+
+// `attribute principal-id, value string;`
+// `attribute age @independent, value integer;`          <- annotation on the type
+// `attribute email value string @regex("^.*@.*$");`      <- annotation on the VALUE TYPE
+// `attribute empty-sub-data @abstract, sub empty-data;`  <- annotation before `sub`
+// `attribute person-name sub name;`                      <- attribute subtyping, no value type
+AttributeDef:
+    'attribute' name=ID annotations+=Annotation*
+    (','? 'sub' superType=[AttributeDef:ID] subAnnotations+=Annotation*)?
+    (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)? ';';
+
+// `principal plays membership:member;` — a re-open of an already-defined type, with no kind
+// keyword. The spec re-opens with a whole trait list: `person plays employment:employee, owns
+// name @card(0..), owns ref @key;` (`given.feature`), so this is EntityDef's tail on an existing
+// name — and the generator and interpreter treat its traits exactly as they treat a definition's.
+//
+// A re-open may also say `sub` (`person sub parent;`, `name sub valueless-name;`) and `value`
+// (`name value integer;`). The parent is a plain name here, not a cross-reference: the re-opened
+// type's kind is not in the text, so which definition it could resolve to is the interpreter's to
+// decide against the applied schema.
+TypeExtensionDef:
+    type=ID annotations+=Annotation*
+    (','? 'sub' superType=ID subAnnotations+=Annotation*)?
+    (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
+    (','? traits+=Trait (',' traits+=Trait)*)? ';';
+
+// ── undefine ────────────────────────────────────────────────────────────────
+//
+// Phase 04 of the conformance feature (ADR-055). 🔴 `undefine` is NOT `define` with a different
+// keyword: TypeDB's grammar admits only the targeted forms — a bare type name, and `<what> from
+// <type> [<capability>]` — and the behaviour spec calls every define-like form a PARSING failure
+// (`undefine entity person;`, `undefine person owns name;`, `undefine name value string;` —
+// undefine.feature L42). So this rule has no kind keyword and no trait list, on purpose.
+//
+// `undefine` alone is a valid, empty statement.
+UndefineClause:
+    {infer UndefineClause} 'undefine' undefinitions+=Undefinition*;
+
+Undefinition:
+    UndefineFrom | UndefineType;
+
+// `undefine person;` — the type itself, whatever its kind.
+UndefineType:
+    type=ID ';';
+
+// `sub person from child;` `owns name from person;` `plays employment:employee from person;`
+// `relates employee from employment;` `value string from name;` `@card from person owns name;`
+// `@regex from email value string;` `as parent from fathership relates father;`
+UndefineFrom:
+    target=UndefineTarget 'from' type=ID (capability=Capability)? ';';
+
+UndefineTarget:
+      {infer UndefineAnnotation} category=AnnotationKeyword ('(' key=STRING ')')?
+    | {infer UndefineSub} 'sub' superType=ID
+    | {infer UndefineOwns} 'owns' attribute=ID
+    | {infer UndefinePlays} 'plays' role=RoleName
+    | {infer UndefineRelates} 'relates' role=ID
+    | {infer UndefineValue} 'value' valueType=ValueType
+    | {infer UndefineSpecialise} 'as' role=ID;
+
+// The capability an annotation or a specialisation is removed from: `… from person owns name`.
+Capability:
+      {infer CapabilityOwns} 'owns' attribute=ID
+    | {infer CapabilityPlays} 'plays' role=RoleName
+    | {infer CapabilityRelates} 'relates' role=ID
+    | {infer CapabilitySub} 'sub' superType=ID
+    | {infer CapabilityValue} 'value' valueType=ValueType;
+
+// An annotation named by its category alone — `@card`, not `@card(1..1)`.
+AnnotationKeyword returns string:
+    '@key' | '@unique' | '@card' | '@independent' | '@abstract' | '@distinct' | '@cascade'
+    | '@regex' | '@values' | '@range' | '@doc' | '@meta';
+
+// `employment:employee` as plain names — undefine and redefine name things defined elsewhere,
+// and a cross-reference would resolve to nothing in this document.
+RoleName:
+    relation=ID ':' role=ID;
+
+// ── redefine ────────────────────────────────────────────────────────────────
+//
+// 🔴 Stricter than `define`, on purpose. TypeDB's `redefine` takes exactly ONE statement making
+// exactly ONE change, and the spec calls the rest PARSING failures: `redefine entity person;`
+// (nothing to change), two traits in one statement, a variable (`redefine $p isa person;`).
+// Whether the one change IS a change — "Nothing was redefined" — is the interpreter's.
+RedefineClause:
+    {infer RedefineClause} 'redefine' (redefinition=Redefinition)?;
+
+Redefinition:
+    RedefineRoleLabel | RedefineType;
+
+// `redefine entity person owns name @card(0..1);` `redefine child sub person;`
+// `redefine attribute email value integer;` `redefine entity before-rename label after-rename;`
+// `redefine player @abstract;`
+RedefineType:
+    (kind=Kind)? type=ID change=RedefineChange ';';
+
+Kind returns string:
+    'entity' | 'relation' | 'attribute';
+
+RedefineChange:
+      {infer RedefineLabel} 'label' newLabel=ID
+    | {infer RedefineSub} 'sub' superType=ID
+    | {infer RedefineValue} 'value' valueType=ValueType annotations+=Annotation*
+    | {infer RedefineTrait} trait=Trait
+    | {infer RedefineAnnotations} annotations+=Annotation+;
+
+// `redefine relation-of-rename:before-rename label sibling-role;` — a role is renamed through its relation.
+RedefineRoleLabel:
+    role=RoleName 'label' newLabel=ID ';';
+
+Trait:
+    OwnsTrait | RelatesTrait | PlaysTrait;
+
+// 🔴 These are real Langium cross-references, not strings. Langium then resolves them, and an
+// unresolved name becomes an error for free — along with go-to-definition and find-references in
+// any editor. A grammar that merely parses `owns nonexistent-attribute` is not checking anything.
+OwnsTrait:
+    'owns' attribute=[AttributeDef:ID] annotations+=Annotation*;
+
+// `name`, not `role`, so the role is a *named element* other references can resolve to.
+RelatesTrait:
+    'relates' name=ID annotations+=Annotation*;
+
+// `plays employment:employee @card(0..)` — the spec annotates plays as it does owns.
+PlaysTrait:
+    'plays' role=RoleRef annotations+=Annotation*;
+
+// The role is scoped to the relation named alongside it, not looked up globally — see
+// `TypeQLiteScopeProvider`. Two relations may each relate a role called `member`.
+RoleRef:
+    relation=[RelationDef:ID] ':' role=[RelatesTrait:ID];
+
+// ⚠️ Every annotation here PARSES. Only `@key` is enforced by the runtime; the rest are accepted
+// and reported by `define` as *parsed and not enforced* — founder decision 2026-09-11, the third
+// outcome between refusing a valid schema and silently ignoring a constraint. The conformance
+// report card measures each one's semantics as they land.
+Annotation:
+    KeyAnnotation | UniqueAnnotation | CardAnnotation | IndependentAnnotation | AbstractAnnotation
+    | DistinctAnnotation | CascadeAnnotation | RegexAnnotation | ValuesAnnotation | RangeAnnotation
+    | DocAnnotation | MetaAnnotation;
+
+// The whole point of both schemas — see the header comments in iam.schema.typeqlite and
+// skills.schema.typeqlite. Generates a UNIQUE index.
+KeyAnnotation:
+    {infer KeyAnnotation} '@key';
+
+UniqueAnnotation:
+    {infer UniqueAnnotation} '@unique';
+
+// `@card(0..)` — downstream-store's multi-valued attributes. An absent upper bound is unbounded.
+CardAnnotation:
+    '@card' '(' min=INT '..' (max=INT)? ')';
+
+// `attribute age @independent, value integer;` — an attribute instance may exist with no owner.
+IndependentAnnotation:
+    {infer IndependentAnnotation} '@independent';
+
+// `entity abstract-type @abstract;` — no instances of this type itself, only of its subtypes.
+AbstractAnnotation:
+    {infer AbstractAnnotation} '@abstract';
+
+DistinctAnnotation:
+    {infer DistinctAnnotation} '@distinct';
+
+CascadeAnnotation:
+    {infer CascadeAnnotation} '@cascade';
+
+// `value string @regex("^.*@.*$")`
+RegexAnnotation:
+    '@regex' '(' pattern=STRING ')';
+
+// `value integer @values(1, 2, 3)`
+ValuesAnnotation:
+    '@values' '(' values+=Literal (',' values+=Literal)* ')';
+
+// `value string @range("A".."z")` — either bound may be absent.
+RangeAnnotation:
+    '@range' '(' (min=Literal)? '..' (max=Literal)? ')';
+
+// `entity player @doc("docs here")`, `@meta("key", "value")` — metadata TypeDB stores and
+// `get_doc()` reads back. Parsed since Phase 03 of the conformance feature because the
+// admissibility table has rows for them; retained nowhere yet, and reported as such.
+DocAnnotation:
+    '@doc' '(' text=STRING ')';
+
+MetaAnnotation:
+    '@meta' '(' key=STRING ',' value=STRING ')';
+
+// The value types TypeDB 3 has, plus any other name: `value rgba`, `value bool` parse — TypeDB's
+// grammar admits a struct name here — and the validator refuses one it does not know, so the
+// refusal is `define`'s and not the parser's, as the behaviour spec expects (`; fails`).
+ValueType returns string:
+    'string' | 'integer' | 'long' | 'double' | 'decimal' | 'boolean' | 'datetime-tz' | 'datetime'
+    | 'date' | 'duration' | ID;
+
+// ── Queries ─────────────────────────────────────────────────────────────────
+//
+// A pipeline is a sequence of stages, which is how TypeQLite 3.x composes read and write:
+// `match ...; insert ...;` and `match ...; select $a, $b;` are both pipelines.
+
+// 🔴 Stage ORDER is part of the grammar, not a validator rule. An earlier version wrote this as
+// `stages+=Stage+`, which parses but is ambiguous across query boundaries: a file of consecutive
+// queries collapsed into ONE pipeline, because nothing told the parser where a pipeline ends.
+// Encoding the real order — match, then a write, then a projection — makes each query terminate.
+Pipeline:
+      match=MatchStage (write=WriteStage)? (select=SelectStage)? (reduce=ReduceStage)?
+    | write=WriteStage;
+
+WriteStage:
+    InsertStage | PutStage | DeleteStage;
+
+MatchStage:
+    'match' patterns+=Pattern+;
+
+InsertStage:
+    'insert' patterns+=Pattern+;
+
+// `put $o isa organization, has org-id "x";` — match-or-insert, in one statement.
+PutStage:
+    'put' patterns+=Pattern+;
+
+// Two shapes, both real:
+//   `delete $old of $p;`  detaches an attribute from its owner — how update is implemented.
+//   `delete $i;`          deletes the thing itself — `skills-projection-target.ts`'s
+//                         delete-then-insert idempotency, re-applied on every redelivered change.
+//
+// 🔴 The second was MISSED by the first scope survey and found by Phase 00's verification step,
+// which re-derived the surface from every `.execute`/`.query` call site instead of re-reading the
+// earlier summary. `skills-projection-target.ts` was not in that survey at all.
+DeleteStage:
+    'delete' deletions+=Deletion+;
+
+SelectStage:
+    'select' variables+=VAR (',' variables+=VAR)* ';';
+
+// `reduce $c = count($y), $s? = sum($z) groupby $x;` — Phase 06 of the conformance feature. One
+// row, or one per group, of value cells; `?` marks a reduction that may answer nothing.
+ReduceStage:
+    'reduce' reductions+=Reduction (',' reductions+=Reduction)* ('groupby' groups+=VAR (',' groups+=VAR)*)? ';';
+
+// `$c = count($x)`, `$c = count`, `$m? = max($y)` — a bare `count` takes no parentheses
+// (reduce.feature L92).
+Reduction:
+    variable=VAR (optional?='?')? '=' reducer=ID ('(' (argument=VAR)? ')')?;
+
+Deletion:
+    target=VAR ('of' owner=VAR)? ';';
+
+Pattern:
+    ThingPattern | AnonRelationPattern | TypePattern | KindPattern | LetPattern | ComparisonPattern;
+
+// ── values (Phase 06) ───────────────────────────────────────────────────────
+
+// `let $v = $a * 2;` — a value variable, assigned once.
+LetPattern:
+    'let' variable=VAR '=' expression=Expression ';';
+
+// `$a > 10;` `$v == $a;` — a predicate over bound values, filtering the match.
+ComparisonPattern:
+    left=VAR comparator=Comparator right=Expression ';';
+
+Comparator returns string:
+    '==' | '!=' | '<=' | '>=' | '<' | '>';
+
+// Precedence climbing: `+ -` < `* / %` < unary `-` < `^` (right-associative) < atoms.
+Expression:
+    AdditiveExpression;
+
+AdditiveExpression infers Expression:
+    MultiplicativeExpression ({infer BinaryExpression.left=current} operator=('+' | '-') right=MultiplicativeExpression)*;
+
+MultiplicativeExpression infers Expression:
+    UnaryExpression ({infer BinaryExpression.left=current} operator=('*' | '/' | '%') right=UnaryExpression)*;
+
+UnaryExpression infers Expression:
+    {infer NegationExpression} '-' operand=UnaryExpression | PowerExpression;
+
+PowerExpression infers Expression:
+    AtomExpression ({infer BinaryExpression.left=current} operator='^' right=UnaryExpression)?;
+
+// 🔴 An expression's literal is UNSIGNED: `10-1` must lex as `10` `-` `1`, so the terminals carry
+// no sign (finding, Phase 06 review), and `-1` here is a `NegationExpression` over `1`. Outside an
+// expression — `has age -5`, `@range(-5..5)` — the sign belongs to the `Literal` (below).
+AtomExpression infers Expression:
+      {infer LiteralExpression} literal=ExpressionLiteral
+    | {infer VariableExpression} variable=VAR
+    | {infer FunctionExpression} function=FunctionName '(' (arguments+=Expression (',' arguments+=Expression)*)? ')'
+    | '(' Expression ')';
+
+// `floor`, `std::math::floor`, `std::string::len` — the built-ins, with or without their
+// namespace; `string` is a value-type keyword, so a segment is a `ValueType`, which admits it.
+FunctionName returns string:
+    ValueType ('::' ValueType)*;
+
+// `$s isa skill, has skill-id "x", has skill-name $n;`
+// `$r isa step-dependency (dependent: $d, prerequisite: $p);`
+// `$p has principal-type $old;`                       <- no isa; constrains an existing binding
+// `$x sub person; $x owns name; $x label dog;`         <- a TYPE variable (Phase 05): the same head,
+//                                                         told apart by its properties
+ThingPattern:
+    variable=VAR properties+=Property (',' properties+=Property)* ';';
+
+// `person owns $x;` `writer sub $x;` `employment relates $x;` — a type named as the subject, with
+// a variable somewhere in its properties. Phase 05 of the conformance feature.
+TypePattern:
+    subject=ID properties+=Property (',' properties+=Property)* ';';
+
+// `entity $x;` `relation $t;` `attribute $x;` `relation $x label connection;` — a kind filter on a
+// type variable, optionally with properties.
+KindPattern:
+    kind=Kind variable=VAR (properties+=Property (',' properties+=Property)*)? ';';
+
+// `(owner: $s, step: $st) isa skill-composition;` — an unbound relation, never referred to again.
+AnonRelationPattern:
+    players=RolePlayers 'isa' type=ID ';';
+
+Property:
+    IsaProperty | HasProperty | LinksProperty | LabelProperty | SubProperty | OwnsProperty
+    | PlaysProperty | RelatesProperty;
+
+// `isa person`, `isa $t` (a type variable), `isa! person` (the exact type, no subtypes).
+IsaProperty:
+    (exact?='isa!' | 'isa') (type=ID | typeVariable=VAR) (players=RolePlayers)?;
+
+// ── type properties (Phase 05) ──────────────────────────────────────────────
+//
+// Each names a type or a type variable; a ThingPattern carrying one is a TYPE pattern, and the
+// interpreter refuses a head that mixes `has`/`links` with these.
+LabelProperty:
+    'label' label=ID;
+
+SubProperty:
+    (direct?='sub!' | 'sub') (type=ID | typeVariable=VAR);
+
+OwnsProperty:
+    'owns' (attribute=ID | attributeVariable=VAR);
+
+PlaysProperty:
+    'plays' (role=RoleName | roleVariable=VAR);
+
+RelatesProperty:
+    'relates' (role=ID | roleVariable=VAR);
+
+// The value is a literal when constraining, a variable when binding for output.
+HasProperty:
+    'has' attribute=ID (value=Literal | valueVariable=VAR)?;
+
+LinksProperty:
+    'links' players=RolePlayers;
+
+RolePlayers:
+    '(' entries+=RolePlayer (',' entries+=RolePlayer)* ')';
+
+RolePlayer:
+    role=ID ':' player=VAR;
+
+// 🔴 `DatetimeLiteral`, then `DateLiteral`, then `DoubleLiteral`, then `IntLiteral`, mirroring the
+// terminal order in `terminals.langium` — all begin with digits, and the alternation is resolved by
+// the token the lexer already chose.
+//
+// **Added because a downstream feature needed them, which is this grammar's rule for every construct.**
+// `ValueType` has admitted `boolean` and `datetime` since day one, but nothing could *write* one:
+// `workbench.schema.typeqlite` declares two boolean and two datetime attributes, and real call sites
+// emit `has is-latest true` and `has created-at 2026-09-03T10:00:00`. Neither parsed
+// ([ADR-038](../../../../../docs/architecture/adr-038-port-prompt-workbench-as-a-domain-cqrs-app.md)
+// Amendment 1(d)).
+//
+// **The date and double literals arrived the same way, 2026-09-11.** `fetch.feature`'s Background
+// inserts `has end-date 2021-01-01` and `has karma 123.4567891`; the behaviour spec is the caller.
+//
+// **Signed here, unsigned in an expression (Phase 06).** The numeric terminals carry no sign, so
+// that `10-1` is a subtraction; a `has age -5` or `@range(-5..5)` takes its `-` as the literal's
+// `negative` flag, and `literalText` applies it.
+Literal:
+    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | BooleanLiteral
+    | SignedDecimalLiteral | SignedDoubleLiteral | SignedIntLiteral;
+
+// An expression's literal carries no sign — `-1` there is a `NegationExpression` over `1`.
+ExpressionLiteral infers Literal:
+    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | BooleanLiteral
+    | DecimalLiteral | DoubleLiteral | IntLiteral;
+
+SignedDecimalLiteral infers DecimalLiteral:
+    (negative?='-')? value=DECIMAL;
+
+SignedDoubleLiteral infers DoubleLiteral:
+    (negative?='-')? value=DOUBLE;
+
+SignedIntLiteral infers IntLiteral:
+    (negative?='-')? value=INT;
+
+// `10.2dec`, `5dec` — TypeDB's exact decimal, before DOUBLE and INT which are its prefixes.
+DecimalLiteral:
+    value=DECIMAL;
+
+StringLiteral:
+    value=STRING;
+
+// `2024-06-04T00:00:00+0010`, `2024-06-04T00:00:00 Europe/Belfast` — a datetime with its zone,
+// which is its own value type (`datetime-tz`). Before DATETIME, which is its prefix.
+DatetimeTzLiteral:
+    value=DATETIME_TZ;
+
+DatetimeLiteral:
+    value=DATETIME;
+
+DateLiteral:
+    value=DATE;
+
+DoubleLiteral:
+    value=DOUBLE;
+
+// Keywords rather than a terminal: `true` also matches `ID`, and Langium resolves that with a
+// keyword token carrying `longer_alt: ID` — so `trueish` stays one identifier.
+BooleanLiteral:
+    value=('true' | 'false');
+
+IntLiteral:
+    value=INT;

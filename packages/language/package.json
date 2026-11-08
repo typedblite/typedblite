@@ -1,0 +1,40 @@
+{
+  "name": "@typedblite/language",
+  "description": "TypeQLite grammar, AST, language services and SQLite generator",
+  "version": "0.0.1",
+  "type": "module",
+  "engines": {
+    "node": ">=20.10.0",
+    "npm": ">=10.2.3"
+  },
+  "files": [
+    "out",
+    "src"
+  ],
+  "main": "./out/index.js",
+  "module": "./out/index.js",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "default": "./out/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      ".": [
+        "out/index"
+      ]
+    }
+  },
+  "scripts": {
+    "langium:generate": "langium generate",
+    "build": "tsc -b tsconfig.src.json"
+  },
+  "dependencies": {
+    "langium": "~4.3.1",
+    "vscode-languageserver": "~9.0.1"
+  },
+  "devDependencies": {
+    "langium-cli": "~4.3.0"
+  }
+}

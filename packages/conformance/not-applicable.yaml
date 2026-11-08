@@ -1,0 +1,6 @@
+# Step PATTERNS outside the engine's contract — a user, a cluster, a driver-side concept object.
+# Never "hard". A scenario using any of these is not-applicable, decided before it runs.
+#
+# Empty for query/language: every step it uses is either a query the engine answers or protocol
+# the harness stands in for (see `World`). Expected to stay short.
+[]

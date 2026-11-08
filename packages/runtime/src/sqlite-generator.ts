@@ -1,0 +1,345 @@
+import {
+  isAbstractAnnotation,
+  isAttributeDef,
+  isEntityDef,
+  isRelationDef,
+  isTypeExtensionDef,
+  isOwnsTrait,
+  isRelatesTrait,
+  isKeyAnnotation,
+  isUniqueAnnotation,
+  isDefineClause,
+  isPlaysTrait,
+  type Annotation,
+  type TypeQLiteFile,
+} from '@typedblite/language';
+import {
+  recordCategory,
+  recordText,
+  roleRef,
+  subSubject,
+  traitSubject,
+  typeSubject,
+  valueSubject,
+} from './schema-subjects.js';
+
+/**
+ * TypeQLite → SQLite.
+ *
+ * The storage model mirrors TypeDB's own rather than generating a table per entity type: one
+ * `thing` row per instance, attributes and role-players as separate tables. That is what makes
+ * the two guarantees fall out of SQLite's own constraint machinery instead of being re-checked
+ * in application code:
+ *
+ * - **`@key`** becomes a partial `UNIQUE INDEX` on the attribute type.
+ * - **"a dangling dependency is unrepresentable"** becomes a `FOREIGN KEY` from every role
+ *   player back to `thing`. This is the guarantee the GraphQLite spike (2026-08-29) failed —
+ *   it accepted an edge to a non-existent node and silently wrote it between two unrelated ones.
+ *
+ * 🔴 `PRAGMA foreign_keys = ON` is emitted first and is not optional. SQLite defaults it OFF
+ * per connection, so without it the second guarantee silently does not exist.
+ */
+
+const PRELUDE = `PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS thing (
+  iid   INTEGER PRIMARY KEY,
+  type  TEXT NOT NULL
+);
+
+-- Subtype closure, so \`isa doc\` also matches \`adr\` (downstream-store's \`entity adr sub doc\`).
+CREATE TABLE IF NOT EXISTS type_parent (
+  type   TEXT PRIMARY KEY,
+  parent TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS attr (
+  owner INTEGER NOT NULL REFERENCES thing(iid) ON DELETE CASCADE,
+  type  TEXT NOT NULL,
+  value TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS attr_owner ON attr(owner);
+CREATE INDEX IF NOT EXISTS attr_lookup ON attr(type, value);
+
+-- The applied schema's own vocabulary, so a FILE-BACKED database can be reopened and still know
+-- what it defines. Without this the type list lives only in the process that ran define, and a
+-- fresh process against an existing database believes no schema has been applied -- which makes
+-- --database persist data that nothing can then query.
+-- (No backticks in here: this block is a TypeScript template literal.)
+CREATE TABLE IF NOT EXISTS schema_element (
+  kind TEXT NOT NULL CHECK (kind IN ('type', 'attribute')),
+  name TEXT NOT NULL,
+  PRIMARY KEY (kind, name)
+);
+
+-- Which type owns which attribute, which schema_element cannot express.
+--
+-- It held two flat sets -- types, attributes -- and no relation between them, so the runtime could
+-- say edge-id exists and not that a node never owns it. A match binding an attribute its type does
+-- not own therefore answered zero rows with no explanation, and an attempt to infer the fault from
+-- candidate counts was wrong twice before being deleted as undecidable. It is not undecidable; the
+-- ownership was simply never recorded. The schema AST has had it all along.
+-- (No backticks in here either -- same template literal.)
+CREATE TABLE IF NOT EXISTS schema_owns (
+  type      TEXT NOT NULL,
+  attribute TEXT NOT NULL,
+  PRIMARY KEY (type, attribute)
+);
+
+-- Which types are relations. schema_element's kind CHECK admits 'type' and 'attribute' only and
+-- SQLite cannot alter a CHECK in place, so this is additive, the way key_attribute is. A projected
+-- thing whose type is here is a relation cell; any other is an entity cell.
+CREATE TABLE IF NOT EXISTS schema_relation (
+  name TEXT PRIMARY KEY
+);
+
+-- Each attribute type's DECLARED value type. A subtype declaring none inherits its parent's, which
+-- is resolved by walking type_parent -- the same table that carries a thing type's parent, because
+-- TypeDB labels are unique across kinds and an attribute's sub is a sub. Additive, like the two
+-- above: schema_element cannot grow a column in place. Without it define could not tell that
+-- attribute name value integer contradicts the string name already applied, and accepted it.
+-- (No backticks in here either -- same template literal.)
+CREATE TABLE IF NOT EXISTS schema_value_type (
+  attribute  TEXT PRIMARY KEY,
+  value_type TEXT NOT NULL
+);
+
+-- Which roles each relation declares, so plays employment:employee can be checked against a
+-- role that exists and person relates employee refused on a type that is not a relation.
+CREATE TABLE IF NOT EXISTS schema_relates (
+  relation TEXT NOT NULL,
+  role     TEXT NOT NULL,
+  PRIMARY KEY (relation, role)
+);
+
+-- Which types are abstract, so an insert of one is refused -- and, because it is refused, an
+-- abstract type never has direct instances and converting a type to abstract can look at the
+-- instances alone, with no memory of whether it was abstract before. Which ownerships are key,
+-- so a restated @key on reopen is known to be a restatement and not a conversion the data must
+-- conform to. Additive, like the tables above. (No backticks in here -- same template literal.)
+CREATE TABLE IF NOT EXISTS schema_abstract (
+  name TEXT PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS schema_key_owns (
+  type      TEXT NOT NULL,
+  attribute TEXT NOT NULL,
+  PRIMARY KEY (type, attribute)
+);
+
+-- Every annotation the applied schema carries, per subject (a type, its sub, its value type, or
+-- one of its traits -- see schema-subjects.ts for the keys) with the category and the text as
+-- written. What undefine removes and redefine replaces. Phase 04 of the conformance feature;
+-- additive like the tables above. (No backticks in here -- same template literal.)
+CREATE TABLE IF NOT EXISTS schema_annotation (
+  subject  TEXT NOT NULL,
+  category TEXT NOT NULL,
+  text     TEXT NOT NULL,
+  PRIMARY KEY (subject, category)
+);
+
+-- Which types play which roles (relation:role), the third capability beside owns and relates.
+CREATE TABLE IF NOT EXISTS schema_plays (
+  type TEXT NOT NULL,
+  role TEXT NOT NULL,
+  PRIMARY KEY (type, role)
+);
+
+CREATE TABLE IF NOT EXISTS role_player (
+  rel    INTEGER NOT NULL REFERENCES thing(iid) ON DELETE CASCADE,
+  role   TEXT NOT NULL,
+  player INTEGER NOT NULL REFERENCES thing(iid),
+  PRIMARY KEY (rel, role, player)
+);
+
+-- A relation is looked up by who plays which role in it (a planned join's candidate seed, and every relation
+-- check): the primary key starts with rel, so without this each lookup scans the whole table. An existing
+-- store gets it when it is next opened (the interpreter ensures it). Not a rule; a lookup path.
+CREATE INDEX IF NOT EXISTS role_player_by_player ON role_player(player, role, rel);`;
+
+export interface SchemaSql {
+  readonly ddl: string;
+  /** Attribute types carrying `@key`, in declaration order. */
+  readonly keys: readonly string[];
+}
+
+/** Generates the DDL for a `define` clause. */
+export function generateSchema(file: TypeQLiteFile): SchemaSql {
+  const statements: string[] = [PRELUDE];
+  const keys: string[] = [];
+  const subtypes: Array<[string, string]> = [];
+  const elements: Array<['type' | 'attribute', string]> = [];
+  const relations: string[] = [];
+  const owns: Array<[string, string]> = [];
+  const valueTypes: Array<[string, string]> = [];
+  const relates: Array<[string, string]> = [];
+  const uniques: string[] = [];
+  const abstracts: string[] = [];
+  const keyOwns: Array<[string, string]> = [];
+  const annotations: Array<[string, string, string]> = [];
+  const plays: Array<[string, string]> = [];
+  const record = (subject: string, list: readonly Annotation[]): void => {
+    for (const annotation of list) annotations.push([subject, recordCategory(annotation), recordText(annotation)]);
+  };
+
+  for (const clause of file.clauses) {
+    if (!isDefineClause(clause)) continue;
+
+    for (const definition of clause.definitions) {
+      if (isEntityDef(definition) || isRelationDef(definition) || isTypeExtensionDef(definition)) {
+        // A re-open (`person owns ref @key;`, no kind keyword) names an existing type and adds
+        // traits to it. Its owns and keys register exactly as a definition's do; only the element
+        // row and the parent are the definition's alone.
+        const name = isTypeExtensionDef(definition) ? definition.type : definition.name;
+        if (!isTypeExtensionDef(definition)) {
+          elements.push(['type', definition.name]);
+          if (isRelationDef(definition)) relations.push(definition.name);
+        }
+        // `person sub parent;` and `name value integer;` — a re-open may assign either, and the
+        // interpreter has already refused the ones TypeDB refuses. A re-open's parent is a plain
+        // name; a definition's is a cross-reference.
+        const superType = isTypeExtensionDef(definition)
+          ? definition.superType
+          : definition.superType?.$refText;
+        if (superType) subtypes.push([name, superType]);
+        if (isTypeExtensionDef(definition) && definition.valueType) {
+          valueTypes.push([name, definition.valueType]);
+        }
+        if (definition.annotations.some(isAbstractAnnotation)) abstracts.push(name);
+
+        record(typeSubject(name), definition.annotations);
+        record(subSubject(name), definition.subAnnotations);
+        record(valueSubject(name), definition.valueAnnotations);
+        for (const trait of definition.traits) {
+          record(traitSubject(name, trait).subject, trait.annotations);
+          if (isPlaysTrait(trait)) {
+            plays.push([name, roleRef(trait.role.relation.$refText, trait.role.role.$refText)]);
+          }
+          if (isOwnsTrait(trait)) owns.push([name, trait.attribute.$refText]);
+          if (isOwnsTrait(trait) && trait.annotations.some(isKeyAnnotation)) {
+            // `$refText` rather than `.ref?.name`: the DDL only needs the name as written, and
+            // `.ref` requires a linked document — the generator must work on a parse alone.
+            keys.push(trait.attribute.$refText);
+            keyOwns.push([name, trait.attribute.$refText]);
+          }
+          if (isOwnsTrait(trait) && trait.annotations.some(isUniqueAnnotation)) {
+            uniques.push(trait.attribute.$refText);
+          }
+          if (isRelatesTrait(trait)) relates.push([name, trait.name]);
+        }
+      }
+      // An attribute's instances are rows in `attr`, so it needs no table of its own — but its
+      // parent and its value type are schema facts the refusals read, and `plays` is a schema-level
+      // permission this model does not enforce structurally — see the honest-gaps note in the README.
+      //
+      // 🔴 The parent was dropped here. `attribute first-name sub name;` pushed the element row
+      // and nothing else, so no `type_parent` row existed for an attribute and the closure the
+      // things' reads walk had nothing to walk (`d-20260911-an-attribute-subtype-is-accepted-by`).
+      if (isAttributeDef(definition)) {
+        elements.push(['attribute', definition.name]);
+        record(typeSubject(definition.name), definition.annotations);
+        record(subSubject(definition.name), definition.subAnnotations);
+        record(valueSubject(definition.name), definition.valueAnnotations);
+        const superType = definition.superType?.$refText;
+        if (superType) subtypes.push([definition.name, superType]);
+        if (definition.valueType) valueTypes.push([definition.name, definition.valueType]);
+        if (definition.annotations.some(isAbstractAnnotation)) abstracts.push(definition.name);
+      }
+    }
+  }
+
+  for (const [kind, name] of elements) {
+    statements.push(
+      `INSERT OR IGNORE INTO schema_element(kind, name) VALUES (${q(kind)}, ${q(name)});`,
+    );
+  }
+
+  for (const name of relations) {
+    statements.push(`INSERT OR IGNORE INTO schema_relation(name) VALUES (${q(name)});`);
+  }
+
+  for (const [type, attribute] of owns) {
+    statements.push(
+      `INSERT OR IGNORE INTO schema_owns(type, attribute) VALUES (${q(type)}, ${q(attribute)});`,
+    );
+  }
+
+  for (const [type, parent] of subtypes) {
+    statements.push(
+      `INSERT OR REPLACE INTO type_parent(type, parent) VALUES (${q(type)}, ${q(parent)});`,
+    );
+  }
+
+  for (const [attribute, valueType] of valueTypes) {
+    statements.push(
+      `INSERT OR REPLACE INTO schema_value_type(attribute, value_type) VALUES (${q(attribute)}, ${q(valueType)});`,
+    );
+  }
+
+  for (const [relation, role] of relates) {
+    statements.push(
+      `INSERT OR IGNORE INTO schema_relates(relation, role) VALUES (${q(relation)}, ${q(role)});`,
+    );
+  }
+
+  for (const name of abstracts) {
+    statements.push(`INSERT OR IGNORE INTO schema_abstract(name) VALUES (${q(name)});`);
+  }
+
+  for (const [type, attribute] of keyOwns) {
+    statements.push(
+      `INSERT OR IGNORE INTO schema_key_owns(type, attribute) VALUES (${q(type)}, ${q(attribute)});`,
+    );
+  }
+
+  for (const [subject, category, text] of annotations) {
+    statements.push(
+      `INSERT OR REPLACE INTO schema_annotation(subject, category, text) VALUES (${q(subject)}, ${q(category)}, ${q(text)});`,
+    );
+  }
+
+  for (const [type, role] of plays) {
+    statements.push(`INSERT OR IGNORE INTO schema_plays(type, role) VALUES (${q(type)}, ${q(role)});`);
+  }
+
+  for (const key of keys) {
+    // Partial index: uniqueness applies within the attribute type, which is what @key means for
+    // these schemas — `skill-id` unique across skills, `step-id` globally, as its comment states.
+    statements.push(
+      `CREATE UNIQUE INDEX IF NOT EXISTS key_${ident(key)} ON attr(value) WHERE type = ${q(key)};`,
+    );
+  }
+
+  // `@unique` is the same index without the identity: the value is unique among owners, and
+  // nothing else is claimed. Enforced since Phase 03 of the conformance feature — it was parsed
+  // and reported as not enforced — and, like `@key`, refused at define when the existing rows
+  // repeat (`define.feature` L2949). ⚠️ Per attribute type, not per owner type, as the `@key`
+  // index above already simplifies: TypeDB's `@unique` is among owners of ONE type.
+  for (const attribute of uniques) {
+    if (keys.includes(attribute)) continue;
+    statements.push(
+      `CREATE UNIQUE INDEX IF NOT EXISTS unique_${ident(attribute)} ON attr(value) WHERE type = ${q(attribute)};`,
+    );
+  }
+
+  return { ddl: statements.join('\n\n'), keys };
+}
+
+/**
+ * 🔴 **`generatePipeline` was deleted on 2026-09-03, unused since it was written.**
+ *
+ * It generated SQL for a query pipeline — a second, complete implementation of literal
+ * conversion, variable binding, insert and select, standing beside the one
+ * `TypeDBLiteInterpreter` actually runs. **Nothing called it**: not this package, not a test, not
+ * an app. It was reachable only through the runtime index.
+ *
+ * Found while adding boolean and datetime literals, which had to be implemented *twice* to keep
+ * two implementations of one concern from drifting — and the second copy had no way to be wrong
+ * visibly, because no test could reach it. Deleting it leaves one literal path, in the
+ * interpreter, with the round-trip tests that exercise it.
+ *
+ * `generateSchema` above is the part with callers: `TypeDBLiteInterpreter.define` uses it.
+ */
+
+const q = (s: string): string => `'${s.replace(/'/g, "''")}'`;
+const ident = (s: string): string => s.replace(/[^a-zA-Z0-9_]/g, '_');

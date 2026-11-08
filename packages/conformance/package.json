@@ -1,0 +1,17 @@
+{
+  "name": "typedblite-conformance",
+  "description": "TypeDB's behaviour specification, vendored and run against TypeDBLite as a report card (ADR-055)",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./out/index.js",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "default": "./out/index.js"
+    }
+  },
+  "dependencies": {
+    "@typedblite/runtime": "0.0.1"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@typedblite/runtime",
+  "description": "SQLite generator, interpreter and TypeDBLiteDatabase adapter for TypeQL",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./out/index.js",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "default": "./out/index.js"
+    }
+  },
+  "dependencies": {
+    "@typedblite/content-revision": "0.0.1",
+    "@typedblite/language": "0.0.1",
+    "langium": "~4.3.1",
+    "vscode-languageserver": "~9.0.1"
+  }
+}

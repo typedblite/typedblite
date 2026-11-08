@@ -1,0 +1,57 @@
+{
+  "name": "typeqlite-language",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/language/src",
+  "projectType": "library",
+  "tags": [
+    "scope:shared",
+    "type:util"
+  ],
+  "targets": {
+    "langium-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "langium generate",
+        "cwd": "packages/language"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "langium-generate"
+      ],
+      "options": {
+        "command": "tsc -b tsconfig.src.json",
+        "cwd": "packages/language"
+      },
+      "outputs": [
+        "{projectRoot}/out"
+      ]
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "typecheck",
+        "langium-generate"
+      ],
+      "outputs": [
+        "{workspaceRoot}/coverage/{projectRoot}"
+      ],
+      "options": {
+        "command": "vitest run",
+        "cwd": "packages/language"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "commands": [
+          "tsc -p tsconfig.spec.json --noEmit"
+        ],
+        "cwd": "packages/language",
+        "parallel": true
+      }
+    }
+  }
+}

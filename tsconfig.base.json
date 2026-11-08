@@ -14,6 +14,10 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "strict": true,
-    "paths": {}
+    "paths": {
+      "@typedblite/language": ["./packages/language/src/index.ts"],
+      "@typedblite/content-revision": ["./packages/content-revision/src/index.ts"],
+      "@typedblite/runtime": ["./packages/runtime/src/index.ts"]
+    }
   }
 }
