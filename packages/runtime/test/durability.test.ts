@@ -17,11 +17,8 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
-const LIBS = fileURLToPath(new URL('../../../..', import.meta.url));
-const SCHEMA = join(
-  LIBS,
-  'platform/skills/infrastructure/src/lib/skills.schema.typeqlite',
-);
+const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
+const SCHEMA = join(SCHEMAS, 'skills.schema.typeqlite');
 
 const runChild = (fixture: string, args: string[]) =>
   spawnSync(

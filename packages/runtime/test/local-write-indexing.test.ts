@@ -26,9 +26,9 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 
-const LIBS = fileURLToPath(new URL('../../../..', import.meta.url));
+const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
 const documentSchema = readFileSync(
-  join(LIBS, 'platform/document-store/infrastructure/src/lib/document-store.schema.typeqlite'),
+  join(SCHEMAS, 'document-store.schema.typeqlite'),
   'utf8',
 );
 

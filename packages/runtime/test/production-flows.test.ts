@@ -13,12 +13,10 @@ import { TypeDBLiteInterpreter, type TypeDBLiteValue } from '../src/interpreter.
  * that binds two of them. These are the sequences the repositories actually issue.
  */
 
-const LIBS = fileURLToPath(new URL('../../../..', import.meta.url));
-const read = (path: string) => readFileSync(join(LIBS, path), 'utf8');
-const skillsSchema = read(
-  'platform/skills/infrastructure/src/lib/skills.schema.typeqlite',
-);
-const iamSchema = read('platform/iam/infrastructure/src/lib/iam.schema.typeqlite');
+const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
+const read = (name: string) => readFileSync(join(SCHEMAS, name), 'utf8');
+const skillsSchema = read('skills.schema.typeqlite');
+const iamSchema = read('iam.schema.typeqlite');
 
 const value = (row: Record<string, TypeDBLiteValue>, name: string) =>
   row[name]?.asString() ?? null;

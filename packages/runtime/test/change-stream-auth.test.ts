@@ -18,10 +18,8 @@ import { ChangeStreamClient } from '../src/change-stream-client.js';
 import { TypeDBLiteReplicator } from '../src/typedblite-replicator.js';
 import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
 
-const LIBS = fileURLToPath(new URL('../../../..', import.meta.url));
-const schema = readKeyedSkillsSchema(
-  join(LIBS, 'platform/skills/infrastructure/src/lib/skills.schema.typeqlite'),
-);
+const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
+const schema = readKeyedSkillsSchema(join(SCHEMAS, 'skills.schema.typeqlite'));
 const node = () => {
   const db = new TypeDBLiteInterpreter(':memory:');
   db.define(schema);

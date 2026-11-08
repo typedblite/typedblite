@@ -13,24 +13,15 @@ import { isDefineClause } from '../src/generated/ast.js';
 // `__dirname` does not exist under ESM. Jest runs with cwd at the package root — both via the
 // Nx `test` target's `cwd` option and when invoked here directly.
 const PACKAGE = process.cwd();
-const LIBS = join(PACKAGE, '..', '..', '..');
+const SCHEMAS = join(PACKAGE, '..', '..', 'test-fixtures', 'schemas');
 const EXAMPLES = join(PACKAGE, 'examples');
 
 const read = (path: string) => readFileSync(path, 'utf8');
 
 describe('production TypeQLite parses', () => {
   it.each([
-    [
-      'iam.schema.typeqlite',
-      join(LIBS, 'platform/iam/infrastructure/src/lib/iam.schema.typeqlite'),
-    ],
-    [
-      'skills.schema.typeqlite',
-      join(
-        LIBS,
-        'platform/skills/infrastructure/src/lib/skills.schema.typeqlite',
-      ),
-    ],
+    ['iam.schema.typeqlite', join(SCHEMAS, 'iam.schema.typeqlite')],
+    ['skills.schema.typeqlite', join(SCHEMAS, 'skills.schema.typeqlite')],
   ])('%s parses', (_name, path) => {
     const result = parse(read(path));
     expect(result.lexerErrors).toHaveLength(0);
@@ -71,17 +62,8 @@ describe('production TypeQLite parses', () => {
   // Stronger than parsing: the schemas this repository owns must also validate cleanly, or the
   // not-implemented checks (ADR-018 D7) have been written too aggressively.
   it.each([
-    [
-      'iam.schema.typeqlite',
-      join(LIBS, 'platform/iam/infrastructure/src/lib/iam.schema.typeqlite'),
-    ],
-    [
-      'skills.schema.typeqlite',
-      join(
-        LIBS,
-        'platform/skills/infrastructure/src/lib/skills.schema.typeqlite',
-      ),
-    ],
+    ['iam.schema.typeqlite', join(SCHEMAS, 'iam.schema.typeqlite')],
+    ['skills.schema.typeqlite', join(SCHEMAS, 'skills.schema.typeqlite')],
   ])('%s validates with no diagnostics', async (_name, path) => {
     const diagnostics = await validate(read(path));
     expect(diagnostics.map((d) => d.message)).toEqual([]);

@@ -20,8 +20,6 @@ import { parse } from './parse.js';
 const SPEC = join(
   process.cwd(),
   '..',
-  '..',
-  'typedblite',
   'conformance',
   'spec',
   'query',

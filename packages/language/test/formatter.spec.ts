@@ -3,27 +3,15 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { astShape, format, parse } from './parse.js';
 const PACKAGE = process.cwd();
-const LIBS = join(PACKAGE, '..', '..', '..');
+const SCHEMAS = join(PACKAGE, '..', '..', 'test-fixtures', 'schemas');
 const EXAMPLES = join(PACKAGE, 'examples');
 const read = (path: string) => readFileSync(path, 'utf8');
 
 const CORPUS: Array<[string, string]> = [
-  [
-    'iam.schema.typeqlite',
-    join(LIBS, 'platform/iam/infrastructure/src/lib/iam.schema.typeqlite'),
-  ],
-  [
-    'skills.schema.typeqlite',
-    join(
-      LIBS,
-      'platform/skills/infrastructure/src/lib/skills.schema.typeqlite',
-    ),
-  ],
+  ['iam.schema.typeqlite', join(SCHEMAS, 'iam.schema.typeqlite')],
+  ['skills.schema.typeqlite', join(SCHEMAS, 'skills.schema.typeqlite')],
   ['real-queries.typeqlite', join(EXAMPLES, 'real-queries.typeqlite')],
-  [
-    'projection-target.typeqlite',
-    join(EXAMPLES, 'projection-target.typeqlite'),
-  ],
+  ['projection-target.typeqlite', join(EXAMPLES, 'projection-target.typeqlite')],
 ];
 
 describe('the formatter normalises', () => {

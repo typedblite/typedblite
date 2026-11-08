@@ -8,7 +8,7 @@ import { loadSpec } from './spec.js';
 /** Where the vendored spec, the baseline and the declarations live — this project's root. */
 export const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const SPEC_ROOT = join(PROJECT_ROOT, 'spec');
-export const REPOSITORY_ROOT = resolve(PROJECT_ROOT, '..', '..', '..', '..');
+export const REPOSITORY_ROOT = resolve(PROJECT_ROOT, '..', '..');
 
 export interface ConformanceRun {
   readonly results: ReadonlyArray<ScenarioResult>;

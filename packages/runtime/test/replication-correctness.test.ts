@@ -57,19 +57,14 @@ import { ChangeStreamClient } from '../src/change-stream-client.js';
 import { TypeDBLiteReplicator } from '../src/typedblite-replicator.js';
 import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
 
-const LIBS = fileURLToPath(new URL('../../../..', import.meta.url));
-const SCHEMA = readKeyedSkillsSchema(
-  join(LIBS, 'platform/skills/infrastructure/src/lib/skills.schema.typeqlite'),
-);
+const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
+const SCHEMA = readKeyedSkillsSchema(join(SCHEMAS, 'skills.schema.typeqlite'));
 /**
  * 🔴 `membership` is this repository's only relation that carries `@key`, and therefore the only
  * one that replicates at all once a keyless id is refused. Every relation in the skills schema is
  * keyless — see the first case in Tier 1 — so the deferred-edge case can only be reached here.
  */
-const IAM_SCHEMA = readFileSync(
-  join(LIBS, 'platform/iam/infrastructure/src/lib/iam.schema.typeqlite'),
-  'utf8',
-);
+const IAM_SCHEMA = readFileSync(join(SCHEMAS, 'iam.schema.typeqlite'), 'utf8');
 
 const freshIam = () => {
   const db = new TypeDBLiteInterpreter(':memory:');

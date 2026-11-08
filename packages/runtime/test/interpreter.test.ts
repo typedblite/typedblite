@@ -62,12 +62,10 @@ const isUniqueConstraintViolation = (
   error.message.includes("[CNT9] Constraint '@unique' has been violated") &&
   error.message.includes(`'${attribute}'`);
 
-const LIBS = fileURLToPath(new URL('../../../..', import.meta.url));
-const read = (path: string) => readFileSync(join(LIBS, path), 'utf8');
-const skillsSchema = read(
-  'platform/skills/infrastructure/src/lib/skills.schema.typeqlite',
-);
-const iamSchema = read('platform/iam/infrastructure/src/lib/iam.schema.typeqlite');
+const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
+const read = (name: string) => readFileSync(join(SCHEMAS, name), 'utf8');
+const skillsSchema = read('skills.schema.typeqlite');
+const iamSchema = read('iam.schema.typeqlite');
 
 describe('the interpreter runs real repository TypeQLite', () => {
   let db: TypeDBLiteInterpreter;

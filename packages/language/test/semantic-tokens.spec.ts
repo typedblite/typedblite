@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { semanticTokens } from './parse.js';
 
-const LIBS = join(process.cwd(), '..', '..', '..');
+const SCHEMAS = join(process.cwd(), '..', '..', 'test-fixtures', 'schemas');
 const read = (path: string) => readFileSync(path, 'utf8');
 
 const SCHEMA = [
@@ -87,15 +87,12 @@ describe('the production schemas are fully classified', () => {
   it.each([
     [
       'iam.schema.typeqlite',
-      join(LIBS, 'platform/iam/infrastructure/src/lib/iam.schema.typeqlite'),
+      join(SCHEMAS, 'iam.schema.typeqlite'),
       ['principal', 'organization', 'membership'],
     ],
     [
       'skills.schema.typeqlite',
-      join(
-        LIBS,
-        'platform/skills/infrastructure/src/lib/skills.schema.typeqlite',
-      ),
+      join(SCHEMAS, 'skills.schema.typeqlite'),
       ['skill', 'skill-step', 'step-dependency'],
     ],
   ])('%s declares %s as types', async (_name, path, expected) => {

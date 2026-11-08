@@ -19,11 +19,8 @@ import type { ChangeRecord } from '../src/change-log.js';
 import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
-const LIBS = fileURLToPath(new URL('../../../..', import.meta.url));
-const SCHEMA_PATH = join(
-  LIBS,
-  'platform/skills/infrastructure/src/lib/skills.schema.typeqlite',
-);
+const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
+const SCHEMA_PATH = join(SCHEMAS, 'skills.schema.typeqlite');
 const schema = readKeyedSkillsSchema(SCHEMA_PATH);
 
 const node = () => {

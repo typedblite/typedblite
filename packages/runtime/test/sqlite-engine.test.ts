@@ -15,11 +15,8 @@ import { SqliteEngine } from '../src/sqlite-engine';
 describe('SqliteEngine', () => {
   // A real schema from the workspace, as the sibling suites use — a hand-written one would be a
   // second dialect to keep in step with the parser.
-  const LIBS = fileURLToPath(new URL('../../../..', import.meta.url));
-  const schema = readFileSync(
-    join(LIBS, 'platform/skills/infrastructure/src/lib/skills.schema.typeqlite'),
-    'utf8',
-  );
+  const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
+  const schema = readFileSync(join(SCHEMAS, 'skills.schema.typeqlite'), 'utf8');
 
   it('starts with no schema, and reports one after define', async () => {
     const engine = new SqliteEngine();
