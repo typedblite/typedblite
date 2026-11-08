@@ -6,13 +6,10 @@
 - **Extends:** [ADR-002](adr-002-typeql-engine-as-a-port.md) — the engine gains a change log; the
   port boundary it established is unchanged
 - **Feature:** [TypeQLite Sync](../planning/typeqlite-sync/typeqlite-sync.feature.md)
-- **Amended by:** **Amendment from a downstream feature Phase 07 below**, 2026-09-04. Decision 3's
+- **Amended by:** **Amendment from Phase 07 below**, 2026-09-04. Decision 3's
   revision generator has a **second consumer outside this engine**, and therefore no longer lives in
-  it: `computeRevision` and the canonical encoding moved to `libs/core/content-revision`. The
-  semantics are unchanged — the move is what the boundary rules required, not a redesign. **Amended
-  again, 2026-09-15** — see the note after Context below: PouchDB Dependency Removal Phase 00
-  removes PouchDB from the repository entirely; once that phase's own branch merges, Context's
-  "two storage engines" framing will no longer describe the current state.
+  it: `computeRevision` and the canonical encoding moved to `@typedblite/content-revision`. The
+  semantics are unchanged — the move is what the boundary rules required, not a redesign.
 - **Evidence:** [baseline.md](../planning/typeqlite-sync/phases/00-scope-and-adr/baseline.md),
   [conflict-model.md](../planning/typeqlite-sync/phases/00-scope-and-adr/conflict-model.md),
   [port-and-transport.md](../planning/typeqlite-sync/phases/00-scope-and-adr/port-and-transport.md)
@@ -20,50 +17,18 @@
 > ✅ **Accepted by the founder, 2026-08-31.** Drafted by Phase 00 alongside its analysis and held at
 > Proposed until a person accepted it.
 >
-> It was accepted **after** the feature merged into `dev` ([#119](the downstream repository))
-> and after two review rounds closed fifteen findings — nine from a review of the whole feature run
-> before the merge decision, and six from a re-review of those fixes, four of which the fixes had
-> themselves introduced. 🔴 **None of the fifteen argued this decision was wrong**; every one was a
-> place the implementation did not yet honour it, which is why acceptance waited for them to close
-> rather than being reconsidered. See
-> [Phase 07's summary](../planning/typeqlite-sync/phases/07-replication-correctness/summary.md).
+> It was accepted after two review rounds closed fifteen findings — nine from a review of the whole
+> feature run before the merge decision, and six from a re-review of those fixes, four of which the
+> fixes had themselves introduced. 🔴 **None of the fifteen argued this decision was wrong**; every
+> one was a place the implementation did not yet honour it, which is why acceptance waited for them
+> to close rather than being reconsidered.
 >
 > 🔴 **One consequence was found while closing them and is recorded in Consequences below**: a
-> relation without `@key` has no cross-node identity and therefore does not replicate, which today
-> means none of the skills schema's four relations do.
->
-> ✅ **The prior-art step `create-adr` requires was performed this time.** ADR-017, ADR-002 and
-> ADR-019 each recorded it as unavailable because `downstream-store` was unreachable. The stack is running
-> again, and its corpus was searched: 90 hits on `pouchdb` surface
-> `downstream-monorepo`'s ADR-001 and ADR-005 (`docs/architecture/downstream-studio/`), both already
-> incorporated. **No
-> prior decision on data replication exists.** This repository's own documents remain outside that
-> corpus, which is still tracked in the parking lot.
+> relation without `@key` has no cross-node identity and therefore does not replicate.
+
+---
 
 ## Context
-
-> ⚠️ **2026-09-15, PouchDB Dependency Removal Phase 00 (on its own branch, not yet merged to `dev`
-> as of this note): this Context paragraph is becoming historical, not yet fully so.** That phase
-> removes every PouchDB-backed repository and adapter; once it merges, the "two storage engines"
-> framing below will no longer describe the current state — check `package.json` for whether
-> `pouchdb` is still a live dependency before trusting either version. The Decisions below
-> (CouchDB's *semantics*, kept; its wire protocol, never adopted) are unaffected — they were never
-> about running PouchDB itself. What is affected: the "What is already built" table's differential
-> CouchDB oracle (`couchdb-oracle.test.ts`) is removed by that same phase — a **real, disclosed
-> coverage loss when it lands**, not one superseded by anything: TypeDB conformance (ADR-005)
-> checks TypeQL query execution, not replication/conflict semantics, so it does not stand in for
-> what that oracle checked. A future
-> claim of CouchDB-conflict-model parity needs a new oracle, not an assumption that this one still
-> runs.
-
-TypeQLite runs the real repositories on SQLite ([ADR-002](adr-002-typeql-engine-as-a-port.md),
-Phase 03), and PouchDB remains beside it for anything needing replication. Two storage engines is
-the visible cost; the invisible one is that **replication does not actually work anywhere in this
-repository.** `downstream-app` has no sync port at all — `libs/core/persistence/domain` is
-`projection.ts` and `repository.ts`. The nearest prior art, in `downstream-monorepo`, is a `SyncClient`
-whose only implementation fabricates a checkpoint token and replicates nothing, wrapped in a
-`SyncCoordinator` that short-circuits once a checkpoint exists and therefore never replicates twice.
-Its suite is green because it exercises the coordinator, not the client.
 
 Two facts about the substrate were measured on Node v24.19.0 rather than assumed, and they shape
 everything below:
@@ -74,15 +39,18 @@ everything below:
 - **`node:sqlite` exposes no update or commit hook.** The engine cannot tell anyone a row changed,
   so change detection must come from the writer, not the store.
 
+Replication does not exist in this repository before this ADR. The nearest prior art is a
+`SyncClient` whose only implementation fabricates a checkpoint token and replicates nothing,
+wrapped in a coordinator that short-circuits once a checkpoint exists and therefore never replicates
+twice. Its suite is green because it exercises the coordinator, not the client.
+
 ## Decision
 
 1. **The change log is part of the engine, written in the same transaction as the data.** The row
-   lands inside `TypeQliteInterpreter.execute()`'s `BEGIN`/`COMMIT`, never after it and never
-   derived from an event bus. A commit followed by a lost publish is a change that never replicates
-   and that nothing detects — the failure shape already recorded here as the IAM store that never
-   persisted because nothing called `persist()`. Writing it in the interpreter also means a write
-   that bypasses the application is logged anyway, which is why bypassing writes are absorbed rather
-   than forbidden.
+   lands inside the interpreter's `BEGIN`/`COMMIT`, never after it and never derived from an event
+   bus. A commit followed by a lost publish is a change that never replicates and that nothing
+   detects. Writing it in the interpreter also means a write that bypasses the application is logged
+   anyway, which is why bypassing writes are absorbed rather than forbidden.
 
 2. **The cursor is `seq`, an `INTEGER PRIMARY KEY AUTOINCREMENT`.** `AUTOINCREMENT` is required, not
    stylistic: measured, a plain `INTEGER PRIMARY KEY` reuses a deleted rowid (`1, 2, 3`) where
@@ -123,10 +91,10 @@ everything below:
    the protocol's rather than ours. The client is hand-rolled over `fetch`: Node has no global
    `EventSource` without `--experimental-eventsource`, and this substrate already depends on one
    experimental API. Ours are named `ChangeStream` and `ChangeStreamClient` — `EventSource` already
-   means something else in `libs/core/events/domain` and keeps that meaning.
+   means something else in the events domain and keeps that meaning.
 
 9. **One substrate, per-store policies.** The log, revision trees, cursor and transport are shared;
-   `GraphSync`, `DocumentSync` and `FileSync` supply what a record is and how conflicts resolve.
+   store-specific adapters supply what a record is and how conflicts resolve.
    **`FileStore` is deferred to its own feature** — binary cannot ride a `text/event-stream` body,
    and resumable digest-addressed transfer is a different problem.
 
@@ -155,22 +123,20 @@ message, because each changes what the decisions above mean.
     a `map`, which runs each child to completion before the next starts — three "concurrent" writers
     that never contended, passing while testing serial writes.
 
-## Amendment from a downstream feature Phase 07 — 2026-09-04
+## Amendment from Phase 07 — 2026-09-04
 
 12. 🔴 **Decision 3's generator is no longer part of this engine, because it has a consumer outside
-    it.** [ADR-038](adr-038-port-prompt-workbench-as-a-domain-cqrs-app.md) Amendment 4 gives
-    a downstream feature's `DocumentVersion` a `generation-digest` — one value for which version a prompt
+    it.** A second consumer of `generation-digest` appeared: one value for which version an entity
     is and what it contains. That is the same generator, and it had to be *the same one*: a second
     copy of a digest whose entire purpose is that two writers independently derive the same value is
     a contradiction in terms.
 
-    **It could not be imported where it was needed.** `typeqlite-runtime` is
-    `scope:shared, type:infrastructure`; `DocumentVersion` lives in `scope:platform, type:domain`,
-    which may depend only on `type:domain` and `type:util` — and `@nx/enforce-module-boundaries` is
-    an **error**, not a warning. So `computeRevision`, `winner`, `conflicts`, `generationOf`,
+    **It could not be imported where it was needed.** `@typedblite/runtime` is infrastructure;
+    the second consumer lives in the domain layer, which may depend only on domain and utilities —
+    not infrastructure. So `computeRevision`, `winner`, `conflicts`, `generationOf`,
     `digestOf` and the canonical **encoding** they derive from now live in
-    **`libs/core/content-revision`** (`scope:shared, type:util`), which this engine re-exports so no
-    existing consumer of its barrel is affected.
+    **`@typedblite/content-revision`**, which the runtime re-exports so no existing consumer of
+    its barrel is affected.
 
     ⚠️ **`entityId` and `isReplicable` stayed here, and the split is the point.** A `local:` id is a
     fact about *this engine's storage* — Amendment 10's rule that a keyless thing has no cross-node
@@ -179,7 +145,7 @@ message, because each changes what the decisions above mean.
 
     🔴 **The semantics are untouched, and the test count is the evidence.** This file warns that
     CouchDB's revision-tree behaviour is kept deliberately, that it was proven against **real CouchDB
-    3.4.3**, and that `nx run typeqlite-runtime:test-oracle` is not in the routine suite. A move is
+    3.4.3**, and that `nx run @typedblite/runtime:test-oracle` is not in the routine suite. A move is
     not a semantics change: **157 tests before, 157 after**, redistributed 18 to the new library and
     139 left here. ⚠️ **The oracle command is unchanged** — `couchdb-oracle.test.ts` did not move.
 
@@ -243,12 +209,8 @@ must cite a run in which the oracle was up.**
   only pay off if a real PouchDB is to replicate against us. That scoping is a feature's, not this
   ADR's.
 - ⛔ **Whether TypeQLite serves HTTP itself**, or a separate app puts a facade in front of the
-  runtime. [ADR-027](adr-027-generic-http-dispatch-for-composition-roots.md) already governs HTTP
-  dispatch for composition roots and is the thing to reconcile against.
-- ⛔ **Attachments.** Related and separately directed — see the parking lot. TypeQLite has no
-  attachment support at all, and `AttachmentAdapter` in `libs/core/persistence/domain` has **zero
-  implementations and zero callers**, so it is not a capability being lost in a migration. It is new
-  work.
+  runtime.
+- ⛔ **Attachments.** TypeQLite has no attachment support at all. It is new work.
 
 ## Alternatives considered
 
@@ -257,13 +219,6 @@ Rejected for the change log: a changeset is a row-level diff carrying no generat
 no revision tree, and its conflict handling is an apply-time `OMIT`/`REPLACE` callback — last-write-
 wins by another name, which contradicts Decision 3. Kept in view for seeding a brand-new spoke,
 where there is no history to reconcile.
-
-**Reviving the PouchDB SQLite adapter** (`downstream-monorepo`'s ADR-001, superseded by its ADR-005 —
-both under `docs/architecture/downstream-studio/` **in that repository, not this one**).
-Cheaper — roughly
-2–2.5 weeks — but it ends with us maintaining a PouchDB-7-era SQL core against PouchDB 9, plus the
-double-quoted-string patch ADR-005 named as a reason to leave. It buys storage consistency and
-leaves replication exactly as broken.
 
 **Deriving the log from the EventBus.** Rejected by Decision 1's reasoning. It is the design that
 looks cleanest right up to the first crash between commit and publish.
@@ -277,25 +232,13 @@ looks cleanest right up to the first crash between commit and publish.
 - **The single-writer property becomes something we depend on.** Decision 2's "no gap handling" is
   true because SQLite serialises writers. Moving the hub to a multi-writer engine would invalidate
   it silently.
-- **`graph-store` gets built.** Nothing in this repository needs replication today, so the proving
-  consumer is a new bounded context — the first real increment of the DataStore direction, scoped to
-  one context.
-- **Docker removal from `downstream-store` moves closer but is not unlocked.** That store lives in
-  `downstream-monorepo`, which is maintenance-only, so reaching the endgame means migrating it here first.
-- 🔴 **A relation without `@key` cannot replicate, and today that is every relation in the skills
-  schema.** *Added 2026-08-31 at acceptance; found while closing Phase 07, not at drafting time.*
-  Decision 3 makes identity the `@key` attribute's value, so a keyless thing falls back to
-  `last_insert_rowid()` — measured, `local:skill-composition/3`. Its *role players* are keyed and
-  encode perfectly, which is why nothing about such a record looks wrong. `skill-composition`,
-  `sub-workflow`, `step-dependency` and `step-output` are all keyless.
+- 🔴 **A relation without `@key` cannot replicate.** Decision 3 makes identity the `@key`
+  attribute's value, so a keyless thing falls back to `last_insert_rowid()`. Its *role players* are
+  keyed and encode perfectly, which is why nothing about such a record looks wrong.
 
   Before Phase 07 these replicated **and were wrong**: two nodes' unrelated relations merged under
-  one id, and `localIid` cannot resolve a `local:` id, so every arriving revision inserted another
-  `thing` row. They are now refused at the boundary, which is what Decision 3 always implied.
+  one id. They are now refused at the boundary, which is what Decision 3 always implied.
 
-  **Refusing is correct without being sufficient.** Those edges are the cross-aggregate structure
-  [ADR-015](adr-015-skills-as-a-bounded-context.md) exists to hold, and they do not cross a node
-  boundary. The remedy is already in the schema's own vocabulary — a derived composite projected
-  into an attribute that can carry `@key`, as `output-key` and IAM's `membership-key` do, which is
-  why `membership` is the one relation in this repository that replicates. **That is a schema
-  decision this ADR does not make**, and it is parked as `#architecture`.
+  **Refusing is correct without being sufficient.** The remedy is in the schema's own vocabulary —
+  a derived composite projected into an attribute that can carry `@key`. That is a schema decision
+  this ADR does not make.

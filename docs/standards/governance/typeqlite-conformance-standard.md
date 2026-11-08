@@ -14,8 +14,7 @@ operationalises: [adr-005]
 > 🔴 **The ADR decides; this standard is how the decision is met.** Where the two disagree, the ADR
 > wins and this standard has the bug.
 >
-> ✅ **Active since 2026-09-11**, the day ADR-005 was accepted, per
-> [ADR-054](../../architecture/adr-054-an-adr-that-mandates-behaviour-has-a-companion-standard.md) D5.
+> ✅ **Active since 2026-09-11**, the day ADR-005 was accepted.
 
 ---
 

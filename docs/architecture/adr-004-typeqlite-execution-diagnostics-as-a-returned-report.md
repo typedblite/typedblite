@@ -12,14 +12,9 @@
 > ✅ **Accepted by the founder, 2026-08-31.** Drafted by Phase 00 alongside its analysis and held
 > at Proposed until a person accepted it, as ADR-003 was.
 >
-> 🔴 **The prior-art search this Skill requires could not run, and is reported rather than skipped.**
-> This repository's documents are outside `downstream-store`'s corpus — verified again here: no
-> `downstream-store` script exists in this repo's `package.json`, and the string `downstream-app` appears
-> nowhere in `downstream-monorepo`'s `downstream-store` sources. A disk substitute was run instead
-> (`docs/architecture/*.md` for *diagnostic* and *DomainEvent*), and the only hit is
-> `platform-capability-porting.md`, which is not an ADR and states no competing decision.
-> **"downstream-store returned nothing" is not an answer here — it was never asked.** Standing
-> parking-lot item; ADR-017, ADR-002 and ADR-003 were all written under the same gap.
+> 🔴 **Prior-art search was run against `docs/architecture/*.md` for *diagnostic* and
+> *DomainEvent*.** The only hit is `platform-capability-porting.md`, which is not an ADR and states
+> no competing decision.
 
 ---
 
@@ -32,8 +27,8 @@ that succeeds but does the wrong thing — a `define` that re-applied as a no-op
 candidate set was empty — says nothing at all.
 
 This mattered less when TypeQLite was a parser. It matters now: since
-[ADR-003](adr-003-typeqlite-change-log-and-sync-as-a-port.md) the engine holds real IAM and Skills
-data, replicates it, and searches it.
+[ADR-003](adr-003-typeqlite-change-log-and-sync-as-a-port.md) the engine holds real data,
+replicates it, and searches it.
 
 **A source-mapped debugger was the first answer, and was cut.** It was scoped as three phases —
 traced generation, source maps, a DAP adapter — and rejected on 2026-08-31 before any branch
@@ -58,7 +53,7 @@ generic over its payload and does not change.
 
 **3. Errors that throw today keep throwing.** A diagnostic is attached to the thrown error; it never
 replaces it. 🔴 Converting a `throw` into a diagnostic downgrades a failure to a warning, and
-[ADR-001](adr-001-typedb-for-iam-persistence.md)'s duplicate-registration guarantee and ADR-002's
+[ADR-001](adr-001-typedb-for-graph-persistence.md)'s store-level constraint guarantees and ADR-002's
 constraint layers are both enforced by failures propagating. **A change that ends with fewer throws
 than it started with has broken something**, and the suite asserts the count.
 
@@ -94,10 +89,8 @@ reference-implementation rule, upstream's shape is the specification.
   `ThingConstraint`, dropping the AST link, and every range-less throw inherits that loss. Three of
   `checkKnown`'s five call sites still hold the AST node and simply do not pass it.
 - **The widening is additive, proven by compiling rather than by reading.** A scratch probe widened
-  all three signatures; the two consumers outside the library —
-  [`typedb-database.ts`](../../libs/core/persistence/infrastructure/src/lib/typedblite-database.ts) and
-  `session.ts` (typedblite sibling repo: `apps/cli/src/`) — compiled untouched, and
-  `nx run-many -t lint test build` was green for all 36 projects with the probe in place.
+  all three signatures; the two consumers outside the library compiled untouched, and
+  `nx run-many -t lint test build` was green for all projects with the probe in place.
 - **The engine stays portable.** A consumer with no event bus loses nothing.
 
 ### Negative / Constraints

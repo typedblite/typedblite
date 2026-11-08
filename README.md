@@ -147,11 +147,7 @@ Coverage is collected on CI (`CI=true npm run test`) and written to `coverage/`.
 
 ## Test fixtures
 
-Shared TypeQLite schemas used across multiple test suites live in [test-fixtures/schemas/](test-fixtures/schemas/):
-
-- `iam.schema.typeqlite` — identity and access management schema
-- `skills.schema.typeqlite` — skill definition graph schema
-- `document-store.schema.typeqlite` — document store schema
+Shared TypeQLite schemas used across multiple test suites live in [test-fixtures/schemas/](test-fixtures/schemas/). These are production-grade schemas exercising the full range of TypeQLite constructs: `@key`, relations with role players, multi-valued attributes, and complex match patterns.
 
 ## Architecture decisions
 
@@ -159,7 +155,7 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 
 | ADR | Title |
 |---|---|
-| [ADR-001](docs/architecture/adr-001-typedb-for-iam-persistence.md) | TypeDB for IAM Persistence |
+| [ADR-001](docs/architecture/adr-001-typedb-for-graph-persistence.md) | TypeDB for Graph Persistence |
 | [ADR-002](docs/architecture/adr-002-typeql-engine-as-a-port.md) | TypeQL Engine as a Port |
 | [ADR-003](docs/architecture/adr-003-typeqlite-change-log-and-sync-as-a-port.md) | TypeQLite Change Log and Sync as a Port |
 | [ADR-004](docs/architecture/adr-004-typeqlite-execution-diagnostics-as-a-returned-report.md) | TypeQLite Execution Diagnostics as a Returned Report |

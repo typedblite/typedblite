@@ -2,7 +2,7 @@
 kind: adr
 status: accepted
 date: 2026-09-11
-decision-owners: [founder, downstream-maintainers]
+decision-owners: [TypeDBLite maintainers]
 extends: [adr-002, adr-003]
 operationalised-by: [typeqlite-conformance-standard]
 ---
@@ -17,12 +17,8 @@ operationalised-by: [typeqlite-conformance-standard]
   this makes a measured claim; [ADR-003](adr-003-typeqlite-change-log-and-sync-as-a-port.md), whose
   CouchDB differential oracle is the same technique aimed at a different question
 - **Operationalised by:** the
-  [TypeQLite Conformance Standard](../standards/governance/typeqlite-conformance-standard.md), per
-  [ADR-054](adr-054-an-adr-that-mandates-behaviour-has-a-companion-standard.md) — the baseline and
-  deviation rules below are recurring obligations, and the procedure lives there
-- **Relates to:** [ADR-046](adr-046-promptos-conformance-for-every-prompt-artifact.md) and
-  [ADR-047](adr-047-promptos-facet-waivers-against-measured-evidence.md), the repository's prior
-  measured-conformance rule, whose *waivers against evidence* shape Decision 5 borrows
+  [TypeQLite Conformance Standard](../standards/governance/typeqlite-conformance-standard.md) —
+  the baseline and deviation rules below are recurring obligations, and the procedure lives there
 
 > ✅ **Accepted 2026-09-11 by the founder**, four phases in — after the oracle had printed 0, 140,
 > 164 and 416 of 1,756 (the feature doc, `docs/planning/typeqlite-conformance/`, is on
@@ -41,8 +37,7 @@ evaluation semantic in the interpreter has therefore been a guess, and on 2026-0
 caught those guesses one at a time: sixteen rounds on `defect/typeqlite-select-entity-variable`,
 against a gate whose own `MAX_REVIEW_ROUNDS` is 3, before four semantics were settled in minutes by
 running the same queries against a live TypeDB 3. The relation-matching rewrite is parked on that
-finding, and the PouchDB retirement's engine schema reads relations, so the gap now blocks the
-repository's top-priority work.
+finding, and the gap now blocks the repository's top-priority work.
 
 ADR-002 commits TypeQLite to being a drop-in TypeDB replacement, and ADR-003's amendment extends
 that to CouchDB/PouchDB. **The TypeDB half of that claim has never been measured.** TypeDB publishes
@@ -151,8 +146,8 @@ requires of CouchDB compatibility. A claim without a cited run is prose.
   intact, and modifications to *those files* are MPL. Our step definitions are ours. The vendored
   directory carries the licence and says so.
 - **The differential oracle against a live TypeDB is still owed for *our* schemas.** The
-  specification covers the language, not `downstream-store` or `skills`. That is a separate, smaller
-  piece of work, sequenced after this, and it needs the `downstream-store` stack running.
+  specification covers the language. A live-server differential oracle covers the schemas we write.
+  That is a separate, smaller piece of work, sequenced after this.
 - **`not-applicable` is a judgement, and judgements drift.** Decision 3's rule that the four counts
   sum to the total is what keeps a scenario from quietly moving from fail to not-applicable; the
   standard says how the classification is declared.
@@ -162,11 +157,11 @@ requires of CouchDB compatibility. A claim without a cited run is prose.
 - **Hand-written semantics tests derived from the TypeDB docs.** The status quo, in effect: the
   relation-semantics suites written on 2026-09-10 were exactly this, and each encoded a guess the
   review then falsified. The specification already exists; writing our own is writing it wrong.
-- **The live-TypeDB differential oracle first.** It needs Docker and the `downstream-store` stack up, so
+- **The live-TypeDB differential oracle first.** It needs Docker and a running TypeDB server, so
   it cannot be routine; it covers only the schemas we write; and it tests the same assertion as this
   corpus with more machinery. It is still worth having — for our schemas — and is sequenced second.
-- **The suite as a gate with waivers.** 791 waivers on day one, and ADR-047's waiver discipline
-  exists precisely because a waiver granted in bulk is not evidence of anything.
+- **The suite as a gate with waivers.** 791 waivers on day one, and a waiver granted in bulk is
+  not evidence of anything.
 - **Fetching the specification at test time.** Non-deterministic, network-dependent, and the score
   would change without a commit. The pin is the point.
 - **The tests shipped with `@downstream/typedb-wasm`.** They are that package's, not TypeDB's, and
@@ -182,10 +177,3 @@ requires of CouchDB compatibility. A claim without a cited run is prose.
 - [ADR-002](adr-002-typeql-engine-as-a-port.md) — the drop-in claim this measures
 - [ADR-003](adr-003-typeqlite-change-log-and-sync-as-a-port.md) — the CouchDB oracle, and the rule
   that a compatibility claim cites a run
-- [ADR-046](adr-046-promptos-conformance-for-every-prompt-artifact.md),
-  [ADR-047](adr-047-promptos-facet-waivers-against-measured-evidence.md) — measured conformance and
-  waivers against evidence
-- [ADR-054](adr-054-an-adr-that-mandates-behaviour-has-a-companion-standard.md) — why the
-  procedure is in a standard
-- [`next-session-plan.md`](../planning/next-session-plan.md) — the 2026-09-10 session's record of
-  what nothing in the repository checked
