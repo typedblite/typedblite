@@ -100,7 +100,7 @@ Key constraints:
 
 The SQLite schema is generated from a TypeQLite `define` statement by `sqlite-generator.ts`. The interpreter in `interpreter.ts` translates TypeQLite queries to SQLite.
 
-TypeQL entities become rows in a table named after the entity type. Attributes become columns. Relations become junction tables. `@key` generates a `UNIQUE` index.
+TypeQLite entities become rows in a table named after the entity type. Attributes become columns. Relations become junction tables. `@key` generates a `UNIQUE` index.
 
 ### Change log and replication
 

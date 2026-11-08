@@ -1,4 +1,4 @@
-# ADR-004: TypeQL Execution Diagnostics Are a Returned Report, Not an Emitted Event
+# ADR-004: TypeQLite Execution Diagnostics Are a Returned Report, Not an Emitted Event
 
 - **Status:** Accepted
 - **Date:** 2026-08-31
@@ -25,7 +25,7 @@
 
 ## Context
 
-TypeQL execution has no observability. `interpreter.ts` (now in typedblite sibling repo: `packages/runtime/src/`)
+TypeQLite execution has no observability. `interpreter.ts` (now in typedblite sibling repo: `packages/runtime/src/`)
 exposes `define()` for DDL, `execute()` for writes and `query()` for reads, and every failure leaves
 through one of six `throw new Error` sites carrying **a string and no source position**. A statement
 that succeeds but does the wrong thing — a `define` that re-applied as a no-op, a `match` whose
@@ -116,7 +116,7 @@ reference-implementation rule, upstream's shape is the specification.
 
 ## References
 
-- [ADR-002 — The TypeQL engine as a port](adr-002-typeql-engine-as-a-port.md)
+- [ADR-002 — The TypeQLite engine as a port](adr-002-typeql-engine-as-a-port.md)
 - [ADR-003 — A change log belongs to the engine, and sync is a port](adr-003-typeqlite-change-log-and-sync-as-a-port.md)
 - [TypeQLite Language Tooling feature doc](../planning/typeqlite-language-tooling/typeqlite-language-tooling.feature.md)
 - [Multi-Phase Lifecycle Standard](../standards/governance/multi-phase-lifecycle-standard.md)
