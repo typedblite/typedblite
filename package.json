@@ -1,0 +1,35 @@
+{
+  "name": "@typedblite/workspace",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
+    "typecheck": "nx run-many -t typecheck"
+  },
+  "devDependencies": {
+    "@nx/js": "23.3.0",
+    "@nx/workspace": "23.3.0",
+    "@swc-node/register": "^1.12.1",
+    "@swc/cli": "~0.8.1",
+    "@swc/core": "~1.15.5",
+    "@swc/helpers": "~0.5.18",
+    "@vitest/coverage-v8": "^4.1.11",
+    "nx": "23.3.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.0.8",
+    "vite": "7.3.7"
+  },
+  "allowScripts": {
+    "@swc/core@1.15.47": true,
+    "nx@23.3.0": true,
+    "esbuild@0.28.2": true
+  }
+}
