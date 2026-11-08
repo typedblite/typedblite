@@ -12,7 +12,7 @@ operationalised-by: [typeqlite-conformance-standard]
 - **Status:** Accepted — by the founder (Dave Jackson), 2026-09-11, with Phases 00–03 of the conformance
   feature closed and the card at 416 of 1,756
 - **Date:** 2026-09-11
-- **Decision owners:** Founder; the downstream application maintainers
+- **Decision owners:** Founder; TypeDBLite maintainers
 - **Extends:** [ADR-002](adr-002-typeql-engine-as-a-port.md), whose "drop-in TypeDB replacement"
   this makes a measured claim; [ADR-003](adr-003-typeqlite-change-log-and-sync-as-a-port.md), whose
   CouchDB differential oracle is the same technique aimed at a different question

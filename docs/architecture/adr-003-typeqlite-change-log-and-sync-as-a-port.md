@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-31
-- **Decision owners:** the downstream application maintainers
+- **Decision owners:** TypeDBLite maintainers
 - **Extends:** [ADR-002](adr-002-typeql-engine-as-a-port.md) — the engine gains a change log; the
   port boundary it established is unchanged
 - **Feature:** [TypeQLite Sync](../planning/typeqlite-sync/typeqlite-sync.feature.md)

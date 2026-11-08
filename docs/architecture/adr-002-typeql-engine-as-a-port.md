@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-29
-- **Decision owners:** the downstream application maintainers
+- **Decision owners:** TypeDBLite maintainers
 - **Amends:** [ADR-001](adr-001-typedb-for-iam-persistence.md) and [ADR-015](adr-015-skills-as-a-bounded-context.md) — what they depend on is TypeQL, not the TypeDB product
 - **Feature:** [TypeQL Language and SQLite Runtime](../planning/typeqlite/typeqlite.feature.md)
 

@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-28
-- **Decision owners:** the downstream application maintainers
+- **Decision owners:** TypeDBLite maintainers
 - **Feature:** [IAM TypeDB Persistence](../planning/iam-typedb-persistence/iam-typedb-persistence.feature.md)
 - **Amended by:** [ADR-002](adr-002-typeql-engine-as-a-port.md) — what this ADR depends on is TypeQL and its guarantees, not the TypeDB product; the engine becomes a port
 - **Engine replaced 2026-08-29** — `@downstream/typedb-wasm` removed; TypeQLite is the engine. Decisions 1 and 2 below are left as written and annotated
