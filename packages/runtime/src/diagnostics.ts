@@ -5,10 +5,10 @@ import { TypeQLiteValidationCode } from '@typedblite/language';
 /**
  * Execution diagnostics for TypeQLite — ADR-004.
  *
- * 🔴 **Returned, never emitted.** The engine has no dependency on `libs/core/events/domain` and
+ * 🔴 **Returned, never emitted.** The engine has no dependency on a domain events module and
  * must not acquire one: `change-stream.ts` avoided even the *name* `EventSource` to stay clear of
- * it. The application handler that already publishes a `DomainEvent` is what decides whether a
- * diagnostic belongs in a payload.
+ * domain event types. The application handler that already publishes domain events is what decides
+ * whether a diagnostic belongs in a payload.
  *
  * 🔴 **This is not an error channel.** Anything that throws today still throws; a diagnostic is
  * *attached* to the thrown error, never substituted for it. See `attachDiagnostic`.
@@ -159,10 +159,9 @@ type WithDiagnostic = { diagnostic?: Diagnostic };
 /**
  * Attach a diagnostic to an error **without** changing its class or message.
  *
- * 🔴 Deliberately not a subclass. `isUniqueConstraintViolation` in
- * `@downstream/persistence-infrastructure` matches on the message text, and two production
- * repositories raise `PrincipalAlreadyExistsError` from it. A new error type here would break the
- * duplicate-registration guarantee in exactly the way ADR-004 Decision 3 exists to prevent.
+ * 🔴 Deliberately not a subclass. Consumers match on the error message text; a new subclass would
+ * silently break them. A new error type here would break the duplicate-registration guarantee in
+ * exactly the way ADR-004 Decision 3 exists to prevent.
  */
 export function attachDiagnostic<E>(error: E, diagnostic: Diagnostic): E {
   if (error && typeof error === 'object') {

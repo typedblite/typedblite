@@ -23,12 +23,10 @@ import { TypeDBLiteInterpreter, type TypeDBLiteValue } from '../src/interpreter.
  */
 
 /**
- * 🔴 Deliberate copies of `@downstream/persistence-infrastructure`'s readers and predicate,
- * which is weaker than importing the real ones.
+ * 🔴 Deliberate inline copies of the readers and predicate used by TypeDBLite consumers,
+ * which is weaker than importing from an actual consumer.
  *
- * That package is CommonJS with extensionless relative imports; this one is ESM because Langium is.
- * Bridging them here would also invert the dependency — Phase 03's adapter is what legitimately
- * depends on `persistence-infrastructure`, not the reverse.
+ * Doing so would invert the dependency — a consumer depends on this engine, not the reverse.
  *
  * **Phase 03 proves these against the real, unmocked helpers**, which is where "drop-in" is
  * actually decided. If these copies drift, that phase is what catches it.

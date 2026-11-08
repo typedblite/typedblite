@@ -5,14 +5,12 @@
 - **Decision owners:** TypeDBLite maintainers
 - **Extends:** [ADR-002](adr-002-typeql-engine-as-a-port.md) — the engine gains a change log; the
   port boundary it established is unchanged
-- **Feature:** [TypeDBLite Sync](../planning/typeqlite-sync/typeqlite-sync.feature.md)
+- **Feature:** TypeDBLite Sync
 - **Amended by:** **Amendment from Phase 07 below**, 2026-09-04. Decision 3's
   revision generator has a **second consumer outside this engine**, and therefore no longer lives in
   it: `computeRevision` and the canonical encoding moved to `@typedblite/content-revision`. The
   semantics are unchanged — the move is what the boundary rules required, not a redesign.
-- **Evidence:** [baseline.md](../planning/typeqlite-sync/phases/00-scope-and-adr/baseline.md),
-  [conflict-model.md](../planning/typeqlite-sync/phases/00-scope-and-adr/conflict-model.md),
-  [port-and-transport.md](../planning/typeqlite-sync/phases/00-scope-and-adr/port-and-transport.md)
+- **Evidence:** baseline analysis, conflict model, and port-and-transport scoping (phase planning docs, not in this repo)
 
 > ✅ **Accepted by the founder, 2026-08-31.** Drafted by Phase 00 alongside its analysis and held at
 > Proposed until a person accepted it.

@@ -4,10 +4,9 @@
  * Implements [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
  * Decision 8.
  *
- * 🔴 **Named `ChangeStream`, not `EventSource`.** `libs/core/events/domain` already exports an
- * interface called `EventSource`, meaning the source of a domain event, and it keeps that meaning.
- * SSE's client class shares the name, which is exactly the kind of collision that makes a codebase
- * about events hard to read.
+ * 🔴 **Named `ChangeStream`, not `EventSource`.** `EventSource` is a well-established name for the
+ * source of a domain event; SSE's client class shares the name. Using it here creates exactly the
+ * kind of collision that makes a codebase about events hard to read.
  *
  * The server needs no library — an SSE response is one whose body is never ended.
  */

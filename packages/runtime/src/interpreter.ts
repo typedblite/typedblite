@@ -3278,11 +3278,9 @@ function literalText(node: unknown): string {
 /**
  * 🔴 Translate a SQLite constraint failure into the message the repositories already match on.
  *
- * `isUniqueConstraintViolation(error, attribute)` in `@downstream/persistence-infrastructure`
- * matches `[CNT9] Constraint '@unique' has been violated` **and** the attribute name, and two
- * production repositories raise `PrincipalAlreadyExistsError` on it. Without this translation the
- * match fails, the catch does not fire, and a duplicate registration stops being reported as a
- * duplicate — the `hosted-app-ai-chat` failure of 2026-07-16, restored by its own replacement.
+ * Consumers test for a unique constraint violation by matching `[CNT9] Constraint '@unique' has
+ * been violated` **and** the attribute name. Without this translation the match fails, the catch
+ * does not fire, and a duplicate registration stops being reported as a duplicate.
  *
  * Measured 2026-08-29: SQLite reports `UNIQUE constraint failed: attr.value` with `errcode` 2067
  * and names **neither** the index nor the attribute. So the attribute cannot be recovered from the

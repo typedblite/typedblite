@@ -4,7 +4,7 @@
 - **Date:** 2026-08-29
 - **Decision owners:** TypeDBLite maintainers
 - **Amends:** [ADR-001](adr-001-typedb-for-graph-persistence.md) — what it depends on is TypeQL, not the TypeDB product
-- **Feature:** [TypeQL Language and SQLite Runtime](../planning/typeqlite/typeqlite.feature.md)
+- **Feature:** TypeQL Language and SQLite Runtime
 
 ## Context
 

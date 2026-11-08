@@ -163,4 +163,4 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 
 **Standard:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md)
 
-References in source code link to `docs/architecture/adr-NNN-*.md` using relative paths — they resolve to this repo's `docs/` tree. The ADRs contain cross-references to general platform decisions in the parent monorepo that are not mirrored here.
+References in source code link to `docs/architecture/adr-NNN-*.md` using relative paths — they resolve to this repo's `docs/` tree.

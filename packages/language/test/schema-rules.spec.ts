@@ -6,7 +6,7 @@ const messages = async (text: string) =>
 
 describe('reserved TypeQLite keywords are rejected as identifiers', () => {
   // 🔴 This test used to pin `label`, because the substrate phase hit `[DEX31] The reserved keyword
-  // "label"` — against `@downstream/typedb-wasm`, which is gone. TypeDB 3.10.4 ACCEPTS `label` as an
+  // "label"` — against the old WASM adapter (removed in ADR-002). TypeDB 3.10.4 ACCEPTS `label` as an
   // identifier (probed 2026-09-11; `reserved-keywords.spec.ts` pins the whole list both ways).
   // The rule is unchanged: a word the server refuses is refused here, naming it, because it
   // parses perfectly and would otherwise surface only against a real TypeDB.

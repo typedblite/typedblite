@@ -1,10 +1,9 @@
 /**
  * The `Replicator` port, implemented over a change log and a change stream.
  *
- * 🔴 Structural, not nominal. The port lives in `@downstream/persistence-domain`, which is
- * CommonJS, while this package is ESM because Langium is. A value import across that boundary is
- * the binding trap this workspace already has recorded; the types are re-declared here and the
- * shapes are what must agree. `persistence-domain`'s `sync.ts` is the definition of record.
+ * 🔴 Structural, not nominal. The types are re-declared here — the shapes are what must agree.
+ * Any consumer that adapts this replicator satisfies the port by matching the structure, not by
+ * importing from this package.
  */
 import { isReplicable } from './canonical.js';
 import type { ChangeLog, ChangeRecord } from './change-log.js';

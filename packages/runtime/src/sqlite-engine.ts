@@ -8,12 +8,13 @@ export interface EngineRow {
 /**
  * A SQLite engine behind `TypeDBLiteDatabase`'s five methods.
  *
- * 🔴 This deliberately does **not** import anything from `@downstream/persistence-infrastructure`,
- * and that package does not import this one. The port
+ * 🔴 This deliberately has no dependency on application-layer code, and application code should not
+ * depend on this class directly — only on the port interface. The port
  * ([ADR-002](../../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 1) is
- * structural: `TypeDBLiteDatabase.open({ engine })` accepts anything with these five methods. A direct
- * dependency either way would work and would quietly make SQLite *the* engine, which Decision 1
- * exists to prevent — this is the default adapter, and a TypeDB server over the network is another.
+ * structural: `TypeDBLiteDatabase.open({ engine })` accepts anything with these five methods. A
+ * direct dependency either way would work and would quietly make SQLite *the* engine, which
+ * Decision 1 exists to prevent — this is the default adapter, and a TypeDB server over the network
+ * is another.
  *
  * Async throughout because the port is, not because SQLite is: `node:sqlite` is synchronous, and
  * pretending otherwise here would be the only honest place to hide a future async engine.
