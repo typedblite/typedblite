@@ -14,7 +14,7 @@ import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf } from './diagnostics.js';
 import { evaluate, variablesOf, type SchemaContext, type ValueBinding } from './expressions.js';
 import type { Refuse, SchemaFacts } from './schema-rules.js';
-import { ownsKey, ownsSubject } from './schema-subjects.js';
+import { ownsKey, ownsSubject, relatesSubject } from './schema-subjects.js';
 import type { Binding } from './type-patterns.js';
 
 /**
@@ -67,14 +67,31 @@ const selfAndAncestors = (type: string, facts: SchemaFacts): string[] => {
   return chain;
 };
 
+/** The upper bound a recorded `@card` states — `@card(0..)` none, `@card(1..3)` three, `@card(2)` exactly two. */
+export const cardMax = (card: string | undefined, absent = 1): number => {
+  if (card === undefined) return absent;
+  const range = /\(\s*\d+\s*\.\.\s*(\d*)\s*\)/.exec(card);
+  if (range !== null) return range[1] === '' ? Infinity : Number(range[1]);
+  const exact = /\(\s*(\d+)\s*\)/.exec(card);
+  return exact === null ? absent : Number(exact[1]);
+};
+
 /** The upper bound one declared ownership states. */
 const declaredMax = (owner: string, attribute: string, facts: SchemaFacts): number => {
   const recorded = facts.annotations.get(ownsSubject(owner, attribute));
   if (recorded?.has('key')) return 1;
-  const card = recorded?.get('card');
-  if (card === undefined) return 1;
-  const bounds = /\(\s*\d+\s*\.\.\s*(\d*)\s*\)/.exec(card);
-  return bounds === null || bounds[1] === '' ? Infinity : Number(bounds[1]);
+  return cardMax(recorded?.get('card'));
+};
+
+/**
+ * How many players one relation may hold in a role — the `relates` declaration's `@card`, on the
+ * relation or the ancestor that declares the role; `@card(0..1)` when unannotated, as TypeDB has it.
+ */
+export const roleMax = (relation: string, role: string, facts: SchemaFacts): number => {
+  for (const r of selfAndAncestors(relation, facts)) {
+    if (facts.roles.get(r)?.has(role)) return cardMax(facts.annotations.get(relatesSubject(r, role))?.get('card'));
+  }
+  return 1;
 };
 
 /** The least upper bound of every declared ownership by `owner` (or an ancestor) of a type in `attributes`. */

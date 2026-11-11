@@ -55,6 +55,8 @@ import {
   type SelectStage,
   type DeleteStage,
   type InsertStage,
+  type UpdateStage,
+  type ThingPattern,
   type PutStage,
   type WriteStage,
   type SortStage,
@@ -81,7 +83,7 @@ import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from 
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
 import { applyValueStatements, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
 import { applyReduce, checkReduce } from './reduce.js';
-import { checkFetch, fetchDocument, type FetchContext, type FetchScope, type JsonValue } from './fetch.js';
+import { checkFetch, fetchDocument, ownershipMax, roleMax, type FetchContext, type FetchScope, type JsonValue } from './fetch.js';
 import { isTypeHead, solveTypes, typeConstraintsOf, type Binding } from './type-patterns.js';
 import {
   ownsKey,
@@ -468,6 +470,13 @@ interface ThingConstraint {
  * failing statement can say which one it was and a constraint violation knows which attribute it
  * was writing. That last point is not a nicety — see `translateConstraintError`.
  */
+/** What `execute()` reports: its diagnostics, and what its last write pipeline answers. */
+export interface WriteReport extends ExecutionReport {
+  readonly rows: ReadonlyArray<Record<string, TypeDBLiteValue>>;
+  /** When the pipeline ends in `fetch`: a document per answer, and `rows` is empty. */
+  readonly documents?: ReadonlyArray<JsonValue>;
+}
+
 /**
  * One `match` (and what used to follow it in a fixed order) — the unit the per-match machinery
  * (`combinations`, `selectedOf`, `project`) reads. A pipeline is a list of stages now; each `match`
@@ -1199,9 +1208,12 @@ export class TypeDBLiteInterpreter {
    * an attribute-less thing, **invisible to every TypeQLite query** because they all filter on an
    * attribute, and therefore accumulating unnoticed. Unobservable is not the same as harmless.
    */
-  execute(text: string): ExecutionReport {
+  execute(text: string): WriteReport {
     this.diagnostics = this.freshDiagnostics();
     this.written = { things: 0, attributes: 0, roles: 0 };
+    // What the LAST write pipeline answers — its rows, or its documents when it ends in `fetch`
+    // (update.feature, fetch.feature L2996): TypeDB answers a write's stream as it answers a read's.
+    let answered: { rows: Array<Record<string, TypeDBLiteValue>>; documents?: JsonValue[] } = { rows: [] };
     for (const pipeline of this.pipelines(text)) {
       // A pipeline with no write stage writes nothing; `query()` reads it.
       const firstWrite = pipeline.stages.findIndex(isWriteStage);
@@ -1211,10 +1223,6 @@ export class TypeDBLiteInterpreter {
       const reduceAfter = pipeline.stages.slice(firstWrite).find((stage) => stage.$type === 'ReduceStage');
       if (reduceAfter !== undefined) {
         this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate a `reduce` after a write stage yet.', rangeOf(reduceAfter));
-      }
-      // `insert …; fetch { … };` answers documents of what it wrote — the write-answers phase.
-      if (pipeline.fetch !== undefined) {
-        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate `fetch` after a write stage yet.', rangeOf(pipeline.fetch));
       }
       if (pipeline.returnStage !== undefined) {
         this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate `return` yet: it ends a function, which this engine does not have.', rangeOf(pipeline.returnStage));
@@ -1228,6 +1236,10 @@ export class TypeDBLiteInterpreter {
       // `d-20260905-match-insert-writes-to-one-match`), and one that receives none reports
       // `emptyMatch`.
       const scopes = this.planStages(pipeline);
+      const final = scopes[scopes.length - 1];
+      const fetchContext = pipeline.fetch === undefined ? undefined : this.fetchContext();
+      const fetchScope = fetchContext?.scopeFor(final);
+      if (pipeline.fetch !== undefined && fetchContext !== undefined && fetchScope !== undefined) checkFetch(pipeline.fetch.body, fetchScope, fetchContext);
       this.writeRan = false;
 
       this.touched = new Set();
@@ -1244,7 +1256,12 @@ export class TypeDBLiteInterpreter {
       const savepoint = this.transactionOpen ? `write_${(this.savepointSeq += 1)}` : null;
       this.db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN');
       try {
-        this.runStages(pipeline, scopes, [{}]);
+        const streamed = this.runStages(pipeline, scopes, [{}]);
+        // Read inside the transaction, after every write the pipeline made.
+        answered =
+          pipeline.fetch !== undefined && fetchContext !== undefined && fetchScope !== undefined
+            ? { rows: [], documents: streamed.map((row) => fetchDocument((pipeline.fetch as FetchStage).body, row, fetchScope, fetchContext)) }
+            : { rows: this.projectRows(streamed, final, false) };
         // 🔴 Inside the transaction, before COMMIT. This is the whole point of attaching the log
         // here rather than in `SqliteEngine`, which wraps this method and could only act once the
         // transaction had already closed.
@@ -1295,7 +1312,7 @@ export class TypeDBLiteInterpreter {
       }
     }
     this.flushDeferredFacts();
-    return this.diagnostics.report();
+    return { ...this.diagnostics.report(), ...answered };
   }
 
   /** The counts of the most recent `query()`, or `undefined` when tracing is off. */
@@ -1661,7 +1678,7 @@ export class TypeDBLiteInterpreter {
         this.checkWriteStage(before, stage);
         if (stage.$type === 'DeleteStage') {
           // pipelines.feature L324: a deleted thing is not visible in later stages.
-          for (const deletion of stage.deletions) if (deletion.owner === undefined) drop(deletion.target);
+          for (const deletion of stage.deletions) if (deletion.owner === undefined && deletion.target !== undefined) drop(deletion.target);
         } else {
           for (const pattern of stage.patterns) {
             if (!isThingPattern(pattern)) continue;
@@ -1671,6 +1688,9 @@ export class TypeDBLiteInterpreter {
         }
         return scope;
       }
+      case 'UpdateStage':
+        this.checkUpdateStage(stage, before);
+        return scope;
       case 'SelectStage': {
         for (const variable of [...scope.available]) if (!stage.variables.includes(variable)) drop(variable);
         return scope;
@@ -1754,6 +1774,9 @@ export class TypeDBLiteInterpreter {
         case 'DeleteStage':
           rows = this.runDeleteStage(stage, rows, before);
           break;
+        case 'UpdateStage':
+          rows = this.runUpdateStage(stage, rows);
+          break;
         case 'SelectStage':
           rows = rows.map((row) => Object.fromEntries(Object.entries(row).filter(([variable]) => stage.variables.includes(variable))));
           break;
@@ -1811,6 +1834,145 @@ export class TypeDBLiteInterpreter {
     });
   }
 
+  // ── update ──────────────────────────────────────────────────────────────────
+
+  /**
+   * What an `update` stage is refused for before any row (update.feature): it changes what a thing an
+   * earlier stage bound OWNS or PLAYS — `$p has name "Bob";`, `$f links (friend: $x);` — and nothing
+   * else, each capability single-valued, each in TypeDB's words.
+   */
+  private checkUpdateStage(stage: UpdateStage, before: StreamScope): void {
+    const illegal = (at: Range | undefined): never => this.refuse(DiagnosticCode.mixedPattern, 'Illegal statement provided for an update stage: it changes the `has` and `links` of things an earlier stage bound.', at);
+    const unavailable = (variable: string, at: Range | undefined): never =>
+      this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' referenced in the update stage is unavailable: no earlier stage binds it.`, at);
+    const scope = this.fetchScope(before);
+    for (const pattern of stage.patterns) {
+      // `update try { … };` is TypeDB's (update.feature L2976); this engine does not write through
+      // `try` yet, and says so rather than calling it illegal.
+      if (isOptionalPattern(pattern)) this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not update through `try` yet.', rangeOf(pattern));
+      if (!isThingPattern(pattern)) illegal(rangeOf(pattern));
+      const thing = pattern as ThingPattern;
+      if (isAnonymous(thing.variable)) {
+        this.refuse(DiagnosticCode.mixedPattern, 'An update changes a thing an earlier stage bound; an anonymous variable names none.', rangeOf(pattern));
+      }
+      if (!before.available.has(thing.variable)) unavailable(thing.variable, rangeOf(pattern));
+      if (before.kinds.get(thing.variable) !== 'thing') illegal(rangeOf(pattern));
+      const types = scope.typesOf(thing.variable);
+      for (const property of thing.properties) {
+        const at = rangeOf(property);
+        if (isIsaProperty(property)) {
+          this.refuse(DiagnosticCode.mixedPattern, `Illegal 'isa' provided for variable '${thing.variable.slice(1)}' that is input from a previous stage: an update changes a thing, never its type.`, at);
+        }
+        if (isHasProperty(property)) {
+          const variable = property.valueVariable ?? (property.comparator === '==' && property.compared !== undefined && isVariableExpression(property.compared) ? property.compared.variable : undefined);
+          if (property.comparator !== undefined && property.comparator !== '==') illegal(at);
+          if (variable !== undefined && !before.available.has(variable)) unavailable(variable, at);
+          const attribute = property.attribute ?? (variable === undefined ? undefined : before.attributeOf.get(variable));
+          if (attribute === undefined) continue;
+          this.checkKnown('attribute', attribute, at);
+          if (this.schema.abstracts.has(attribute)) {
+            this.refuse(DiagnosticCode.abstractType, `'${attribute}' is abstract and cannot have a value of its own. Write a concrete subtype.`, at);
+          }
+          for (const type of types ?? []) {
+            if (!this.typeFamily(type, 'inherited').some((t) => this.schema.owns.has(ownsKey(t, attribute)))) {
+              if (types !== undefined && types.every((t) => !this.typeFamily(t, 'inherited').some((u) => this.schema.owns.has(ownsKey(u, attribute))))) {
+                this.refuse(DiagnosticCode.unownedAttribute, `Left type '${type}' across constraint 'has' is not compatible with right type '${attribute}'.`, at);
+              }
+              continue;
+            }
+            if (ownershipMax(type, attribute, this.schema) > 1) {
+              this.refuse(DiagnosticCode.valueTypeConflict, `'${type}' can own more than one '${attribute}', and an update replaces one: its cardinality should not exceed 1.`, at);
+            }
+          }
+          continue;
+        }
+        if (isLinksProperty(property)) {
+          for (const entry of property.players.entries) {
+            if (!before.available.has(entry.player)) unavailable(entry.player, at);
+            if (entry.roleVariable !== undefined) this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not update through a role variable yet: name the role.', at);
+            if (entry.role === undefined) continue;
+            const role = entry.role;
+            const relations = (types ?? []).filter((t) => this.schema.relations.has(t));
+            if (relations.length > 0 && relations.every((r) => !this.typeFamily(r, 'inherited').some((t) => this.schema.roles.get(t)?.has(role)))) {
+              this.refuse(DiagnosticCode.unknownRole, `Role label not found '${role}'.`, at);
+            }
+            for (const relation of relations) {
+              if (this.typeFamily(relation, 'inherited').some((t) => this.schema.roles.get(t)?.has(role)) && roleMax(relation, role, this.schema) > 1) {
+                this.refuse(DiagnosticCode.valueTypeConflict, `'${relation}' can relate more than one '${role}', and an update replaces one: its cardinality should not exceed 1.`, at);
+              }
+            }
+          }
+          continue;
+        }
+        illegal(at);
+      }
+    }
+  }
+
+  /**
+   * `update` once per distinct row: each `has` replaces the owner's values of exactly that attribute
+   * type (a subtype's or supertype's are left alone — update.feature L959), each `links` replaces the
+   * role's player. The new value or player is written as `insert` writes it, so `@key`/`@unique` and
+   * `plays` hold. A pattern reading a variable a `try` left empty does nothing (update.feature L2976).
+   */
+  private runUpdateStage(stage: UpdateStage, rows: Array<Record<string, Binding>>): Array<Record<string, Binding>> {
+    if (rows.length === 0) {
+      this.diagnostics.fact(DiagnosticCode.emptyMatch, '`match` bound 0 combinations, so the write ran 0 times.', rangeOf(stage));
+      return rows;
+    }
+    this.writeRan = true;
+    const distinct = uniqueRows(rows, valueVariablesReadBy(stage));
+    for (const row of distinct) {
+      const values = valueBindingsOf(row);
+      for (const pattern of stage.patterns) {
+        if (!isThingPattern(pattern)) continue;
+        const owner = row[pattern.variable];
+        if (typeof owner !== 'number') continue;
+        for (const property of pattern.properties) {
+          const at = rangeOf(property);
+          if (isHasProperty(property)) {
+            const variable = property.valueVariable ?? (property.compared !== undefined && isVariableExpression(property.compared) ? property.compared.variable : undefined);
+            if (variable !== undefined && row[variable] === undefined) continue;
+            let written: { attribute: string; value: string };
+            if (variable !== undefined) {
+              written = this.writtenValue({ attribute: property.attribute, variable, range: at }, values);
+            } else {
+              const literal = property.value ?? (property.compared !== undefined && isLiteralExpression(property.compared) ? property.compared.literal : undefined);
+              if (literal === undefined || property.attribute === undefined) continue;
+              written = { attribute: property.attribute, value: this.checkedLiteralText(literal, property.attribute, at) };
+            }
+            const ownerType = this.typeOfThing(owner);
+            if (!this.typeFamily(ownerType, 'inherited').some((t) => this.schema.owns.has(ownsKey(t, written.attribute)))) {
+              this.refuse(DiagnosticCode.unownedAttribute, `Left type '${ownerType}' across constraint 'has' is not compatible with right type '${written.attribute}'.`, at);
+            }
+            this.db.prepare('DELETE FROM attr WHERE owner = ? AND type = ?').run(owner, written.attribute);
+            this.touched.add(owner);
+            this.insertAttribute(owner, written.attribute, written.value, at);
+          } else if (isLinksProperty(property)) {
+            for (const entry of property.players.entries) {
+              const player = row[entry.player];
+              if (typeof player !== 'number') continue;
+              let role = entry.role;
+              if (role === undefined) {
+                try {
+                  role = this.inferRole(owner, player, entry.player, at);
+                } catch {
+                  return this.refuse(DiagnosticCode.unknownRole, `Updating 'links (${entry.player})' requires unambiguous role type: '${entry.player}' can play more than one role, or none, of '${this.typeOfThing(owner)}'.`, at);
+                }
+              }
+              this.checkPlays(owner, player, role, entry.player, at);
+              this.db.prepare('DELETE FROM role_player WHERE rel = ? AND role = ?').run(owner, role);
+              this.db.prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?)').run(owner, role, player);
+              this.touched.add(owner);
+              this.written.roles += 1;
+            }
+          }
+        }
+      }
+    }
+    return distinct;
+  }
+
   /** `delete` over every row at once — see `runDeletes`; the deleted things leave the stream. */
   private runDeleteStage(stage: DeleteStage, rows: Array<Record<string, Binding>>, before: StreamScope): Array<Record<string, Binding>> {
     if (rows.length === 0) {
@@ -1820,7 +1982,7 @@ export class TypeDBLiteInterpreter {
     this.writeRan = true;
     const distinct = uniqueRows(rows, valueVariablesReadBy(stage));
     this.runDeletes(before.patterns, stage, resolveEveryMatch(distinct), distinct);
-    const deleted = new Set(stage.deletions.filter((d) => d.owner === undefined).map((d) => d.target));
+    const deleted = new Set(stage.deletions.flatMap((d) => (d.owner === undefined && d.target !== undefined ? [d.target] : [])));
     return distinct.map((row) => Object.fromEntries(Object.entries(row).filter(([variable]) => !deleted.has(variable))));
   }
 
@@ -2822,15 +2984,29 @@ export class TypeDBLiteInterpreter {
     };
     if (write.$type === 'DeleteStage') {
       for (const deletion of write.deletions) {
+        // `delete links (friend: $x) of $r` — a relation the match bound, and things playing in it.
+        if (deletion.links) {
+          if (kindOf(deletion.owner as string) !== 'thing') {
+            this.refuse(DiagnosticCode.mixedPattern, `'${deletion.owner}' is not a relation the \`match\` bound; \`delete links … of ${deletion.owner}\` has nothing to remove from.`, rangeOf(deletion));
+          }
+          for (const entry of deletion.players?.entries ?? []) {
+            if (entry.roleVariable !== undefined) this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not delete through a role variable yet: name the role.', rangeOf(deletion));
+            if (kindOf(entry.player) !== 'thing') {
+              this.refuse(DiagnosticCode.mixedPattern, `'${entry.player}' is not a thing the \`match\` bound; it plays no role to remove.`, rangeOf(deletion));
+            }
+          }
+          continue;
+        }
+        const target = deletion.target as string;
         if (deletion.owner !== undefined) {
-          if (!attributeOf.has(deletion.target)) {
-            this.refuse(DiagnosticCode.mixedPattern, `'${deletion.target}' is not an attribute the \`match\` bound with \`has <attribute> ${deletion.target}\`; \`delete ${deletion.target} of ${deletion.owner}\` has nothing to remove.`, rangeOf(deletion));
+          if (!attributeOf.has(target) && !scope.attributeOf.has(target)) {
+            this.refuse(DiagnosticCode.mixedPattern, `'${target}' is not an attribute the \`match\` bound with \`has <attribute> ${target}\`; \`delete ${target} of ${deletion.owner}\` has nothing to remove.`, rangeOf(deletion));
           }
           // The owner is a thing the match bound — not a type, a value, or nothing (QA, F).
           if (kindOf(deletion.owner) !== 'thing') {
             this.refuse(DiagnosticCode.mixedPattern, `'${deletion.owner}' is not a thing the \`match\` bound; \`delete ${deletion.target} of ${deletion.owner}\` has no owner to remove from.`, rangeOf(deletion));
           }
-        } else if (kindOf(deletion.target) !== 'thing') {
+        } else if (kindOf(target) !== 'thing') {
           // `delete $v` of a value, a type, an attribute variable, or nothing at all (QA, F).
           this.refuse(DiagnosticCode.mixedPattern, `'${deletion.target}' is not a thing the \`match\` bound; \`delete ${deletion.target}\` has nothing to remove.`, rangeOf(deletion));
         }
@@ -3602,19 +3778,22 @@ export class TypeDBLiteInterpreter {
       // `insert $nope links (source: $x);` still reported
       // `Wrote 0 thing(s), 0 attribute(s), 0 role player(s).` at exit 0. A refusal reachable only
       // on the half of the inputs that were already the safer half is not a refusal.
+      // `match $r isa friendship; insert $r links (friend: $x);` — a player added to a relation an
+      // earlier stage bound. 🔴 Refused until the fetch-and-writes phase, because nothing knew the
+      // bound owner was a relation or checked the role: `insert $a links (source: $b)` with `$a` an
+      // ENTITY wrote a `role_player` row keyed on it (d-20260910-insert-of-a-role-player-into-2).
+      // Both are checked now — the owner's kind here, the role and `plays` in `checkPlays`.
       if (constraint?.roles.length) {
-        const message =
-          `Adding a role player to an existing relation is not supported: '${constraint.variable}' ` +
-          'has no `isa` here, so there is nothing to check the role against. Name every player in ' +
-          'one `insert` instead.';
-        throw attachDiagnostic(
-          new Error(message),
-          this.diagnostics.error(
-            DiagnosticCode.unsupportedIncrementalRole,
-            message,
-            constraint.roles[0]?.range,
-          ),
-        );
+        const relation = bindings.get(constraint.variable)?.[0];
+        if (relation === undefined) {
+          const message = `Refusing a dangling relation: '${constraint.variable}' is not bound, so there is no relation to add a player to.`;
+          throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.danglingRelation, message, constraint.range));
+        }
+        const relationType = this.typeOfThing(relation);
+        if (!this.typeFamily(relationType, 'inherited').some((t) => this.schema.relations.has(t))) {
+          this.refuse(DiagnosticCode.mixedPattern, `'${constraint.variable}' is a '${relationType}', not a relation: it has no roles to add a player to.`, constraint.range);
+        }
+        this.insertRoles(relation, constraint.roles, bindings);
       }
 
       // `$p has principal-type "user"` with no `isa` — attach to the already-bound thing.
@@ -3837,9 +4016,16 @@ export class TypeDBLiteInterpreter {
       // relation through `insertThing`, which already marks it — this is belt and braces, and the
       // one path that did NOT create it is now refused above rather than left to skip the log.
       this.touched.add(relation);
-      this.db
-        .prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?)')
-        .run(relation, role.role === undefined ? this.inferRole(relation, player, role.player, role.range) : this.checkPlays(relation, player, role.role, role.player, role.range), player);
+      const name = role.role === undefined ? this.inferRole(relation, player, role.player, role.range) : this.checkPlays(relation, player, role.role, role.player, role.range);
+      try {
+        this.db.prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?)').run(relation, name, player);
+      } catch (error) {
+        // 🔴 Only the duplicate edge is named as one — a foreign-key or busy failure is not a
+        // duplicate, and is rethrown as SQLite raised it (add-role-player.test.ts).
+        if (!/UNIQUE constraint failed: role_player/.test(String(error))) throw error;
+        const message = `'${role.player}' already plays '${name}' in this relation; a player holds a role in one relation once.`;
+        throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.constraintViolated, message, role.range));
+      }
       this.written.roles += 1;
     }
   }
@@ -3848,16 +4034,35 @@ export class TypeDBLiteInterpreter {
     const constraints = this.constraintsOf(patterns);
 
     for (const deletion of write.deletions) {
+      if (deletion.links) {
+        // `delete links (friend: $x) of $r` — those edges, on every relation the match bound; a
+        // relation left with no player is gone too (delete.feature L855).
+        for (const combination of combinations) {
+          const relation = combination[deletion.owner as string];
+          if (typeof relation !== 'number') continue;
+          for (const entry of deletion.players?.entries ?? []) {
+            const player = combination[entry.player];
+            if (typeof player !== 'number') continue;
+            if (entry.role === undefined) this.db.prepare('DELETE FROM role_player WHERE rel = ? AND player = ?').run(relation, player);
+            else this.db.prepare('DELETE FROM role_player WHERE rel = ? AND player = ? AND role = ?').run(relation, player, entry.role);
+          }
+          this.touched.add(relation);
+          if (this.db.prepare('SELECT 1 FROM role_player WHERE rel = ?').get(relation) === undefined) this.deleteThing(relation);
+        }
+        continue;
+      }
+      if (deletion.target === undefined) continue;
+      const target = deletion.target;
       if (deletion.owner) {
         // `delete $old of $p` — the attribute TYPE is not in the delete clause; it is whatever
         // bound `$old` in the match.
-        const attribute = constraints
-          .flatMap((c) => c.bindings)
-          .find((b) => b.variable === deletion.target)?.attribute;
+        const bound = constraints.flatMap((c) => c.bindings).find((b) => b.variable === target);
+        // `has $a` binds an attribute of any type: the row removed is the one the combination holds.
+        const attribute = bound === undefined ? undefined : (bound.attribute ?? '');
         if (attribute === undefined) {
           // `delete $v of $p` with `$v` a `let` value or nothing at all — not an attribute the
           // match bound; refused rather than a silent `Wrote 0` (review, round 10).
-          this.refuse(DiagnosticCode.mixedPattern, `'${deletion.target}' is not an attribute the \`match\` bound with \`has <attribute> ${deletion.target}\`; \`delete ${deletion.target} of ${deletion.owner}\` has nothing to remove.`, rangeOf(deletion));
+          this.refuse(DiagnosticCode.mixedPattern, `'${target}' is not an attribute the \`match\` bound with \`has <attribute> ${target}\`; \`delete ${target} of ${deletion.owner}\` has nothing to remove.`, rangeOf(deletion));
         }
         // 🔴 **The VALUE the match bound, on every owner it bound.** A combination carries `$old`
         // as one attribute value since Phase 06, and `$n == "Al"; delete $n of $p;` removes that
@@ -3867,7 +4072,7 @@ export class TypeDBLiteInterpreter {
         for (const combination of combinations) {
           const owner = combination[deletion.owner];
           if (typeof owner !== 'number') continue;
-          const value = combination[deletion.target];
+          const value = combination[target];
           if (typeof value === 'object' && value.kind === 'attribute') {
             this.db.prepare('DELETE FROM attr WHERE owner = ? AND type = ? AND value = ?').run(owner, value.attributeType, value.value);
           } else {
@@ -3887,31 +4092,34 @@ export class TypeDBLiteInterpreter {
       // on a `@key`, so their matches are single rows and they were correct by accident. The defect
       // gate's claim store was the first to delete over a non-key attribute, and it kept two of
       // three claims — `d-20260905-match-delete-removes-one-match-of`.
-      for (const iid of unique(bindings.get(deletion.target) ?? [])) {
-        // 🔴 Identity must be captured *before* the rows go, and the cascade below deletes relations
-        // this thing plays in — each of those is an entity in its own right and needs its own
-        // tombstone, or a follower would keep a relation whose player is gone.
-        const cascaded = this.db
-          .prepare('SELECT rel FROM role_player WHERE player = ?')
-          .all(iid) as Array<{ rel: number }>;
-        for (const row of cascaded) {
-          const identity = this.changeLog.identify(Number(row.rel));
-          if (identity) this.tombstones.push(identity);
-        }
-        const own = this.changeLog.identify(iid);
-        if (own) this.tombstones.push(own);
-        // Relations this thing participates in go first: `role_player.player` has no ON DELETE
-        // CASCADE, so deleting a thing that still plays a role would be refused. TypeDB deletes the
-        // relation with it, and `skills-projection-target.ts` relies on exactly that when it
-        // delete-then-inserts an invocation.
-        this.db
-          .prepare(
-            'DELETE FROM thing WHERE iid IN (SELECT rel FROM role_player WHERE player = ?)',
-          )
-          .run(iid);
-        this.db.prepare('DELETE FROM thing WHERE iid = ?').run(iid);
-      }
+      for (const iid of unique(bindings.get(target) ?? [])) this.deleteThing(iid);
     }
+  }
+
+  /** A thing, and the relations it plays in — each tombstoned, as a follower must learn of each. */
+  private deleteThing(iid: number): void {
+    // 🔴 Identity must be captured *before* the rows go, and the cascade below deletes relations
+    // this thing plays in — each of those is an entity in its own right and needs its own
+    // tombstone, or a follower would keep a relation whose player is gone.
+    const cascaded = this.db
+      .prepare('SELECT rel FROM role_player WHERE player = ?')
+      .all(iid) as Array<{ rel: number }>;
+    for (const row of cascaded) {
+      const identity = this.changeLog.identify(Number(row.rel));
+      if (identity) this.tombstones.push(identity);
+    }
+    const own = this.changeLog.identify(iid);
+    if (own) this.tombstones.push(own);
+    // Relations this thing participates in go first: `role_player.player` has no ON DELETE
+    // CASCADE, so deleting a thing that still plays a role would be refused. TypeDB deletes the
+    // relation with it, and `skills-projection-target.ts` relies on exactly that when it
+    // delete-then-inserts an invocation.
+    this.db
+      .prepare(
+        'DELETE FROM thing WHERE iid IN (SELECT rel FROM role_player WHERE player = ?)',
+      )
+      .run(iid);
+    this.db.prepare('DELETE FROM thing WHERE iid = ?').run(iid);
   }
 }
 
@@ -4038,7 +4246,7 @@ function insertionOrder(patterns: readonly Pattern[]): Pattern[] {
 
 /** A write stage — what `execute()` runs and `query()` refuses. */
 const isWriteStage = (stage: LeadStage | Stage): stage is WriteStage =>
-  stage.$type === 'InsertStage' || stage.$type === 'PutStage' || stage.$type === 'DeleteStage';
+  stage.$type === 'InsertStage' || stage.$type === 'PutStage' || stage.$type === 'DeleteStage' || stage.$type === 'UpdateStage';
 
 /** One key per distinct row — what `distinct` and the write dedupe compare. */
 function rowKeyOf(row: Record<string, Binding>): string {
@@ -4099,7 +4307,7 @@ function uniqueByConcepts(combinations: readonly Record<string, Binding>[], keep
 
 /** The variables a write stage reads as values: `has <attribute> $v` in an insert, `delete $v of $p`. */
 function valueVariablesReadBy(write: WriteStage): Set<string> {
-  if (write.$type === 'DeleteStage') return new Set(write.deletions.filter((d) => d.owner !== undefined).map((d) => d.target));
+  if (write.$type === 'DeleteStage') return new Set(write.deletions.flatMap((d) => (d.owner !== undefined && d.target !== undefined ? [d.target] : [])));
   return new Set(
     write.patterns.flatMap((pattern) =>
       isThingPattern(pattern)

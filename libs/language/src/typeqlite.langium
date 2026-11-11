@@ -213,8 +213,9 @@ UniqueAnnotation:
     {infer UniqueAnnotation} '@unique';
 
 // `@card(0..)` — downstream-store's multi-valued attributes. An absent upper bound is unbounded.
+// `@card(2)` is exactly two (update.feature L727).
 CardAnnotation:
-    '@card' '(' min=INT '..' (max=INT)? ')';
+    '@card' '(' min=INT (range?='..' (max=INT)?)? ')';
 
 // `attribute age @independent, value integer;` — an attribute instance may exist with no owner.
 IndependentAnnotation:
@@ -282,10 +283,16 @@ LeadStage:
     MatchStage | InsertStage | PutStage | DeleteStage;
 
 Stage:
-    MatchStage | InsertStage | PutStage | DeleteStage | SelectStage | ReduceStage | SortStage
+    MatchStage | InsertStage | PutStage | DeleteStage | UpdateStage | SelectStage | ReduceStage | SortStage
     | OffsetStage | LimitStage | DistinctStage | RequireStage;
 
-type WriteStage = InsertStage | PutStage | DeleteStage;
+type WriteStage = InsertStage | PutStage | DeleteStage | UpdateStage;
+
+// `update $p has name "Bob"; $f links (friend: $x);` — replace what a bound thing owns or what a
+// bound relation's role holds (update.feature). Parsed as patterns; the engine admits only `has`
+// and `links` on variables an earlier stage bound, and says why for anything else.
+UpdateStage:
+    'update' patterns+=Pattern+;
 
 // `sort $age desc, $name;` — ascending unless it says otherwise; stable, so ties keep stream order.
 SortStage:
@@ -341,8 +348,16 @@ ReduceStage:
 Reduction:
     variable=VAR (optional?='?')? '=' reducer=ID ('(' (argument=VAR)? ')')?;
 
+// `delete $x;` (the thing), `delete has $n of $p;` (an ownership the match bound), `delete links
+// (friend: $x) of $r;` (a role player), and the older `delete $n of $p;`. 🔴 Not `delete has name
+// "Alex" of $x;` — TypeDB fails that at PARSE (delete.feature L1100): a delete names what the match
+// bound, never a value.
 Deletion:
-    target=VAR ('of' owner=VAR)? ';';
+    (
+          has?='has' (attribute=ID)? target=VAR 'of' owner=VAR
+        | links?='links' players=RolePlayers 'of' owner=VAR
+        | target=VAR ('of' owner=VAR)?
+    ) ';';
 
 // `return { $a, $b };` `return first $a;` `return count($x), sum($y);` `return check;` — TypeQL's
 // function return, which a `fetch` sub-query also ends with (fetch.feature L882). Parsed in

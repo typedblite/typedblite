@@ -16,8 +16,8 @@ import type { JsonValue } from '@typedblite/runtime';
  * - `… fails with a message containing: "X"` requires the thrown message to contain X. TypeDB's
  *   messages are TypeDB's; ours differ, and those scenarios fail until the message is matched. That
  *   is a real gap in drop-in terms — a caller matching on the message would break.
- * - `get answers of typeql write query` — TypeDB answers the inserted rows. TypeDBLite's `execute`
- *   answers nothing, and no answer set is invented for it: the step itself fails.
+ * - `get answers of typeql write query` — TypeDB answers the written stream's rows, and so does
+ *   `execute` (the write-answers phase); before that, no answer set was invented and the step failed.
  *
  * A step with no definition is not "pending": it fails its scenario and is reported by text, so
  * the first run's undefined list is the next phase's checklist.
@@ -194,14 +194,13 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
     },
   },
   {
-    // TypeDB answers the written rows. TypeDBLite answers nothing from a write, and the harness
-    // does not invent an answer set for it — `update.feature` asserts `answer size is: 0` after a
-    // write, which an invented empty set would satisfy. The write runs, then the step fails.
+    // A write answers its stream as a read does — the rows its last stage left, or a document each
+    // when it ends in `fetch`. The write must still have run: `writeQuery` refuses one that did not.
     pattern: /^get answers of typeql write query$/,
     run: (world, _m, step) => {
-      world.writeQuery(docString(step));
-      world.answers = undefined;
-      throw new HarnessError('TypeDBLite answers nothing from a write; the answer set cannot be evaluated');
+      const query = docString(step);
+      const { rows, documents } = world.writeQuery(query);
+      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute) };
     },
   },
 

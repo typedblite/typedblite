@@ -548,7 +548,7 @@ function walkStages(node: Pipeline, accept?: ValidationAcceptor): Set<string> {
     } else if (isReduceStage(stage)) {
       bound = new Set([...stage.reductions.map((r) => r.variable), ...stage.groups]);
     } else if (isDeleteStage(stage)) {
-      for (const deletion of stage.deletions) if (deletion.owner === undefined) bound.delete(deletion.target);
+      for (const deletion of stage.deletions) if (deletion.owner === undefined && deletion.target !== undefined) bound.delete(deletion.target);
     }
     for (const variable of bound) ever.add(variable);
   }

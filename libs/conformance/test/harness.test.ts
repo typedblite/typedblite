@@ -323,19 +323,21 @@ describe('a scenario cannot pass without reaching its assertion', () => {
     assert.match(result.failure?.reason ?? '', /evaluated nothing/);
   });
 
-  it('answers of a write are not fabricated — TypeDBLite answers nothing from a write, and says so', () => {
-    const [result] = runFeature(
-      feature(scenario('x', [
-        ...open('schema'),
-        step('typeql schema query', { docString: SCHEMA }),
-        step('get answers of typeql write query', { docString: 'insert $p isa person, has ref 1;' }),
-        step('answer size is: 0'),
-      ])),
-      noDeclarations,
-    );
-    assert.equal(result.outcome, 'fail');
-    assert.equal(result.failure?.step.text, 'get answers of typeql write query');
-    assert.match(result.failure?.reason ?? '', /answers nothing from a write/);
+  it('answers of a write are the engine\'s — the row it wrote, never an invented empty set', () => {
+    const run = (size: number) =>
+      runFeature(
+        feature(scenario('x', [
+          ...open('schema'),
+          step('typeql schema query', { docString: SCHEMA }),
+          step('get answers of typeql write query', { docString: 'insert $p isa person, has ref 1;' }),
+          step(`answer size is: ${size}`),
+        ])),
+        noDeclarations,
+      )[0];
+    assert.equal(run(1).outcome, 'pass');
+    // 🔴 The shape this test used to guard: `update.feature` asserts `answer size is: 0` after a
+    // write, which an invented empty set would satisfy. The insert answered one row.
+    assert.equal(run(0).outcome, 'fail');
   });
 
   it('"evaluated nothing" does not satisfy a "fails" step either — the hollow pass must not move over', () => {

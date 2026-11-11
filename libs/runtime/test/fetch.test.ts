@@ -124,8 +124,11 @@ describe('fetch', () => {
     assert.equal(refusal(() => engine.query('match $p isa person; fetch { "x": $p.* };')).code, DiagnosticCode.parseFailed);
   });
 
-  it('what later phases own is refused by name — fetch after a write, return', () => {
-    assert.equal(refusal(() => engine.execute('insert $p isa person, has ref 9; fetch { "r": [ $p.ref ] };')).code, DiagnosticCode.notImplemented);
+  it('a write answers documents too — fetch.feature L2996', () => {
+    assert.deepEqual(engine.execute('insert $p isa person, has ref 9, has person-name "Zed"; fetch { "r": $p.ref, "n": [ $p.person-name ] };').documents, [{ r: 9, n: ['Zed'] }]);
+  });
+
+  it('what later phases own is refused by name — return', () => {
     assert.equal(refusal(() => engine.query('match $p isa person; fetch { "x": [ match $p has ref $r; return { $r }; ] };')).code, DiagnosticCode.notImplemented);
   });
 });

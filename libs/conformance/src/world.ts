@@ -113,7 +113,7 @@ export class World {
    * 🔴 A write that evaluated nothing is a failure, not a success. `execute()` skips a pipeline
    * with no write stage, and reports a fact for each one it ran — no fact, nothing ran.
    */
-  writeQuery(text: string): void {
+  writeQuery(text: string): { rows: ReadonlyArray<AnswerRow>; documents?: ReadonlyArray<JsonValue> } {
     const report = this.engineFor('write').execute(text);
     // `emptyMatch` is a write that RAN, zero times — `match` bound nothing — which is a success on
     // TypeDB too. Only a pipeline that was skipped altogether reports neither fact.
@@ -121,6 +121,7 @@ export class World {
       (d) => d.code === DiagnosticCode.wrote || d.code === DiagnosticCode.emptyMatch,
     );
     if (!ran) throw new EvaluatedNothing('TypeDBLite evaluated nothing: no write stage was executed');
+    return { rows: report.rows, documents: report.documents };
   }
 
   /**
