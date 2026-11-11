@@ -399,7 +399,30 @@ FetchExpression:
     expression=Expression;
 
 Pattern:
-    ThingPattern | AnonRelationPattern | TypePattern | KindPattern | LetPattern | ComparisonPattern;
+    ThingPattern | AnonRelationPattern | TypePattern | KindPattern | LetPattern | ComparisonPattern
+    | NegationPattern | DisjunctionPattern | OptionalPattern | IsPattern;
+
+// ── nested patterns (negation.feature, disjunction.feature, optional.feature) ────────────────
+//
+// Each block is a conjunction of its own, evaluated against the answer the patterns around it bound:
+// `not { … }` keeps the answer only if the block matches nothing, `{ … } or { … }` answers each
+// branch's extensions, `try { … }` extends the answer if the block matches and keeps it unextended
+// if it does not.
+NegationPattern:
+    'not' '{' patterns+=Pattern+ '}' ';';
+
+DisjunctionPattern:
+    branches+=PatternBlock ('or' branches+=PatternBlock)+ ';';
+
+PatternBlock:
+    '{' patterns+=Pattern+ '}';
+
+OptionalPattern:
+    'try' '{' patterns+=Pattern+ '}' ';';
+
+// `$x is $y;` — the same concept.
+IsPattern:
+    left=VAR 'is' right=VAR ';';
 
 // ── values (Phase 06) ───────────────────────────────────────────────────────
 
@@ -482,8 +505,9 @@ KindPattern:
     kind=Kind variable=VAR (properties+=Property (',' properties+=Property)*)? ';';
 
 // `(owner: $s, step: $st) isa skill-composition;` — an unbound relation, never referred to again.
+// `(employee: $x);` — with no `isa`, a relation of any type (negation.feature L608).
 AnonRelationPattern:
-    players=RolePlayers 'isa' type=ID ';';
+    players=RolePlayers ('isa' type=ID)? ';';
 
 Property:
     IsaProperty | HasProperty | LinksProperty | LabelProperty | SubProperty | OwnsProperty
@@ -515,8 +539,13 @@ RelatesProperty:
     'relates' (role=ID | roleVariable=VAR);
 
 // The value is a literal when constraining, a variable when binding for output.
+// `has $a` — any attribute, of whatever type (163 uses in the behaviour spec).
+// `has age > 5`, `has name == $n` — a comparison on the owned value (a write takes `==` as the value).
 HasProperty:
-    'has' attribute=ID (value=Literal | valueVariable=VAR)?;
+    'has' (
+          attribute=ID (comparator=Comparator compared=Expression | value=Literal | valueVariable=VAR)?
+        | valueVariable=VAR
+    );
 
 LinksProperty:
     'links' players=RolePlayers;
@@ -524,8 +553,10 @@ LinksProperty:
 RolePlayers:
     '(' entries+=RolePlayer (',' entries+=RolePlayer)* ')';
 
+// `employee: $p`, or `$p` alone — the role left for the schema to decide (optional.feature L46).
+// `($r: $x)` — the role as a type variable, bound to the role type it plays (negation.feature L365).
 RolePlayer:
-    role=ID ':' player=VAR;
+    ((role=ID | roleVariable=VAR) ':')? player=VAR;
 
 // 🔴 `DatetimeLiteral`, then `DateLiteral`, then `DoubleLiteral`, then `IntLiteral`, mirroring the
 // terminal order in `terminals.langium` — all begin with digits, and the alternation is resolved by

@@ -1,6 +1,6 @@
 import { openNodeSqlite } from './node-sqlite.js';
 import type { SqliteDatabase, SqliteOpener } from './sqlite-database.js';
-import { EmptyFileSystem } from 'langium';
+import { AstUtils, EmptyFileSystem, type AstNode as LangiumNode } from 'langium';
 import {
   createTypeQLiteServices,
   isReservedKeyword,
@@ -26,6 +26,12 @@ import {
   isComparisonPattern,
   isKindPattern,
   isLetPattern,
+  isDisjunctionPattern,
+  isIsPattern,
+  isNegationPattern,
+  isOptionalPattern,
+  isVariableExpression,
+  isLiteralExpression,
   isMatchStage,
   isSelectStage,
   literalFits,
@@ -40,6 +46,8 @@ import {
   type Definition,
   type Literal,
   type Pattern,
+  type LetPattern,
+  type ComparisonPattern,
   type ReduceStage,
   type FetchStage,
   type Pipeline,
@@ -71,7 +79,7 @@ import {
 import { generateSchema } from './sqlite-generator.js';
 import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
-import { applyValueStatements, compareStrings, compareValues, temporalKey, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
+import { applyValueStatements, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
 import { applyReduce, checkReduce } from './reduce.js';
 import { checkFetch, fetchDocument, type FetchContext, type FetchScope, type JsonValue } from './fetch.js';
 import { isTypeHead, solveTypes, typeConstraintsOf, type Binding } from './type-patterns.js';
@@ -438,11 +446,14 @@ interface ThingConstraint {
      */
     alternatives?: Array<{ type: string; value: string }>;
   }>;
-  /** `has skill-name $n` — projected into the result. */
-  bindings: Array<{ attribute: string; variable: string; range?: Range }>;
+  /** `has skill-name $n` — projected into the result. `has $a` names no attribute type: any. */
+  bindings: Array<{ attribute?: string; variable: string; range?: Range }>;
   /** `$r isa step-dependency (dependent: $d, ...)` — the relation's own role players. */
   roles: Array<{
-    role: string;
+    /** `(employee: $p)` names it; `($p)` leaves it to the schema — any role in a match. */
+    role?: string;
+    /** `($r: $p)` — a type variable bound to the role type the player plays. */
+    roleVariable?: string;
     player: string;
     /** Which `links (...)` list this slot was written in — see `rolesOf`. */
     statement: number;
@@ -482,8 +493,8 @@ interface StreamScope {
   readonly patterns: Pattern[];
   /** Each `match` so far, for the types a variable can be. */
   readonly segments: Segment[];
-  /** The attribute type a value variable was bound through (`has age $a`). */
-  readonly attributeOf: Map<string, string>;
+  /** The attribute type a value variable was bound through (`has age $a`); `undefined` for `has $a`. */
+  readonly attributeOf: Map<string, string | undefined>;
   /** A value variable's value type, where the schema or the `let` says. */
   readonly valueTypes: Map<string, string | undefined>;
 }
@@ -1367,7 +1378,7 @@ export class TypeDBLiteInterpreter {
       if (projected.length === 0) {
         // Distinguishes "nothing of this type exists" from "the constraints excluded everything" —
         // a schema problem from a data problem. Neither is recoverable from an empty row set.
-        const constraints = this.constraintsOf(firstMatch?.patterns ?? []);
+        const constraints = this.constraintsOf(firstMatch === undefined ? [] : (this.segmentFor(firstMatch, firstMatch.patterns).match?.patterns ?? []));
         for (const constraint of constraints) {
           if (!constraint.type) continue;
           const withoutRoles = this.candidates(constraint).length;
@@ -1539,7 +1550,7 @@ export class TypeDBLiteInterpreter {
     const intersect = (sets: Array<readonly string[] | undefined>): string[] | undefined =>
       sets.reduce<string[] | undefined>((acc, next) => (next === undefined ? acc : acc === undefined ? [...next] : acc.filter((t) => next.includes(t))), undefined);
     return {
-      available: new Set([...stream.available].filter((variable) => variable !== '$_')),
+      available: new Set([...stream.available].filter((variable) => !isAnonymous(variable))),
       kindOf: (variable) => stream.kinds.get(variable) ?? (stream.available.has(variable) ? 'value' : undefined),
       typesOf: (variable) => intersect([...segments.map((s) => s.typesOf(variable)), parent?.typesOf(variable)]),
       labelsOf: (variable) =>
@@ -1556,9 +1567,11 @@ export class TypeDBLiteInterpreter {
   private checkSubqueryAgainstParent(pipeline: Pipeline, parent: FetchScope): void {
     for (const stage of pipeline.stages) {
       if (!isMatchStage(stage)) continue;
-      const constraints = this.constraintsOf(stage.patterns);
-      const kind = this.conceptKindOf(constraints, stage.patterns);
-      const { typesOf, labels } = this.segmentTypes({ match: stage });
+      const segment = this.segmentFor(stage, stage.patterns);
+      const patterns = segment.match?.patterns ?? [];
+      const constraints = this.constraintsOf(patterns);
+      const kind = this.conceptKindOf(constraints, patterns);
+      const { typesOf, labels } = this.segmentTypes(segment);
       const contradiction = (variable: string, why: string): never =>
         this.refuse(DiagnosticCode.mixedPattern, `Type-inference was unable to find compatible types for '${variable.slice(1)}' in the fetch sub-query: ${why}.`, rangeOf(stage));
       for (const variable of parent.available) {
@@ -1617,10 +1630,12 @@ export class TypeDBLiteInterpreter {
     };
     switch (stage.$type) {
       case 'MatchStage': {
-        const segment: Segment = { match: stage };
-        const constraints = this.constraintsOf(stage.patterns);
-        this.matchStatements(stage.patterns, constraints, before.available, conceptOf);
-        const kind = this.conceptKindOf(constraints, stage.patterns);
+        const segment = this.segmentFor(stage, stage.patterns);
+        const patterns = segment.match?.patterns ?? [];
+        const constraints = this.constraintsOf(patterns);
+        this.matchStatements(patterns, constraints, before.available, conceptOf);
+        this.checkNested(patterns, new Set([...before.available, ...this.ownBound(patterns)]), conceptOf, 'conjunction', before.available);
+        const kind = this.nestedKind(patterns);
         for (const variable of this.selectedOf(segment, constraints)) {
           scope.available.add(variable);
           scope.kinds.set(variable, kind(variable) ?? before.kinds.get(variable) ?? 'value');
@@ -1628,15 +1643,15 @@ export class TypeDBLiteInterpreter {
         for (const constraint of constraints) {
           for (const binding of constraint.bindings) {
             scope.attributeOf.set(binding.variable, binding.attribute);
-            scope.valueTypes.set(binding.variable, this.valueTypeOfAttribute(binding.attribute));
+            scope.valueTypes.set(binding.variable, binding.attribute === undefined ? undefined : this.valueTypeOfAttribute(binding.attribute));
           }
         }
-        for (const pattern of stage.patterns) {
+        for (const pattern of patterns) {
           if (!isLetPattern(pattern)) continue;
           const inferred = inferValueType(pattern.expression, (v) => scope.valueTypes.get(v));
           for (const variable of letVariables(pattern)) scope.valueTypes.set(variable, inferred);
         }
-        scope.patterns.push(...stage.patterns);
+        scope.patterns.push(...patterns);
         scope.segments.push(segment);
         return scope;
       }
@@ -1702,11 +1717,11 @@ export class TypeDBLiteInterpreter {
       if (kind === 'thing' || kind === 'type') {
         this.refuse(DiagnosticCode.valueTypeConflict, `'${name}' is a ${kind}; \`sort\` orders attributes and values.`, at);
       }
+      if (!before.attributeOf.has(key.variable)) continue;
+      // `has $a` may be any attribute the schema has (modifiers.feature L439).
       const attribute = before.attributeOf.get(key.variable);
-      if (attribute === undefined) continue;
       const classes = new Set(
-        this.typeFamily(attribute)
-          .filter((t) => this.typeFamily(t, 'inherited').includes(attribute))
+        (attribute === undefined ? [...this.schema.attributes] : this.typeFamily(attribute).filter((t) => this.typeFamily(t, 'inherited').includes(attribute)))
           .map((t) => this.schema.valueTypes.get(t))
           .filter((t): t is string => t !== undefined)
           .map(sortClass),
@@ -1723,9 +1738,15 @@ export class TypeDBLiteInterpreter {
     pipeline.stages.forEach((stage, index) => {
       const before = scopes[index];
       switch (stage.$type) {
-        case 'MatchStage':
-          rows = rows.flatMap((row) => this.combinations({ match: stage }, row));
+        case 'MatchStage': {
+          // Trimmed to what the stage makes available: a variable one disjunction branch alone
+          // bound, or a synthetic `__anonN`, is not carried into the next stage (pipelines.feature L314).
+          const available = scopes[index + 1].available;
+          rows = rows
+            .flatMap((row) => this.combinations(this.segmentFor(stage, stage.patterns), row))
+            .map((row) => Object.fromEntries(Object.entries(row).filter(([variable]) => available.has(variable))));
           break;
+        }
         case 'InsertStage':
         case 'PutStage':
           rows = this.runInsertStage(stage, rows);
@@ -1779,10 +1800,11 @@ export class TypeDBLiteInterpreter {
     // 🔴 One write per distinct assignment of CONCEPTS — and of the VALUES the write reads (review,
     // rounds 3 and 5): a combination is one per attribute value, and a person with two names would
     // otherwise be written to twice.
+    const ordered = insertionOrder(stage.patterns);
     return uniqueRows(rows, valueVariablesReadBy(stage)).map((row) => {
       const scoped = singleBinding(row);
       const values = valueBindingsOf(row);
-      for (const pattern of stage.patterns) this.runInsert(pattern, scoped, values, stage.$type === 'PutStage');
+      for (const pattern of ordered) this.runInsert(pattern, scoped, values, stage.$type === 'PutStage');
       const next: Record<string, Binding> = { ...row };
       for (const [variable, iids] of scoped) if (iids[0] !== undefined) next[variable] = iids[0];
       return next;
@@ -1840,7 +1862,7 @@ export class TypeDBLiteInterpreter {
   private reduceRows(stage: ReduceStage, rows: Array<Record<string, Binding>>, before: StreamScope): Array<Record<string, Binding>> {
     const cells = rows.map((row) => {
       const out: Record<string, TypeDBLiteValue> = {};
-      for (const [variable, binding] of Object.entries(row)) if (before.available.has(variable)) out[variable.slice(1)] = this.cellOf(binding);
+      for (const [variable, binding] of Object.entries(row)) if (before.available.has(variable) && binding !== undefined) out[variable.slice(1)] = this.cellOf(binding);
       return out;
     });
     const reduced = applyReduce(stage, cells, (variable) => before.valueTypes.get(variable), (attribute) => this.valueTypeOfAttribute(attribute), this.refuse);
@@ -1862,7 +1884,7 @@ export class TypeDBLiteInterpreter {
     for (const row of rows) {
       const cells: Record<string, TypeDBLiteValue> = {};
       for (const [variable, binding] of Object.entries(row)) {
-        if (!scope.available.has(variable) || variable.startsWith('__')) continue;
+        if (!scope.available.has(variable) || variable.startsWith('__') || isAnonymous(variable) || binding === undefined) continue;
         // `select $x` — the caller reads `row.x`, without the `$`.
         cells[variable.slice(1)] = this.cellOf(binding);
       }
@@ -1998,6 +2020,7 @@ export class TypeDBLiteInterpreter {
     // entry point flushes these after its own facts, so what happened survives the cap and the
     // annotations are what get truncated.
     this.deferredFacts = reported.filter((diagnostic) => diagnostic.severity !== 1);
+    renameAnonymous(result.value);
     return result.value;
   }
 
@@ -2151,6 +2174,8 @@ export class TypeDBLiteInterpreter {
     patterns: readonly Pattern[],
     statement: OwnershipStatement = 'match',
   ): ThingConstraint[] {
+    // Named apart: the loop below mints a numeric `statement` id per pattern.
+    const ownership = statement;
     const constraints: ThingConstraint[] = [];
     // A variable that heads a type pattern in one place and a thing pattern in another is refused,
     // as one pattern mixing both is — `$x sub person; $x has ref $r;` (review, round 1).
@@ -2197,11 +2222,11 @@ export class TypeDBLiteInterpreter {
       // A type pattern is `typeConstraintsOf`'s — see `type-patterns.ts`; a mixed head is refused there.
       if (isTypeHead(pattern, this.refuse)) continue;
       if (isAnonRelationPattern(pattern)) {
-        this.checkKnown('type', pattern.type, rangeOf(pattern));
+        if (pattern.type !== undefined) this.checkKnown('type', pattern.type, rangeOf(pattern));
         constraints.push({
           variable: `__anon${constraints.length}`,
           type: pattern.type,
-          isas: [{ type: pattern.type, exact: false }],
+          isas: pattern.type === undefined ? [] : [{ type: pattern.type, exact: false }],
           range: rangeOf(pattern),
           literals: [],
           bindings: [],
@@ -2232,7 +2257,32 @@ export class TypeDBLiteInterpreter {
         } else if (isLinksProperty(property)) {
           constraint.roles.push(...rolesOf(property.players, statement));
         } else if (isHasProperty(property)) {
+          if (property.attribute === undefined) {
+            // `has $a` — an attribute of any type (163 uses in the behaviour spec).
+            if (property.valueVariable) constraint.bindings.push({ variable: property.valueVariable, range: rangeOf(property) });
+            continue;
+          }
           this.checkKnown('attribute', property.attribute, rangeOf(property));
+          if (property.comparator !== undefined && property.compared !== undefined) {
+            // A match never reaches here — `desugarHas` rewrote it into a binding and a comparison.
+            // A write takes `has name == $n` as the value of `$n` (fetch.feature L2996), and nothing
+            // else: `has age > 5` writes no value.
+            if (ownership !== 'write' || property.comparator !== '==') {
+              this.refuse(DiagnosticCode.mixedPattern, `\`has ${property.attribute} ${property.comparator} …\` constrains a match; a write names the value it writes.`, rangeOf(property));
+            }
+            if (isVariableExpression(property.compared)) {
+              constraint.bindings.push({ attribute: property.attribute, variable: property.compared.variable, range: rangeOf(property) });
+            } else if (isLiteralExpression(property.compared)) {
+              constraint.literals.push({
+                attribute: property.attribute,
+                value: this.checkedLiteralText(property.compared.literal, property.attribute, rangeOf(property)),
+                range: rangeOf(property),
+              });
+            } else {
+              this.refuse(DiagnosticCode.notImplemented, `TypeDBLite does not write a computed value through \`has ${property.attribute} == …\` yet; bind it with \`let\` first.`, rangeOf(property));
+            }
+            continue;
+          }
           if (property.value) {
             constraint.literals.push({
               attribute: property.attribute,
@@ -2309,7 +2359,7 @@ export class TypeDBLiteInterpreter {
     if (this.schema.owns.size === 0) return;
     const named = [
       ...constraint.literals.map((l) => ({ attribute: l.attribute, range: l.range })),
-      ...constraint.bindings.map((b) => ({ attribute: b.attribute, range: b.range })),
+      ...constraint.bindings.flatMap((b) => (b.attribute === undefined ? [] : [{ attribute: b.attribute, range: b.range }])),
     ];
     if (named.length === 0) return;
 
@@ -2477,6 +2527,10 @@ export class TypeDBLiteInterpreter {
     }
     // A variable with a bound attribute must actually own that attribute.
     for (const binding of constraint.bindings) {
+      if (binding.attribute === undefined) {
+        where.push('EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid)');
+        continue;
+      }
       where.push(`EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type IN ${SUBTYPES_OF})`);
       params.push(binding.attribute);
     }
@@ -2541,7 +2595,7 @@ export class TypeDBLiteInterpreter {
     const ownKind = this.conceptKindOf(constraints, patterns);
     const statements = orderValueStatements(
       patterns,
-      new Set([...this.conceptVariablesOf(constraints, patterns), ...seedVariables]),
+      new Set([...this.conceptVariablesOf(constraints, patterns), ...seedVariables, ...this.nestedBound(patterns)]),
       this.refuse,
       (variable) => {
         const own = ownKind(variable);
@@ -2567,6 +2621,11 @@ export class TypeDBLiteInterpreter {
     const constraints = this.constraintsOf(patterns);
     const things = constraints.filter((c) => c.roles.length === 0);
     const relations = constraints.filter((c) => c.roles.length > 0);
+
+    // A variable an earlier `try` left EMPTY satisfies no pattern that uses it directly — this
+    // conjunction answers nothing for the row; a nested `try` or `not` reading it decides for itself.
+    const uses = [...this.ownBound(patterns), ...patterns.flatMap((p) => (isComparisonPattern(p) ? [p.left, ...variablesOf(p.right)] : isLetPattern(p) ? variablesOf(p.expression) : []))];
+    if (uses.some((variable) => variable in seed && seed[variable] === undefined)) return [];
 
     // Type variables first — they are answered from the schema alone, and a thing pattern's
     // `isa $t` reads the label they bound (Phase 05).
@@ -2657,28 +2716,76 @@ export class TypeDBLiteInterpreter {
         });
       }
     }
-    // `let $v = $a * 2; $v > 10;` — evaluated per combination, binding the value variables and
-    // filtering (Phase 06).
-    if (statements.lets.length > 0 || statements.comparisons.length > 0) {
-      combinations = combinations.flatMap((combination) => {
-        const values = new Map<string, ValueBinding>();
-        for (const [variable, binding] of Object.entries(combination)) {
-          if (typeof binding === 'object') values.set(variable, binding);
-        }
-        const concept = (variable: string): 'thing' | 'type' | undefined => {
-          const binding = combination[variable];
-          return typeof binding === 'number' ? 'thing' : typeof binding === 'string' ? 'type' : undefined;
-        };
-        const typeOf = (variable: string): string | undefined => {
-          const binding = combination[variable];
-          return typeof binding === 'string' ? binding : undefined;
-        };
-        return applyValueStatements(statements, values, concept, this.refuse, { facts: this.schema, typeOf }).map((answered) => {
-          const extended: Record<string, Binding> = { ...combination };
-          for (const [variable, binding] of answered) extended[variable] = binding;
-          return extended;
+    // `let`s and comparisons whose inputs the concepts already bind run BEFORE the nested blocks, so a
+    // block can read them (`let $x = 1; { $x < 5; } or { … };` — variables.feature L126); the rest
+    // read what a block binds, and run after it.
+    const ready = new Set([...this.conceptVariablesOf(constraints, patterns), ...Object.keys(seed)]);
+    const early = { lets: [] as LetPattern[], comparisons: [] as ComparisonPattern[] };
+    const late = { lets: [] as LetPattern[], comparisons: [] as ComparisonPattern[] };
+    for (const statement of statements.lets) {
+      const isReady = variablesOf(statement.expression).every((variable) => ready.has(variable));
+      (isReady ? early : late).lets.push(statement);
+      if (isReady) for (const variable of letVariables(statement)) ready.add(variable);
+    }
+    for (const comparison of statements.comparisons) {
+      ([comparison.left, ...variablesOf(comparison.right)].every((variable) => ready.has(variable)) ? early : late).comparisons.push(comparison);
+    }
+    combinations = this.applyStatements(early, combinations);
+    // Nested blocks that EXTEND an answer, each a sub-match seeded with it: every branch of a
+    // disjunction answers its own extensions (disjunction.feature L38), and a `try` extends the
+    // answer when it matches and keeps it unextended when it does not (optional.feature L66).
+    for (const pattern of patterns) {
+      if (isDisjunctionPattern(pattern)) {
+        // 🔴 A match answers a SET: a row both branches produce is one answer, not two
+        // (variables.feature L126 — `{ $x < 5; } or { $a < 15; }` with both true answers once). What
+        // only some branches bind is local to them and dropped first, so it cannot keep two copies apart.
+        const common = new Set(this.nestedBound([pattern]));
+        const local = new Set(pattern.branches.flatMap((branch) => [...this.boundBy(this.segmentFor(branch, branch.patterns).match?.patterns ?? [])]).filter((v) => !common.has(v)));
+        const seen = new Set<string>();
+        combinations = combinations.flatMap((row) =>
+          pattern.branches.flatMap((branch) => this.combinations(this.segmentFor(branch, branch.patterns), row)).flatMap((answer) => {
+            const kept = Object.fromEntries(Object.entries(answer).filter(([variable]) => !local.has(variable) || variable in row));
+            const key = rowKeyOf(kept);
+            if (seen.has(key)) return [];
+            seen.add(key);
+            return [kept];
+          }),
+        );
+        note('disjunction');
+      } else if (isOptionalPattern(pattern)) {
+        const segment = this.segmentFor(pattern, pattern.patterns);
+        const introduced = [...this.boundBy(segment.match?.patterns ?? [])];
+        combinations = combinations.flatMap((row) => {
+          const extended = this.combinations(segment, row);
+          if (extended.length > 0) return extended;
+          // 🔴 Unmatched, its variables are EMPTY — present and unbound — not absent: a later stage
+          // that uses one directly answers nothing for this row, where an absent one would be read as
+          // a fresh variable and enumerated (optional.feature L207).
+          const empty: Record<string, Binding> = { ...row };
+          for (const variable of introduced) if (!(variable in row)) (empty as Record<string, Binding | undefined>)[variable] = undefined;
+          return [empty];
         });
-      });
+        note('optional');
+      }
+    }
+    combinations = this.applyStatements(late, combinations);
+    // Then the FILTERS, last, so everything they read is bound: `$x is $y` holds when both are the
+    // one concept (binding one from the other when only one is bound), and `not { … }` keeps the
+    // answer only if its block, seeded with it, matches nothing (negation.feature).
+    for (const pattern of patterns) {
+      if (isIsPattern(pattern)) {
+        combinations = combinations.flatMap((row) => {
+          const [left, right] = [row[pattern.left], row[pattern.right]];
+          if (left === undefined && right === undefined) return [];
+          if (left === undefined) return [{ ...row, [pattern.left]: right as Binding }];
+          if (right === undefined) return [{ ...row, [pattern.right]: left }];
+          return sameConcept(left, right) ? [row] : [];
+        });
+      } else if (isNegationPattern(pattern)) {
+        const segment = this.segmentFor(pattern, pattern.patterns);
+        combinations = combinations.filter((row) => this.combinations(segment, row).length === 0);
+        note('negation');
+      }
     }
     return combinations;
   }
@@ -2739,6 +2846,17 @@ export class TypeDBLiteInterpreter {
       if (isLetPattern(pattern) || isComparisonPattern(pattern)) {
         this.refuse(DiagnosticCode.mixedPattern, 'A `let` or a comparison belongs to a `match`, not to a write stage.', rangeOf(pattern));
       }
+      // A write states what it writes: `not`, `or`, `try` and `is` constrain a match, and an insert
+      // would otherwise pass over them without a word.
+      if (isNegationPattern(pattern) || isDisjunctionPattern(pattern) || isOptionalPattern(pattern) || isIsPattern(pattern)) {
+        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not write through `not`, `or`, `try` or `is`; they constrain a `match`.', rangeOf(pattern));
+      }
+      if (/\(\s*\$[\w-]+\s*:/.test(pattern.$cstNode?.text ?? '')) {
+        // TypeDB writes through a role variable; this engine does not yet — refused by name, so a
+        // scenario TypeDB fails for another reason (an aliased role, insert.feature L2192) is not
+        // passed for this one.
+        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not write through a role variable yet: name each role, `links (employee: $x)`.', rangeOf(pattern));
+      }
       // The literal checks — kind, spelling, range — run here as they do per combination.
       const [constraint] = this.constraintsOf([pattern], 'write');
       if (!isThingPattern(pattern)) continue;
@@ -2746,7 +2864,7 @@ export class TypeDBLiteInterpreter {
         // An abstract attribute has no values of its own (QA, A5), and the match's type owns what
         // the write names (A6) — both before any combination.
         for (const named of [...constraint.literals, ...constraint.bindings]) {
-          if (this.schema.abstracts.has(named.attribute)) {
+          if (named.attribute !== undefined && this.schema.abstracts.has(named.attribute)) {
             this.refuse(DiagnosticCode.abstractType, `'${named.attribute}' is abstract and cannot have a value of its own. Write a concrete subtype.`, named.range);
           }
         }
@@ -2762,12 +2880,15 @@ export class TypeDBLiteInterpreter {
         }
       }
       for (const property of pattern.properties) {
-        if (!isHasProperty(property) || !property.valueVariable) continue;
-        if (!matchBinds.has(property.valueVariable)) {
-          this.refuse(DiagnosticCode.unboundValue, `The variable '${property.valueVariable.slice(1)}' must be bound to a value before it's used in a write.`, rangeOf(property));
+        if (!isHasProperty(property)) continue;
+        // `has age $v`, or `has age == $v` — the write reads `$v`.
+        const variable = property.valueVariable ?? (property.comparator === '==' && property.compared !== undefined && isVariableExpression(property.compared) ? property.compared.variable : undefined);
+        if (variable === undefined) continue;
+        if (!matchBinds.has(variable)) {
+          this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used in a write.`, rangeOf(property));
         }
-        const from = typeOfVariable(property.valueVariable);
-        if (from !== undefined) this.checkValueFits(property.valueVariable, from, property.attribute, rangeOf(property));
+        const from = typeOfVariable(variable);
+        if (from !== undefined && property.attribute !== undefined) this.checkValueFits(variable, from, property.attribute, rangeOf(property));
       }
     }
   }
@@ -2789,6 +2910,7 @@ export class TypeDBLiteInterpreter {
     const typeVariables = new Set([
       ...this.conceptVariablesOf([], patterns),
       ...constraints.flatMap((c) => c.isas.flatMap((isa) => (isa.typeVariable === undefined ? [] : [isa.typeVariable]))),
+      ...constraints.flatMap((c) => c.roles.flatMap((r) => (r.roleVariable === undefined ? [] : [r.roleVariable]))),
     ]);
     const thingVariables = new Set(constraints.flatMap((c) => [c.variable, ...c.roles.map((r) => r.player)]));
     return (variable) => (thingVariables.has(variable) ? 'thing' : typeVariables.has(variable) ? 'type' : undefined);
@@ -2802,6 +2924,7 @@ export class TypeDBLiteInterpreter {
         ...c.isas.flatMap((isa) => (isa.typeVariable === undefined ? [] : [isa.typeVariable])),
         ...c.bindings.map((b) => b.variable),
         ...c.roles.map((r) => r.player),
+        ...c.roles.flatMap((r) => (r.roleVariable === undefined ? [] : [r.roleVariable])),
       ]),
       ...typeConstraintsOf(patterns, this.refuse).flatMap((t) => [
         t.variable,
@@ -2865,17 +2988,22 @@ export class TypeDBLiteInterpreter {
       const resolved = resolveIsas(relation.isas, combination);
       const params: Array<string | number> = [];
       const joins: string[] = [];
+      // A roleless slot (`($p)`) joins on any role (optional.feature L46).
+      const roleOf = (alias: string, role: string | undefined): string => {
+        if (role === undefined) return '';
+        params.push(role);
+        return ` AND ${alias}.role = ?`;
+      };
       mine.forEach((role, index) => {
         joins.push(
           index === 0
-            ? 'JOIN role_player rv0 ON rv0.rel = t.iid AND rv0.role = ?'
-            : `JOIN role_player rv${index} ON rv${index}.rel = t.iid AND rv${index}.role = ? AND rv${index}.player = rv0.player`,
+            ? `JOIN role_player rv0 ON rv0.rel = t.iid${roleOf('rv0', role.role)}`
+            : `JOIN role_player rv${index} ON rv${index}.rel = t.iid${roleOf(`rv${index}`, role.role)} AND rv${index}.player = rv0.player`,
         );
-        params.push(role.role);
       });
       others.forEach((role, index) => {
-        joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid AND ro${index}.role = ? AND ro${index}.player = ?`);
-        params.push(role.role, combination[role.player] as number);
+        joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid${roleOf(`ro${index}`, role.role)} AND ro${index}.player = ?`);
+        params.push(combination[role.player] as number);
       });
       const typed: string[] = [];
       for (const isa of resolved) {
@@ -2911,12 +3039,17 @@ export class TypeDBLiteInterpreter {
     // Every slot already emitted, keyed by the STATEMENT it was written in plus the role name —
     // the mirror case below needs all of them, and must not reach across merged statements.
     const sameRoleSlots = new Map<string, Array<[number, string]>>();
+    const statementSlots = new Map<number, Array<[number, string, string | undefined]>>();
     const joins = relation.roles
       .map((role, index) => {
         const player = combination[role.player];
         const boundPlayer = typeof player === 'number' ? player : undefined;
-        params.push(role.role);
-        let join = `JOIN role_player rp${index} ON rp${index}.rel = t.iid AND rp${index}.role = ?`;
+        // A roleless slot (`($p, $c)`) joins on any role (optional.feature L46).
+        let join = `JOIN role_player rp${index} ON rp${index}.rel = t.iid`;
+        if (role.role !== undefined) {
+          join += ` AND rp${index}.role = ?`;
+          params.push(role.role);
+        }
 
         // 🔴 One variable in two roles must be the SAME thing in both.
         //
@@ -2957,6 +3090,14 @@ export class TypeDBLiteInterpreter {
         const slots = sameRoleSlots.get(key);
         if (slots) slots.push([index, role.player]);
         else sameRoleSlots.set(key, [[index, role.player]]);
+        // A roleless slot is still its OWN role-player edge: `($p, $c)` is two players of the
+        // relation, never one edge read twice. Against every earlier slot of the statement where
+        // either side named no role (two named roles are told apart by the rule above).
+        for (const [earlierIndex, earlierPlayer, earlierRole] of statementSlots.get(role.statement) ?? []) {
+          if (earlierPlayer === role.player || (role.role !== undefined && earlierRole !== undefined)) continue;
+          join += ` AND NOT (rp${index}.role = rp${earlierIndex}.role AND rp${index}.player = rp${earlierIndex}.player)`;
+        }
+        statementSlots.set(role.statement, [...(statementSlots.get(role.statement) ?? []), [index, role.player, role.role]]);
         return join;
       })
       .join(' ');
@@ -2992,6 +3133,10 @@ export class TypeDBLiteInterpreter {
     // A binding is an ownership requirement, not a value test — the same rule `candidates()`
     // applies to an entity.
     for (const binding of relation.bindings) {
+      if (binding.attribute === undefined) {
+        where.push('EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid)');
+        continue;
+      }
       where.push('EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type = ?)');
       params.push(binding.attribute);
     }
@@ -3002,9 +3147,12 @@ export class TypeDBLiteInterpreter {
     // indistinguishable condition, and TypeQLite answers it once. Selecting `t.iid` regardless made
     // them distinct rows and doubled every downstream combination.
     const named = !relation.variable.startsWith('__anon');
+    const roleVariables = relation.roles.some((role) => role.roleVariable !== undefined);
     const columns = [
       ...(named ? ['t.iid'] : []),
       ...relation.roles.map((_, index) => `rp${index}.player AS p${index}`),
+      // `($r: $x)` — the role each slot plays, and the relation's type to name its declaring relation.
+      ...(roleVariables ? ['t.type AS relationType', ...relation.roles.map((_, index) => `rp${index}.role AS r${index}`)] : []),
     ].join(', ');
     const rows = this.db
       .prepare(
@@ -3022,6 +3170,18 @@ export class TypeDBLiteInterpreter {
       relation.roles.forEach((role, index) => {
         next[role.player] = Number(row[`p${index}`]);
       });
+      // A role variable binds the role TYPE, labelled by the relation that declares it — an inherited
+      // role is `employment:employee` on a `part-time-employment` too — and filters when bound already.
+      for (const [index, role] of relation.roles.entries()) {
+        if (role.roleVariable === undefined) continue;
+        const name = String((row as unknown as Record<string, string>)[`r${index}`]);
+        const relationType = String((row as unknown as Record<string, string>)['relationType']);
+        const declaring = this.typeFamily(relationType, 'inherited').find((t) => this.schema.roles.get(t)?.has(name)) ?? relationType;
+        const label = roleRef(declaring, name);
+        const already = next[role.roleVariable];
+        if (already !== undefined && already !== label) return [];
+        next[role.roleVariable] = label;
+      }
       // A named relation variable binds too, so `$r isa step-dependency (...)` is usable later.
       // The anonymous form has no name anybody wrote, so nothing should be able to select it — and
       // `iid` is not in the row for it either, which is what keeps the answer from doubling.
@@ -3056,6 +3216,11 @@ export class TypeDBLiteInterpreter {
             ...(c.variable.startsWith('__anon') ? [] : [c.variable]),
             ...c.isas.flatMap((isa) => (isa.typeVariable === undefined ? [] : [isa.typeVariable])),
             ...c.bindings.map((b) => b.variable),
+            // 🔴 A role player is a named variable like any other, `isa` or not: `links (friend: $a)`
+            // binds `$a`, and TypeDB answers it (negation.feature L241). Leaving it out also dropped it
+            // from the stream, so a later stage would have read it as unbound.
+            ...c.roles.map((r) => r.player),
+            ...c.roles.flatMap((r) => (r.roleVariable === undefined ? [] : [r.roleVariable])),
           ]),
           ...typeConstraintsOf(patterns, this.refuse).flatMap((t) => [
             ...(t.variable.startsWith('__type') ? [] : [t.variable]),
@@ -3065,7 +3230,158 @@ export class TypeDBLiteInterpreter {
             ...t.relates.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
           ]),
           ...patterns.flatMap((p) => (isLetPattern(p) ? letVariables(p) : [])),
+          // What a disjunction binds in EVERY branch, and what a `try` binds — never a negation's.
+          ...this.nestedBound(patterns),
         ]);
+  }
+
+  /** Each `let` (in dependency order) and comparison, per combination — see `applyValueStatements`. */
+  private applyStatements(statements: ValueStatements, combinations: Array<Record<string, Binding>>): Array<Record<string, Binding>> {
+    // `let $v = $a * 2; $v > 10;` — evaluated per combination, binding the value variables and
+    // filtering (Phase 06).
+    if (statements.lets.length === 0 && statements.comparisons.length === 0) return combinations;
+    return combinations.flatMap((combination) => {
+      const values = new Map<string, ValueBinding>();
+      for (const [variable, binding] of Object.entries(combination)) {
+        if (typeof binding === 'object') values.set(variable, binding);
+      }
+      const concept = (variable: string): 'thing' | 'type' | undefined => {
+        const binding = combination[variable];
+        return typeof binding === 'number' ? 'thing' : typeof binding === 'string' ? 'type' : undefined;
+      };
+      const typeOf = (variable: string): string | undefined => {
+        const binding = combination[variable];
+        return typeof binding === 'string' ? binding : undefined;
+      };
+      return applyValueStatements(statements, values, concept, this.refuse, { facts: this.schema, typeOf }).map((answered) => {
+        const extended: Record<string, Binding> = { ...combination };
+        for (const [variable, binding] of answered) extended[variable] = binding;
+        return extended;
+      });
+    });
+  }
+
+  /** The `match` a segment of patterns is, with `has T op expr` rewritten — once per AST node. */
+  private readonly segments = new WeakMap<LangiumNode, Segment>();
+
+  segmentFor(key: LangiumNode, patterns: readonly Pattern[]): Segment {
+    const known = this.segments.get(key);
+    if (known !== undefined) return known;
+    const segment: Segment = { match: { $type: 'MatchStage', patterns: desugarHas(patterns), $cstNode: key.$cstNode } as unknown as MatchStage };
+    this.segments.set(key, segment);
+    return segment;
+  }
+
+  /**
+   * The variables nested blocks bind for the conjunction around them: what every branch of a
+   * disjunction binds, and what a `try` binds. A negation's are its own (variables.feature L181).
+   */
+  private nestedBound(patterns: readonly Pattern[]): string[] {
+    return patterns.flatMap((pattern) => {
+      if (isDisjunctionPattern(pattern)) {
+        const branches = pattern.branches.map((branch) => this.boundBy(this.segmentFor(branch, branch.patterns).match?.patterns ?? []));
+        return [...(branches[0] ?? [])].filter((variable) => branches.every((branch) => branch.has(variable)));
+      }
+      if (isOptionalPattern(pattern)) return [...this.boundBy(this.segmentFor(pattern, pattern.patterns).match?.patterns ?? [])];
+      return [];
+    });
+  }
+
+  /** A variable's kind in a conjunction or any block that binds for it (a disjunction branch, a `try`). */
+  private nestedKind(patterns: readonly Pattern[]): (variable: string) => 'thing' | 'type' | undefined {
+    const own = this.conceptKindOf(this.constraintsOf(patterns), patterns);
+    const inner = patterns.flatMap((pattern) =>
+      isDisjunctionPattern(pattern)
+        ? pattern.branches.map((branch) => this.nestedKind(this.segmentFor(branch, branch.patterns).match?.patterns ?? []))
+        : isOptionalPattern(pattern)
+          ? [this.nestedKind(this.segmentFor(pattern, pattern.patterns).match?.patterns ?? [])]
+          : [],
+    );
+    return (variable) => own(variable) ?? inner.reduce<'thing' | 'type' | undefined>((found, kind) => found ?? kind(variable), undefined);
+  }
+
+  /**
+   * The nested blocks' rules, checked before any row (variables.feature, optional.feature):
+   *
+   * - a variable two sibling blocks both use must be bound by the conjunction around them — two
+   *   negations each `let $x`, two `try`s both binding `$y`, a disjunction branch and a negation
+   *   sharing `$x`: TypeDB's *"The variable 'x' must be bound to a value before it's used"*;
+   * - `try` is not allowed in a negation, nor in a disjunction branch;
+   * - each block's own `let`s and comparisons, against what is bound around it.
+   */
+  private checkNested(
+    patterns: readonly Pattern[],
+    bound: ReadonlySet<string>,
+    conceptOf: (variable: string) => 'thing' | 'type' | undefined,
+    context: 'conjunction' | 'negation' | 'branch',
+    /** What is bound outside this conjunction altogether. */
+    outer: ReadonlySet<string> = new Set(),
+  ): void {
+    const blocks: Array<{ node: LangiumNode; patterns: readonly Pattern[]; kind: 'negation' | 'branch' | 'optional' }> = [];
+    for (const pattern of patterns) {
+      // `$x is $y` compares two concepts something else binds (match.feature L5036).
+      // `$x is $y` binds one side from the other; with neither bound it has nothing to compare (match.feature L5036).
+      if (isIsPattern(pattern) && !bound.has(pattern.left) && !bound.has(pattern.right)) {
+        this.refuse(DiagnosticCode.unboundValue, `The variable '${pattern.left.slice(1)}' must be bound to a value before it's used: \`is\` needs one side bound by something else.`, rangeOf(pattern));
+      }
+      if (isNegationPattern(pattern)) blocks.push({ node: pattern, patterns: pattern.patterns, kind: 'negation' });
+      else if (isOptionalPattern(pattern)) {
+        if (context === 'negation') this.refuse(DiagnosticCode.mixedPattern, 'Optionals are not allowed in negations.', rangeOf(pattern));
+        if (context === 'branch') {
+          const first = variablesWritten(pattern)[0] ?? '$_';
+          this.refuse(DiagnosticCode.unboundValue, `The variable '${first.slice(1)}' must be bound to a value before it's used: an optional is not allowed inside a disjunction branch.`, rangeOf(pattern));
+        }
+        blocks.push({ node: pattern, patterns: pattern.patterns, kind: 'optional' });
+      } else if (isDisjunctionPattern(pattern)) {
+        for (const branch of pattern.branches) blocks.push({ node: branch, patterns: branch.patterns, kind: 'branch' });
+      }
+    }
+    // Sibling blocks — the branches of ONE disjunction count as one block, since only one answers.
+    const owner = new Map<string, LangiumNode>();
+    for (const block of blocks) {
+      const group = block.kind === 'branch' ? (block.node.$container as LangiumNode) : block.node;
+      for (const variable of variablesWritten(block.node)) {
+        if (variable === '$_' || bound.has(variable)) continue;
+        const first = owner.get(variable);
+        if (first !== undefined && first !== group) {
+          this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used: two nested blocks here use it, and nothing around them binds it.`, rangeOf(block.node));
+        }
+        owner.set(variable, group);
+      }
+    }
+    for (const block of blocks) {
+      const inner = this.segmentFor(block.node, block.patterns).match?.patterns ?? [];
+      // What is bound AROUND this block — not what its own disjunction contributes, which its branch
+      // is what binds (variables.feature L63: `{ let $x = 1; } or { let $x = 11; }`).
+      const own = block.kind === 'branch' ? new Set(this.nestedBound([block.node.$container as Pattern])) : new Set<string>();
+      const around = new Set([...bound].filter((variable) => !own.has(variable) || outer.has(variable)));
+      this.matchStatements(inner, this.constraintsOf(inner), around, conceptOf);
+      this.checkNested(inner, new Set([...around, ...this.ownBound(inner)]), conceptOf, block.kind === 'optional' ? 'conjunction' : block.kind, around);
+    }
+  }
+
+  /**
+   * What a conjunction binds for its nested blocks to share: its own concepts and `let`s, and what
+   * every branch of a disjunction binds — never what a `try` binds, since sibling optionals may not
+   * overlap (optional.feature L176).
+   */
+  private ownBound(patterns: readonly Pattern[]): Set<string> {
+    const constraints = this.constraintsOf(patterns);
+    return new Set([
+      ...this.conceptVariablesOf(constraints, patterns),
+      ...patterns.flatMap((p) => (isLetPattern(p) ? letVariables(p) : [])),
+      ...this.nestedBound(patterns.filter(isDisjunctionPattern)),
+    ]);
+  }
+
+  /** Every variable a conjunction binds — its concepts, its `let`s, `is` (from its other side), and its nested blocks'. */
+  private boundBy(patterns: readonly Pattern[]): Set<string> {
+    const constraints = this.constraintsOf(patterns);
+    return new Set([
+      ...this.conceptVariablesOf(constraints, patterns),
+      ...patterns.flatMap((p) => (isLetPattern(p) ? letVariables(p) : isIsPattern(p) ? [p.left, p.right] : [])),
+      ...this.nestedBound(patterns),
+    ]);
   }
 
 
@@ -3224,10 +3540,13 @@ export class TypeDBLiteInterpreter {
    * subtype closure, because a `first-name` is a `name` — with the row's own type, so a cell says
    * what it actually is rather than what the query asked for.
    */
-  private readAttributes(owner: number, attribute: string): Array<{ type: string; value: string }> {
-    return this.db
-      .prepare(`SELECT type, value FROM attr WHERE owner = ? AND type IN ${SUBTYPES_OF} ORDER BY rowid`)
-      .all(owner, attribute)
+  /** An owner's attributes of one type and its subtypes — or, for `has $a`, of every type. */
+  private readAttributes(owner: number, attribute: string | undefined): Array<{ type: string; value: string }> {
+    const rows =
+      attribute === undefined
+        ? this.db.prepare('SELECT type, value FROM attr WHERE owner = ? ORDER BY rowid').all(owner)
+        : this.db.prepare(`SELECT type, value FROM attr WHERE owner = ? AND type IN ${SUBTYPES_OF} ORDER BY rowid`).all(owner, attribute);
+    return rows
       .map((row: unknown) => {
         const r = row as { type: string; value: string };
         return { type: String(r.type), value: String(r.value) };
@@ -3248,6 +3567,9 @@ export class TypeDBLiteInterpreter {
       this.refuse(DiagnosticCode.mixedPattern, 'A `let` or a comparison belongs to a `match`, not to a write stage.', rangeOf(pattern));
     }
     if (isAnonRelationPattern(pattern)) {
+      if (pattern.type === undefined) {
+        return this.refuse(DiagnosticCode.mixedPattern, 'An inserted relation names its type: `(employee: $x) isa employment;`.', rangeOf(pattern));
+      }
       this.checkKnown('type', pattern.type, rangeOf(pattern));
       const iid = this.insertThing(pattern.type, isPut, rangeOf(pattern));
       this.insertRoles(iid, rolesOf(pattern.players, 0), bindings);
@@ -3309,7 +3631,8 @@ export class TypeDBLiteInterpreter {
         this.insertAttribute(owner, literal.attribute, literal.value, literal.range);
       }
       for (const binding of constraint?.bindings ?? []) {
-        this.insertAttribute(owner, binding.attribute, this.valueFor(binding.variable, binding.attribute, values, binding.range), binding.range);
+        const written = this.writtenValue(binding, values);
+        this.insertAttribute(owner, written.attribute, written.value, binding.range);
       }
       return;
     }
@@ -3328,7 +3651,7 @@ export class TypeDBLiteInterpreter {
     // `put` is match-or-insert: if a @key already matches, reuse it rather than inserting. A
     // `has ref $a` looks up the VALUE the match bound, not any `ref` (review, round 10).
     if (isPut) {
-      const bound = constraint.bindings.map((b) => ({ attribute: b.attribute, value: this.valueFor(b.variable, b.attribute, values, b.range), range: b.range }));
+      const bound = constraint.bindings.map((b) => ({ ...this.writtenValue(b, values), range: b.range }));
       const existing = this.candidates({ ...constraint, literals: [...constraint.literals, ...bound], bindings: [] })[0];
       if (existing !== undefined) {
         bindings.set(constraint.variable, [existing]);
@@ -3342,7 +3665,8 @@ export class TypeDBLiteInterpreter {
     }
     // `insert $x isa person, has age $v` — the value the match bound (review, round 5).
     for (const binding of constraint.bindings) {
-      this.insertAttribute(iid, binding.attribute, this.valueFor(binding.variable, binding.attribute, values, binding.range), binding.range);
+      const written = this.writtenValue(binding, values);
+      this.insertAttribute(iid, written.attribute, written.value, binding.range);
     }
     this.insertRoles(iid, constraint.roles, bindings);
     bindings.set(constraint.variable, [iid]);
@@ -3363,6 +3687,21 @@ export class TypeDBLiteInterpreter {
     // Stored as the attribute's type spells it — `canonicalValue` — so an integer `10` on a
     // double attribute is `10.0` and a computed decimal `3.0` is `3` (review, rounds 7 and 10).
     return this.canonicalValue(attribute, bound.value, at);
+  }
+
+  /**
+   * What `has <attribute> $v` writes — the value `$v` holds, as `<attribute>` spells it — and what
+   * `has $a` writes: the attribute the match bound to `$a`, under its own type (fetch.feature L2996).
+   */
+  private writtenValue(binding: { attribute?: string; variable: string; range?: Range }, values: ReadonlyMap<string, ValueBinding>): { attribute: string; value: string } {
+    if (binding.attribute !== undefined) {
+      return { attribute: binding.attribute, value: this.valueFor(binding.variable, binding.attribute, values, binding.range) };
+    }
+    const bound = values.get(binding.variable);
+    if (bound?.kind !== 'attribute') {
+      return this.refuse(DiagnosticCode.mixedPattern, `\`has ${binding.variable}\` writes an attribute the match bound; '${binding.variable.slice(1)}' ${bound === undefined ? 'is not bound' : 'is a value, not an attribute — name its type: `has <attribute> ' + binding.variable + '`'}.`, binding.range);
+    }
+    return { attribute: bound.attributeType, value: bound.value };
   }
 
   private insertThing(type: string, _isPut: boolean, at?: Range): number {
@@ -3430,16 +3769,60 @@ export class TypeDBLiteInterpreter {
     }
   }
 
+  /**
+   * The one role a player can take in a relation when the insert names none — `links ($p)`: every
+   * role the relation type declares or inherits that the player's type (or an ancestor) plays. None,
+   * or more than one, is refused rather than guessed.
+   */
+  private inferRole(relation: number, player: number, variable: string, at: Range | undefined): string {
+    const relationType = this.typeOfThing(relation);
+    const playerTypes = this.typeFamily(this.typeOfThing(player), 'inherited');
+    const candidates = new Set<string>();
+    for (const declaring of this.typeFamily(relationType, 'inherited')) {
+      for (const role of this.schema.roles.get(declaring) ?? []) {
+        if (playerTypes.some((t) => this.schema.plays.has(playsSubject(t, roleRef(declaring, role))))) candidates.add(role);
+      }
+    }
+    if (candidates.size === 1) return [...candidates][0];
+    const message =
+      candidates.size === 0
+        ? `'${variable}' cannot play any role of '${relationType}', so \`links (${variable})\` has no role to take.`
+        : `'${variable}' could play ${[...candidates].sort().join(' or ')} in '${relationType}'; name the role: \`links (<role>: ${variable})\`.`;
+    throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.unknownRole, message, at));
+  }
+
+  /**
+   * A named role on an insert must be one the relation has — declared or inherited — and one the
+   * player's type (or an ancestor) plays. 🔴 Never checked before the fetch phase's audit: insert.feature
+   * L1015 "passed" only because its relation was written before its player and failed as dangling.
+   */
+  private checkPlays(relation: number, player: number, role: string, variable: string, at: Range | undefined): string {
+    const relationType = this.typeOfThing(relation);
+    const declaring = this.typeFamily(relationType, 'inherited').find((t) => this.schema.roles.get(t)?.has(role));
+    if (declaring === undefined) {
+      const message = `'${relationType}' has no role '${role}'.`;
+      throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.unknownRole, message, at));
+    }
+    // A schema that declares no `plays` at all predates the plays record; nothing to check against.
+    if (this.schema.plays.size === 0) return role;
+    const playerType = this.typeOfThing(player);
+    if (!this.typeFamily(playerType, 'inherited').some((t) => this.schema.plays.has(playsSubject(t, roleRef(declaring, role))))) {
+      const message = `'${playerType}' cannot play '${roleRef(declaring, role)}', so '${variable}' cannot be the ${role} of '${relationType}'.`;
+      throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.unknownRole, message, at));
+    }
+    return role;
+  }
+
   private insertRoles(
     relation: number,
-    roles: ReadonlyArray<{ role: string; player: string; range?: Range }>,
+    roles: ReadonlyArray<{ role?: string; player: string; range?: Range }>,
     bindings: Map<string, number[]>,
   ): void {
     for (const role of roles) {
       const player = bindings.get(role.player)?.[0];
       if (player === undefined) {
         const message =
-          `Refusing a dangling relation: '${role.player}' is not bound, so role '${role.role}' ` +
+          `Refusing a dangling relation: '${role.player}' is not bound, so ${role.role === undefined ? 'it' : `role '${role.role}'`} ` +
           'has nothing to relate.';
         throw attachDiagnostic(
           new Error(message),
@@ -3456,7 +3839,7 @@ export class TypeDBLiteInterpreter {
       this.touched.add(relation);
       this.db
         .prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?)')
-        .run(relation, role.role, player);
+        .run(relation, role.role === undefined ? this.inferRole(relation, player, role.player, role.range) : this.checkPlays(relation, player, role.role, role.player, role.range), player);
       this.written.roles += 1;
     }
   }
@@ -3561,6 +3944,98 @@ function resolveEveryMatch(
   return bindings;
 }
 
+/** What an anonymous `$_` becomes — `$_#N`, which no query can write, so it collides with nothing. */
+const isAnonymous = (variable: string): boolean => variable.startsWith('$_#');
+
+/**
+ * 🔴 Each `$_` is its OWN variable — "something", never "the same something as the last `$_`".
+ * `insert $_ isa person, has ref 0; $_ isa person, has ref 1;` is two people, and was refused here as
+ * one variable inserted twice (disjunction.feature L172, match.feature L842). Renamed after the
+ * validator has seen `$_` — it refuses `select $_` by that name (pipelines.feature L287) — and the
+ * projection never answers one, as TypeDB never answers an anonymous variable.
+ */
+function renameAnonymous(root: LangiumNode): void {
+  let counter = 0;
+  for (const node of AstUtils.streamAst(root)) {
+    const record = node as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(record)) {
+      if (key.startsWith('$')) continue;
+      if (value === '$_') record[key] = `$_#${(counter += 1)}`;
+      else if (Array.isArray(value) && value.includes('$_')) record[key] = value.map((v) => (v === '$_' ? `$_#${(counter += 1)}` : v));
+    }
+  }
+}
+
+/** Whether two bindings are the one concept — a thing by iid, a type by label, an attribute or value by type and value. */
+function sameConcept(left: Binding, right: Binding): boolean {
+  if (typeof left !== 'object' || typeof right !== 'object') return left === right;
+  const typeOf = (binding: ValueBinding): string => (binding.kind === 'attribute' ? binding.attributeType : binding.valueType);
+  return left.kind === right.kind && typeOf(left) === typeOf(right) && left.value === right.value;
+}
+
+/** Every `$variable` written in a node's source text, in order — what a block mentions, bound or read. */
+function variablesWritten(node: LangiumNode): string[] {
+  return [...new Set<string>(node.$cstNode?.text.match(/\$[a-zA-Z0-9_][a-zA-Z0-9_-]*/g) ?? [])];
+}
+
+let hasCounter = 0;
+
+/**
+ * `has age > 5` and `has name == $n` in a match become `has age __hasN; __hasN > 5;` — a binding
+ * and a comparison, which the engine already evaluates (modifiers.feature, insert.feature L312). The
+ * rewritten nodes keep the source's position, so a refusal still points at what was written.
+ */
+function desugarHas(patterns: readonly Pattern[]): Pattern[] {
+  const rewritten: Pattern[] = [];
+  const comparisons: Pattern[] = [];
+  for (const pattern of patterns) {
+    if (!isThingPattern(pattern) || !pattern.properties.some((p) => isHasProperty(p) && p.comparator !== undefined)) {
+      rewritten.push(pattern);
+      continue;
+    }
+    const properties = pattern.properties.map((property) => {
+      if (!isHasProperty(property) || property.comparator === undefined || property.compared === undefined) return property;
+      // Named like `__anonN` — no `$`, so no query can write it and the projection never shows it.
+      const variable = `__has${(hasCounter += 1)}`;
+      comparisons.push({ $type: 'ComparisonPattern', left: variable, comparator: property.comparator, right: property.compared, $cstNode: property.$cstNode } as unknown as Pattern);
+      return { ...property, comparator: undefined, compared: undefined, valueVariable: variable };
+    });
+    rewritten.push({ ...pattern, properties } as Pattern);
+  }
+  return [...rewritten, ...comparisons];
+}
+
+/**
+ * A stage's patterns in an order that inserts every player before a relation that links it.
+ * 🔴 TypeDB's insert is a set of statements, not a script: `insert $r isa employment, links ($p);
+ * $p isa person;` is one insert, and written in that order it failed here as "$p is not bound" —
+ * a refusal for the wrong reason, which passed insert.feature L996 hollowly. Stable otherwise, and
+ * a cycle (a relation playing in its own player) keeps the written order for what remains.
+ */
+function insertionOrder(patterns: readonly Pattern[]): Pattern[] {
+  const introduces = (pattern: Pattern): string | undefined => (isThingPattern(pattern) ? pattern.variable : undefined);
+  const needs = (pattern: Pattern): string[] => {
+    const lists = isAnonRelationPattern(pattern)
+      ? [pattern.players]
+      : isThingPattern(pattern)
+        ? pattern.properties.flatMap((p) => (isLinksProperty(p) ? [p.players] : isIsaProperty(p) && p.players ? [p.players] : []))
+        : [];
+    return lists.flatMap((list) => list.entries.map((entry) => entry.player));
+  };
+  const introducedHere = new Set(patterns.flatMap((p) => introduces(p) ?? []));
+  const placed = new Set<string>();
+  const remaining = [...patterns];
+  const ordered: Pattern[] = [];
+  while (remaining.length > 0) {
+    const index = remaining.findIndex((p) => needs(p).every((v) => !introducedHere.has(v) || placed.has(v) || v === introduces(p)));
+    const [next] = remaining.splice(index < 0 ? 0 : index, 1);
+    ordered.push(next);
+    const variable = introduces(next);
+    if (variable !== undefined) placed.add(variable);
+  }
+  return ordered;
+}
+
 /** A write stage — what `execute()` runs and `query()` refuses. */
 const isWriteStage = (stage: LeadStage | Stage): stage is WriteStage =>
   stage.$type === 'InsertStage' || stage.$type === 'PutStage' || stage.$type === 'DeleteStage';
@@ -3627,7 +4102,17 @@ function valueVariablesReadBy(write: WriteStage): Set<string> {
   if (write.$type === 'DeleteStage') return new Set(write.deletions.filter((d) => d.owner !== undefined).map((d) => d.target));
   return new Set(
     write.patterns.flatMap((pattern) =>
-      isThingPattern(pattern) ? pattern.properties.flatMap((p) => (isHasProperty(p) && p.valueVariable ? [p.valueVariable] : [])) : [],
+      isThingPattern(pattern)
+        ? pattern.properties.flatMap((p) =>
+            !isHasProperty(p)
+              ? []
+              : p.valueVariable
+                ? [p.valueVariable]
+                : p.comparator === '==' && p.compared !== undefined && isVariableExpression(p.compared)
+                  ? [p.compared.variable]
+                  : [],
+          )
+        : [],
     ),
   );
 }
@@ -3666,7 +4151,7 @@ let patternCounter = 0;
 function rolesOf(
   players: RolePlayers,
   statement: number,
-): Array<{ role: string; player: string; statement: number; range?: Range }> {
+): Array<{ role?: string; roleVariable?: string; player: string; statement: number; range?: Range }> {
   // 🔴 One id per PATTERN, not per role list.
   //
   // `constraintsOf` merges roles across every pattern naming a variable, so without this two
@@ -3679,6 +4164,7 @@ function rolesOf(
   // to close, reintroduced through the fix for the opposite one.
   return players.entries.map((entry) => ({
     role: entry.role,
+    roleVariable: entry.roleVariable,
     player: entry.player,
     statement,
     // The provenance that gives `insertRoles`'s refusal a source position — see ThingConstraint.

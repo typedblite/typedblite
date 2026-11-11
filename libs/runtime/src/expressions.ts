@@ -567,7 +567,11 @@ export function compare(comparator: string, left: ValueBinding, right: Value, re
     }
     order = left.value === right.text ? 0 : 1;
   } else {
-    return refuse(DiagnosticCode.valueTypeConflict, `Cannot compare a ${left.valueType} with a ${right.valueType}.`, at);
+    // 🔴 Reached only when the static check could not know the types — `has $r` may hold a string
+    // or an integer, row by row. A declared conflict is refused before any row (`checkComparison`);
+    // a value that merely turns out to be of another kind is not equal to it, and orders against it
+    // not at all: TypeDB answers `not { $r == 55; }` for the strings (negation.feature L436).
+    return comparator === '!=';
   }
   switch (comparator) {
     case '==': return order === 0;

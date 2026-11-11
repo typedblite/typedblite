@@ -22,6 +22,8 @@ import {
   isKeyAnnotation,
   isKindPattern,
   isLetPattern,
+  isDisjunctionPattern,
+  isOptionalPattern,
   isMatchStage,
   isInsertStage,
   isPutStage,
@@ -574,38 +576,29 @@ function checkNamed(stage: AstNode, accept: ValidationAcceptor): void {
   });
 }
 
-function checkSelect(select: SelectStage, bound: ReadonlySet<string>, ever: ReadonlySet<string>, last: MatchBindings | undefined, accept: ValidationAcceptor): void {
-  const things = last?.things ?? new Map();
-  const rolePlayersOnly = last?.rolePlayersOnly ?? new Set<string>();
-  const canSelect = [...bound].filter((name) => !rolePlayersOnly.has(name) || things.has(name)).sort();
-  const unconstrainedPlayers = [...rolePlayersOnly].filter((name) => !things.has(name) && !(last?.selectable.has(name) ?? false)).sort();
+function checkSelect(select: SelectStage, bound: ReadonlySet<string>, ever: ReadonlySet<string>, _last: MatchBindings | undefined, accept: ValidationAcceptor): void {
+  // A role player is bound like any other variable, `isa` or not — `relationBindings` binds it and
+  // TypeDB answers it. This check used to hedge every selection with "has no `isa` pattern, so this
+  // `match` answers 0 rows", which was true before relations bound their players and is not now.
+  const canSelect = [...bound].filter((name) => !name.startsWith('$_')).sort();
   const inventory = canSelect.length ? ` Bound here: ${canSelect.join(', ')}.` : ' Nothing in this `match` is bound.';
-  // 🔴 The hedge that keeps this check from handing out bad advice. Every name in `canSelect` is
-  // projectable, but a `match` carrying an unconstrained role player answers **zero rows
-  // regardless** — so offering the list without the warning trades one silent zero for another.
-  const blockedByPlayers = unconstrainedPlayers.length
-    ? ` ⚠️ ${unconstrainedPlayers.join(', ')} ${
-        unconstrainedPlayers.length === 1 ? 'has' : 'have'
-      } no \`isa\` pattern, so this \`match\` answers 0 rows whatever is selected.`
-    : '';
   for (const variable of select.variables) {
-    if (bound.has(variable) && !unconstrainedPlayers.includes(variable)) continue;
+    if (bound.has(variable)) continue;
     // A variable a `let` or comparison reads without anything binding it is the unbound-value
     // finding, in TypeDB's words; this one would only add a second (expression.feature L34).
-    if (!bound.has(variable) && valueReadOutsideScope(select, variable)) continue;
+    if (valueReadOutsideScope(select, variable)) continue;
     // Bound once, and dropped since — TypeDB's own words for it.
-    if (!bound.has(variable) && ever.has(variable)) {
+    if (ever.has(variable)) {
       accept('error', `The variable '${variable.slice(1)}' was not available in the stage: an earlier stage deleted, reduced or deselected it.`, {
         node: select,
         code: TypeQLiteValidationCode.unprojectableVariable,
       });
       return;
     }
-    const message = unconstrainedPlayers.includes(variable)
-      ? `\`select\` names '${variable}', which appears only as a role player and has no ` +
-        `\`isa\` pattern, so the \`match\` never bound it.${inventory}${blockedByPlayers}`
-      : `\`select\` names '${variable}', which the \`match\` never bound.${inventory}` + blockedByPlayers;
-    accept('error', message, { node: select, code: TypeQLiteValidationCode.unprojectableVariable });
+    accept('error', `\`select\` names '${variable}', which the \`match\` never bound.${inventory}`, {
+      node: select,
+      code: TypeQLiteValidationCode.unprojectableVariable,
+    });
     return;
   }
 }
@@ -647,7 +640,11 @@ export function bindingsOf(patterns: readonly Pattern[]): MatchBindings {
   const rolePlayersOnly = new Set<string>();
 
   const players = (list: RolePlayers | undefined): void => {
-    for (const entry of list?.entries ?? []) rolePlayersOnly.add(entry.player);
+    for (const entry of list?.entries ?? []) {
+      rolePlayersOnly.add(entry.player);
+      // `($role: $x)` — the role is a type variable the relation binds.
+      if (entry.roleVariable) selectable.add(entry.roleVariable);
+    }
   };
 
   // A variable bound by a type property — `owns $y`, `plays $y`, `relates $y`, `sub $y`, `isa $t`
@@ -681,6 +678,21 @@ export function bindingsOf(patterns: readonly Pattern[]): MatchBindings {
       typeBound(pattern.properties);
       continue;
     }
+    // A disjunction binds what EVERY branch binds; a `try` binds what it binds (when it matches); a
+    // negation binds nothing outside itself (variables.feature L63–L252).
+    if (isDisjunctionPattern(pattern)) {
+      const branches = pattern.branches.map((branch) => {
+        const inner = bindingsOf(branch.patterns);
+        return new Set([...inner.selectable, ...inner.things.keys()]);
+      });
+      for (const variable of branches[0] ?? []) if (branches.every((branch) => branch.has(variable))) selectable.add(variable);
+      continue;
+    }
+    if (isOptionalPattern(pattern)) {
+      const inner = bindingsOf(pattern.patterns);
+      for (const variable of [...inner.selectable, ...inner.things.keys()]) selectable.add(variable);
+      continue;
+    }
     if (!isThingPattern(pattern)) continue;
     typeBound(pattern.properties);
 
@@ -695,7 +707,7 @@ export function bindingsOf(patterns: readonly Pattern[]): MatchBindings {
         if (property.valueVariable) {
           selectable.add(property.valueVariable);
           thing.bound.push(property.valueVariable);
-        } else {
+        } else if (property.attribute !== undefined) {
           thing.literals.push(property.attribute);
         }
       }

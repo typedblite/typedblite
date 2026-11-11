@@ -106,40 +106,20 @@ describe('a select that names a variable the match never bound is refused', () =
     assert.equal(diagnosticOf(error)?.code, DiagnosticCode.unprojectableVariable);
   });
 
-  // 🔴 A role player named only inside `links (...)` is NOT bound here — `findRelation` reads
-  // `combination[$s] ?? -1`, and nothing puts it there without an `isa` of its own. Reporting it
-  // as bound would describe the query the author meant instead of the one this engine runs, and
-  // hide the fault. Same root as d-20260910-a-relation-match-whose-role-players: such a match
-  // silently answers zero rows, which is why the message says so. ⚠️ TypeDB binds the player; this
-  // refusal is TypeDBLite's own gap, and the conformance report card counts it.
-  it('tells an unconstrained role player apart from a typo', () => {
-    const error = refusalOf(
-      'match $l isa link, links (source: $s, target: $t), has edge-id $e; select $s;',
-    );
-
-    assert.match(error.message, /\$s/);
-    assert.match(error.message, /only as a role player/);
-    assert.doesNotMatch(error.message, /which the `match` never bound\./);
-    // 🔴 Must name BOTH players. Warning about $s alone tells the reader to give it an `isa`,
-    // after which $t still has none and the match still answers nothing.
-    assert.match(error.message, /\$s, \$t have no `isa` pattern/);
-    assert.match(error.message, /answers 0 rows whatever is selected/);
-    assert.match(error.message, /Bound here: \$e, \$l\./);
+  // ✅ A role player named only inside `links (...)` IS bound — `relationBindings` binds it, and it
+  // is answered like any variable, as TypeDB answers it. This test asserted a refusal ("has no `isa`
+  // pattern, so this `match` answers 0 rows") and named it "TypeDBLite's own gap, which the
+  // conformance report card counts"; the card's negation.feature L241 is where it closed.
+  it('selects a role player that has no `isa` of its own', () => {
+    const { rows } = engine.query('match $l isa link, links (source: $s, target: $t), has edge-id $e; select $s;');
+    assert.ok(rows.length > 0);
+    for (const row of rows) assert.ok(row['s']?.isThing(), 'the cell is the player itself');
   });
 
-  // ⚠️ `relationBindings` fixed the MATCH — `$sid`, an attribute read off a role player, now
-  // projects (`relation-role-binding.test.ts`). It did not touch this validator-level check, which
-  // still names `$s`/`$t` themselves unselectable: this is a static, parse-time inventory, and the
-  // hedge is still true of the class of variable, not of what this specific relation happens to
-  // bind — see the validator's own comment for why that stays TypeDBLite's own gap.
-  it('still hedges a typo recommendation with the unconstrained-player warning', () => {
-    const error = refusalOf(
-      'match $l isa link, links (source: $s, target: $t), has edge-id $e; select $typo;',
-    );
-
-    assert.match(error.message, /Bound here: \$e, \$l\./);
-    assert.match(error.message, /\$s, \$t have no `isa` pattern/);
-    assert.match(error.message, /answers 0 rows whatever is selected/);
+  it('a typo names every bound variable, role players included', () => {
+    const error = refusalOf('match $l isa link, links (source: $s, target: $t), has edge-id $e; select $typo;');
+    assert.match(error.message, /Bound here: \$e, \$l, \$s, \$t\./);
+    assert.doesNotMatch(error.message, /answers 0 rows/);
   });
 });
 

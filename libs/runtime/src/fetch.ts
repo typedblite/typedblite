@@ -240,6 +240,8 @@ const schemaContext = (combination: Record<string, Binding>, facts: SchemaFacts)
 });
 
 function expressionJson(expression: Expression, combination: Record<string, Binding>, ctx: FetchContext): JsonValue {
+  // A variable a `try` left empty makes the value empty: `null` (fetch.feature L957).
+  if (variablesOf(expression).some((variable) => variable in combination && combination[variable] === undefined)) return null;
   if (isVariableExpression(expression)) {
     const binding = combination[expression.variable];
     // A type is its label; a thing was refused in `checkFetch`.

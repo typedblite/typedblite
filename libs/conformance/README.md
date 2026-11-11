@@ -86,21 +86,21 @@ Rules:
 | redefine | 155 |
 | undefine | 131 |
 | expression | 92 |
-| reduce | 33 |
-| insert | 30 |
-| match | 34 |
+| reduce | 63 |
+| insert | 37 |
+| match | 56 |
 | delete | 5 |
-| fetch | 22 |
+| fetch | 40 |
 | pipelines | 7 |
-| modifiers | 19 |
+| modifiers | 21 |
 | update | 1 |
-| variables | 3 |
-| disjunction | 0 |
+| variables | 11 |
+| disjunction | 7 |
 | given | 0 |
 | metadata | 107 |
-| negation | 0 |
-| optional | 0 |
-| put | 0 |
+| negation | 14 |
+| optional | 10 |
+| put | 1 |
 
 ## Tests
 
