@@ -112,6 +112,21 @@ describe('nested patterns', () => {
     }
   });
 
+  it('a `let` is assigned once per branch, in one order across branches, of one value type — expression L34–L281', () => {
+    for (const [query, pattern] of [
+      ['match $p isa person, has age $a; let $v = $a + 1; not { not { let $v = 10; }; };', /Variable 'v' cannot be assigned to multiple times in the same branch/],
+      ['match $p isa person, has age $a; { let $v = $a; } or { let $v = 1; }; { let $v = 2; } or { let $v = 3; };', /cannot be assigned to multiple times/],
+      ['match let $x = 1; match { let $x = 2; } or { let $x = 3; };', /already bound in a previous stage/],
+      ['match $p isa person, has age $a; $v > $a; try { let $v = $a / 2; };', /must be bound to a value before it's used/],
+      ['match { let $x = 5; let $y = $x; } or { let $y = 6; let $x = $y; };', /illegal circular expression assignment & usage/],
+      ['match try { let $x = $y + 0; let $y = $x + 0; };', /could not be satisfied \(there may be a circular dependency\)/],
+      ['match $p isa person, has age $a; { let $v = $a * 2; } or { let $v = $a / 2.0; };', /All assignments of the variable 'v' must have the same value type/],
+      ['match $p isa person, has $a; let $v = $a;', /must have a single possible value type/],
+    ] as const) {
+      assert.match(refusal(() => engine.query(query)).message, pattern, query);
+    }
+  });
+
   it('a write states what it writes: not, or, try and is are refused there by name', () => {
     assert.equal(refusal(() => engine.execute('insert $p isa person, has ref 20; not { $p has age 1; };')).code, DiagnosticCode.notImplemented);
   });

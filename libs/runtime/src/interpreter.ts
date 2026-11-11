@@ -1741,8 +1741,12 @@ export class TypeDBLiteInterpreter {
         const segment = this.segmentFor(stage, stage.patterns);
         const patterns = segment.match?.patterns ?? [];
         const constraints = this.constraintsOf(patterns);
-        this.matchStatements(patterns, constraints, before.available, conceptOf);
-        this.checkNested(patterns, new Set([...before.available, ...this.ownBound(patterns)]), conceptOf, 'conjunction', before.available);
+        this.matchStatements(patterns, constraints, before.available, conceptOf, before.available);
+        // Each block's own rules first — a cycle inside one block is refused there, in its words — then
+        // the order across branches, which only the whole stage can see.
+        this.checkNested(patterns, new Set([...before.available, ...this.ownBound(patterns)]), conceptOf, 'conjunction', before.available, undefined, before.available);
+        this.checkLetOrder(patterns);
+        this.checkUntypedReads(patterns, constraints);
         const kind = this.nestedKind(patterns);
         for (const variable of this.selectedOf(segment, constraints)) {
           scope.available.add(variable);
@@ -2858,6 +2862,12 @@ export class TypeDBLiteInterpreter {
     constraints: readonly ThingConstraint[],
     seedVariables: Iterable<string>,
     seedKind: (variable: string) => 'thing' | 'type' | undefined,
+    /**
+     * What EARLIER STAGES bound — a `let` reassigning one is TypeDB's "already bound in a previous
+     * stage". Only the stage planner knows it: a nested block's seed is its own stage's outer
+     * conjunction, where a reassignment is "assigned to multiple times" (expression.feature L124).
+     */
+    previous: ReadonlySet<string> = new Set(),
   ): ValueStatements {
     // `$p isa person; $q has name $p` — a thing or a type as an attribute value, refused before a
     // single combination exists, so an empty store refuses it too (review, round 12).
@@ -2876,7 +2886,9 @@ export class TypeDBLiteInterpreter {
     const ownKind = this.conceptKindOf(constraints, patterns);
     const statements = orderValueStatements(
       patterns,
-      new Set([...this.conceptVariablesOf(constraints, patterns), ...seedVariables, ...this.nestedBound(patterns)]),
+      // What a `try` binds may be EMPTY, so the conjunction around it may not read it (expression.feature
+      // L137); what every branch of a disjunction binds, it may.
+      new Set([...this.conceptVariablesOf(constraints, patterns), ...seedVariables, ...this.nestedBound(patterns.filter(isDisjunctionPattern))]),
       this.refuse,
       (variable) => {
         const own = ownKind(variable);
@@ -2888,7 +2900,7 @@ export class TypeDBLiteInterpreter {
         return attribute === undefined ? undefined : this.valueTypeOfAttribute(attribute);
       },
       this.schema,
-      new Set(seedVariables),
+      previous,
     );
     return statements;
   }
@@ -3584,6 +3596,60 @@ export class TypeDBLiteInterpreter {
     });
   }
 
+  /**
+   * `let`s must admit ONE evaluation order across every branch of a stage: `{ let $y = $x; } or
+   * { let $x = $y; }` is circular although each branch alone is not (expression.feature L195).
+   */
+  private checkLetOrder(patterns: readonly Pattern[]): void {
+    const reads = new Map<string, Set<string>>();
+    const collect = (list: readonly Pattern[]): void => {
+      for (const pattern of list) {
+        if (isLetPattern(pattern)) {
+          for (const variable of letVariables(pattern)) reads.set(variable, new Set([...(reads.get(variable) ?? []), ...variablesOf(pattern.expression)]));
+        } else if (isNegationPattern(pattern) || isOptionalPattern(pattern)) collect(pattern.patterns);
+        else if (isDisjunctionPattern(pattern)) for (const branch of pattern.branches) collect(branch.patterns);
+      }
+    };
+    collect(patterns);
+    const visiting = new Set<string>();
+    const done = new Set<string>();
+    const visit = (variable: string): void => {
+      if (done.has(variable)) return;
+      if (visiting.has(variable)) {
+        // A cycle within one conjunction is refused earlier, in `orderValueStatements`' words; one
+        // that only closes across branches is TypeDB's other message (expression.feature L195).
+        this.refuse(DiagnosticCode.valueCycle, `illegal circular expression assignment & usage: '${variable.slice(1)}' is assigned from itself across the branches of this stage.`, undefined);
+      }
+      visiting.add(variable);
+      for (const read of reads.get(variable) ?? []) if (reads.has(read)) visit(read);
+      visiting.delete(variable);
+      done.add(variable);
+    };
+    for (const variable of reads.keys()) visit(variable);
+  }
+
+  /**
+   * `has $a` may bind attributes of several value types; an expression needs one (expression.feature
+   * L281): the types the owner can own, through `has $a`, must agree.
+   */
+  private checkUntypedReads(patterns: readonly Pattern[], constraints: readonly ThingConstraint[]): void {
+    const untyped = new Map(constraints.flatMap((c) => c.bindings.filter((b) => b.attribute === undefined).map((b) => [b.variable, c] as const)));
+    if (untyped.size === 0) return;
+    for (const pattern of patterns) {
+      const read = isLetPattern(pattern) ? variablesOf(pattern.expression) : isComparisonPattern(pattern) ? [pattern.left, ...variablesOf(pattern.right)] : [];
+      for (const variable of read) {
+        const owner = untyped.get(variable);
+        if (owner === undefined) continue;
+        const types = owner.isas.flatMap((isa) => (isa.type === undefined ? [] : this.typeFamily(isa.type).filter((t) => this.typeFamily(t, 'inherited').includes(isa.type as string))));
+        const owned = [...this.schema.attributes].filter((a) => (types.length === 0 ? true : types.some((t) => this.typeFamily(t, 'inherited').some((u) => this.schema.owns.has(ownsKey(u, a))))));
+        const valueTypes = new Set(owned.map((a) => this.valueTypeOfAttribute(a)).filter((t): t is string => t !== undefined).map((t) => (t === 'long' ? 'integer' : t)));
+        if (valueTypes.size > 1) {
+          this.refuse(DiagnosticCode.valueTypeConflict, `The variable '${variable.slice(1)}' must have a single possible value type to be used in an expression: it may hold ${[...valueTypes].sort().join(', ')}.`, rangeOf(pattern));
+        }
+      }
+    }
+  }
+
   /** A variable's kind in a conjunction or any block that binds for it (a disjunction branch, a `try`). */
   private nestedKind(patterns: readonly Pattern[]): (variable: string) => 'thing' | 'type' | undefined {
     const own = this.conceptKindOf(this.constraintsOf(patterns), patterns);
@@ -3613,6 +3679,10 @@ export class TypeDBLiteInterpreter {
     context: 'conjunction' | 'negation' | 'branch',
     /** What is bound outside this conjunction altogether. */
     outer: ReadonlySet<string> = new Set(),
+    /** What the enclosing conjunctions assign with `let` — a nested `let` may not assign one again. */
+    lets: ReadonlySet<string> = new Set(patterns.flatMap((p) => (isLetPattern(p) ? letVariables(p) : []))),
+    /** What earlier STAGES bound — reassigning one is "already bound in a previous stage". */
+    previous: ReadonlySet<string> = outer,
   ): void {
     const blocks: Array<{ node: LangiumNode; patterns: readonly Pattern[]; kind: 'negation' | 'branch' | 'optional' }> = [];
     for (const pattern of patterns) {
@@ -3652,8 +3722,54 @@ export class TypeDBLiteInterpreter {
       // is what binds (variables.feature L63: `{ let $x = 1; } or { let $x = 11; }`).
       const own = block.kind === 'branch' ? new Set(this.nestedBound([block.node.$container as Pattern])) : new Set<string>();
       const around = new Set([...bound].filter((variable) => !own.has(variable) || outer.has(variable)));
+      // `let $v = …; not { not { let $v = 10; }; };` — one variable, assigned twice in one branch of
+      // the pipeline (expression.feature L124), not a value "declared as both" kinds.
+      const group = block.kind === 'branch' ? block.node.$container : block.node;
+      const siblingLets = new Set(
+        blocks
+          .filter((other) => (other.kind === 'branch' ? other.node.$container : other.node) !== group)
+          .flatMap((other) => other.patterns.flatMap((p) => (isLetPattern(p) ? letVariables(p) : []))),
+      );
+      for (const statement of inner.filter(isLetPattern)) {
+        for (const variable of letVariables(statement)) {
+          if (previous.has(variable)) {
+            this.refuse(DiagnosticCode.valueAssignedTwice, `The variable '${variable.slice(1)}' may not be assigned to, as it was already bound in a previous stage.`, rangeOf(statement));
+          }
+          if (lets.has(variable) || siblingLets.has(variable)) {
+            this.refuse(DiagnosticCode.valueAssignedTwice, `Variable '${variable.slice(1)}' cannot be assigned to multiple times in the same branch.`, rangeOf(statement));
+          }
+        }
+      }
       this.matchStatements(inner, this.constraintsOf(inner), around, conceptOf);
-      this.checkNested(inner, new Set([...around, ...this.ownBound(inner)]), conceptOf, block.kind === 'optional' ? 'conjunction' : block.kind, around);
+      const innerLets = new Set([...lets, ...inner.flatMap((p) => (isLetPattern(p) ? letVariables(p) : []))]);
+      this.checkNested(inner, new Set([...around, ...this.ownBound(inner)]), conceptOf, block.kind === 'optional' ? 'conjunction' : block.kind, around, innerLets, previous);
+    }
+    // Every branch of a disjunction assigns its common variables ONE value type (expression.feature L281).
+    for (const pattern of patterns) {
+      if (!isDisjunctionPattern(pattern)) continue;
+      const typed = new Map<string, Set<string>>();
+      // What the enclosing conjunction binds counts too: `has age $a; { let $v = $a * 2; } or …`.
+      const around = this.constraintsOf(patterns).flatMap((c) => c.bindings.flatMap((b) => (b.attribute === undefined ? [] : [[b.variable, b.attribute] as const])));
+      for (const branch of pattern.branches) {
+        const inner = this.segmentFor(branch, branch.patterns).match?.patterns ?? [];
+        const attributeOf = new Map([...around, ...this.constraintsOf(inner).flatMap((c) => c.bindings.flatMap((b) => (b.attribute === undefined ? [] : [[b.variable, b.attribute] as const])))]);
+        const lets = new Map(inner.filter(isLetPattern).map((l) => [l.variable, l.expression] as const));
+        const typeOf = (variable: string, seen: ReadonlySet<string> = new Set()): string | undefined => {
+          const attribute = attributeOf.get(variable);
+          if (attribute !== undefined) return this.valueTypeOfAttribute(attribute);
+          const expression = lets.get(variable);
+          return expression === undefined || seen.has(variable) ? undefined : inferValueType(expression, (v) => typeOf(v, new Set([...seen, variable])));
+        };
+        for (const variable of lets.keys()) {
+          const type = typeOf(variable);
+          if (type !== undefined) typed.set(variable, new Set([...(typed.get(variable) ?? []), type === 'long' ? 'integer' : type]));
+        }
+      }
+      for (const [variable, types] of typed) {
+        if (types.size > 1) {
+          this.refuse(DiagnosticCode.valueTypeConflict, `All assignments of the variable '${variable.slice(1)}' must have the same value type. The branches here assign ${[...types].sort().join(' and ')}.`, rangeOf(pattern));
+        }
+      }
     }
   }
 
