@@ -3,6 +3,8 @@ import type { SqliteDatabase, SqliteOpener } from './sqlite-database.js';
 import { EmptyFileSystem } from 'langium';
 import {
   createTypeQLiteServices,
+  isReservedKeyword,
+  reservedKeywordMessage,
   validateSync,
   isAbstractAnnotation,
   isAnonRelationPattern,
@@ -37,6 +39,7 @@ import {
   type Literal,
   type Pattern,
   type ReduceStage,
+  type FetchStage,
   type Pipeline,
   type RedefineClause,
   type RolePlayers,
@@ -59,6 +62,7 @@ import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from 
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
 import { applyValueStatements, inferValueType, letVariables, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
 import { applyReduce, checkReduce } from './reduce.js';
+import { checkFetch, fetchDocument, type FetchContext, type FetchScope, type JsonValue } from './fetch.js';
 import { isTypeHead, solveTypes, typeConstraintsOf, type Binding } from './type-patterns.js';
 import {
   ownsKey,
@@ -1160,6 +1164,10 @@ export class TypeDBLiteInterpreter {
       if (pipeline.reduce !== undefined) {
         this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate a `reduce` after a write stage yet.', rangeOf(pipeline.reduce));
       }
+      // `insert …; fetch { … };` answers documents of what it wrote — the write-answers phase.
+      if (pipeline.fetch !== undefined) {
+        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate `fetch` after a write stage yet.', rangeOf(pipeline.fetch));
+      }
       // `insert $p has nick $zz` with nothing binding `$zz`: refused before the match runs, so an
       // empty match does not turn it into a success (review, round 11).
       this.checkWriteStage(pipeline, write);
@@ -1296,10 +1304,14 @@ export class TypeDBLiteInterpreter {
     return this.lastTrace;
   }
 
-  /** Run a read pipeline and project its `select`. */
+  /**
+   * Run a read pipeline and project its `select` — or, when it ends in `fetch`, answer one JSON
+   * document per answer in `documents` (fetch.feature), with `rows` empty.
+   */
   query(text: string): {
     rows: Array<Record<string, TypeDBLiteValue>>;
     diagnostics: ExecutionReport['diagnostics'];
+    documents?: JsonValue[];
   } {
     if (!this.tracing) return this.runQuery(text);
     this.trace = newTrace();
@@ -1314,9 +1326,11 @@ export class TypeDBLiteInterpreter {
   private runQuery(text: string): {
     rows: Array<Record<string, TypeDBLiteValue>>;
     diagnostics: ExecutionReport['diagnostics'];
+    documents?: JsonValue[];
   } {
     this.diagnostics = this.freshDiagnostics();
     const rows: Array<Record<string, TypeDBLiteValue>> = [];
+    let documents: JsonValue[] | undefined;
     const pipelines = this.pipelines(text);
     // 🔴 `match …; select $a; match let $y = $x + 2;` is ONE pipeline of two stages on TypeDB, and
     // the second stage sees what the first selected. Here each `match` would evaluate alone — and
@@ -1333,6 +1347,15 @@ export class TypeDBLiteInterpreter {
       //
       // No projectability check here. `TypeQLiteValidator.checkSelectProjectsVariables` owns it
       // and `parse()` runs it, so the rule has one definition serving the editor and the engine.
+      if (pipeline.returnStage) {
+        // `return` ends a function body or a fetch sub-query; a read query does not return.
+        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate `return` yet: it ends a function, which this engine does not have.', rangeOf(pipeline.returnStage));
+      }
+      if (pipeline.fetch) {
+        documents = [...(documents ?? []), ...this.fetch(pipeline, pipeline.fetch)];
+        this.diagnostics.fact(DiagnosticCode.projected, `Fetched ${documents.length} document(s).`, rangeOf(pipeline.fetch));
+        continue;
+      }
       const projected = pipeline.reduce === undefined ? this.project(pipeline) : this.reduce(pipeline, pipeline.reduce);
       rows.push(...projected);
 
@@ -1444,7 +1467,115 @@ export class TypeDBLiteInterpreter {
       );
     }
     this.flushDeferredFacts();
-    return { rows, diagnostics: this.diagnostics.report().diagnostics };
+    return { rows, diagnostics: this.diagnostics.report().diagnostics, ...(documents === undefined ? {} : { documents }) };
+  }
+
+  // ── fetch ─────────────────────────────────────────────────────────────────
+
+  /** A pipeline's documents — checked from the query and the schema first, then one per answer. */
+  private fetch(pipeline: Pipeline, stage: FetchStage): JsonValue[] {
+    // 🔴 A write before `fetch` answers the rows it wrote — the write-answers phase, not this one.
+    // Refused rather than read past: `query()` would otherwise fetch from a match whose insert
+    // never ran.
+    if (pipeline.write) this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate `fetch` after a write stage yet.', rangeOf(stage));
+    if (pipeline.reduce) this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate `fetch` after `reduce` yet.', rangeOf(stage));
+    const context = this.fetchContext();
+    const scope = this.fetchScope(pipeline);
+    checkFetch(stage.body, scope, context);
+    return this.combinations(pipeline).map((combination) => fetchDocument(stage.body, combination, scope, context));
+  }
+
+  private fetchContext(): FetchContext {
+    return {
+      facts: this.schema,
+      refuse: this.refuse,
+      scopeOf: (pipeline, parent) => this.fetchScope(pipeline, parent),
+      combinations: (pipeline, seed) => this.combinations(pipeline, seed),
+      attributes: (owner, attribute) =>
+        attribute === undefined
+          ? (this.db.prepare('SELECT type, value FROM attr WHERE owner = ? ORDER BY rowid').all(owner) as Array<{ type: string; value: string }>).map((r) => ({ type: String(r.type), value: String(r.value) }))
+          : this.readAttributes(owner, attribute),
+      typeOfThing: (iid) => this.typeOfThing(iid),
+      valueTypeOf: (attribute) => this.valueTypeOfAttribute(attribute),
+    };
+  }
+
+  /**
+   * What a `fetch` may read: the `select` — or every variable the `match` names, with what a parent
+   * pipeline answers when this is a sub-query — and, per variable, its kind and the types it can be,
+   * from the schema alone.
+   */
+  private fetchScope(pipeline: Pipeline, parent?: FetchScope): FetchScope {
+    const patterns = pipeline.match?.patterns ?? [];
+    const constraints = this.constraintsOf(patterns);
+    const selected = [...this.selectedOf(pipeline, constraints)].filter((variable) => variable !== '$_');
+    const available = new Set(pipeline.select || parent === undefined ? selected : [...parent.available, ...selected]);
+    const kind = this.conceptKindOf(constraints, patterns);
+    // The labels each type variable can take, from the schema alone (Phase 05's solver, unseeded).
+    const typeLabels = new Map<string, Set<string>>();
+    for (const combination of solveTypes(typeConstraintsOf(patterns, this.refuse), this.schema, [{}], this.refuse)) {
+      for (const [variable, binding] of Object.entries(combination)) {
+        if (typeof binding === 'string') typeLabels.set(variable, new Set([...(typeLabels.get(variable) ?? []), binding]));
+      }
+    }
+    const descendants = (type: string): string[] =>
+      this.typeFamily(type).filter((t) => this.typeFamily(t, 'inherited').includes(type));
+    const ownTypesOf = (variable: string): string[] | undefined => {
+      const constraint = constraints.find((c) => c.variable === variable);
+      const typed = constraint?.isas.filter((isa) => isa.type !== undefined || isa.typeVariable !== undefined) ?? [];
+      if (typed.length === 0) return undefined;
+      let types: string[] | undefined;
+      for (const isa of typed) {
+        const labels = isa.type !== undefined ? [isa.type] : [...(typeLabels.get(isa.typeVariable as string) ?? [])];
+        const these = labels.flatMap((label) => (isa.exact ? [label] : descendants(label)));
+        types = types === undefined ? these : types.filter((t) => these.includes(t));
+      }
+      return types;
+    };
+    // 🔴 A sub-query may constrain its parent's variables further, never contradict them: `relation
+    // $t` under a parent's `entity $t`, `$p isa! $t2; relation $t2` under a parent `$p` that is an
+    // entity, `relation $p` under a parent thing `$p` — each is a type-inference failure on TypeDB,
+    // and here would quietly answer an empty list (fetch.feature L1047).
+    if (parent !== undefined) {
+      const contradiction = (variable: string, why: string): never =>
+        this.refuse(DiagnosticCode.mixedPattern, `Type-inference was unable to find compatible types for '${variable.slice(1)}' in the fetch sub-query: ${why}.`, rangeOf(pipeline));
+      for (const variable of parent.available) {
+        const own = kind(variable);
+        const inherited = parent.kindOf(variable);
+        if (own !== undefined && inherited !== undefined && inherited !== 'value' && own !== inherited) {
+          contradiction(variable, `it is a ${inherited} in the parent and a ${own} here`);
+        }
+        const types = ownTypesOf(variable);
+        const parentTypes = parent.typesOf(variable);
+        if (types !== undefined && parentTypes !== undefined && !types.some((t) => parentTypes.includes(t))) {
+          contradiction(variable, 'no type it can be here is a type it can be in the parent');
+        }
+        const labels = typeLabels.get(variable);
+        const parentLabels = parent.labelsOf(variable);
+        if (labels !== undefined && parentLabels !== undefined && ![...labels].some((l) => parentLabels.includes(l))) {
+          contradiction(variable, 'no label it can take here is one it can take in the parent');
+        }
+      }
+    }
+    return {
+      available,
+      labelsOf: (variable) => {
+        const labels = typeLabels.get(variable);
+        return labels !== undefined ? [...labels] : parent?.labelsOf(variable);
+      },
+      kindOf: (variable) => {
+        const own = kind(variable);
+        if (own !== undefined) return own;
+        if (parent !== undefined && !selected.includes(variable)) return parent.kindOf(variable);
+        return available.has(variable) ? 'value' : undefined;
+      },
+      typesOf: (variable) => {
+        const own = ownTypesOf(variable);
+        const inherited = parent?.typesOf(variable);
+        if (own === undefined) return inherited;
+        return inherited === undefined ? own : own.filter((t) => inherited.includes(t));
+      },
+    };
   }
 
   /**
@@ -1527,6 +1658,18 @@ export class TypeDBLiteInterpreter {
       };
       const offset = first.offset ?? first.token?.startOffset ?? 0;
       const length = first.length ?? first.token?.image?.length ?? 1;
+      // 🔴 A reserved word where a label belongs is TypeDB's `[DEX31]`, not a bare parse failure.
+      // The validator used to say so for `fetch` and `update`, the two the grammar did not know;
+      // once `fetch` became a grammar keyword (the fetch phase) `attribute fetch` stopped parsing,
+      // and the refusal lost its reason. Every reserved word that is a keyword lands here instead.
+      const image = first.token?.image;
+      if (image !== undefined && isReservedKeyword(image) && /Expecting token of type 'ID'/.test(String((errors[0] as { message?: string }).message))) {
+        const reserved = reservedKeywordMessage(image);
+        throw attachDiagnostic(
+          new Error(reserved),
+          this.diagnostics.error(DiagnosticCode.reservedKeyword, reserved, rangeFromOffset(text, offset, length)),
+        );
+      }
       throw attachDiagnostic(
         new Error(message),
         this.diagnostics.error(
@@ -1958,7 +2101,15 @@ export class TypeDBLiteInterpreter {
     // candidates; the unbound type variables bind afterwards, from the candidate's own type.
     const resolved = resolveIsas(constraint.isas, combination);
     const unbound = resolved.filter((isa) => isa.typeVariable !== undefined && isa.type === undefined);
-    const seed = this.planJoins ? this.relationSeed(constraint.variable, relations, combination) : undefined;
+    // Already bound — by a `fetch` sub-query's parent: the constraint filters that one thing.
+    const bound = combination[constraint.variable];
+    if (bound !== undefined && typeof bound !== 'number') return [];
+    const seed =
+      typeof bound === 'number'
+        ? { sql: 'SELECT ?', params: [bound] }
+        : this.planJoins
+          ? this.relationSeed(constraint.variable, relations, combination)
+          : undefined;
     return this.candidates({ ...constraint, isas: resolved }, seed).flatMap((iid) =>
       unbound.length === 0
         ? [{ ...combination, [constraint.variable]: iid }]
@@ -2074,7 +2225,12 @@ export class TypeDBLiteInterpreter {
    * enumerated whole. The Skills catalog's `subSkillsIn` was 211,000 combinations and 32 s before
    * this; it is 59 combinations now (`relation-join-planning.test.ts` asserts the counts).
    */
-  private combinations(pipeline: Pipeline): Array<Record<string, Binding>> {
+  /**
+   * `seed` is what is already bound before this match runs — a `fetch` sub-query's parent answer
+   * (fetch.feature L1159). Every binding in it stays as it is: a thing variable is a filter, not a
+   * fresh enumeration.
+   */
+  private combinations(pipeline: Pipeline, seed: Record<string, Binding> = {}): Array<Record<string, Binding>> {
     const patterns = pipeline.match?.patterns ?? [];
     const constraints = this.constraintsOf(patterns);
     const things = constraints.filter((c) => c.roles.length === 0);
@@ -2082,7 +2238,7 @@ export class TypeDBLiteInterpreter {
 
     // Type variables first — they are answered from the schema alone, and a thing pattern's
     // `isa $t` reads the label they bound (Phase 05).
-    let combinations = solveTypes(typeConstraintsOf(patterns, this.refuse), this.schema, [{}], this.refuse);
+    let combinations = solveTypes(typeConstraintsOf(patterns, this.refuse), this.schema, [seed], this.refuse);
     const note = (stage: string): void => {
       if (!this.trace) return;
       this.trace.stages.push({ stage, combinations: combinations.length });
@@ -2129,11 +2285,17 @@ export class TypeDBLiteInterpreter {
     // Every `let` and comparison is checked before a single combination is evaluated — an unbound
     // operand or a cycle fails a match with no answers too (expression.feature).
     const attributeOf = new Map(constraints.flatMap((c) => c.bindings.map((b) => [b.variable, b.attribute] as const)));
+    const ownKind = this.conceptKindOf(constraints, patterns);
     const statements = orderValueStatements(
       patterns,
-      this.conceptVariablesOf(constraints, patterns),
+      new Set([...this.conceptVariablesOf(constraints, patterns), ...Object.keys(seed)]),
       this.refuse,
-      this.conceptKindOf(constraints, patterns),
+      (variable) => {
+        const own = ownKind(variable);
+        if (own !== undefined) return own;
+        const seeded = seed[variable];
+        return typeof seeded === 'number' ? 'thing' : typeof seeded === 'string' ? 'type' : undefined;
+      },
       (variable) => {
         const attribute = attributeOf.get(variable);
         return attribute === undefined ? undefined : this.valueTypeOfAttribute(attribute);

@@ -268,8 +268,8 @@ ValueType returns string:
 // queries collapsed into ONE pipeline, because nothing told the parser where a pipeline ends.
 // Encoding the real order — match, then a write, then a projection — makes each query terminate.
 Pipeline:
-      match=MatchStage (write=WriteStage)? (select=SelectStage)? (reduce=ReduceStage)?
-    | write=WriteStage;
+      match=MatchStage (write=WriteStage)? (select=SelectStage)? (reduce=ReduceStage)? (fetch=FetchStage | returnStage=ReturnStage)?
+    | write=WriteStage (fetch=FetchStage)?;
 
 WriteStage:
     InsertStage | PutStage | DeleteStage;
@@ -310,6 +310,60 @@ Reduction:
 
 Deletion:
     target=VAR ('of' owner=VAR)? ';';
+
+// `return { $a, $b };` `return first $a;` `return count($x), sum($y);` `return check;` — TypeQL's
+// function return, which a `fetch` sub-query also ends with (fetch.feature L882). Parsed in
+// TypeQL's own shapes so that the shapes it refuses — an aggregate mixed with a variable,
+// `return $age, count($name);` (L2260) — fail to parse for THAT reason, and not because `return`
+// was unknown. Evaluating one is the functions phase's; the engine refuses it by name.
+ReturnStage:
+    'return' (
+          '{' streamed+=VAR (',' streamed+=VAR)* '}'
+        | selector=('first' | 'last') selected+=VAR (',' selected+=VAR)*
+        | check?='check'
+        | reductions+=ReturnReduction (',' reductions+=ReturnReduction)*
+    ) ';';
+
+ReturnReduction:
+    reducer=ID ('(' (argument=VAR)? ')')?;
+
+// ── fetch ───────────────────────────────────────────────────────────────────
+//
+// `fetch { "name": $n, "ages": [ $p.age ], "all": { $p.* }, "sub": [ match …; fetch { … }; ] };` —
+// a JSON document per answer (fetch.feature). The shapes are TypeDB's, and so are the parse
+// failures the spec names: `fetch;` (no object), `"all attributes": $p.*` (a spread is an object's
+// entry, never a value), and a sub-query written outside `[ … ]`.
+FetchStage:
+    'fetch' body=FetchObject ';'?;
+
+// A trailing comma is admitted — `fetch { "person name": $n, };` (fetch.feature L989).
+FetchObject:
+    {infer FetchObject} '{' (entries+=FetchEntry (',' entries+=FetchEntry)* ','?)? '}';
+
+FetchEntry:
+    FetchKeyValue | FetchAllAttributes;
+
+FetchKeyValue:
+    key=STRING ':' value=FetchValue;
+
+// `$p.*` — every attribute the thing owns, keyed by its type.
+FetchAllAttributes:
+    variable=VAR '.' '*';
+
+FetchValue:
+    FetchObject | FetchList | FetchAttribute | FetchExpression;
+
+// `$p.age` — scalar: `null`, or the one value; refused when the attribute can be owned more than once.
+FetchAttribute:
+    variable=VAR '.' attribute=ID;
+
+// `[ $p.name ]`, `[ get_names($p) ]`, `[ match …; fetch { … }; ]` — a list.
+FetchList:
+    '[' (subquery=Pipeline | attribute=FetchAttribute | expression=Expression) ']';
+
+// `$n`, `100`, `$k - 100`, `get_doc($t)` — a value.
+FetchExpression:
+    expression=Expression;
 
 Pattern:
     ThingPattern | AnonRelationPattern | TypePattern | KindPattern | LetPattern | ComparisonPattern;

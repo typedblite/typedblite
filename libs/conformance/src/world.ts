@@ -1,4 +1,4 @@
-import { DiagnosticCode, TypeDBLiteInterpreter, type TypeDBLiteValue } from '@typedblite/runtime';
+import { DiagnosticCode, TypeDBLiteInterpreter, type JsonValue, type TypeDBLiteValue } from '@typedblite/runtime';
 
 export type TransactionKind = 'schema' | 'write' | 'read';
 
@@ -10,6 +10,8 @@ export interface Answers {
   readonly query: string;
   /** The driver's `getHas` — how `key:ref:1` is resolved against a thing cell, by iid. */
   readonly has: (iid: number, attribute: string) => ReadonlyArray<TypeDBLiteValue>;
+  /** A `fetch` query's answers — one document each — and then `rows` is empty. */
+  readonly documents?: ReadonlyArray<JsonValue>;
 }
 
 /** A step's failure, distinguished from an engine failure so the report can say which it was. */
@@ -130,11 +132,16 @@ export class World {
    * refused the same way.
    */
   readQuery(text: string): ReadonlyArray<AnswerRow> {
-    const { rows, diagnostics } = this.engineFor('read').query(text);
+    return this.readAnswers(text).rows;
+  }
+
+  /** A read's rows, and its documents when it ends in `fetch` — under the same evaluated-nothing guard. */
+  readAnswers(text: string): { rows: ReadonlyArray<AnswerRow>; documents?: ReadonlyArray<JsonValue> } {
+    const { rows, diagnostics, documents } = this.engineFor('read').query(text);
     if (!diagnostics.some((d) => d.code === DiagnosticCode.projected)) {
       throw new EvaluatedNothing('TypeDBLite evaluated nothing: no pipeline reported a projection');
     }
-    return rows;
+    return { rows, documents };
   }
 
   /** A thing's attributes of one type, from the engine the open transaction reads. */

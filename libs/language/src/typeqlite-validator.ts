@@ -351,8 +351,7 @@ export class TypeQLiteValidator {
       if (RESERVED.has(definition.name)) {
         accept(
           'error',
-          `'${definition.name}' is a reserved TypeQLite keyword and cannot be used as an ` +
-            'identifier — TypeDB refuses it with [DEX31]. Qualify it: `skill-id`, `step-kind`.',
+          reservedKeywordMessage(definition.name),
           { node: definition, property: 'name', code: TypeQLiteValidationCode.reservedKeyword },
         );
       }
@@ -413,7 +412,7 @@ export class TypeQLiteValidator {
     // document is one pipeline or several (review, round 2). Whether the stages chain is the
     // engine's to decide.
     const clauses = (node.$container as { clauses?: AstNode[] }).clauses ?? [];
-    const earlier = new Set(clauses.slice(0, clauses.indexOf(node)).filter(isPipeline).flatMap(outputsOf));
+    const earlier = new Set([...clauses.slice(0, clauses.indexOf(node)).filter(isPipeline).flatMap(outputsOf), ...enclosingOutputs(node)]);
     const patterns = node.match?.patterns ?? [];
     const { selectable, things, rolePlayersOnly } = bindingsOf(patterns);
     const bound = (variable: string): boolean =>
@@ -436,7 +435,10 @@ export class TypeQLiteValidator {
   checkSelectProjectsVariables(node: Pipeline, accept: ValidationAcceptor): void {
     const select = node.select;
     if (!select) return;
-    const { selectable, things, rolePlayersOnly } = bindingsOf(node.match?.patterns ?? []);
+    const bound = bindingsOf(node.match?.patterns ?? []);
+    const { things, rolePlayersOnly } = bound;
+    // A `fetch` sub-query may select what its parent pipelines bound.
+    const selectable = new Set([...bound.selectable, ...enclosingOutputs(node)]);
 
     const canSelect = [...new Set([...selectable, ...things.keys()])].sort();
     const unconstrainedPlayers = [...rolePlayersOnly]
@@ -509,6 +511,14 @@ const RESERVED = new Set([
   'relates', 'has', 'links', 'insert', 'delete', 'define', 'undefine', 'put', 'update',
 ]);
 
+/** Whether TypeDB refuses `word` as an identifier with `[DEX31]` — see `RESERVED`. */
+export const isReservedKeyword = (word: string): boolean => RESERVED.has(word);
+
+/** The `[DEX31]` refusal, worded once for the validator and for the engine's parse step. */
+export const reservedKeywordMessage = (word: string): string =>
+  `'${word}' is a reserved TypeQLite keyword and cannot be used as an ` +
+  'identifier — TypeDB refuses it with [DEX31]. Qualify it: `skill-id`, `step-kind`.';
+
 const article = (subject: AnnotationSubject): string => (/^[aeiou]/.test(subject) ? 'an' : 'a');
 
 /** Every named definition in a `define` clause, with the label TypeDB would see. */
@@ -552,6 +562,18 @@ function outputsOf(pipeline: Pipeline): string[] {
   if (pipeline.reduce) return [...pipeline.reduce.reductions.map((r) => r.variable), ...pipeline.reduce.groups];
   const { selectable, things, rolePlayersOnly } = bindingsOf(pipeline.match?.patterns ?? []);
   return pipeline.select ? pipeline.select.variables : [...selectable, ...things.keys(), ...rolePlayersOnly];
+}
+
+/**
+ * What the pipelines ENCLOSING a `fetch` sub-query answer — `[ match $p has name $pn; $pn != $n; … ]`
+ * reads `$n` from its parent (fetch.feature L1159). Empty for a top-level pipeline.
+ */
+function enclosingOutputs(node: AstNode): string[] {
+  const outputs: string[] = [];
+  for (let container = node.$container; container !== undefined; container = container.$container) {
+    if (isPipeline(container)) outputs.push(...outputsOf(container));
+  }
+  return outputs;
 }
 
 /** The variables an expression reads, in order of appearance. */

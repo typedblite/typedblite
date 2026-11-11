@@ -421,6 +421,45 @@ describe('a scenario cannot pass without reaching its assertion', () => {
   });
 });
 
+describe('documents are compared as TypeDB compares them', () => {
+  // `typedb/typedb` tests/behaviour/steps/util.rs, `jsons_equal_up_to_reorder` — read 2026-11-11.
+  const FETCH = `define
+attribute ref, value integer;
+attribute nick, value string;
+attribute karma, value double;
+entity person, owns ref @key, owns nick @card(0..), owns karma;`;
+  const outcome = (fetch: string, assertion: string, expected: string) =>
+    runFeature(
+      feature(scenario('x', [
+        ...open('schema'),
+        step('typeql schema query', { docString: FETCH }),
+        step('typeql write query', { docString: 'insert $p isa person, has ref 1, has nick "a", has nick "b", has karma 123.4567891;' }),
+        step('get answers of typeql read query', { docString: fetch }),
+        step(assertion, { docString: expected }),
+      ])),
+      noDeclarations,
+    )[0];
+
+  it('a number is within 1e-10, absolutely — f64 arithmetic is not the written decimal', () => {
+    const fetch = 'match $p isa person, has karma $k; fetch { "k": $k - 100 };';
+    assert.equal(outcome(fetch, 'answer contains document:', '{ "k": 23.4567891 }').outcome, 'pass');
+    assert.equal(outcome(fetch, 'answer contains document:', '{ "k": 23.4567892 }').outcome, 'fail');
+  });
+
+  it('a list is a multiset; an object’s keys are unordered', () => {
+    const fetch = 'match $p isa person; fetch { "r": $p.ref, "n": [ $p.nick ] };';
+    assert.equal(outcome(fetch, 'answer contains document:', '{ "n": [ "b", "a" ], "r": 1 }').outcome, 'pass');
+    assert.equal(outcome(fetch, 'answer contains document:', '{ "n": [ "a", "a" ], "r": 1 }').outcome, 'fail');
+    assert.equal(outcome(fetch, 'answer does not contain document:', '{ "n": [ "a" ], "r": 1 }').outcome, 'pass');
+  });
+
+  it('a document assertion is never satisfied by rows — "does not contain" would be vacuous', () => {
+    const result = outcome('match $p isa person;', 'answer does not contain document:', '{ "r": 1 }');
+    assert.equal(result.outcome, 'fail');
+    assert.match(result.failure?.reason ?? '', /rows, not documents/);
+  });
+});
+
 describe('the four outcomes', () => {
   const failing = () =>
     scenario('fails by design', [...open('schema'), step('typeql schema query; fails', { docString: SCHEMA })]);

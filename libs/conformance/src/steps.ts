@@ -2,6 +2,7 @@ import { DiagnosticCode, diagnosticOf } from '@typedblite/runtime';
 import { orderedIdentify, rowKey, singleRowVariable, uniquelyIdentify } from './identify.js';
 import type { SpecStep } from './spec.js';
 import { EvaluatedNothing, HarnessError, World, type TransactionKind } from './world.js';
+import type { JsonValue } from '@typedblite/runtime';
 
 /**
  * The specification's step vocabulary, bound to TypeDBLite — what a driver's step definitions do.
@@ -188,7 +189,8 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
     pattern: /^get answers of typeql read query$/,
     run: (world, _m, step) => {
       const query = docString(step);
-      world.answers = { rows: world.readQuery(query), query, has: (iid, attribute) => world.attributesOf(iid, attribute) };
+      const { rows, documents } = world.readAnswers(query);
+      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute) };
     },
   },
   {
@@ -207,7 +209,9 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
   {
     pattern: /^answer size is: (\d+)$/,
     run: (world, m) => {
-      const rows = answersOf(world).rows.length;
+      // A `fetch` answers documents, one per answer; anything else answers rows.
+      const answers = answersOf(world);
+      const rows = answers.documents?.length ?? answers.rows.length;
       if (rows !== Number(m[1])) throw new Error(`expected ${m[1]} answer(s), got ${rows}`);
     },
   },
@@ -242,17 +246,49 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
     },
   },
   {
-    // `fetch` answers documents. TypeDBLite has no fetch; a read that reached here answered rows
-    // or nothing, and neither is a document.
+    // `fetch` answers documents, compared with TypeDB's own equality — `jsonEqual`.
     pattern: /^answer (contains|does not contain) document:$/,
-    run: (world, m) => {
-      answersOf(world);
-      if (m[1] === 'contains') throw new Error('TypeDBLite answers rows, not documents');
-      // "does not contain" is vacuously true of no documents — and that would be a false pass.
-      throw new Error('TypeDBLite answers rows, not documents; the assertion cannot be evaluated');
+    run: (world, m, step) => {
+      const { documents } = answersOf(world);
+      // 🔴 "does not contain" is vacuously true of a read that answered rows — a false pass. A
+      // document assertion needs documents.
+      if (documents === undefined) throw new HarnessError('the query answered rows, not documents; a document assertion cannot be evaluated');
+      const expected = JSON.parse(docString(step)) as JsonValue;
+      const found = documents.some((document) => jsonEqual(document, expected));
+      if (m[1] === 'contains' && !found) {
+        throw new Error(`no answer is the document ${JSON.stringify(expected)}; answered: ${JSON.stringify(documents)}`);
+      }
+      if (m[1] === 'does not contain' && found) throw new Error(`an answer is the document ${JSON.stringify(expected)}`);
     },
   },
 ];
+
+/**
+ * TypeDB's own document equality — `jsons_equal_up_to_reorder` in `typedb/typedb`
+ * `tests/behaviour/steps/util.rs`, read 2026-11-11 rather than guessed (ADR-005 D2):
+ *
+ * - a number is an f64, equal within an ABSOLUTE `1e-10` (`equals_approximate`) — so `$k - 100`
+ *   answering `23.456789099999995` is the spec's `23.4567891`, as it is on TypeDB's own f64;
+ * - a list is a multiset: same length, each item matched to an unused item, greedily as TypeDB does;
+ * - an object's keys are unordered;
+ * - strings, booleans and null are exact.
+ */
+const jsonEqual = (a: JsonValue, b: JsonValue): boolean => {
+  if (typeof a === 'number' && typeof b === 'number') return Math.abs(a - b) < 1e-10;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return a === b;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    const used = new Set<number>();
+    return a.every((item) => {
+      const index = b.findIndex((candidate, i) => !used.has(i) && jsonEqual(item, candidate));
+      if (index < 0) return false;
+      used.add(index);
+      return true;
+    });
+  }
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => key in b && jsonEqual(a[key], b[key]));
+};
 
 const answersOf = (world: World) => {
   if (world.answers === undefined) throw new HarnessError('no answers — run `get answers of …` first');

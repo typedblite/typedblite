@@ -36,6 +36,8 @@ export const DiagnosticCode = {
   // what `TypeQLiteValidationCode`'s header records going wrong.
   annotationNotEnforced: TypeQLiteValidationCode.annotationNotEnforced,
   parseFailed: 'typedblite.parse-failed',
+  /** A reserved word where a label belongs — TypeDB's `[DEX31]`; the validator's code, forwarded. */
+  reservedKeyword: TypeQLiteValidationCode.reservedKeyword,
   unknownType: 'typedblite.unknown-type',
   unknownAttribute: 'typedblite.unknown-attribute',
   danglingRelation: 'typedblite.dangling-relation',
@@ -118,6 +120,12 @@ export const DiagnosticCode = {
   valueCycle: 'typedblite.value-cycle',
   /** A reducer the engine does not know, or one applied to the wrong kind of variable (Phase 06). */
   reducer: 'typedblite.reducer',
+  /**
+   * A `fetch` the engine refuses before any row: a variable not available to it, a key mapped twice,
+   * an entity or relation fetched as a value, an attribute no owner can have, a scalar projection
+   * of an attribute that can be owned more than once, a sub-query with no `fetch`.
+   */
+  fetch: 'typedblite.fetch',
   truncated: 'typedblite.diagnostics-truncated',
 } as const;
 
