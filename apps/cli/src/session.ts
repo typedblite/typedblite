@@ -126,8 +126,10 @@ export function splitStatements(source: string): string[] {
       // internal semicolons are NOT terminators. The pipeline ends once its LAST stage has been
       // consumed — the stage order the grammar encodes: `match (write)? (select)? (reduce)?`. A
       // `select` followed by a `reduce` is not the end (Phase 06 review, round 4).
-      if (!/\b(insert|put|delete|select|reduce)\b/i.test(body)) continue;
-      if (/\bselect\b/i.test(body) && !/\breduce\b/i.test(body) && /^\s*reduce\b/i.test(rest)) continue;
+      if (!/\b(insert|put|delete|select|reduce|sort|offset|limit|distinct|require|fetch)\b/i.test(body)) continue;
+      // A stage that only reshapes the stream — and a `fetch`, which ends it — continues the
+      // pipeline it follows: `match …; select $x; sort $x; limit 1;` is one query.
+      if (/^\s*(select|reduce|sort|offset|limit|distinct|require|fetch)\b/i.test(rest)) continue;
     }
 
     statements.push(body);

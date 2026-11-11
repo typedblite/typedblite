@@ -49,8 +49,10 @@ export interface FetchScope {
 export interface FetchContext {
   readonly facts: SchemaFacts;
   readonly refuse: Refuse;
+  /** A sub-query's scope: its stages planned on top of the parent's. */
   readonly scopeOf: (pipeline: Pipeline, parent: FetchScope) => FetchScope;
-  readonly combinations: (pipeline: Pipeline, seed: Record<string, Binding>) => Array<Record<string, Binding>>;
+  /** A sub-query's answers from one parent answer — every stage run, seeded with it. */
+  readonly rows: (pipeline: Pipeline, parent: FetchScope, seed: Record<string, Binding>) => Array<Record<string, Binding>>;
   /** An owner's attributes in written order — of one type and its subtypes, or every one. */
   readonly attributes: (owner: number, attribute?: string) => Array<{ type: string; value: string }>;
   readonly typeOfThing: (iid: number) => string;
@@ -196,14 +198,15 @@ function checkValue(value: FetchValue, scope: FetchScope, ctx: FetchContext): vo
  */
 function checkSubquery(subquery: Pipeline, parent: FetchScope, ctx: FetchContext): void {
   const at = rangeOf(subquery);
-  if (subquery.write) refuseFetch(ctx.refuse, 'A fetch sub-query reads; it may not write.', at);
+  if (subquery.stages.some((stage) => stage.$type === 'InsertStage' || stage.$type === 'PutStage' || stage.$type === 'DeleteStage')) {
+    refuseFetch(ctx.refuse, 'A fetch sub-query reads; it may not write.', at);
+  }
   if (subquery.returnStage) {
     ctx.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate a `return` sub-query yet.', rangeOf(subquery.returnStage));
   }
   if (!subquery.fetch) {
     refuseFetch(ctx.refuse, 'Invalid fetch sub-query: no fetch stage ends it, and a list sub-query answers documents.', at);
   }
-  if (subquery.reduce) ctx.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate a `reduce` inside a fetch sub-query yet.', at);
   checkFetch((subquery.fetch as NonNullable<Pipeline['fetch']>).body, ctx.scopeOf(subquery, parent), ctx);
 }
 
@@ -291,7 +294,7 @@ function valueJson(value: FetchValue, combination: Record<string, Binding>, scop
         if (combination[variable] !== undefined) seed[variable] = combination[variable];
       }
       const body = (subquery.fetch as NonNullable<Pipeline['fetch']>).body;
-      return ctx.combinations(subquery, seed).map((row) => fetchDocument(body, row, subscope, ctx));
+      return ctx.rows(subquery, scope, seed).map((row) => fetchDocument(body, row, subscope, ctx));
     }
   }
   return null;

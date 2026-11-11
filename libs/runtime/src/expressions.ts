@@ -523,6 +523,16 @@ const numericOrRefuse = (evaluated: Evaluated, refuse: Refuse, at: Range | undef
     : evaluated;
 
 /** `$a > 10`, `$v == $a` — over numbers by value, over strings and booleans by text. */
+/** Dates and datetimes, which order by instant — `temporalKey`. Zoned datetimes and durations do not yet. */
+const ORDERED_TEMPORAL = new Set(['date', 'datetime']);
+
+/** A date or datetime as one comparable text: a date is its midnight, seconds to the nanosecond. */
+export function temporalKey(text: string): string {
+  const [date, time = '00:00:00'] = text.split('T');
+  const [whole, fraction = ''] = time.split('.');
+  return `${date}T${whole}.${fraction.padEnd(9, '0')}`;
+}
+
 /** Strings order by Unicode code point, not UTF-16 code unit: `"𝔸"` (U+1D538) is above `"ﬀ"` (U+FB00) (review, round 14). */
 export function compareStrings(a: string, b: string): number {
   const x = Array.from(a);
@@ -539,10 +549,14 @@ export function compare(comparator: string, left: ValueBinding, right: Value, re
   let order: number;
   if (isNumericType(left.valueType) && isNumericType(right.valueType)) {
     order = compareNumeric(toNumeric(left.valueType, left.value, refuse, at), toNumeric(right.valueType, right.text, refuse, at));
+  } else if (ORDERED_TEMPORAL.has(left.valueType) && ORDERED_TEMPORAL.has(right.valueType)) {
+    // 🔴 By instant, not by text: `2020-01-01T00:00:00` and `…:00.000` are one instant and two
+    // texts (review, round 11), and a date is its midnight (modifiers.feature L458).
+    order = compareStrings(temporalKey(left.value), temporalKey(right.text));
   } else if (TEMPORAL_TYPES.has(left.valueType) || TEMPORAL_TYPES.has(right.valueType)) {
-    // A temporal comparison is refused by NAME, equality included: `2020-01-01T00:00:00` and
-    // `…:00.000` are one instant and two texts, and a text equality answering nothing is the
-    // silent shape ADR-002 D7 forbids (review, round 11). Temporal values are Phase 07's.
+    // A zoned datetime or a duration is refused by NAME, equality included — their comparison needs
+    // zone and calendar arithmetic, and a text equality answering nothing is the silent shape
+    // ADR-002 D7 forbids.
     return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not compare ${TEMPORAL_TYPES.has(left.valueType) ? left.valueType : right.valueType} values yet.`, at);
   } else if (left.valueType === right.valueType && left.valueType === 'string') {
     order = compareStrings(left.value, right.text);
@@ -703,6 +717,7 @@ export function checkComparison(comparison: ComparisonPattern, variableType: (va
   const right = inferValueType(comparison.right, variableType);
   if (left === undefined || right === undefined) return;
   const at = rangeOf(comparison);
+  if (ORDERED_TEMPORAL.has(left) && ORDERED_TEMPORAL.has(right)) return;
   if (TEMPORAL_TYPES.has(left) || TEMPORAL_TYPES.has(right)) {
     refuse(DiagnosticCode.notImplemented, `TypeDBLite does not compare ${TEMPORAL_TYPES.has(left) ? left : right} values yet.`, at);
   }

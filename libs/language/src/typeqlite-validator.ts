@@ -22,6 +22,14 @@ import {
   isKeyAnnotation,
   isKindPattern,
   isLetPattern,
+  isMatchStage,
+  isInsertStage,
+  isPutStage,
+  isSelectStage,
+  isSortStage,
+  isRequireStage,
+  isReduceStage,
+  isDeleteStage,
   isOwnsProperty,
   isOwnsTrait,
   isPipeline,
@@ -40,6 +48,7 @@ import {
   type Literal,
   type OwnsTrait,
   type Pattern,
+  type SelectStage,
   type Pipeline,
   type PlaysTrait,
   type Property,
@@ -115,7 +124,7 @@ export function registerValidationChecks(services: TypeQLiteServices): void {
     OwnsTrait: validator.checkAnnotationsOnTrait,
     RelatesTrait: validator.checkAnnotationsOnTrait,
     PlaysTrait: validator.checkAnnotationsOnTrait,
-    Pipeline: [validator.checkSelectProjectsVariables, validator.checkValueVariablesBound],
+    Pipeline: [validator.checkValueVariablesBound],
   };
   registry.register(checks, validator);
 }
@@ -406,86 +415,10 @@ export class TypeQLiteValidator {
    * refusal there, so it is one here — not a zero-row answer from the engine.
    */
   checkValueVariablesBound(node: Pipeline, accept: ValidationAcceptor): void {
-    // A `match` after another is a later STAGE on TypeDB, and may read what the earlier ones
-    // answered — so what an earlier pipeline selects, binds or reduces to counts as bound here
-    // (variables.feature L38), and a variable NO stage binds is still the finding, whether the
-    // document is one pipeline or several (review, round 2). Whether the stages chain is the
-    // engine's to decide.
-    const clauses = (node.$container as { clauses?: AstNode[] }).clauses ?? [];
-    const earlier = new Set([...clauses.slice(0, clauses.indexOf(node)).filter(isPipeline).flatMap(outputsOf), ...enclosingOutputs(node)]);
-    const patterns = node.match?.patterns ?? [];
-    const { selectable, things, rolePlayersOnly } = bindingsOf(patterns);
-    const bound = (variable: string): boolean =>
-      selectable.has(variable) || things.has(variable) || rolePlayersOnly.has(variable) || earlier.has(variable);
-    for (const pattern of patterns) {
-      const reads = isLetPattern(pattern)
-        ? expressionVariables(pattern.expression)
-        : isComparisonPattern(pattern)
-          ? [pattern.left, ...expressionVariables(pattern.right)]
-          : [];
-      const unbound = reads.find((variable) => !bound(variable));
-      if (unbound === undefined) continue;
-      accept('error', `The variable '${unbound.slice(1)}' must be bound to a value before it's used.`, {
-        node: pattern,
-        code: TypeQLiteValidationCode.unboundValue,
-      });
-    }
-  }
-
-  checkSelectProjectsVariables(node: Pipeline, accept: ValidationAcceptor): void {
-    const select = node.select;
-    if (!select) return;
-    const bound = bindingsOf(node.match?.patterns ?? []);
-    const { things, rolePlayersOnly } = bound;
-    // A `fetch` sub-query may select what its parent pipelines bound.
-    const selectable = new Set([...bound.selectable, ...enclosingOutputs(node)]);
-
-    const canSelect = [...new Set([...selectable, ...things.keys()])].sort();
-    const unconstrainedPlayers = [...rolePlayersOnly]
-      .filter((name) => !things.has(name) && !selectable.has(name))
-      .sort();
-    const inventory = canSelect.length
-      ? ` Bound here: ${canSelect.join(', ')}.`
-      : ' Nothing in this `match` is bound.';
-
-    // 🔴 The hedge that keeps this check from handing out bad advice. Every name in `canSelect` is
-    // projectable, but a `match` carrying an unconstrained role player answers **zero rows
-    // regardless** — so offering the list without the warning trades one silent zero for another.
-    const blockedByPlayers = unconstrainedPlayers.length
-      ? ` ⚠️ ${unconstrainedPlayers.join(', ')} ${
-          unconstrainedPlayers.length === 1 ? 'has' : 'have'
-        } no \`isa\` pattern, so this \`match\` answers 0 rows whatever is selected.`
-      : '';
-
-    // A variable a `let` or comparison reads without anything binding it is
-    // `checkValueVariablesBound`'s finding, in TypeDB's words; this check would only add a second,
-    // and the engine throws the first (expression.feature L34).
-    const valueReads = new Set(
-      (node.match?.patterns ?? []).flatMap((pattern) =>
-        isLetPattern(pattern)
-          ? expressionVariables(pattern.expression)
-          : isComparisonPattern(pattern)
-            ? [pattern.left, ...expressionVariables(pattern.right)]
-            : [],
-      ),
-    );
-    for (const variable of select.variables) {
-      if (selectable.has(variable) || things.has(variable) || valueReads.has(variable)) continue;
-
-      const message = unconstrainedPlayers.includes(variable)
-        ? `\`select\` names '${variable}', which appears only as a role player and has no ` +
-          `\`isa\` pattern, so the \`match\` never bound it.${inventory}${blockedByPlayers}`
-        : `\`select\` names '${variable}', which the \`match\` never bound.${inventory}` +
-          blockedByPlayers;
-
-      accept('error', message, {
-        node: select,
-        code: TypeQLiteValidationCode.unprojectableVariable,
-      });
-      return;
-    }
+    walkStages(node, accept);
   }
 }
+
 
 /**
  * TypeQLite keywords that cannot be used as identifiers.
@@ -559,9 +492,129 @@ export interface MatchBindings {
  * it binds.
  */
 function outputsOf(pipeline: Pipeline): string[] {
-  if (pipeline.reduce) return [...pipeline.reduce.reductions.map((r) => r.variable), ...pipeline.reduce.groups];
-  const { selectable, things, rolePlayersOnly } = bindingsOf(pipeline.match?.patterns ?? []);
-  return pipeline.select ? pipeline.select.variables : [...selectable, ...things.keys(), ...rolePlayersOnly];
+  return [...walkStages(pipeline)];
+}
+
+const valueReadsOf = (pattern: Pattern): string[] =>
+  isLetPattern(pattern)
+    ? expressionVariables(pattern.expression)
+    : isComparisonPattern(pattern)
+      ? [pattern.left, ...expressionVariables(pattern.right)]
+      : [];
+
+/**
+ * A pipeline's stages in order, with what each one sees bound — and, given `accept`, the two
+ * findings that need nothing but the AST:
+ *
+ * - every variable a `let` or comparison reads is bound — by a concept pattern of its `match`, by
+ *   an EARLIER stage, or by the parent of a `fetch` sub-query. `$v == $a; $v > $h;` with no `let $v`
+ *   is TypeDB's *"The variable 'v' must be bound to a value before it's used"* (expression.feature
+ *   L34), a compile-time refusal there and so here;
+ * - every variable a `select` names is bound by then (`unprojectableVariable`), with the inventory
+ *   of what is.
+ *
+ * What a stage leaves bound: a `match` or a write adds what it names, a `select` keeps what it names,
+ * a `reduce` answers its reductions and groups, a `delete $x` removes `$x` (pipelines.feature L287–L336).
+ * Returns what the last stage leaves bound — what `fetch` reads.
+ */
+function walkStages(node: Pipeline, accept?: ValidationAcceptor): Set<string> {
+  let bound = new Set(enclosingOutputs(node));
+  // Everything any stage has bound — so a variable an earlier stage DROPPED (a `delete`, a `reduce`,
+  // a `select`) is told apart from one nothing ever bound (pipelines.feature L324, L336).
+  const ever = new Set(bound);
+  let last: MatchBindings | undefined;
+  for (const stage of node.stages) {
+    if (accept) checkNamed(stage, accept);
+    if (isMatchStage(stage) || isInsertStage(stage) || isPutStage(stage)) {
+      const bindings = bindingsOf(stage.patterns);
+      const local = new Set([...bound, ...bindings.selectable, ...bindings.things.keys(), ...bindings.rolePlayersOnly]);
+      if (accept && isMatchStage(stage)) {
+        for (const pattern of stage.patterns) {
+          const unbound = valueReadsOf(pattern).find((variable) => !local.has(variable));
+          if (unbound === undefined) continue;
+          accept('error', `The variable '${unbound.slice(1)}' must be bound to a value before it's used.`, {
+            node: pattern,
+            code: TypeQLiteValidationCode.unboundValue,
+          });
+        }
+      }
+      if (isMatchStage(stage)) last = bindings;
+      bound = local;
+    } else if (isSelectStage(stage)) {
+      if (accept) checkSelect(stage, bound, ever, last, accept);
+      bound = new Set(stage.variables);
+    } else if (isReduceStage(stage)) {
+      bound = new Set([...stage.reductions.map((r) => r.variable), ...stage.groups]);
+    } else if (isDeleteStage(stage)) {
+      for (const deletion of stage.deletions) if (deletion.owner === undefined) bound.delete(deletion.target);
+    }
+    for (const variable of bound) ever.add(variable);
+  }
+  return bound;
+}
+
+/** What a stage names a variable for — to project, order, require, reduce or group by. */
+function namedBy(stage: AstNode): string[] {
+  if (isSelectStage(stage)) return stage.variables;
+  if (isSortStage(stage)) return stage.keys.map((key) => key.variable);
+  if (isRequireStage(stage)) return stage.variables;
+  if (isReduceStage(stage)) return [...stage.reductions.flatMap((r) => (r.argument === undefined ? [] : [r.argument])), ...stage.groups];
+  return [];
+}
+
+/**
+ * `$_` is anonymous: a pattern may use it to say "something", but a stage that projects, orders,
+ * requires or groups by a variable needs one it can name (pipelines.feature L287).
+ */
+function checkNamed(stage: AstNode, accept: ValidationAcceptor): void {
+  if (!namedBy(stage).includes('$_')) return;
+  accept('error', 'A non-anonymous variable is expected in this statement for the query: `$_` cannot be selected, sorted, required, reduced or grouped by.', {
+    node: stage,
+    code: TypeQLiteValidationCode.anonymousVariable,
+  });
+}
+
+function checkSelect(select: SelectStage, bound: ReadonlySet<string>, ever: ReadonlySet<string>, last: MatchBindings | undefined, accept: ValidationAcceptor): void {
+  const things = last?.things ?? new Map();
+  const rolePlayersOnly = last?.rolePlayersOnly ?? new Set<string>();
+  const canSelect = [...bound].filter((name) => !rolePlayersOnly.has(name) || things.has(name)).sort();
+  const unconstrainedPlayers = [...rolePlayersOnly].filter((name) => !things.has(name) && !(last?.selectable.has(name) ?? false)).sort();
+  const inventory = canSelect.length ? ` Bound here: ${canSelect.join(', ')}.` : ' Nothing in this `match` is bound.';
+  // 🔴 The hedge that keeps this check from handing out bad advice. Every name in `canSelect` is
+  // projectable, but a `match` carrying an unconstrained role player answers **zero rows
+  // regardless** — so offering the list without the warning trades one silent zero for another.
+  const blockedByPlayers = unconstrainedPlayers.length
+    ? ` ⚠️ ${unconstrainedPlayers.join(', ')} ${
+        unconstrainedPlayers.length === 1 ? 'has' : 'have'
+      } no \`isa\` pattern, so this \`match\` answers 0 rows whatever is selected.`
+    : '';
+  for (const variable of select.variables) {
+    if (bound.has(variable) && !unconstrainedPlayers.includes(variable)) continue;
+    // A variable a `let` or comparison reads without anything binding it is the unbound-value
+    // finding, in TypeDB's words; this one would only add a second (expression.feature L34).
+    if (!bound.has(variable) && valueReadOutsideScope(select, variable)) continue;
+    // Bound once, and dropped since — TypeDB's own words for it.
+    if (!bound.has(variable) && ever.has(variable)) {
+      accept('error', `The variable '${variable.slice(1)}' was not available in the stage: an earlier stage deleted, reduced or deselected it.`, {
+        node: select,
+        code: TypeQLiteValidationCode.unprojectableVariable,
+      });
+      return;
+    }
+    const message = unconstrainedPlayers.includes(variable)
+      ? `\`select\` names '${variable}', which appears only as a role player and has no ` +
+        `\`isa\` pattern, so the \`match\` never bound it.${inventory}${blockedByPlayers}`
+      : `\`select\` names '${variable}', which the \`match\` never bound.${inventory}` + blockedByPlayers;
+    accept('error', message, { node: select, code: TypeQLiteValidationCode.unprojectableVariable });
+    return;
+  }
+}
+
+/** Whether `variable` is read by a `let` or comparison in an earlier `match` of the same pipeline. */
+function valueReadOutsideScope(select: SelectStage, variable: string): boolean {
+  const pipeline = select.$container as Pipeline;
+  const before = pipeline.stages.slice(0, pipeline.stages.indexOf(select));
+  return before.some((stage) => isMatchStage(stage) && stage.patterns.some((pattern) => valueReadsOf(pattern).includes(variable)));
 }
 
 /**

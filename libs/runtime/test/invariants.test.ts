@@ -58,7 +58,10 @@ describe('a refusal never depends on the data', () => {
     ['match $p isa person, has ref R; let $v = -2020-01-01;', DiagnosticCode.notImplemented, 'read'],
     ['match $p isa person, has ref R; let $v = 2020-01-01 + 1;', DiagnosticCode.notImplemented, 'read'],
     ['match $p isa person, has ref R; let $v = len(2020-01-01);', DiagnosticCode.notImplemented, 'read'],
-    ['match $p isa person, has ref R, has born $b; $b == 2000-01-01T00:00:00;', DiagnosticCode.notImplemented, 'read'],
+    // Dates and datetimes compare by instant (modifiers.feature L458); a zoned datetime needs zone
+    // arithmetic, and is refused by name.
+    ['match $p isa person, has ref R, has born $b; $b == 2000-01-01T00:00:00;', 'no refusal', 'read'],
+    ['match $p isa person, has ref R, has stamp $b; $b == 2000-01-01T00:00:00Z;', DiagnosticCode.notImplemented, 'read'],
     ['match $p isa person, has ref R, has age $b; $b == 2000-01-01;', DiagnosticCode.notImplemented, 'read'],
     // Schema functions (metadata.feature): `get_fun_…` is not implemented; the rest refuse their
     // arity, argument kinds and labels from the query's shape, before a row exists.

@@ -29,8 +29,8 @@ function firstLiteral(text: string): {
   const result = parse(text);
   const errors = result.lexerErrors.length + result.parserErrors.length;
   const clause = result.value.clauses?.[0];
-  const pattern =
-    clause && 'match' in clause ? clause.match?.patterns?.[0] : undefined;
+  const first = clause && 'stages' in clause ? clause.stages[0] : undefined;
+  const pattern = first && 'patterns' in first ? first.patterns[0] : undefined;
   if (!pattern || !isThingPattern(pattern))
     return { literal: undefined, errors };
   const property = pattern.properties.find(isHasProperty);

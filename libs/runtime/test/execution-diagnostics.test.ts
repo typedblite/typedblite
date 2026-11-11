@@ -307,7 +307,9 @@ describe('the report is capped', () => {
     const many = Array.from(
       { length: MAX_DIAGNOSTICS + 20 },
       (_, i) => `insert $n${i} isa node, has node-id "n${i}";`,
-    ).join('\n');
+      // `end;` keeps them separate queries — back to back, they would be one pipeline of inserts
+      // with one `wrote` fact, and nothing to truncate.
+    ).join('\nend;\n');
     const report = engine.execute(many);
     const truncation = report.diagnostics.find(
       (d) => d.code === DiagnosticCode.truncated,

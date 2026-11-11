@@ -8,14 +8,14 @@
   "insert": 30,
   "match": 34,
   "metadata": 107,
-  "modifiers": 1,
+  "modifiers": 19,
   "negation": 0,
   "optional": 0,
-  "pipelines": 2,
-  "put": 0,
+  "pipelines": 7,
+  "put": 1,
   "redefine": 155,
   "reduce": 33,
   "undefine": 131,
   "update": 1,
-  "variables": 2
+  "variables": 3
 }

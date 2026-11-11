@@ -263,16 +263,49 @@ ValueType returns string:
 // A pipeline is a sequence of stages, which is how TypeQLite 3.x composes read and write:
 // `match ...; insert ...;` and `match ...; select $a, $b;` are both pipelines.
 
-// 🔴 Stage ORDER is part of the grammar, not a validator rule. An earlier version wrote this as
-// `stages+=Stage+`, which parses but is ambiguous across query boundaries: a file of consecutive
-// queries collapsed into ONE pipeline, because nothing told the parser where a pipeline ends.
-// Encoding the real order — match, then a write, then a projection — makes each query terminate.
+// 🔴 A pipeline is an ordered list of STAGES, as TypeQL 3's is: `match …; match …;` chains, and
+// `match …; sort $x; limit 1; insert …;` streams the match's answers through each stage in turn
+// (pipelines.feature, modifiers.feature). It opens with a stage that can start a stream and may end
+// with `fetch` or `return`, which answer documents or a function's result and nothing after them.
+//
+// ⚠️ This replaced a FIXED order — `match (write)? (select)? (reduce)?` — which had been chosen to
+// stop a file of consecutive queries collapsing into one pipeline. On TypeDB that IS one pipeline:
+// a query is one pipeline, and a second `match` is a second stage reading the first's answers. A
+// caller with several independent queries runs them one at a time (the CLI splits its input).
+//
+// `end;` closes a pipeline explicitly — TypeQL's terminator, which is how one document holds several
+// queries (`examples/real-queries.typeqlite`).
 Pipeline:
-      match=MatchStage (write=WriteStage)? (select=SelectStage)? (reduce=ReduceStage)? (fetch=FetchStage | returnStage=ReturnStage)?
-    | write=WriteStage (fetch=FetchStage)?;
+    stages+=LeadStage stages+=Stage* (fetch=FetchStage | returnStage=ReturnStage)? (end?='end' ';')?;
 
-WriteStage:
-    InsertStage | PutStage | DeleteStage;
+LeadStage:
+    MatchStage | InsertStage | PutStage | DeleteStage;
+
+Stage:
+    MatchStage | InsertStage | PutStage | DeleteStage | SelectStage | ReduceStage | SortStage
+    | OffsetStage | LimitStage | DistinctStage | RequireStage;
+
+type WriteStage = InsertStage | PutStage | DeleteStage;
+
+// `sort $age desc, $name;` — ascending unless it says otherwise; stable, so ties keep stream order.
+SortStage:
+    'sort' keys+=SortKey (',' keys+=SortKey)* ';';
+
+SortKey:
+    variable=VAR (order=('asc' | 'desc'))?;
+
+OffsetStage:
+    'offset' count=INT ';';
+
+LimitStage:
+    'limit' count=INT ';';
+
+DistinctStage:
+    {infer DistinctStage} 'distinct' ';';
+
+// `require $x, $y;` — keep only the answers where each is bound (after a `try`).
+RequireStage:
+    'require' variables+=VAR (',' variables+=VAR)* ';';
 
 MatchStage:
     'match' patterns+=Pattern+;
