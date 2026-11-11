@@ -23,7 +23,8 @@ export { canonical } from '@typedblite/content-revision';
  * 🔴 **Never `thing.iid`.** That is `last_insert_rowid()`, so two nodes both call their first
  * entity `1` and replication would merge unrelated things. Identity is the `@key` attribute's
  * value, which is what makes two nodes agree they are describing the same entity — and which the
- * schema already enforces as unique via a partial `UNIQUE INDEX ON attr(value) WHERE type = <key>`.
+ * schema already enforces as unique via a partial `UNIQUE INDEX ON has(attribute) WHERE type = <key>`:
+ * one key attribute instance, owned once (ADR-006).
  *
  * Keyless things have **no cross-node identity** and are marked `local:` so replication can refuse
  * them rather than silently inventing an equivalence. See `isReplicable`.

@@ -467,7 +467,8 @@ function renameType(name: string, kind: Kind, newLabel: string, node: RedefineTy
       db.prepare(sql).run(...params);
     };
     run('UPDATE thing SET type = ? WHERE type = ?', newLabel, name);
-    run('UPDATE attr SET type = ? WHERE type = ?', newLabel, name);
+    run('UPDATE attribute SET type = ? WHERE type = ?', newLabel, name);
+    run('UPDATE has SET type = ? WHERE type = ?', newLabel, name);
     run('UPDATE type_parent SET type = ? WHERE type = ?', newLabel, name);
     run('UPDATE type_parent SET parent = ? WHERE parent = ?', newLabel, name);
     run('UPDATE schema_element SET name = ? WHERE name = ?', newLabel, name);
@@ -489,7 +490,7 @@ function renameType(name: string, kind: Kind, newLabel: string, node: RedefineTy
         const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?").get(`${prefix}_${ident(name)}`);
         if (exists) {
           db.exec(`DROP INDEX ${prefix}_${ident(name)}`);
-          db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ${prefix}_${ident(newLabel)} ON attr(value) WHERE type = ${q(newLabel)}`);
+          db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ${prefix}_${ident(newLabel)} ON has(attribute) WHERE type = ${q(newLabel)}`);
         }
       }
     }
@@ -837,14 +838,14 @@ function inheritingFamily(attribute: string, facts: SchemaFacts): string[] {
 const attributeValuesInheriting = (db: SqliteDatabase, attribute: string, facts: SchemaFacts): number => {
   const family = inheritingFamily(attribute, facts);
   const marks = family.map(() => '?').join(', ');
-  return Number((db.prepare(`SELECT COUNT(*) AS n FROM attr WHERE type IN (${marks})`).get(...family) as { n: number }).n);
+  return Number((db.prepare(`SELECT COUNT(*) AS n FROM attribute WHERE type IN (${marks})`).get(...family) as { n: number }).n);
 };
 
 const ownersHolding = (db: SqliteDatabase, type: string, attribute: string): number =>
   Number(
     (db.prepare(
       `SELECT COUNT(*) AS n FROM thing t WHERE t.type IN (WITH RECURSIVE sub(x) AS (SELECT ? UNION SELECT type FROM type_parent, sub WHERE parent = sub.x) SELECT x FROM sub) ` +
-        'AND EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type = ?)',
+        'AND EXISTS (SELECT 1 FROM has h WHERE h.owner = t.iid AND h.type = ?)',
     ).get(type, attribute) as { n: number }).n,
   );
 
@@ -852,7 +853,7 @@ const ownersHolding = (db: SqliteDatabase, type: string, attribute: string): num
 const ownersHoldingExactly = (db: SqliteDatabase, type: string, attribute: string): number =>
   Number(
     (db.prepare(
-      'SELECT COUNT(*) AS n FROM thing t WHERE t.type = ? AND EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type = ?)',
+      'SELECT COUNT(*) AS n FROM thing t WHERE t.type = ? AND EXISTS (SELECT 1 FROM has h WHERE h.owner = t.iid AND h.type = ?)',
     ).get(type, attribute) as { n: number }).n,
   );
 
@@ -902,7 +903,7 @@ function dropUniqueIfUnowned(db: SqliteDatabase, attribute: string): void {
 }
 
 function rebuildUniqueIndex(db: SqliteDatabase, attribute: string, prefix: 'key' | 'unique'): void {
-  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ${prefix}_${ident(attribute)} ON attr(value) WHERE type = ${q(attribute)}`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ${prefix}_${ident(attribute)} ON has(attribute) WHERE type = ${q(attribute)}`);
 }
 
 // ── plumbing ────────────────────────────────────────────────────────────────

@@ -84,6 +84,7 @@ import {
   rangeOf,
   type ExecutionReport,
 } from './diagnostics.js';
+import { OWNED, hasAttributeTables, migrateAttrTable, ownAttribute, ownersOfValue, sweepAttributes } from './attribute-store.js';
 import { generateSchema } from './sqlite-generator.js';
 import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
@@ -620,6 +621,9 @@ export class TypeDBLiteInterpreter {
 
     this.changeLog = new ChangeLog(this.db);
     this.changeLog.ensureSchema();
+    // A store written before ADR-006 keeps its attributes in `attr`; move them, once, before anything
+    // reads the store. A store `define` never reached has neither table and nothing to move.
+    migrateAttrTable(this.db);
     this.loadSchema();
     this.ensureRolePlayerIndex();
   }
@@ -1011,6 +1015,10 @@ export class TypeDBLiteInterpreter {
         }
         this.reloadSchema();
       }
+      // `undefine @independent from email` takes the emails nothing owns with it, at once — it is not
+      // refused (ADR-006 D4, delete.feature L1329). Every attribute is looked at: the change touched
+      // no ownership, so the sweep table holds none of them.
+      if (hasAttributeTables(this.db)) sweepAttributes(this.db, 'all');
       this.diagnostics.fact(
         DiagnosticCode.schemaChanged,
         `\`${mutations[0].$type === 'UndefineClause' ? 'undefine' : 'redefine'}\` applied ${changed} change(s).`,
@@ -1123,7 +1131,8 @@ export class TypeDBLiteInterpreter {
   private dataFacts(): DataFacts {
     return {
       instancesOf: (type: string): number => {
-        const table = this.schema.attributes.has(type) ? 'attr' : 'thing';
+        // An attribute type's instances are its stored values (ADR-006), owned or not.
+        const table = this.schema.attributes.has(type) ? 'attribute' : 'thing';
         try {
           const row = this.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE type = ?`).get(type) as
             | { n: number }
@@ -1140,7 +1149,7 @@ export class TypeDBLiteInterpreter {
           const row = this.db
             .prepare(
               `SELECT COUNT(*) AS n FROM thing t WHERE t.type IN ${SUBTYPES_OF} ` +
-                'AND (SELECT COUNT(*) FROM attr a WHERE a.owner = t.iid AND a.type = ?) <> 1',
+                'AND (SELECT COUNT(*) FROM has h WHERE h.owner = t.iid AND h.type = ?) <> 1',
             )
             .get(owner, attribute) as { n: number } | undefined;
           return Number(row?.n ?? 0);
@@ -1151,7 +1160,8 @@ export class TypeDBLiteInterpreter {
       repeatedValueOf: (attribute: string): string | undefined => {
         try {
           const row = this.db
-            .prepare('SELECT value FROM attr WHERE type = ? GROUP BY value HAVING COUNT(*) > 1 LIMIT 1')
+            // One attribute instance owned more than once — what a `@key`/`@unique` index refuses.
+            .prepare(`SELECT v.value AS value FROM ${OWNED} WHERE h.type = ? GROUP BY h.attribute HAVING COUNT(*) > 1 LIMIT 1`)
             .get(attribute) as { value: string } | undefined;
           return row === undefined ? undefined : JSON.stringify(String(row.value));
         } catch {
@@ -1283,6 +1293,9 @@ export class TypeDBLiteInterpreter {
           pipeline.fetch !== undefined && fetchContext !== undefined && fetchScope !== undefined
             ? { rows: [], documents: streamed.map((row) => fetchDocument((pipeline.fetch as FetchStage).body, row, fetchScope, fetchContext)) }
             : { rows: this.projectRows(streamed, final) };
+        // After the answers, which may name an attribute the statement left with no owner — the insert
+        // answers it, a later query does not find it (ADR-006 D4, match.feature L4214).
+        sweepAttributes(this.db);
         // 🔴 Inside the transaction, before COMMIT. This is the whole point of attaching the log
         // here rather than in `SqliteEngine`, which wraps this method and could only act once the
         // transaction had already closed.
@@ -1555,7 +1568,7 @@ export class TypeDBLiteInterpreter {
       contextFor: (combination) => this.evaluationContext(combination),
       attributes: (owner, attribute) =>
         attribute === undefined
-          ? (this.db.prepare('SELECT type, value FROM attr WHERE owner = ? ORDER BY rowid').all(owner) as Array<{ type: string; value: string }>).map((r) => ({ type: String(r.type), value: String(r.value) }))
+          ? this.readAttributes(owner, undefined)
           : this.readAttributes(owner, attribute),
       typeOfThing: (iid) => this.typeOfThing(iid),
       valueTypeOf: (attribute) => this.valueTypeOfAttribute(attribute),
@@ -2163,7 +2176,7 @@ export class TypeDBLiteInterpreter {
             if (!this.typeFamily(ownerType, 'inherited').some((t) => this.schema.owns.has(ownsKey(t, written.attribute)))) {
               this.refuse(DiagnosticCode.unownedAttribute, `Left type '${ownerType}' across constraint 'has' is not compatible with right type '${written.attribute}'.`, at);
             }
-            this.db.prepare('DELETE FROM attr WHERE owner = ? AND type = ?').run(owner, written.attribute);
+            this.db.prepare('DELETE FROM has WHERE owner = ? AND type = ?').run(owner, written.attribute);
             this.touched.add(owner);
             this.insertAttribute(owner, written.attribute, written.value, at);
           } else if (isLinksProperty(property)) {
@@ -2900,23 +2913,23 @@ export class TypeDBLiteInterpreter {
           continue;
         }
         where.push(
-          `EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND (${literal.alternatives.map(() => '(a.type = ? AND a.value = ?)').join(' OR ')}))`,
+          `t.iid IN (${ownersOfValue(literal.alternatives.map(() => '(v.type = ? AND v.value = ?)').join(' OR '))})`,
         );
         for (const alternative of literal.alternatives) params.push(alternative.type, alternative.value);
         continue;
       }
       where.push(
-        `EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type IN ${SUBTYPES_OF} AND a.value = ?)`,
+        `t.iid IN (${ownersOfValue(`v.type IN ${SUBTYPES_OF} AND v.value = ?`)})`,
       );
       params.push(literal.attribute, literal.value);
     }
     // A variable with a bound attribute must actually own that attribute.
     for (const binding of constraint.bindings) {
       if (binding.attribute === undefined) {
-        where.push('EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid)');
+        where.push('EXISTS (SELECT 1 FROM has h WHERE h.owner = t.iid)');
         continue;
       }
-      where.push(`EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type IN ${SUBTYPES_OF})`);
+      where.push(`EXISTS (SELECT 1 FROM has h WHERE h.owner = t.iid AND h.type IN ${SUBTYPES_OF})`);
       params.push(binding.attribute);
     }
 
@@ -3548,17 +3561,17 @@ export class TypeDBLiteInterpreter {
       params.push(already);
     }
     for (const literal of relation.literals) {
-      where.push('EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type = ? AND a.value = ?)');
+      where.push(`t.iid IN (${ownersOfValue('v.type = ? AND v.value = ?')})`);
       params.push(literal.attribute, literal.value);
     }
     // A binding is an ownership requirement, not a value test — the same rule `candidates()`
     // applies to an entity.
     for (const binding of relation.bindings) {
       if (binding.attribute === undefined) {
-        where.push('EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid)');
+        where.push('EXISTS (SELECT 1 FROM has h WHERE h.owner = t.iid)');
         continue;
       }
-      where.push('EXISTS (SELECT 1 FROM attr a WHERE a.owner = t.iid AND a.type = ?)');
+      where.push('EXISTS (SELECT 1 FROM has h WHERE h.owner = t.iid AND h.type = ?)');
       params.push(binding.attribute);
     }
 
@@ -4105,8 +4118,8 @@ export class TypeDBLiteInterpreter {
   private readAttributes(owner: number, attribute: string | undefined): Array<{ type: string; value: string }> {
     const rows =
       attribute === undefined
-        ? this.db.prepare('SELECT type, value FROM attr WHERE owner = ? ORDER BY rowid').all(owner)
-        : this.db.prepare(`SELECT type, value FROM attr WHERE owner = ? AND type IN ${SUBTYPES_OF} ORDER BY rowid`).all(owner, attribute);
+        ? this.db.prepare(`SELECT v.type AS type, v.value AS value FROM ${OWNED} WHERE h.owner = ? ORDER BY h.rowid`).all(owner)
+        : this.db.prepare(`SELECT v.type AS type, v.value AS value FROM ${OWNED} WHERE h.owner = ? AND h.type IN ${SUBTYPES_OF} ORDER BY h.rowid`).all(owner, attribute);
     return rows
       .map((row: unknown) => {
         const r = row as { type: string; value: string };
@@ -4311,16 +4324,9 @@ export class TypeDBLiteInterpreter {
     }
     // An owner owns an attribute VALUE once, as on TypeDB — a second `has age 5` on the same
     // thing is the same ownership, not a second row a `count` would see twice (QA, B5).
-    const owned = this.db
-      .prepare('SELECT 1 FROM attr WHERE owner = ? AND type = ? AND value = ?')
-      .get(owner, attribute, value);
-    if (owned !== undefined) return;
-    this.touched.add(owner);
-
     try {
-      this.db
-        .prepare('INSERT INTO attr(owner, type, value) VALUES (?, ?, ?)')
-        .run(owner, attribute, value);
+      if (!ownAttribute(this.db, owner, attribute, value)) return;
+      this.touched.add(owner);
       this.written.attributes += 1;
     } catch (error) {
       const translated = translateConstraintError(error, attribute);
@@ -4474,9 +4480,9 @@ export class TypeDBLiteInterpreter {
           if (typeof owner !== 'number') continue;
           const value = combination[target];
           if (typeof value === 'object' && value.kind === 'attribute') {
-            this.db.prepare('DELETE FROM attr WHERE owner = ? AND type = ? AND value = ?').run(owner, value.attributeType, value.value);
+            this.db.prepare('DELETE FROM has WHERE owner = ? AND attribute = (SELECT id FROM attribute WHERE type = ? AND value = ?)').run(owner, value.attributeType, value.value);
           } else {
-            this.db.prepare(`DELETE FROM attr WHERE owner = ? AND type IN ${SUBTYPES_OF}`).run(owner, attribute);
+            this.db.prepare(`DELETE FROM has WHERE owner = ? AND type IN ${SUBTYPES_OF}`).run(owner, attribute);
           }
           // Removing an attribute changes the owner's state — an update, not a tombstone.
           this.touched.add(owner);

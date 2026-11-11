@@ -29,7 +29,7 @@ describe('ChangeLog.compact', () => {
   /**
    * Rows written straight into `change_log`, rather than through `applyRemote`.
    *
-   * 🔴 Deliberate, not a shortcut. `applyRemote` also *projects* the winner into `thing`/`attr`,
+   * 🔴 Deliberate, not a shortcut. `applyRemote` also *projects* the winner into `thing`/`has`,
    * which needs a full interpreter and a real schema. Compaction — and every query it must not
    * break, `leavesOf`, `winnerOf`, `conflictsOf`, `stateOf` — reads `change_log` and nothing else,
    * so a log built directly is the faithful fixture and a smaller one.

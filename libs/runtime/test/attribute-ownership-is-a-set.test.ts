@@ -12,9 +12,10 @@ import { DiagnosticCode } from '../src/diagnostics.js';
  * answer, so this never showed — the extra answers are **correct**, and inserting per answer wrote
  * `tag "T"` twice and read it back twice.
  *
- * ⚠️ `attr` carries no unique constraint on `(owner, type, value)`, so nothing in the store catches
- * it. This is the same family as the two 2026-09-05 defects from the other side: what
- * `combinations()` returns decides how many times a write runs.
+ * The store catches it now — `has` is keyed on `(owner, attribute)` since ADR-006 — but the old
+ * `attr` table carried no unique constraint on `(owner, type, value)`, and nothing did. This is the
+ * same family as the two 2026-09-05 defects from the other side: what `combinations()` returns
+ * decides how many times a write runs.
  */
 const SCHEMA = [
   'define',

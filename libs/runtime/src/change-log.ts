@@ -18,6 +18,7 @@ import {
   isReplicable,
   type EntityState,
 } from './canonical.js';
+import { OWNED, ownAttribute, sweepAttributes } from './attribute-store.js';
 import { FullTextIndex } from './full-text.js';
 import {
   computeRevision,
@@ -170,7 +171,7 @@ export class ChangeLog {
     if (!thing) return undefined;
 
     const attributes = this.db
-      .prepare('SELECT type, value FROM attr WHERE owner = ?')
+      .prepare(`SELECT v.type AS type, v.value AS value FROM ${OWNED} WHERE h.owner = ? ORDER BY h.rowid`)
       .all(iid) as Array<{ type: string; value: string }>;
 
     // Roles name their players by *entity id*, never by iid — see canonical.ts. A player whose own
@@ -213,7 +214,7 @@ export class ChangeLog {
     const owned =
       attributes ??
       (this.db
-        .prepare('SELECT type, value FROM attr WHERE owner = ?')
+        .prepare(`SELECT v.type AS type, v.value AS value FROM ${OWNED} WHERE h.owner = ? ORDER BY h.rowid`)
         .all(iid) as Array<{ type: string; value: string }>);
     const key = owned.find((a) => keys.has(a.type));
     const id = entityId(resolvedType, key, iid);
@@ -379,12 +380,15 @@ export class ChangeLog {
     const keyValue = id.slice(slash + 1);
     const row = this.db
       .prepare(
-        `SELECT t.iid AS iid FROM thing t
-         JOIN attr a ON a.owner = t.iid
-         WHERE t.type = ? AND a.value = ? AND a.type IN (SELECT type FROM key_attribute)
+        // Value first — the key's attribute by its unique index, then its owner — not a scan of
+        // every thing of the type.
+        `SELECT t.iid AS iid FROM attribute v
+         JOIN has h ON h.attribute = v.id
+         JOIN thing t ON t.iid = h.owner
+         WHERE v.type IN (SELECT type FROM key_attribute) AND v.value = ? AND t.type = ?
          LIMIT 1`,
       )
-      .get(type, keyValue) as { iid: number } | undefined;
+      .get(keyValue, type) as { iid: number } | undefined;
     return row ? Number(row.iid) : undefined;
   }
 
@@ -445,12 +449,10 @@ export class ChangeLog {
 
     // Replace rather than merge: the winning revision *is* the state, and a merge would leave
     // attributes from a losing revision behind with nothing naming them.
-    this.db.prepare('DELETE FROM attr WHERE owner = ?').run(iid);
-    const insertAttr = this.db.prepare(
-      'INSERT INTO attr(owner, type, value) VALUES (?, ?, ?)',
-    );
+    // The attributes the owner loses are swept below if nothing else owns them (ADR-006 D4).
+    this.db.prepare('DELETE FROM has WHERE owner = ?').run(iid);
     for (const attribute of state.attributes) {
-      insertAttr.run(iid, attribute.type, attribute.value);
+      ownAttribute(this.db, iid, attribute.type, attribute.value);
     }
 
     this.db.prepare('DELETE FROM role_player WHERE rel = ?').run(iid);
@@ -531,7 +533,12 @@ export class ChangeLog {
       );
       // Project only when something actually arrived. Re-projecting on a duplicate would rewrite
       // identical rows for no reason, and on a large resync that is the whole store.
-      if (isNew) this.projectWinner(record.entityId);
+      if (isNew) {
+        this.projectWinner(record.entityId);
+        // A projection replaces an owner's ownerships, and a tombstone removes the owner: an
+        // attribute nothing owns any more goes, as it does after a local statement (ADR-006 D4).
+        sweepAttributes(this.db);
+      }
       this.db.exec(`RELEASE ${savepoint}`);
       return isNew;
     } catch (error) {
