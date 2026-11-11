@@ -41,6 +41,8 @@ Definition:
 // `entity person owns ref` alike (verified on the live server 2026-09-11); this grammar required
 // the comma, and every Background in the behaviour spec is written without it —
 // `d-20260911-the-typeql-grammar-requires-a-comma`. Between traits the comma stays required.
+// The same holds before `sub`: `relation person, sub base @doc("…")` (metadata.feature L228), as
+// `AttributeDef` already admitted.
 //
 // 🔴 **An annotation belongs to the thing it follows, and the AST says which.** `entity player
 // @abstract sub person` annotates the *type*; `entity player sub person @abstract` annotates the
@@ -51,14 +53,14 @@ Definition:
 // `define.feature` L392 says `; fails`, not `parsing fails`.
 EntityDef:
     'entity' name=ID annotations+=Annotation*
-    ('sub' superType=[EntityDef:ID] subAnnotations+=Annotation*)?
+    (','? 'sub' superType=[EntityDef:ID] subAnnotations+=Annotation*)?
     (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
     (','? traits+=Trait (',' traits+=Trait)*)? ';';
 
 // `relation membership, relates member, relates org, owns membership-key @key;`
 RelationDef:
     'relation' name=ID annotations+=Annotation*
-    ('sub' superType=[RelationDef:ID] subAnnotations+=Annotation*)?
+    (','? 'sub' superType=[RelationDef:ID] subAnnotations+=Annotation*)?
     (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
     (','? traits+=Trait (',' traits+=Trait)*)? ';';
 
@@ -315,8 +317,11 @@ Pattern:
 // ── values (Phase 06) ───────────────────────────────────────────────────────
 
 // `let $v = $a * 2;` — a value variable, assigned once.
+// `let $key, $value in get_all_meta(person);` — one row per tuple the expression answers
+// (metadata.feature). `variable` stays the first name so every single-variable reader is unchanged;
+// `others` are the rest of the tuple, and `iterate` marks the `in` form.
 LetPattern:
-    'let' variable=VAR '=' expression=Expression ';';
+    'let' variable=VAR (',' others+=VAR)* (iterate?='in' | '=') expression=Expression ';';
 
 // `$a > 10;` `$v == $a;` — a predicate over bound values, filtering the match.
 ComparisonPattern:
@@ -347,13 +352,29 @@ PowerExpression infers Expression:
 AtomExpression infers Expression:
       {infer LiteralExpression} literal=ExpressionLiteral
     | {infer VariableExpression} variable=VAR
-    | {infer FunctionExpression} function=FunctionName '(' (arguments+=Expression (',' arguments+=Expression)*)? ')'
+    | {infer FunctionExpression} function=FunctionName '(' (arguments+=FunctionArgument (',' arguments+=FunctionArgument)*)? ')'
     | '(' Expression ')';
+
+// `person`, `marriage:spouse` — a type named as a function's argument, as the schema functions take
+// it: `get_doc(person)`, `get_relates_doc(person, person:newrole)` (metadata.feature).
+//
+// 🔴 **An argument, never an atom.** As an atom, `let $a = P524287Y;` — a duration literal this
+// grammar does not have — parsed as a label, the engine refused it as "a type, not a value", and
+// `typeql read query; fails` passed for that reason (expression.feature L825, found by this
+// phase's audit of its own new passes). TypeDB parses a bare label nowhere else in an expression.
+FunctionArgument infers Expression:
+    {infer LabelExpression} label=ScopedLabel | Expression;
+
+// The label itself — also what `$r label marriage:spouse` names.
+ScopedLabel returns string:
+    ID (':' ID)?;
 
 // `floor`, `std::math::floor`, `std::string::len` — the built-ins, with or without their
 // namespace; `string` is a value-type keyword, so a segment is a `ValueType`, which admits it.
+// `label` is a keyword (`$t label person`), and also the schema function `label($t)`
+// (expression.feature L1334) — admitted here by name.
 FunctionName returns string:
-    ValueType ('::' ValueType)*;
+    (ValueType | 'label') ('::' ValueType)*;
 
 // `$s isa skill, has skill-id "x", has skill-name $n;`
 // `$r isa step-dependency (dependent: $d, prerequisite: $p);`
@@ -389,8 +410,10 @@ IsaProperty:
 //
 // Each names a type or a type variable; a ThingPattern carrying one is a TYPE pattern, and the
 // interpreter refuses a head that mixes `has`/`links` with these.
+// `$t label person`, `$r label marriage:spouse` — a role type is labelled through its relation
+// (metadata.feature L73), as the solver's universe already names it.
 LabelProperty:
-    'label' label=ID;
+    'label' label=ScopedLabel;
 
 SubProperty:
     (direct?='sub!' | 'sub') (type=ID | typeVariable=VAR);

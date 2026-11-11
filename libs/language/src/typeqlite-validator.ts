@@ -599,7 +599,7 @@ export function bindingsOf(patterns: readonly Pattern[]): MatchBindings {
     }
     // `let $v = …` binds a value variable (Phase 06); a comparison binds nothing.
     if (isLetPattern(pattern)) {
-      selectable.add(pattern.variable);
+      for (const variable of [pattern.variable, ...pattern.others]) selectable.add(variable);
       continue;
     }
     if (isTypePattern(pattern)) {

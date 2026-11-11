@@ -60,7 +60,17 @@ describe('a refusal never depends on the data', () => {
     ['match $p isa person, has ref R; let $v = len(2020-01-01);', DiagnosticCode.notImplemented, 'read'],
     ['match $p isa person, has ref R, has born $b; $b == 2000-01-01T00:00:00;', DiagnosticCode.notImplemented, 'read'],
     ['match $p isa person, has ref R, has age $b; $b == 2000-01-01;', DiagnosticCode.notImplemented, 'read'],
-    ['match $p isa person, has ref R; let $v = get_owns_doc(1);', DiagnosticCode.notImplemented, 'read'],
+    // Schema functions (metadata.feature): `get_fun_…` is not implemented; the rest refuse their
+    // arity, argument kinds and labels from the query's shape, before a row exists.
+    ['match $p isa person, has ref R; let $v = get_fun_doc("f");', DiagnosticCode.notImplemented, 'read'],
+    ['match $p isa person, has ref R; let $v = get_owns_doc(1);', DiagnosticCode.functionArity, 'read'],
+    ['match $p isa person, has ref R; let $v = get_doc(1);', DiagnosticCode.valueTypeConflict, 'read'],
+    ['match $p isa person, has ref R; let $v = get_meta(person, person);', DiagnosticCode.valueTypeConflict, 'read'],
+    ['match $p isa person, has ref R; let $v = get_doc(nonesuch);', DiagnosticCode.unknownType, 'read'],
+    ['match $p isa person, has ref R; let $v = get_all_meta(person);', DiagnosticCode.valueTypeConflict, 'read'],
+    // A bare label is a function's argument only — elsewhere it does not parse (expression.feature L825).
+    ['match $p isa person, has ref R; let $v = person;', DiagnosticCode.parseFailed, 'read'],
+    ['match $p isa person, has ref R, has age $a; let $v = floor(person);', DiagnosticCode.valueTypeConflict, 'read'],
     ['match $p isa person, has ref R; let $a = 9223372036854775808;', DiagnosticCode.valueOutOfRange, 'read'],
     ['match $p isa person, has ref R; let $a = 1.8e308;', DiagnosticCode.valueOutOfRange, 'read'],
     ['match $p isa person, has ref R; let $a = 9223372036854775808.0dec;', DiagnosticCode.valueOutOfRange, 'read'],

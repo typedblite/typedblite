@@ -46,9 +46,9 @@ The test suite exits non-zero if any scenario is below its baseline. The report 
 
 ```json
 {
-  "define": 414,
+  "define": 415,
   "undefine": 131,
-  "redefine": 154,
+  "redefine": 155,
   ...
 }
 ```
@@ -82,10 +82,10 @@ Rules:
 
 | Feature | Passing |
 |---|---|
-| define | 414 |
-| redefine | 154 |
+| define | 415 |
+| redefine | 155 |
 | undefine | 131 |
-| expression | 91 |
+| expression | 92 |
 | reduce | 33 |
 | insert | 30 |
 | match | 34 |
@@ -97,7 +97,7 @@ Rules:
 | variables | 2 |
 | disjunction | 0 |
 | given | 0 |
-| metadata | 0 |
+| metadata | 92 |
 | negation | 0 |
 | optional | 0 |
 | put | 0 |

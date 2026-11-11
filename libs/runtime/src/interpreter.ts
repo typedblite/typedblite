@@ -57,7 +57,7 @@ import {
 import { generateSchema } from './sqlite-generator.js';
 import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
-import { applyValueStatements, inferValueType, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
+import { applyValueStatements, inferValueType, letVariables, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
 import { applyReduce, checkReduce } from './reduce.js';
 import { isTypeHead, solveTypes, typeConstraintsOf, type Binding } from './type-patterns.js';
 import {
@@ -2138,6 +2138,7 @@ export class TypeDBLiteInterpreter {
         const attribute = attributeOf.get(variable);
         return attribute === undefined ? undefined : this.valueTypeOfAttribute(attribute);
       },
+      this.schema,
     );
 
     // 🔴 A relation **binds** its role players; it does not merely check them.
@@ -2201,10 +2202,15 @@ export class TypeDBLiteInterpreter {
           const binding = combination[variable];
           return typeof binding === 'number' ? 'thing' : typeof binding === 'string' ? 'type' : undefined;
         };
-        if (!applyValueStatements(statements, values, concept, this.refuse)) return [];
-        const extended: Record<string, Binding> = { ...combination };
-        for (const [variable, binding] of values) extended[variable] = binding;
-        return [extended];
+        const typeOf = (variable: string): string | undefined => {
+          const binding = combination[variable];
+          return typeof binding === 'string' ? binding : undefined;
+        };
+        return applyValueStatements(statements, values, concept, this.refuse, { facts: this.schema, typeOf }).map((answered) => {
+          const extended: Record<string, Binding> = { ...combination };
+          for (const [variable, binding] of answered) extended[variable] = binding;
+          return extended;
+        });
       });
     }
     return combinations;
@@ -2602,7 +2608,7 @@ export class TypeDBLiteInterpreter {
             ...t.plays.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
             ...t.relates.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
           ]),
-          ...patterns.flatMap((p) => (isLetPattern(p) ? [p.variable] : [])),
+          ...patterns.flatMap((p) => (isLetPattern(p) ? letVariables(p) : [])),
         ]);
   }
 
