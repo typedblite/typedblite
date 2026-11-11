@@ -79,7 +79,9 @@ const sameOr = (compare: () => boolean): boolean => {
 };
 
 const temporalText = (text: string): string => {
-  const dated = /^\d{4}-\d{2}-\d{2}$/.test(text.trim()) ? `${text.trim()}T00:00:00` : text.trim();
+  const dated = (/^\d{4}-\d{2}-\d{2}$/.test(text.trim()) ? `${text.trim()}T00:00:00` : text.trim())
+    // Minutes without seconds, as the driver reads them: `…T00:00` is `…T00:00:00` (insert.feature L1560).
+    .replace(/(T\d{2}:\d{2})(?=$|[+\-Z ])/, '$1:00');
   const fraction = dated.replace(/(\d{2}:\d{2}:\d{2})\.(\d*?)0*(?=$|[+\-Z ])/, (_m, time: string, digits: string) => (digits === '' ? time : `${time}.${digits}`));
   return fraction.replace(/([+-])(\d{2}):?(\d{2})$/, (_m, sign: string, hh: string, mm: string) => (hh === '00' && mm === '00' ? 'Z' : `${sign}${hh}:${mm}`));
 };

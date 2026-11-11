@@ -63,10 +63,10 @@ export const OWNED = 'has h JOIN attribute v ON v.id = h.attribute';
 export const ownersOfValue = (where: string): string => `SELECT h.owner FROM attribute v JOIN has h ON h.attribute = v.id WHERE ${where}`;
 
 /** The attribute with this type and canonical value, created if it does not exist yet. */
-export function ensureAttribute(db: SqliteDatabase, type: string, value: string): number {
-  db.prepare('INSERT OR IGNORE INTO attribute(type, value) VALUES (?, ?)').run(type, value);
+export function ensureAttribute(db: SqliteDatabase, type: string, value: string): { id: number; created: boolean } {
+  const created = db.prepare('INSERT OR IGNORE INTO attribute(type, value) VALUES (?, ?)').run(type, value).changes > 0;
   const row = db.prepare('SELECT id FROM attribute WHERE type = ? AND value = ?').get(type, value) as { id: number };
-  return Number(row.id);
+  return { id: Number(row.id), created };
 }
 
 /** The id of an existing attribute, or `undefined`. */
@@ -83,7 +83,7 @@ export function attributeId(db: SqliteDatabase, type: string, value: string): nu
  * would have been dropped in silence instead of refused.
  */
 export function ownAttribute(db: SqliteDatabase, owner: number, type: string, value: string): boolean {
-  const id = ensureAttribute(db, type, value);
+  const { id } = ensureAttribute(db, type, value);
   if (db.prepare('SELECT 1 FROM has WHERE owner = ? AND attribute = ?').get(owner, id) !== undefined) return false;
   db.prepare('INSERT INTO has(owner, attribute, type) VALUES (?, ?, ?)').run(owner, id, type);
   return true;

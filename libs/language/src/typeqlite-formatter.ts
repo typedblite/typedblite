@@ -262,6 +262,8 @@ export class TypeQLiteFormatter extends AbstractFormatter {
     const f = this.getNodeFormatter(node);
     f.property('type').prepend(Formatting.oneSpace());
     if (node.players) f.node(node.players).prepend(Formatting.oneSpace());
+    // `$n isa name "John"` — an attribute instance's value, spaced as `has name "John"` is.
+    if (node.value) f.node(node.value).prepend(Formatting.oneSpace());
   }
 
   private formatHasProperty(node: HasProperty): void {

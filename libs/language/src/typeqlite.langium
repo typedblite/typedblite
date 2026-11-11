@@ -581,8 +581,12 @@ Property:
     | PlaysProperty | RelatesProperty;
 
 // `isa person`, `isa $t` (a type variable), `isa! person` (the exact type, no subtypes).
+// An attribute instance takes its value as `has` does (ADR-006): `$n isa name "John"`,
+// `$a isa age > 18` in a match, `insert $_ isa name == $a` (expression.feature L1407) — and
+// `insert $x isa age > 18` parses, to be refused by name (insert.feature L1619).
 IsaProperty:
-    (exact?='isa!' | 'isa') (type=ID | typeVariable=VAR) (players=RolePlayers)?;
+    (exact?='isa!' | 'isa') (type=ID | typeVariable=VAR)
+    (players=RolePlayers | comparator=Comparator compared=Expression | value=Literal)?;
 
 // ── type properties (Phase 05) ──────────────────────────────────────────────
 //

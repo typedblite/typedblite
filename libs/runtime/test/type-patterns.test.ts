@@ -86,15 +86,17 @@ describe('type patterns', () => {
   });
 
   it('isa $t binds the thing\'s own type and every ancestor when unbound, and reads it when bound — L842, L146', () => {
+    // An attribute is an instance too (ADR-006): the two stored `ref`s answer with their type, as
+    // `attribute $t; $x isa $t` does in TypeDB (insert.feature L276, match.feature L842).
     const rows = engine.query('match $x isa $t;').rows;
-    assert.deepEqual(rows.map((r) => `${r['x'].type}→${r['t'].label}`).sort(), ['person→person', 'writer→person', 'writer→writer']);
+    assert.deepEqual(rows.map((r) => `${r['x'].type}→${r['t'].label}`).sort(), ['person→person', 'ref→ref', 'ref→ref', 'writer→person', 'writer→writer']);
     assert.equal(engine.query('match $t label person; $x isa $t;').rows.length, 2, 'bound to person: the closure');
     assert.equal(engine.query('match $t label writer; $x isa $t;').rows.length, 1);
     // The two readings agree: `entity $t; $x isa $t` is the same set of (type, thing) pairs.
     assert.equal(engine.query('match entity $t; $x isa $t; select $x;').rows.length, 3);
     assert.equal(engine.query('match $x isa $t; entity $t;').rows.length, 3);
     // `isa!` — the own type only, whichever way round the patterns come (review, round 1).
-    assert.deepEqual(engine.query('match $x isa! $t;').rows.map((r) => r['t'].label).sort(), ['person', 'writer']);
+    assert.deepEqual(engine.query('match $x isa! $t;').rows.map((r) => r['t'].label).sort(), ['person', 'ref', 'ref', 'writer']);
     assert.equal(engine.query('match $x has ref $r; $x isa! person;').rows.length, 1, 'isa! survives the merge');
     assert.equal(engine.query('match $x has ref $r; $x isa $t;').rows.length, 3, 'isa $t survives the merge');
   });
@@ -126,8 +128,8 @@ describe('type patterns', () => {
     assert.equal(engine.query('match $x isa person; $x isa! writer;').rows.length, 1);
     assert.equal(engine.query('match $x isa! writer; $x isa person;').rows.length, 1);
     assert.deepEqual(engine.query('match $x isa $t; $x isa! writer;').rows.map((r) => r['t'].label).sort(), ['person', 'writer']);
-    // The writer binds $t and $u independently (2 × 2), the person once: five rows, not none.
-    assert.deepEqual(engine.query('match $x isa $t; $x isa $u; select $u;').rows.map((r) => r['u'].label).sort(), ['person', 'person', 'person', 'writer', 'writer']);
+    // The writer binds $t and $u independently (2 × 2), the person once, each `ref` once: seven rows.
+    assert.deepEqual(engine.query('match $x isa $t; $x isa $u; select $u;').rows.map((r) => r['u'].label).sort(), ['person', 'person', 'person', 'ref', 'ref', 'writer', 'writer']);
   });
 
   it('a variable used through isa $t and headed as a thing is refused, at the conflicting pattern — review round 2', () => {
