@@ -599,13 +599,17 @@ RolePlayer:
 // that `10-1` is a subtraction; a `has age -5` or `@range(-5..5)` takes its `-` as the literal's
 // `negative` flag, and `literalText` applies it.
 Literal:
-    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | BooleanLiteral
+    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | DurationLiteral | BooleanLiteral
     | SignedDecimalLiteral | SignedDoubleLiteral | SignedIntLiteral;
 
 // An expression's literal carries no sign — `-1` there is a `NegationExpression` over `1`.
 ExpressionLiteral infers Literal:
-    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | BooleanLiteral
+    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | DurationLiteral | BooleanLiteral
     | DecimalLiteral | DoubleLiteral | IntLiteral;
+
+// `P1Y2M3DT4H5M6.789S` — a duration, stored as TypeDB holds one: months, days and exact time.
+DurationLiteral:
+    value=DURATION;
 
 SignedDecimalLiteral infers DecimalLiteral:
     (negative?='-')? value=DECIMAL;

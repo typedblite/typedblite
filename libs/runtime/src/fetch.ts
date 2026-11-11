@@ -15,6 +15,7 @@ import { DiagnosticCode, rangeOf } from './diagnostics.js';
 import { evaluate, variablesOf, type SchemaContext, type ValueBinding } from './expressions.js';
 import type { Refuse, SchemaFacts } from './schema-rules.js';
 import { ownsKey, ownsSubject, relatesSubject } from './schema-subjects.js';
+import { formatDuration, parseDuration } from './temporal.js';
 import type { Binding } from './type-patterns.js';
 
 /**
@@ -146,6 +147,9 @@ export function jsonOf(valueType: string, text: string): JsonValue {
       const [, local, iana, hours, minutes] = zone;
       return `${nanoseconds(local)}${iana !== undefined ? ` ${iana}` : hours !== undefined ? `${hours}:${minutes}` : 'Z'}`;
     }
+    case 'duration':
+      // The seconds' fraction to the nanosecond, as TypeDB writes it (fetch.feature L746).
+      return formatDuration(parseDuration(text, (_c, message) => { throw new Error(message); }, undefined), true);
     default:
       return text;
   }

@@ -226,7 +226,8 @@ describe('value expressions', () => {
     // Dates compare by instant now (modifiers.feature L458) — refused by name until they could.
     assert.deepEqual(values(engine, 'match $p isa person, has born $b; $b < 2001-01-01; select $b;'), [{ b: 'born:2000-01-01' }]);
     assert.equal(values(engine, 'match $p isa person, has born $b; let $v = $b; $v == $b; select $v;').length, 1);
-    assert.equal(refusal(() => engine.query('match $p isa person, has born $b; let $v = $b + 1;')).code, DiagnosticCode.notImplemented);
+    // A date and an integer have no `+` — a duration does (expression.feature L492).
+    assert.equal(refusal(() => engine.query('match $p isa person, has born $b; let $v = $b + 1;')).code, DiagnosticCode.valueTypeConflict);
     engine.execute('match $p isa person, has ref 0; let $v = 10; insert $p has weight $v;');
     assert.deepEqual(values(engine, 'match $p isa person, has ref 0, has weight 10.0; select $p;'), [{ p: 'thing:person' }]);
     assert.equal(refusal(() => engine.execute('match $p isa person, has ref 0; insert $p has age 1; reduce $c = count;')).code, DiagnosticCode.notImplemented);

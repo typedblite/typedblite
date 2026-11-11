@@ -55,9 +55,16 @@ describe('a refusal never depends on the data', () => {
     ['match $p isa person, has ref R, has name $n; reduce $m? = mean($n);', DiagnosticCode.reducer, 'read'],
     ['match $p isa person, has ref R, has born $d; reduce $m? = std($d);', DiagnosticCode.reducer, 'read'],
     ['match $p isa person, has ref R, has name $n; reduce $s = sum($n);', DiagnosticCode.reducer, 'read'],
-    ['match $p isa person, has ref R; let $v = -2020-01-01;', DiagnosticCode.notImplemented, 'read'],
-    ['match $p isa person, has ref R; let $v = 2020-01-01 + 1;', DiagnosticCode.notImplemented, 'read'],
-    ['match $p isa person, has ref R; let $v = len(2020-01-01);', DiagnosticCode.notImplemented, 'read'],
+    // Temporal values (expression.feature L492–L837): a signed year is a date of its own, a date and
+    // an integer have no `+`, and `len` takes a string — each refused before any row, as a type.
+    ['match $p isa person, has ref R; let $v = -2020-01-01;', 'no refusal', 'read'],
+    ['match $p isa person, has ref R; let $v = 2020-01-01 + 1;', DiagnosticCode.valueTypeConflict, 'read'],
+    ['match $p isa person, has ref R; let $v = len(2020-01-01);', DiagnosticCode.valueTypeConflict, 'read'],
+    ['match $p isa person, has ref R; let $v = 2020-01-01 + P1D;', 'no refusal', 'read'],
+    // A duration LITERAL out of range is refused as it is read (L825); a computed one, like an integer
+    // overflow, only when it is computed.
+    ['match $p isa person, has ref R; let $v = P524287Y;', DiagnosticCode.valueOutOfRange, 'read'],
+    ['match $p isa person, has ref R; let $v = +262143-01-01T00:00:00;', DiagnosticCode.valueOutOfRange, 'read'],
     // Dates and datetimes compare by instant (modifiers.feature L458); a zoned datetime needs zone
     // arithmetic, and is refused by name.
     ['match $p isa person, has ref R, has born $b; $b == 2000-01-01T00:00:00;', 'no refusal', 'read'],

@@ -1,6 +1,7 @@
 export * from './sqlite-generator.js';
 export * from './interpreter.js';
 export type { JsonValue } from './fetch.js';
+export { instantOf, canonicalTemporal } from './temporal.js';
 export * from './diagnostics.js';
 export * from './sqlite-engine.js';
 export * from './canonical.js';

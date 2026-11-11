@@ -85,6 +85,7 @@ import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from 
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
 import { applyValueStatements, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
 import { applyReduce, checkReduce } from './reduce.js';
+import { canonicalTemporal } from './temporal.js';
 import { checkFetch, fetchDocument, ownershipMax, roleMax, type FetchContext, type FetchScope, type JsonValue } from './fetch.js';
 import { isTypeHead, solveTypes, typeConstraintsOf, type Binding } from './type-patterns.js';
 import {
@@ -3912,13 +3913,18 @@ export class TypeDBLiteInterpreter {
         // A date on a datetime attribute is midnight of that day, in the datetime's one spelling
         // (review, round 13): `2000-01-01` and `2000-01-01T00:00:00` are one stored text — and a
         // fraction of zeros is no fraction: `…:00.000` is `…:00` (round 14).
-        const dated = /^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text;
+        const dated = (/^[+-]?\d{4,}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text)
+          // Minutes without seconds are TypeDB's too (expression.feature L704): `…T10:00` is `…T10:00:00`.
+          .replace(/(T\d{2}:\d{2})(?=$|[+\-Z ])/, '$1:00');
         const trimmed = dated.replace(/(\d{2}:\d{2}:\d{2})\.(\d*?)0*(?=$|[+\-Z ])/, (_m, time: string, fraction: string) => (fraction === '' ? time : `${time}.${fraction}`));
         // One spelling per offset (QA, B1): `+00:00`, `+0000`, `-00:00` and `Z` are one, and every
         // other offset carries its colon. A zone NAME is kept as written — an offset and a zone
         // are two values on TypeDB. Two offsets naming one instant stay two texts.
         return trimmed.replace(/([+-])(\d{2}):?(\d{2})$/, (_m, sign: string, hh: string, mm: string) => (hh === '00' && mm === '00' ? 'Z' : `${sign}${hh}:${mm}`));
       }
+      case 'duration':
+        // `P66W` is `P462D`, `PT90M` is `PT1H30M` — one spelling per duration.
+        return canonicalTemporal('duration', text, refuse, at);
       default:
         return text;
     }

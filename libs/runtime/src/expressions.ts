@@ -4,6 +4,7 @@ import {
   isDateLiteral,
   isDatetimeLiteral,
   isDatetimeTzLiteral,
+  isDurationLiteral,
   isComparisonPattern,
   isDecimalLiteral,
   isDoubleLiteral,
@@ -24,6 +25,7 @@ import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf } from './diagnostics.js';
 import { callSchemaFunction, checkSchemaCall, isSchemaFunction, schemaFunctionWidth, type ArgumentShape, type SchemaArgument } from './schema-functions.js';
 import type { Refuse, SchemaFacts } from './schema-rules.js';
+import { canonicalTemporal, temporalArithmetic, temporalResultType, type TemporalValue } from './temporal.js';
 
 /**
  * Value expressions — Phase 06 of the conformance feature.
@@ -449,9 +451,13 @@ function evaluateNumeric(expression: Expression, env: Environment, refuse: Refus
     if (isBooleanLiteral(literal)) return { kind: 'text', value: { valueType: 'boolean', text: literal.value } };
     // A temporal literal is carried as text, as a temporal attribute is: `$d == 2020-01-01`
     // compares as written (review, round 9); its arithmetic is refused by name where it is used.
-    if (isDateLiteral(literal)) return { kind: 'text', value: { valueType: 'date', text: literal.value } };
-    if (isDatetimeLiteral(literal)) return { kind: 'text', value: { valueType: 'datetime', text: literal.value } };
-    if (isDatetimeTzLiteral(literal)) return { kind: 'text', value: { valueType: 'datetime-tz', text: literal.value } };
+    // A temporal literal is checked as it is read — an out-of-range date, a zoned time in a gap or an
+    // overlap, a duration over the limit are refused here (expression.feature L692–L837) — and
+    // carried in its one spelling.
+    if (isDateLiteral(literal)) return { kind: 'text', value: { valueType: 'date', text: canonicalTemporal('date', literal.value, refuse, at) } };
+    if (isDatetimeLiteral(literal)) return { kind: 'text', value: { valueType: 'datetime', text: canonicalTemporal('datetime', literal.value, refuse, at) } };
+    if (isDatetimeTzLiteral(literal)) return { kind: 'text', value: { valueType: 'datetime-tz', text: canonicalTemporal('datetime-tz', literal.value, refuse, at) } };
+    if (isDurationLiteral(literal)) return { kind: 'text', value: { valueType: 'duration', text: canonicalTemporal('duration', literal.value, refuse, at) } };
     return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate a ${(literal as { $type: string }).$type} in an expression yet.`, at);
   }
   if (isVariableExpression(expression)) {
@@ -490,10 +496,10 @@ function evaluateNumeric(expression: Expression, env: Environment, refuse: Refus
     if (left.kind === 'text' && right.kind === 'text' && expression.operator === '+' && left.value.valueType === 'string' && right.value.valueType === 'string') {
       return { kind: 'text', value: { valueType: 'string', text: left.value.text + right.value.text } };
     }
-    for (const side of [left, right]) {
-      if (side.kind === 'text' && TEMPORAL_TYPES.has(side.value.valueType)) {
-        return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${side.value.valueType} arithmetic yet.`, at);
-      }
+    // Dates, datetimes and durations add and subtract by TypeDB's table — `temporal.ts`.
+    if (left.kind === 'text' && right.kind === 'text' && TEMPORAL_TYPES.has(left.value.valueType) && TEMPORAL_TYPES.has(right.value.valueType)) {
+      const result = temporalArithmetic(expression.operator, left.value as TemporalValue, right.value as TemporalValue, refuse, at);
+      return { kind: 'text', value: result };
     }
     return arithmetic(expression.operator, numericOrRefuse(left, refuse, at), numericOrRefuse(right, refuse, at), refuse, at);
   }
@@ -517,9 +523,7 @@ function evaluateNumeric(expression: Expression, env: Environment, refuse: Refus
 
 const numericOrRefuse = (evaluated: Evaluated, refuse: Refuse, at: Range | undefined): Numeric =>
   evaluated.kind === 'text'
-    ? TEMPORAL_TYPES.has(evaluated.value.valueType)
-      ? refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${evaluated.value.valueType} arithmetic yet.`, at)
-      : refuse(DiagnosticCode.valueTypeConflict, `A ${evaluated.value.valueType} is not a number and cannot be an operand here.`, at)
+    ? refuse(DiagnosticCode.valueTypeConflict, `A ${evaluated.value.valueType} is not a number and cannot be an operand here.`, at)
     : evaluated;
 
 /** `$a > 10`, `$v == $a` — over numbers by value, over strings and booleans by text. */
@@ -600,14 +604,18 @@ export function inferValueType(expression: Expression, variableType: (variable: 
     if (isDateLiteral(literal)) return 'date';
     if (isDatetimeLiteral(literal)) return 'datetime';
     if (isDatetimeTzLiteral(literal)) return 'datetime-tz';
+    if (isDurationLiteral(literal)) return 'duration';
     return undefined;
   }
   if (isVariableExpression(expression)) return variableType(expression.variable);
   if (isNegationExpression(expression)) return inferValueType(expression.operand, variableType);
   if (isBinaryExpression(expression)) {
-    if (expression.operator === '/' || expression.operator === '^') return 'double';
     const left = inferValueType(expression.left, variableType);
     const right = inferValueType(expression.right, variableType);
+    if (left !== undefined && right !== undefined && (TEMPORAL_TYPES.has(left) || TEMPORAL_TYPES.has(right))) {
+      return temporalResultType(expression.operator, left, right);
+    }
+    if (expression.operator === '/' || expression.operator === '^') return 'double';
     if (left === 'string' || right === 'string') return 'string';
     if (left === 'double' || right === 'double') return 'double';
     if (left === 'decimal' || right === 'decimal') return 'decimal';
@@ -673,7 +681,7 @@ export function checkExpression(expression: Expression, variableType: (variable:
     const qualified = `${known.namespace}::${bare}`;
     const [first, second] = kinds;
     for (const kind of kinds) {
-      if (kind !== undefined && TEMPORAL_TYPES.has(kind)) refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${kind} arithmetic yet.`, at);
+      if (kind !== undefined && TEMPORAL_TYPES.has(kind)) refuse(DiagnosticCode.valueTypeConflict, `Built-in function '${qualified}' cannot be applied to arguments of type '${kind}'.`, at);
     }
     if (bare === 'len') {
       if (first !== undefined && first !== 'string') refuse(DiagnosticCode.valueTypeConflict, `Built-in function '${qualified}' cannot be applied to arguments of type '${first}'.`, at);
@@ -694,7 +702,6 @@ export function checkExpression(expression: Expression, variableType: (variable:
     }
     checkExpression(expression.operand, variableType, refuse, facts);
     const type = inferValueType(expression.operand, variableType);
-    if (type !== undefined && TEMPORAL_TYPES.has(type)) refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${type} arithmetic yet.`, at);
     if (type !== undefined && !isNumericType(type)) refuse(DiagnosticCode.valueTypeConflict, `A ${type} is not a number and cannot be negated.`, at);
     return;
   }
@@ -705,10 +712,13 @@ export function checkExpression(expression: Expression, variableType: (variable:
     const right = inferValueType(expression.right, variableType);
     if (left === undefined || right === undefined) return;
     if (expression.operator === '+' && left === 'string' && right === 'string') return;
-    for (const type of [left, right]) {
-      if (TEMPORAL_TYPES.has(type)) {
-        refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${type} arithmetic yet.`, at);
+    if (TEMPORAL_TYPES.has(left) || TEMPORAL_TYPES.has(right)) {
+      if (temporalResultType(expression.operator, left, right) === undefined) {
+        refuse(DiagnosticCode.valueTypeConflict, `There is no '${expression.operator}' for a ${left} and a ${right}.`, at);
       }
+      return;
+    }
+    for (const type of [left, right]) {
       if (!isNumericType(type)) refuse(DiagnosticCode.valueTypeConflict, `A ${type} is not a number and cannot be an operand here.`, at);
     }
   }

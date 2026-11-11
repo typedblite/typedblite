@@ -14,6 +14,11 @@ terminal VAR returns string: /\$[a-zA-Z0-9_][a-zA-Z0-9_-]*/;
 // is one variable (VAR admits the hyphen too) and `$a - 1` is a subtraction — the space decides,
 // as it does in TypeDB. The numeric terminals below carry NO sign for the same reason: `10-1`
 // is `10` `-` `1`, and a literal's sign is the grammar's (`Literal`, `NegationExpression`).
+// `P1Y2M3DT4H5M6.789S`, `P66W`, `PT0S` — an ISO 8601 duration (expression.feature L810). Before ID,
+// which would otherwise take `P1Y` as a label; it needs at least one component, so `P` and `PT`
+// alone are still identifiers.
+terminal DURATION returns string: /P(?:[0-9]+W|(?=[0-9]|T[0-9])(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+D)?(?:T(?=[0-9])(?:[0-9]+H)?(?:[0-9]+M)?(?:[0-9]+(?:\.[0-9]+)?S)?)?)(?![a-zA-Z0-9_-])/;
+
 terminal ID returns string: /[a-zA-Z_][a-zA-Z0-9_-]*/;
 
 // Double- or single-quoted — `has name 'Steve'` (expression.feature L1002) beside `"Alice"`.
@@ -32,13 +37,17 @@ terminal STRING returns string: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
 // `d.toISOString().replace('Z', '').slice(0, 19)`; the behaviour spec's `fetch.feature` inserts
 // `2020-01-01T13:13:13.999`, and that caller arrived 2026-09-11. ⚠️ `attr.value` is compared as
 // text, so `…:13` and `…:13.000` are two texts for one instant and will never match each other —
-// a caller mixing spellings gets what it wrote. Minutes-only (`2026-09-03T10:00`) is still refused.
-terminal DATETIME_TZ returns string: /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([+-][0-9]{2}:?[0-9]{2}|Z| [A-Za-z_]+(\/[A-Za-z0-9_+-]+)+)/;
+// a caller mixing spellings gets what it wrote. Minutes-only (`2026-09-03T10:00`) is TypeDB's too,
+// and the engine stores it with `:00`.
+//
+// A year may carry a sign and more digits — `+262142-12-31`, `-262143-01-01` (expression.feature
+// L506) — and the seconds may be left out: `…T00:00+02:00` (L704), as ISO 8601 and TypeDB allow.
+terminal DATETIME_TZ returns string: /(?:[+-][0-9]{4,}|[0-9]{4})-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(\.[0-9]+)?)?([+-][0-9]{2}:?[0-9]{2}|Z| [A-Za-z_]+(\/[A-Za-z0-9_+-]+)+)/;
 
-terminal DATETIME returns string: /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?/;
+terminal DATETIME returns string: /(?:[+-][0-9]{4,}|[0-9]{4})-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(\.[0-9]+)?)?/;
 
 // `2021-01-01` — after DATETIME (which needs the `T…`), before INT. `fetch.feature`, 2026-09-11.
-terminal DATE returns string: /[0-9]{4}-[0-9]{2}-[0-9]{2}/;
+terminal DATE returns string: /(?:[+-][0-9]{4,}|[0-9]{4})-[0-9]{2}-[0-9]{2}/;
 
 // `10.2dec`, `5dec` — an exact decimal (Phase 06). Before DOUBLE and INT, which are its prefixes.
 terminal DECIMAL returns string: /[0-9]+(\.[0-9]+)?dec/;

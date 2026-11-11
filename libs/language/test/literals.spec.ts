@@ -139,12 +139,12 @@ describe('datetime literals', () => {
       expect(literal).toMatchObject({ value: '123.4567891' });
     });
 
-    it('refuses no seconds (2026-09-03T10:00)', () => {
-      const { errors } = firstLiteral(
-        'match $p isa prompt, has created-at 2026-09-03T10:00;',
-      );
-
-      expect(errors).toBeGreaterThan(0);
+    // TypeDB accepts minutes without seconds (expression.feature L704, modifiers.feature L458); it was
+    // refused here until the temporal phase. The engine stores it with `:00`, one spelling per instant.
+    it('accepts no seconds (2026-09-03T10:00) as a datetime', () => {
+      const { literal, errors } = firstLiteral('match $p isa prompt, has created-at 2026-09-03T10:00;');
+      expect(errors).toBe(0);
+      expect(isDatetimeLiteral(literal)).toBe(true);
     });
 
     // A zone makes it a DatetimeTzLiteral — TypeDB's `datetime-tz` value type, a different kind,

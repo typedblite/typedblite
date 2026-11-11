@@ -3,6 +3,7 @@ import {
   isDateLiteral,
   isDatetimeLiteral,
   isDatetimeTzLiteral,
+  isDurationLiteral,
   isDecimalLiteral,
   isDoubleLiteral,
   isIntLiteral,
@@ -116,6 +117,7 @@ export function literalFits(literal: Literal, valueType: string): boolean {
   if (isDateLiteral(literal)) return valueType === 'date' || valueType === 'datetime';
   if (isDatetimeLiteral(literal)) return valueType === 'datetime';
   if (isDatetimeTzLiteral(literal)) return valueType === 'datetime-tz';
+  if (isDurationLiteral(literal)) return valueType === 'duration';
   return false;
 }
 
@@ -129,5 +131,6 @@ export function literalKind(literal: Literal): string {
   if (isDateLiteral(literal)) return 'a date';
   if (isDatetimeLiteral(literal)) return 'a datetime';
   if (isDatetimeTzLiteral(literal)) return 'a datetime-tz';
+  if (isDurationLiteral(literal)) return 'a duration';
   return 'a literal';
 }

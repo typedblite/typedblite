@@ -1,3 +1,4 @@
+import { canonicalTemporal, instantOf } from '@typedblite/runtime';
 import type { TypeDBLiteValue } from '@typedblite/runtime';
 import type { AnswerRow, Answers } from './world.js';
 
@@ -64,6 +65,19 @@ const decimalOf = (text: string): string | undefined => {
   return `${zero ? '' : sign}${integer}${trimmed === '' ? '' : `.${trimmed}`}`;
 };
 
+const fail = (_code: unknown, message: string): never => {
+  throw new Error(message);
+};
+
+/** A comparison that cannot even read one side is a non-match, not an error in the harness. */
+const sameOr = (compare: () => boolean): boolean => {
+  try {
+    return compare();
+  } catch {
+    return false;
+  }
+};
+
 const temporalText = (text: string): string => {
   const dated = /^\d{4}-\d{2}-\d{2}$/.test(text.trim()) ? `${text.trim()}T00:00:00` : text.trim();
   const fraction = dated.replace(/(\d{2}:\d{2}:\d{2})\.(\d*?)0*(?=$|[+\-Z ])/, (_m, time: string, digits: string) => (digits === '' ? time : `${time}.${digits}`));
@@ -100,14 +114,16 @@ const valueMatches = (valueType: string, literal: string, actual: string): boole
     }
     case 'date':
     case 'datetime':
-    case 'datetime-tz':
-      // By instant as TypeDB writes it: a date is its midnight, a fraction of zeros is none, and an
-      // offset is one spelling (`+0100` is `+01:00`, `+00:00` is `Z`) — what a driver parses the
-      // literal to before comparing. A zone NAME is kept as written.
+      // As the driver parses the literal: a date is its midnight, a fraction of zeros is none.
       return temporalText(actual) === temporalText(literal);
+    case 'datetime-tz':
+      // 🔴 By INSTANT: TypeDB's zoned values are equal when they name one moment — the answer
+      // `2026-01-27T12:00:00+00:00` is `…12:00:00 Europe/London` in January (expression.feature L627).
+      return sameOr(() => instantOf(actual) === instantOf(literal));
+    case 'duration':
+      // By value: `P66W` is `P462D`, `…5.00394892S` is `…5.003948920S`.
+      return sameOr(() => canonicalTemporal('duration', actual, fail, undefined) === canonicalTemporal('duration', literal, fail, undefined));
     default:
-      // duration: compared as written. A representation TypeDBLite renders differently is a
-      // non-match, and that is a finding, not a tolerance.
       return actual.trim() === literal.trim();
   }
 };
