@@ -280,7 +280,15 @@ Pipeline:
     stages+=LeadStage stages+=Stage* (fetch=FetchStage | returnStage=ReturnStage)? (end?='end' ';')?;
 
 LeadStage:
-    MatchStage | InsertStage | PutStage | DeleteStage;
+    GivenStage | MatchStage | InsertStage | PutStage | DeleteStage;
+
+// `given $n: string, $p: person, $y: integer?;` — the rows the caller passes in, each variable typed
+// and `?` when it may be absent (given.feature). Only ever the first stage.
+GivenStage:
+    'given' declarations+=GivenDeclaration (',' declarations+=GivenDeclaration)* ';';
+
+GivenDeclaration:
+    variable=VAR ':' type=ValueType (optional?='?')?;
 
 Stage:
     MatchStage | InsertStage | PutStage | DeleteStage | UpdateStage | SelectStage | ReduceStage | SortStage

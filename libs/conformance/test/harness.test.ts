@@ -84,6 +84,13 @@ describe('the row model cannot flatter an identification', () => {
   it('attr: reads the type from the cell itself, not from the query', () => {
     assert.equal(identifierMatches(parseIdentifier('attr:name:Alice'), row, 'n', has), true);
     assert.equal(identifierMatches(parseIdentifier('attr:email:Alice'), row, 'n', has), false);
+    // By value when the attribute's value type is known, as a driver parses the literal (given.feature L100).
+    const decimal = { d: TypeDBLiteValue.attribute('price', '1.5') };
+    const typed = () => 'decimal';
+    assert.equal(identifierMatches(parseIdentifier('attr:price:1.50dec'), decimal, 'd', has, typed), true);
+    assert.equal(identifierMatches(parseIdentifier('attr:price:1.51dec'), decimal, 'd', has, typed), false);
+    const zoned = { z: TypeDBLiteValue.attribute('at', '2024-09-20T16:40:05.000000001+01:00') };
+    assert.equal(identifierMatches(parseIdentifier('attr:at:2024-09-20T16:40:05.000000001+0100'), zoned, 'z', has, () => 'datetime-tz'), true);
     assert.equal(identifierMatches(parseIdentifier('attr:name:Bob'), row, 'n', has), false);
     // 🔴 The subtype case the old query-text reading could not close: a `first-name` answered for
     // `has name $n` is a `first-name` cell, and `attr:name:` does not match it.
@@ -403,6 +410,12 @@ describe('a scenario cannot pass without reaching its assertion', () => {
       'verify answer set is equivalent for query',
       'answer contains document:',
       'set time-zone: Europe/London',
+      // The five `given rows` forms — given.feature.
+      'set query given rows',
+      'get answers of typeql read query with given rows',
+      'get answers of typeql write query with given rows',
+      'typeql read query with given rows; fails with a message containing: "x"',
+      'typeql write query with given rows; fails with a message containing: "x"',
     ]) {
       assert.doesNotThrow(() => findStep(text), text);
     }
@@ -410,13 +423,6 @@ describe('a scenario cannot pass without reaching its assertion', () => {
       'typeql delete',
       'each answer satisfies',
       'get answers of templated typeql read query',
-      // The five `given rows` forms — `given.feature`, 64 uses. Unbound until Phase 03+ decides
-      // what a given stage means here; hidden today only because every Background fails first.
-      'set query given rows',
-      'get answers of typeql read query with given rows',
-      'get answers of typeql write query with given rows',
-      'typeql read query with given rows; fails with a message containing: "x"',
-      'typeql write query with given rows; fails with a message containing: "x"',
     ]) {
       assert.throws(() => findStep(text), UndefinedStep, text);
     }

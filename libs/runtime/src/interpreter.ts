@@ -26,6 +26,7 @@ import {
   isComparisonPattern,
   isKindPattern,
   isLetPattern,
+  VALUE_TYPES,
   isDisjunctionPattern,
   isIsPattern,
   isNegationPattern,
@@ -57,6 +58,7 @@ import {
   type InsertStage,
   type UpdateStage,
   type ThingPattern,
+  type OptionalPattern,
   type PutStage,
   type WriteStage,
   type SortStage,
@@ -470,6 +472,12 @@ interface ThingConstraint {
  * failing statement can say which one it was and a constraint violation knows which attribute it
  * was writing. That last point is not a nicety — see `translateConstraintError`.
  */
+/**
+ * The rows a `given` stage receives (given.feature): one record per row, keyed by variable name
+ * without its `$`. `null` is an absent value — admitted only for a variable declared optional (`?`).
+ */
+export type GivenRows = ReadonlyArray<Readonly<Record<string, TypeDBLiteValue | null>>>;
+
 /** What `execute()` reports: its diagnostics, and what its last write pipeline answers. */
 export interface WriteReport extends ExecutionReport {
   readonly rows: ReadonlyArray<Record<string, TypeDBLiteValue>>;
@@ -506,6 +514,8 @@ interface StreamScope {
   readonly attributeOf: Map<string, string | undefined>;
   /** A value variable's value type, where the schema or the `let` says. */
   readonly valueTypes: Map<string, string | undefined>;
+  /** Variables that may be EMPTY — from a `try`, or a `given` declared `?` — which a write may read only inside `try`. */
+  readonly optional: Set<string>;
 }
 
 export class TypeDBLiteInterpreter {
@@ -1208,7 +1218,7 @@ export class TypeDBLiteInterpreter {
    * an attribute-less thing, **invisible to every TypeQLite query** because they all filter on an
    * attribute, and therefore accumulating unnoticed. Unobservable is not the same as harmless.
    */
-  execute(text: string): WriteReport {
+  execute(text: string, given?: GivenRows): WriteReport {
     this.diagnostics = this.freshDiagnostics();
     this.written = { things: 0, attributes: 0, roles: 0 };
     // What the LAST write pipeline answers — its rows, or its documents when it ends in `fetch`
@@ -1236,6 +1246,7 @@ export class TypeDBLiteInterpreter {
       // `d-20260905-match-insert-writes-to-one-match`), and one that receives none reports
       // `emptyMatch`.
       const scopes = this.planStages(pipeline);
+      const start = this.givenStart(pipeline, given);
       const final = scopes[scopes.length - 1];
       const fetchContext = pipeline.fetch === undefined ? undefined : this.fetchContext();
       const fetchScope = fetchContext?.scopeFor(final);
@@ -1256,7 +1267,7 @@ export class TypeDBLiteInterpreter {
       const savepoint = this.transactionOpen ? `write_${(this.savepointSeq += 1)}` : null;
       this.db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN');
       try {
-        const streamed = this.runStages(pipeline, scopes, [{}]);
+        const streamed = this.runStages(pipeline, scopes, start);
         // Read inside the transaction, after every write the pipeline made.
         answered =
           pipeline.fetch !== undefined && fetchContext !== undefined && fetchScope !== undefined
@@ -1324,22 +1335,22 @@ export class TypeDBLiteInterpreter {
    * Run a read pipeline and project its `select` — or, when it ends in `fetch`, answer one JSON
    * document per answer in `documents` (fetch.feature), with `rows` empty.
    */
-  query(text: string): {
+  query(text: string, given?: GivenRows): {
     rows: Array<Record<string, TypeDBLiteValue>>;
     diagnostics: ExecutionReport['diagnostics'];
     documents?: JsonValue[];
   } {
-    if (!this.tracing) return this.runQuery(text);
+    if (!this.tracing) return this.runQuery(text, given);
     this.trace = newTrace();
     this.lastTrace = this.trace;
     try {
-      return this.runQuery(text);
+      return this.runQuery(text, given);
     } finally {
       this.trace = undefined;
     }
   }
 
-  private runQuery(text: string): {
+  private runQuery(text: string, given?: GivenRows): {
     rows: Array<Record<string, TypeDBLiteValue>>;
     diagnostics: ExecutionReport['diagnostics'];
     documents?: JsonValue[];
@@ -1368,20 +1379,21 @@ export class TypeDBLiteInterpreter {
         this.refuse(DiagnosticCode.writeInRead, `\`query()\` reads; this pipeline has a \`${write.$type.replace(/Stage$/, '').toLowerCase()}\` stage, which \`execute()\` runs.`, rangeOf(write));
       }
       const scopes = this.planStages(pipeline);
+      const start = this.givenStart(pipeline, given);
       const final = scopes[scopes.length - 1];
       if (pipeline.fetch) {
         const context = this.fetchContext();
         const scope = context.scopeFor(final);
         checkFetch(pipeline.fetch.body, scope, context);
         const body = pipeline.fetch.body;
-        const fetched = this.runStages(pipeline, scopes, [{}]).map((row) => fetchDocument(body, row, scope, context));
+        const fetched = this.runStages(pipeline, scopes, start).map((row) => fetchDocument(body, row, scope, context));
         documents = [...(documents ?? []), ...fetched];
         this.diagnostics.fact(DiagnosticCode.projected, `Fetched ${fetched.length} document(s).`, rangeOf(pipeline.fetch));
         continue;
       }
       // A `reduce` answers its row even when it holds no cell (`$m? = max(…)` over nothing).
       const reduced = pipeline.stages.some((stage) => stage.$type === 'ReduceStage');
-      const projected = this.projectRows(this.runStages(pipeline, scopes, [{}]), final, reduced);
+      const projected = this.projectRows(this.runStages(pipeline, scopes, start), final, reduced);
       rows.push(...projected);
       const firstMatch = pipeline.stages.find(isMatchStage);
       const select = [...pipeline.stages].reverse().find(isSelectStage);
@@ -1611,10 +1623,75 @@ export class TypeDBLiteInterpreter {
     }
   }
 
+  // ── given ───────────────────────────────────────────────────────────────────
+
+  /**
+   * The rows a pipeline starts from: `[{}]`, or — for `given $x: integer, $y: string?;` — the
+   * caller's rows, checked as TypeDB checks them (given.feature): a given stage needs rows and rows
+   * need a given stage; every column is declared; a required variable is present and not None; a
+   * value decodes as the declared value type (an integer or decimal widens to a double); a concept
+   * exists and is of the declared type. An absent optional value is EMPTY, as a `try` leaves one.
+   */
+  private givenStart(pipeline: Pipeline, given: GivenRows | undefined): Array<Record<string, Binding>> {
+    const first = pipeline.stages[0];
+    const stage = first?.$type === 'GivenStage' ? first : undefined;
+    const refuse = (message: string): never => this.refuse(DiagnosticCode.given, message, rangeOf(stage ?? pipeline));
+    if (stage === undefined) {
+      if (given !== undefined) refuse('The query contains no given stage, but given rows were provided.');
+      return [{}];
+    }
+    if (given === undefined) return refuse('The query contains a given stage, but no given rows were provided.');
+    const declared = new Map(stage.declarations.map((d) => [d.variable.slice(1), d] as const));
+    return given.map((row, rowIndex) => {
+      const columns = Object.keys(row);
+      for (const name of columns) if (!declared.has(name)) refuse(`The variable '${name}' was not declared in the query.`);
+      const seeded: Record<string, Binding | undefined> = {};
+      for (const [name, declaration] of declared) {
+        const column = columns.indexOf(name);
+        const cell = column < 0 ? null : row[name];
+        if (cell === null || cell === undefined) {
+          if (!declaration.optional) {
+            refuse(
+              column < 0
+                ? `The given rows are missing the required variable '${name}'.`
+                : `The given value at row '${rowIndex}' and column '${column}' was None, but the variable was not declared optional.`,
+            );
+          }
+          seeded[declaration.variable] = undefined;
+          continue;
+        }
+        seeded[declaration.variable] = this.givenBinding(cell, declaration.type, rowIndex, column, refuse);
+      }
+      return seeded as Record<string, Binding>;
+    });
+  }
+
+  private givenBinding(cell: TypeDBLiteValue, type: string, row: number, column: number, refuse: (message: string) => never): Binding {
+    if (this.schema.types.has(type)) {
+      if (!cell.isThing()) return refuse(`The given value at row '${row}' and column '${column}' does not not satisfy the declared type '${type}'.`);
+      const actual = this.typeOfThing(cell.iid);
+      if (actual === '') return refuse(`The given instance at row '${row}' and column '${column}' does not exist in the database.`);
+      if (!this.typeFamily(actual, 'inherited').includes(type)) return refuse(`The given value at row '${row}' and column '${column}' does not not satisfy the declared type '${type}'.`);
+      return cell.iid;
+    }
+    if (cell.isThing() || cell.isType()) return refuse(`The given value at row '${row}' and column '${column}' does not not satisfy the declared type '${type}'.`);
+    const attribute = this.schema.attributes.has(type) ? type : undefined;
+    const wanted = attribute === undefined ? type : (this.valueTypeOfAttribute(attribute) ?? 'string');
+    const has = cell.isAttribute() ? (this.valueTypeOfAttribute(cell.type) ?? 'string') : cell.type;
+    const widens = has === wanted || (wanted === 'double' && (has === 'integer' || has === 'decimal')) || (wanted === 'decimal' && has === 'integer');
+    if (!widens) {
+      const shown = has === 'string' ? `"${cell.asString()}"` : cell.asString();
+      return refuse(`The provided value '${shown}' has type '${has}' and could not be decoded as the value type '${wanted}'.`);
+    }
+    return attribute === undefined
+      ? { kind: 'value', valueType: wanted, value: cell.asString() }
+      : { kind: 'attribute', attributeType: attribute, valueType: wanted, value: this.canonicalValue(attribute, cell.asString(), undefined) };
+  }
+
   // ── the stage pipeline ──────────────────────────────────────────────────────
 
   private initialScope(): StreamScope {
-    return { available: new Set(), kinds: new Map(), patterns: [], segments: [], attributeOf: new Map(), valueTypes: new Map() };
+    return { available: new Set(), kinds: new Map(), patterns: [], segments: [], attributeOf: new Map(), valueTypes: new Map(), optional: new Set() };
   }
 
   /**
@@ -1636,6 +1713,7 @@ export class TypeDBLiteInterpreter {
       segments: [...before.segments],
       attributeOf: new Map(before.attributeOf),
       valueTypes: new Map(before.valueTypes),
+      optional: new Set(before.optional),
     };
     const conceptOf = (variable: string): 'thing' | 'type' | undefined => {
       const kind = before.kinds.get(variable);
@@ -1646,6 +1724,19 @@ export class TypeDBLiteInterpreter {
       scope.kinds.delete(variable);
     };
     switch (stage.$type) {
+      case 'GivenStage': {
+        for (const declaration of stage.declarations) {
+          const type = declaration.type;
+          const isThingType = this.schema.types.has(type);
+          if (!isThingType && !this.schema.attributes.has(type) && !VALUE_TYPES.has(type)) this.checkKnown('type', type, rangeOf(declaration));
+          scope.available.add(declaration.variable);
+          scope.kinds.set(declaration.variable, isThingType ? 'thing' : 'value');
+          if (this.schema.attributes.has(type)) scope.attributeOf.set(declaration.variable, type);
+          scope.valueTypes.set(declaration.variable, VALUE_TYPES.has(type) ? type : this.schema.attributes.has(type) ? this.valueTypeOfAttribute(type) : undefined);
+          if (declaration.optional) scope.optional.add(declaration.variable);
+        }
+        return scope;
+      }
       case 'MatchStage': {
         const segment = this.segmentFor(stage, stage.patterns);
         const patterns = segment.match?.patterns ?? [];
@@ -1670,6 +1761,7 @@ export class TypeDBLiteInterpreter {
         }
         scope.patterns.push(...patterns);
         scope.segments.push(segment);
+        for (const variable of this.nestedBound(patterns.filter(isOptionalPattern))) scope.optional.add(variable);
         return scope;
       }
       case 'InsertStage':
@@ -1827,11 +1919,38 @@ export class TypeDBLiteInterpreter {
     return uniqueRows(rows, valueVariablesReadBy(stage)).map((row) => {
       const scoped = singleBinding(row);
       const values = valueBindingsOf(row);
-      for (const pattern of ordered) this.runInsert(pattern, scoped, values, stage.$type === 'PutStage');
+      for (const pattern of ordered) {
+        if (isOptionalPattern(pattern)) {
+          // Runs only when what it reads is bound (given.feature L353).
+          if (this.blockReady(pattern, row)) for (const inner of insertionOrder(pattern.patterns)) this.runInsert(inner, scoped, values, stage.$type === 'PutStage');
+          continue;
+        }
+        this.runInsert(pattern, scoped, values, stage.$type === 'PutStage');
+      }
       const next: Record<string, Binding> = { ...row };
       for (const [variable, iids] of scoped) if (iids[0] !== undefined) next[variable] = iids[0];
       return next;
     });
+  }
+
+  /**
+   * A write may read a variable that can be EMPTY — from a `try`, or a `given` declared `?` — only
+   * inside a `try` of its own, which runs only when it is bound (given.feature L353, update.feature
+   * L3031): TypeDB's *"A write stage uses the optional variable 'name' outside a 'try' block"*.
+   */
+  private checkOptionalUse(patterns: readonly Pattern[], scope: StreamScope): void {
+    for (const pattern of patterns) {
+      if (isOptionalPattern(pattern)) continue;
+      const used = variablesWritten(pattern).find((variable) => scope.optional.has(variable));
+      if (used !== undefined) {
+        this.refuse(DiagnosticCode.unboundValue, `A write stage uses the optional variable '${used.slice(1)}' outside a 'try' block.`, rangeOf(pattern));
+      }
+    }
+  }
+
+  /** Whether a write's `try` block may run on this row: every variable it reads from the row is bound. */
+  private blockReady(block: OptionalPattern, row: Record<string, Binding>): boolean {
+    return variablesWritten(block).every((variable) => !(variable in row) || row[variable] !== undefined);
   }
 
   // ── update ──────────────────────────────────────────────────────────────────
@@ -1846,10 +1965,8 @@ export class TypeDBLiteInterpreter {
     const unavailable = (variable: string, at: Range | undefined): never =>
       this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' referenced in the update stage is unavailable: no earlier stage binds it.`, at);
     const scope = this.fetchScope(before);
-    for (const pattern of stage.patterns) {
-      // `update try { … };` is TypeDB's (update.feature L2976); this engine does not write through
-      // `try` yet, and says so rather than calling it illegal.
-      if (isOptionalPattern(pattern)) this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not update through `try` yet.', rangeOf(pattern));
+    this.checkOptionalUse(stage.patterns, before);
+    for (const pattern of writtenPatterns(stage.patterns, this.refuse)) {
       if (!isThingPattern(pattern)) illegal(rangeOf(pattern));
       const thing = pattern as ThingPattern;
       if (isAnonymous(thing.variable)) {
@@ -1924,7 +2041,9 @@ export class TypeDBLiteInterpreter {
     const distinct = uniqueRows(rows, valueVariablesReadBy(stage));
     for (const row of distinct) {
       const values = valueBindingsOf(row);
-      for (const pattern of stage.patterns) {
+      // A `try` block updates only when what it reads is bound (update.feature L2976).
+      const patterns = stage.patterns.flatMap((p) => (isOptionalPattern(p) ? (this.blockReady(p, row) ? [...p.patterns] : []) : [p]));
+      for (const pattern of patterns) {
         if (!isThingPattern(pattern)) continue;
         const owner = row[pattern.variable];
         if (typeof owner !== 'number') continue;
@@ -2769,6 +2888,7 @@ export class TypeDBLiteInterpreter {
         return attribute === undefined ? undefined : this.valueTypeOfAttribute(attribute);
       },
       this.schema,
+      new Set(seedVariables),
     );
     return statements;
   }
@@ -3018,14 +3138,15 @@ export class TypeDBLiteInterpreter {
     // EVERY written `isa` of the variable, not the last (review, round 20): `isa! memo, isa doc`
     // is refused by the `isa!` whichever comes first.
     const matchIsasOf = new Map(matchConstraints.map((c) => [c.variable, c.isas.filter((isa) => isa.type !== undefined)] as const));
-    for (const pattern of write.patterns) {
+    this.checkOptionalUse(write.patterns, scope);
+    for (const pattern of writtenPatterns(write.patterns, this.refuse)) {
       if (isLetPattern(pattern) || isComparisonPattern(pattern)) {
         this.refuse(DiagnosticCode.mixedPattern, 'A `let` or a comparison belongs to a `match`, not to a write stage.', rangeOf(pattern));
       }
-      // A write states what it writes: `not`, `or`, `try` and `is` constrain a match, and an insert
-      // would otherwise pass over them without a word.
-      if (isNegationPattern(pattern) || isDisjunctionPattern(pattern) || isOptionalPattern(pattern) || isIsPattern(pattern)) {
-        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not write through `not`, `or`, `try` or `is`; they constrain a `match`.', rangeOf(pattern));
+      // A write states what it writes: `not`, `or` and `is` constrain a match, and an insert would
+      // otherwise pass over them without a word. (`try` is a write's own — `writtenPatterns`.)
+      if (isNegationPattern(pattern) || isDisjunctionPattern(pattern) || isIsPattern(pattern)) {
+        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not write through `not`, `or` or `is`; they constrain a `match`.', rangeOf(pattern));
       }
       if (/\(\s*\$[\w-]+\s*:/.test(pattern.$cstNode?.text ?? '')) {
         // TypeDB writes through a role variable; this engine does not yet — refused by name, so a
@@ -3699,6 +3820,11 @@ export class TypeDBLiteInterpreter {
    * Every attribute of the given type a thing owns — the driver's `getHas`. The harness resolves a
    * `key:ref:0` identifier through this rather than trusting anything the cell carries.
    */
+  /** The value type an attribute type holds, through its parents — what a driver reads off the schema. */
+  attributeValueType(attribute: string): string | undefined {
+    return this.valueTypeOfAttribute(attribute);
+  }
+
   attributesOf(iid: number, attribute: string): ReadonlyArray<TypeDBLiteValue> {
     return this.readAttributes(iid, attribute).map((v) => TypeDBLiteValue.attribute(v.type, v.value));
   }
@@ -4244,6 +4370,19 @@ function insertionOrder(patterns: readonly Pattern[]): Pattern[] {
   return ordered;
 }
 
+/**
+ * A write stage's patterns with each `try { … }` opened — the block's own patterns are written as
+ * the stage's are, when it runs. A `try` inside a `try` is refused (update.feature L3042).
+ */
+function writtenPatterns(patterns: readonly Pattern[], refuse: Refuse): Pattern[] {
+  return patterns.flatMap((pattern) => {
+    if (!isOptionalPattern(pattern)) return [pattern];
+    const nested = pattern.patterns.find(isOptionalPattern);
+    if (nested !== undefined) refuse(DiagnosticCode.mixedPattern, 'Nested try blocks are not allowed in a write stage.', rangeOf(nested));
+    return [...pattern.patterns];
+  });
+}
+
 /** A write stage — what `execute()` runs and `query()` refuses. */
 const isWriteStage = (stage: LeadStage | Stage): stage is WriteStage =>
   stage.$type === 'InsertStage' || stage.$type === 'PutStage' || stage.$type === 'DeleteStage' || stage.$type === 'UpdateStage';
@@ -4309,7 +4448,7 @@ function uniqueByConcepts(combinations: readonly Record<string, Binding>[], keep
 function valueVariablesReadBy(write: WriteStage): Set<string> {
   if (write.$type === 'DeleteStage') return new Set(write.deletions.flatMap((d) => (d.owner !== undefined && d.target !== undefined ? [d.target] : [])));
   return new Set(
-    write.patterns.flatMap((pattern) =>
+    write.patterns.flatMap((p) => (isOptionalPattern(p) ? [...p.patterns] : [p])).flatMap((pattern) =>
       isThingPattern(pattern)
         ? pattern.properties.flatMap((p) =>
             !isHasProperty(p)

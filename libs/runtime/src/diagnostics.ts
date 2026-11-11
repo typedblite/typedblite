@@ -126,6 +126,8 @@ export const DiagnosticCode = {
    * of an attribute that can be owned more than once, a sub-query with no `fetch`.
    */
   fetch: 'typedblite.fetch',
+  /** Given rows that do not fit the `given` stage — missing, undeclared, None, or of the wrong type. */
+  given: 'typedblite.given',
   /** A write stage handed to `query()`, which reads — `execute()` runs writes. */
   writeInRead: 'typedblite.write-in-read',
   truncated: 'typedblite.diagnostics-truncated',

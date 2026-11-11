@@ -25,6 +25,7 @@ import {
   isDisjunctionPattern,
   isOptionalPattern,
   isMatchStage,
+  isGivenStage,
   isInsertStage,
   isPutStage,
   isSelectStage,
@@ -527,7 +528,10 @@ function walkStages(node: Pipeline, accept?: ValidationAcceptor): Set<string> {
   let last: MatchBindings | undefined;
   for (const stage of node.stages) {
     if (accept) checkNamed(stage, accept);
-    if (isMatchStage(stage) || isInsertStage(stage) || isPutStage(stage)) {
+    if (isGivenStage(stage)) {
+      // `given $x: integer;` — bound by the caller's rows.
+      for (const declaration of stage.declarations) bound.add(declaration.variable);
+    } else if (isMatchStage(stage) || isInsertStage(stage) || isPutStage(stage)) {
       const bindings = bindingsOf(stage.patterns);
       const local = new Set([...bound, ...bindings.selectable, ...bindings.things.keys(), ...bindings.rolePlayersOnly]);
       if (accept && isMatchStage(stage)) {

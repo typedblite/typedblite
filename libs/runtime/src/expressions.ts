@@ -769,6 +769,8 @@ export function orderValueStatements(
   attributeType: (variable: string) => string | undefined = () => undefined,
   /** The applied schema, so a schema call's label is checked before any row. */
   facts?: SchemaFacts,
+  /** What earlier stages bound — a `let` may not reassign one (given.feature L153). */
+  previous: ReadonlySet<string> = new Set(),
 ): ValueStatements {
   const lets = patterns.filter(isLetPattern);
   const comparisons = patterns.filter(isComparisonPattern);
@@ -808,6 +810,13 @@ export function orderValueStatements(
         );
       }
       assigned.add(variable);
+      if (previous.has(variable)) {
+        refuse(
+          DiagnosticCode.valueAssignedTwice,
+          `The variable '${variable.slice(1)}' may not be assigned to, as it was already bound in a previous stage.`,
+          rangeOf(statement),
+        );
+      }
       if (bound.has(variable)) {
         refuse(
           DiagnosticCode.mixedPattern,

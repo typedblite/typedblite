@@ -64,6 +64,12 @@ const decimalOf = (text: string): string | undefined => {
   return `${zero ? '' : sign}${integer}${trimmed === '' ? '' : `.${trimmed}`}`;
 };
 
+const temporalText = (text: string): string => {
+  const dated = /^\d{4}-\d{2}-\d{2}$/.test(text.trim()) ? `${text.trim()}T00:00:00` : text.trim();
+  const fraction = dated.replace(/(\d{2}:\d{2}:\d{2})\.(\d*?)0*(?=$|[+\-Z ])/, (_m, time: string, digits: string) => (digits === '' ? time : `${time}.${digits}`));
+  return fraction.replace(/([+-])(\d{2}):?(\d{2})$/, (_m, sign: string, hh: string, mm: string) => (hh === '00' && mm === '00' ? 'Z' : `${sign}${hh}:${mm}`));
+};
+
 const valueMatches = (valueType: string, literal: string, actual: string): boolean => {
   switch (valueType) {
     case 'integer':
@@ -92,9 +98,16 @@ const valueMatches = (valueType: string, literal: string, actual: string): boole
       const got = decimalOf(actual);
       return expected !== undefined && got !== undefined && expected === got;
     }
+    case 'date':
+    case 'datetime':
+    case 'datetime-tz':
+      // By instant as TypeDB writes it: a date is its midnight, a fraction of zeros is none, and an
+      // offset is one spelling (`+0100` is `+01:00`, `+00:00` is `Z`) — what a driver parses the
+      // literal to before comparing. A zone NAME is kept as written.
+      return temporalText(actual) === temporalText(literal);
     default:
-      // datetime, datetime-tz, date, duration: compared as written. A representation TypeDBLite
-      // renders differently is a non-match, and that is a finding, not a tolerance.
+      // duration: compared as written. A representation TypeDBLite renders differently is a
+      // non-match, and that is a finding, not a tolerance.
       return actual.trim() === literal.trim();
   }
 };
@@ -104,6 +117,7 @@ export const identifierMatches = (
   row: AnswerRow,
   variable: string,
   has: Answers['has'],
+  valueTypeOf?: Answers['valueTypeOf'],
 ): boolean => {
   const cell: TypeDBLiteValue | undefined = row[variable];
   if (identifier.kind === 'none') return cell === undefined;
@@ -114,12 +128,16 @@ export const identifierMatches = (
         cell.isThing() &&
         has(cell.iid, identifier.type).some((a) => unquote(a.asString()) === unquote(identifier.literal))
       );
-    case 'attr':
-      return (
-        cell.isAttribute() &&
-        cell.type === identifier.type &&
-        unquote(cell.asString()) === unquote(identifier.literal)
-      );
+    case 'attr': {
+      // 🔴 By VALUE, as the driver compares one: it parses the literal as the attribute's value type
+      // — `1234567890.0001234567890dec` is the stored `1234567890.000123456789`, `…+0100` is `…+01:00`
+      // (given.feature L100). Without the value type, the text is what there is.
+      if (!cell.isAttribute() || cell.type !== identifier.type) return false;
+      const valueType = valueTypeOf?.(cell.type);
+      return valueType === undefined || valueType === 'string'
+        ? unquote(cell.asString()) === unquote(identifier.literal)
+        : valueMatches(normaliseValueType(valueType), identifier.literal, cell.asString());
+    }
     case 'value':
       // 🔴 A VALUE cell carries its value type, and the identifier's must be it — an integer `752`
       // is not `value:double:752.0`, and `valueMatches` alone could not tell (Phase 06 review,
@@ -142,7 +160,7 @@ const matchesOf = (
   const identifiers = cells.map(parseIdentifier);
   const matched: number[] = [];
   answers.rows.forEach((row, index) => {
-    const all = header.every((variable, i) => identifierMatches(identifiers[i], row, variable, answers.has));
+    const all = header.every((variable, i) => identifierMatches(identifiers[i], row, variable, answers.has, answers.valueTypeOf));
     if (all) matched.push(index);
   });
   return matched;
@@ -183,7 +201,7 @@ export const orderedIdentify = (
   rows.forEach((cells, i) => {
     const identifiers = cells.map(parseIdentifier);
     const row = answers.rows[i];
-    const ok = header.every((variable, j) => identifierMatches(identifiers[j], row, variable, answers.has));
+    const ok = header.every((variable, j) => identifierMatches(identifiers[j], row, variable, answers.has, answers.valueTypeOf));
     if (!ok) throw new Error(`answer ${i + 1} is not (${cells.join(' | ')})`);
   });
 };
@@ -191,7 +209,7 @@ export const orderedIdentify = (
 /** `Then result is a single row with variable 'count': value:integer:6`. */
 export const singleRowVariable = (variable: string, cell: string, answers: Answers): void => {
   if (answers.rows.length !== 1) throw new Error(`expected 1 row, got ${answers.rows.length}`);
-  const ok = identifierMatches(parseIdentifier(cell), answers.rows[0], variable, answers.has);
+  const ok = identifierMatches(parseIdentifier(cell), answers.rows[0], variable, answers.has, answers.valueTypeOf);
   if (!ok) throw new Error(`variable '${variable}' is not ${cell}`);
 };
 

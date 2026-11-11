@@ -87,20 +87,20 @@ Rules:
 | undefine | 131 |
 | expression | 92 |
 | reduce | 63 |
-| insert | 40 |
+| insert | 42 |
 | match | 56 |
 | delete | 15 |
 | fetch | 40 |
 | pipelines | 9 |
 | modifiers | 24 |
-| update | 27 |
+| update | 30 |
 | variables | 11 |
 | disjunction | 7 |
-| given | 0 |
+| given | 18 |
 | metadata | 107 |
 | negation | 14 |
 | optional | 10 |
-| put | 5 |
+| put | 7 |
 
 ## Tests
 

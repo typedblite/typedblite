@@ -1,4 +1,4 @@
-import { DiagnosticCode, diagnosticOf } from '@typedblite/runtime';
+import { DiagnosticCode, diagnosticOf, TypeDBLiteValue, type GivenRows } from '@typedblite/runtime';
 import { orderedIdentify, rowKey, singleRowVariable, uniquelyIdentify } from './identify.js';
 import type { SpecStep } from './spec.js';
 import { EvaluatedNothing, HarnessError, World, type TransactionKind } from './world.js';
@@ -190,7 +190,7 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
     run: (world, _m, step) => {
       const query = docString(step);
       const { rows, documents } = world.readAnswers(query);
-      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute) };
+      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute), valueTypeOf: (attribute) => world.attributeValueType(attribute) };
     },
   },
   {
@@ -200,7 +200,30 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
     run: (world, _m, step) => {
       const query = docString(step);
       const { rows, documents } = world.writeQuery(query);
-      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute) };
+      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute), valueTypeOf: (attribute) => world.attributeValueType(attribute) };
+    },
+  },
+
+  // ── given rows (given.feature) ──────────────────────────────────────────────────────────────
+  {
+    pattern: /^set query given rows$/,
+    run: (world, _m, step) => void (world.givenRows = givenRows(table(step))),
+  },
+  {
+    pattern: /^get answers of typeql (read|write) query with given rows$/,
+    run: (world, m, step) => {
+      const query = docString(step);
+      const given = givenOf(world);
+      const { rows, documents } = m[1] === 'read' ? world.readAnswers(query, given) : world.writeQuery(query, given);
+      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute), valueTypeOf: (attribute) => world.attributeValueType(attribute) };
+    },
+  },
+  {
+    pattern: /^typeql (read|write) query with given rows; fails with a message containing: "(.*)"$/,
+    run: (world, m, step) => {
+      const query = docString(step);
+      const given = givenOf(world);
+      expectFailure(() => void (m[1] === 'read' ? world.readAnswers(query, given) : world.writeQuery(query, given)), 'containing', m[2]);
     },
   },
 
@@ -287,6 +310,34 @@ const jsonEqual = (a: JsonValue, b: JsonValue): boolean => {
   }
   const keys = Object.keys(a);
   return keys.length === Object.keys(b).length && keys.every((key) => key in b && jsonEqual(a[key], b[key]));
+};
+
+const givenOf = (world: World): GivenRows => {
+  if (world.givenRows === undefined) throw new HarnessError('no given rows — run `set query given rows` first');
+  return world.givenRows;
+};
+
+/**
+ * A given-rows table: the header names each variable (`n: string` — the type is the query's to
+ * declare), a cell is `value:<type>:<text>` or `none` (absent). 🔴 A cell naming a TypeDB iid
+ * (`iid:entity:0:1`) is TypeDB's own storage numbering; nothing here can resolve one, and inventing
+ * a mapping would be guessing — the step fails instead.
+ */
+const givenRows = (rows: ReadonlyArray<ReadonlyArray<string>>): GivenRows => {
+  const [header, ...body] = rows;
+  const names = header.map((column) => column.split(':')[0].trim());
+  return body.map((row) =>
+    Object.fromEntries(
+      row.map((cell, index) => {
+        const text = cell.trim();
+        if (text === 'none') return [names[index], null];
+        const value = /^value:([\w-]+):(.*)$/.exec(text);
+        if (value === null) throw new HarnessError(`a given cell '${text}' names no value this harness can pass — a TypeDB iid cannot be resolved here`);
+        const [, type, raw] = value;
+        return [names[index], TypeDBLiteValue.value(type, type === 'decimal' ? raw.replace(/dec$/, '') : raw)];
+      }),
+    ),
+  );
 };
 
 const answersOf = (world: World) => {
