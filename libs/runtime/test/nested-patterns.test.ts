@@ -127,6 +127,12 @@ describe('nested patterns', () => {
     }
   });
 
+  it('a function answering attributes joins on a bound variable; one passed its own variable is unbound — disjunction L172, variables L284', () => {
+    const fn = 'with fun names($x: person) -> { name }: match $x has name $n; return { $n }; ';
+    assert.equal(engine.query(`${fn}match $p isa person, has name $n; let $n in names($p);`).rows.length, 2);
+    assert.match(refusal(() => engine.query('with fun ident($x: integer) -> integer: match let $y = $x; return first $y; match let $x = ident($x);')).message, /The variable 'x' must be bound to a value before it's used/);
+  });
+
   it('a write states what it writes: not, or, try and is are refused there by name', () => {
     assert.equal(refusal(() => engine.execute('insert $p isa person, has ref 20; not { $p has age 1; };')).code, DiagnosticCode.notImplemented);
   });

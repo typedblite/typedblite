@@ -4,15 +4,18 @@ import {
   isFetchExpression,
   isFetchList,
   isFetchObject,
+  isFetchSingle,
+  isFunctionExpression,
   isVariableExpression,
   type Expression,
   type FetchObject,
   type FetchValue,
   type Pipeline,
+  type ReturnStage,
 } from '@typedblite/language';
 import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf } from './diagnostics.js';
-import { evaluate, variablesOf, type SchemaContext, type ValueBinding } from './expressions.js';
+import { evaluate, shapeOfFunction, userFunctionOf, variablesOf, type ReturnShape, type SchemaContext, type ValueBinding } from './expressions.js';
 import type { Refuse, SchemaFacts } from './schema-rules.js';
 import { ownsKey, ownsSubject, relatesSubject } from './schema-subjects.js';
 import { formatDuration, parseDuration } from './temporal.js';
@@ -54,6 +57,10 @@ export interface FetchContext {
   readonly scopeOf: (pipeline: Pipeline, parent: FetchScope) => FetchScope;
   /** A sub-query's answers from one parent answer — every stage run, seeded with it. */
   readonly rows: (pipeline: Pipeline, parent: FetchScope, seed: Record<string, Binding>) => Array<Record<string, Binding>>;
+  /** What a `return` sub-query answers from one parent answer: its tuples. */
+  readonly returned: (pipeline: Pipeline, parent: FetchScope, seed: Record<string, Binding>) => ReadonlyArray<ReadonlyArray<ValueBinding | undefined>>;
+  /** What an expression evaluated in one answer may read — the schema, the bindings, function calls. */
+  readonly contextFor: (combination: Record<string, Binding>) => SchemaContext;
   /** An owner's attributes in written order — of one type and its subtypes, or every one. */
   readonly attributes: (owner: number, attribute?: string) => Array<{ type: string; value: string }>;
   readonly typeOfThing: (iid: number) => string;
@@ -155,6 +162,40 @@ export function jsonOf(valueType: string, text: string): JsonValue {
   }
 }
 
+// ── functions and return sub-queries ────────────────────────────────────────
+
+const shapeOfReturn = (stage: ReturnStage): ReturnShape => ({
+  stream: stage.streamed.length > 0,
+  reduce: stage.reductions.length > 0,
+  width: stage.streamed.length + stage.selected.length + stage.reductions.length,
+});
+
+/**
+ * Where a function's or a sub-query's answers go (fetch.feature L1961–L2930): a SCALAR position takes
+ * one value — a stream "must be wrapped in `[]`", a tuple "returns a non-scalar result"; a LIST takes
+ * a stream of single values, one value, or a reduction's tuple flattened — a stream of tuples is
+ * refused.
+ */
+function checkShape(shape: ReturnShape, position: 'scalar' | 'list', what: string, subquery: boolean, refuse: Refuse, at: Range | undefined): void {
+  if (position === 'scalar') {
+    if (shape.stream) refuseFetch(refuse, `${what} returns a stream, which must be wrapped in \`[]\` to collect into a list.`, at);
+    if (shape.width > 1) refuseFetch(refuse, `${what} returns a non-scalar result, and this fetch entry takes one value.`, at);
+    return;
+  }
+  if (shape.width > 1 && !(shape.reduce && !shape.stream)) {
+    refuseFetch(refuse, subquery && shape.stream ? `${what} returns a non-scalar non-reduce result, which a list cannot hold.` : `${what} returns a non-scalar result, which a list cannot hold.`, at);
+  }
+}
+
+const tupleJson = (tuple: ReadonlyArray<ValueBinding | undefined>): JsonValue[] => tuple.map((v) => (v === undefined ? null : jsonOf(v.valueType, v.value)));
+
+function answersJson(tuples: ReadonlyArray<ReadonlyArray<ValueBinding | undefined>>, shape: ReturnShape, position: 'scalar' | 'list'): JsonValue {
+  if (position === 'scalar') return tuples[0] === undefined ? null : tupleJson(tuples[0])[0];
+  // A reduction's one tuple is the list itself — `[ … return count($n), sum($a); ]` is `[2, 20]`.
+  if (!shape.stream && shape.reduce) return tuples[0] === undefined ? [] : tupleJson(tuples[0]);
+  return tuples.map((tuple) => tupleJson(tuple)[0]);
+}
+
 // ── the static pass ──────────────────────────────────────────────────────────
 
 const refuseFetch = (refuse: Refuse, message: string, at: Range | undefined): never => refuse(DiagnosticCode.fetch, message, at);
@@ -196,8 +237,16 @@ function checkProjection(variable: string, attribute: string, scalar: boolean, s
   }
 }
 
-function checkExpressionReads(expression: Expression, scope: FetchScope, ctx: FetchContext): void {
+function checkExpressionReads(expression: Expression, scope: FetchScope, ctx: FetchContext, position: 'scalar' | 'list' = 'scalar'): void {
   const at = rangeOf(expression);
+  const definition = userFunctionOf(expression);
+  if (definition !== undefined) {
+    checkShape(shapeOfFunction(definition), position, `'${definition.name}'`, false, ctx.refuse, at);
+    // An argument nothing binds is a value read before it is bound (fetch.feature L3127).
+    for (const variable of variablesOf(expression)) {
+      if (!scope.available.has(variable)) refuseFetch(ctx.refuse, `The variable '${variable.slice(1)}' must be bound to a value before it's used.`, at);
+    }
+  }
   for (const variable of variablesOf(expression)) requireAvailable(variable, scope, ctx.refuse, at);
   if (isVariableExpression(expression)) refuseThing(expression.variable, scope, ctx.facts, ctx.refuse, at);
 }
@@ -208,24 +257,28 @@ function checkValue(value: FetchValue, scope: FetchScope, ctx: FetchContext): vo
   if (isFetchExpression(value)) return checkExpressionReads(value.expression, scope, ctx);
   if (isFetchList(value)) {
     if (value.attribute) return checkProjection(value.attribute.variable, value.attribute.attribute, false, scope, ctx, rangeOf(value));
-    if (value.expression) return checkExpressionReads(value.expression, scope, ctx);
-    if (value.subquery) return checkSubquery(value.subquery, scope, ctx);
+    if (value.expression) return checkExpressionReads(value.expression, scope, ctx, 'list');
+    if (value.subquery) return checkSubquery(value.subquery, scope, ctx, 'list');
   }
+  if (isFetchSingle(value)) return checkSubquery(value.subquery as unknown as Pipeline, scope, ctx, 'scalar');
 }
 
 /**
  * A list sub-query reads its parent's answers and answers documents of its own: it must end in a
  * `fetch`, and it may not write — a `fetch` is a read (fetch.feature L1478).
  */
-function checkSubquery(subquery: Pipeline, parent: FetchScope, ctx: FetchContext): void {
+function checkSubquery(subquery: Pipeline, parent: FetchScope, ctx: FetchContext, position: 'scalar' | 'list'): void {
   const at = rangeOf(subquery);
-  if (subquery.stages.some((stage) => stage.$type === 'InsertStage' || stage.$type === 'PutStage' || stage.$type === 'DeleteStage')) {
+  if (subquery.stages.some((stage) => stage.$type === 'InsertStage' || stage.$type === 'PutStage' || stage.$type === 'DeleteStage' || stage.$type === 'UpdateStage')) {
     refuseFetch(ctx.refuse, 'A fetch sub-query reads; it may not write.', at);
   }
+  // `[ match …; return { $n }; ]`, `( match …; return count($n); )` — a sub-query answering values.
   if (subquery.returnStage) {
-    ctx.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate a `return` sub-query yet.', rangeOf(subquery.returnStage));
+    ctx.scopeOf(subquery, parent);
+    checkShape(shapeOfReturn(subquery.returnStage), position, 'This sub-query', true, ctx.refuse, at);
+    return;
   }
-  if (!subquery.fetch) {
+  if (!subquery.fetch || position === 'scalar') {
     refuseFetch(ctx.refuse, 'Invalid fetch sub-query: no fetch stage ends it, and a list sub-query answers documents.', at);
   }
   checkFetch((subquery.fetch as NonNullable<Pipeline['fetch']>).body, ctx.scopeOf(subquery, parent), ctx);
@@ -260,7 +313,22 @@ const schemaContext = (combination: Record<string, Binding>, facts: SchemaFacts)
   },
 });
 
+function callJson(expression: Expression, combination: Record<string, Binding>, ctx: FetchContext, position: 'scalar' | 'list'): JsonValue | undefined {
+  const definition = userFunctionOf(expression);
+  if (definition === undefined || !isFunctionExpression(expression)) return undefined;
+  const context = ctx.contextFor(combination);
+  const args = expression.arguments.map((argument) => {
+    if (isVariableExpression(argument)) return combination[argument.variable];
+    const value = evaluate(argument, (v) => (typeof combination[v] === 'object' ? (combination[v] as ValueBinding) : undefined), ctx.refuse, context);
+    return { kind: 'value' as const, valueType: value.valueType, value: value.text };
+  });
+  const tuples = context.call?.(definition, args, rangeOf(expression)) ?? [];
+  return answersJson(tuples, shapeOfFunction(definition), position);
+}
+
 function expressionJson(expression: Expression, combination: Record<string, Binding>, ctx: FetchContext): JsonValue {
+  const called = callJson(expression, combination, ctx, 'scalar');
+  if (called !== undefined) return called;
   // A variable a `try` left empty makes the value empty: `null` (fetch.feature L957).
   if (variablesOf(expression).some((variable) => variable in combination && combination[variable] === undefined)) return null;
   if (isVariableExpression(expression)) {
@@ -274,7 +342,7 @@ function expressionJson(expression: Expression, combination: Record<string, Bind
     const binding = combination[variable];
     return typeof binding === 'object' ? binding : undefined;
   };
-  const value = evaluate(expression, env, ctx.refuse, schemaContext(combination, ctx.facts));
+  const value = evaluate(expression, env, ctx.refuse, ctx.contextFor(combination));
   return jsonOf(value.valueType, value.text);
 }
 
@@ -302,26 +370,44 @@ function allAttributes(variable: string, combination: Record<string, Binding>, c
 }
 
 function valueJson(value: FetchValue, combination: Record<string, Binding>, scope: FetchScope, ctx: FetchContext): JsonValue {
-  if (isFetchObject(value)) return fetchDocument(value, combination, scope, ctx);
+  if (isFetchObject(value)) {
+    // `{ $e.* }` of a thing a `try` left empty is no object at all: `null` (fetch.feature L882).
+    const [only] = value.entries;
+    if (value.entries.length === 1 && isFetchAllAttributes(only) && only.variable in combination && combination[only.variable] === undefined) return null;
+    return fetchDocument(value, combination, scope, ctx);
+  }
   if (isFetchAttribute(value)) return projectionJson(value.variable, value.attribute, true, combination, ctx);
   if (isFetchExpression(value)) return expressionJson(value.expression, combination, ctx);
   if (isFetchList(value)) {
     if (value.attribute) return projectionJson(value.attribute.variable, value.attribute.attribute, false, combination, ctx);
-    if (value.expression) return [expressionJson(value.expression, combination, ctx)];
+    if (value.expression) return callJson(value.expression, combination, ctx, 'list') ?? [expressionJson(value.expression, combination, ctx)];
+    if (value.subquery?.returnStage) {
+      const subquery = value.subquery;
+      return answersJson(ctx.returned(subquery, scope, seedFrom(scope, combination)), shapeOfReturn(subquery.returnStage as ReturnStage), 'list');
+    }
     if (value.subquery?.fetch) {
       const subquery = value.subquery;
       const subscope = ctx.scopeOf(subquery, scope);
       // The parent's answer is the sub-query's starting point: what it binds stays bound.
-      const seed: Record<string, Binding> = {};
-      for (const variable of scope.available) {
-        if (combination[variable] !== undefined) seed[variable] = combination[variable];
-      }
+      const seed = seedFrom(scope, combination);
       const body = (subquery.fetch as NonNullable<Pipeline['fetch']>).body;
       return ctx.rows(subquery, scope, seed).map((row) => fetchDocument(body, row, subscope, ctx));
     }
   }
+  if (isFetchSingle(value)) {
+    return answersJson(ctx.returned(value.subquery as unknown as Pipeline, scope, seedFrom(scope, combination)), shapeOfReturn(value.subquery.returnStage), 'scalar');
+  }
   return null;
 }
+
+/** The parent's answer as a sub-query's starting point: what it binds stays bound. */
+const seedFrom = (scope: FetchScope, combination: Record<string, Binding>): Record<string, Binding> => {
+  const seed: Record<string, Binding> = {};
+  // 🔴 An EMPTY variable (a `try` that matched nothing) stays present and empty: a sub-query that uses
+  // it answers nothing for this row, where an absent one would be enumerated (fetch.feature L882).
+  for (const variable of scope.available) if (variable in combination) seed[variable] = combination[variable];
+  return seed;
+};
 
 /** One answer's document. */
 export function fetchDocument(object: FetchObject, combination: Record<string, Binding>, scope: FetchScope, ctx: FetchContext): JsonValue {

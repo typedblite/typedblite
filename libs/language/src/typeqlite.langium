@@ -277,7 +277,29 @@ ValueType returns string:
 // `end;` closes a pipeline explicitly — TypeQL's terminator, which is how one document holds several
 // queries (`examples/real-queries.typeqlite`).
 Pipeline:
-    stages+=LeadStage stages+=Stage* (fetch=FetchStage | returnStage=ReturnStage)? (end?='end' ';')?;
+    (functions+=FunctionDefinition)* stages+=LeadStage stages+=Stage* (fetch=FetchStage | returnStage=ReturnStage)? (end?='end' ';')?;
+
+// ── query-local functions ───────────────────────────────────────────────────
+//
+// `with fun get_names($p: person) -> { name }: match $p has name $n; return { $n };` — a function the
+// query that follows may call (fetch.feature L1687). `-> { T, … }` answers a stream of tuples,
+// `-> T, …` one tuple (or none); a `?` marks a value that may be absent. The body is a pipeline that
+// ends in `return`. 🔴 `define fun …` — a function the SCHEMA stores — is not this, and does not parse.
+FunctionDefinition:
+    'with' 'fun' name=ID '(' (parameters+=FunctionParameter (',' parameters+=FunctionParameter)*)? ')' '->' output=FunctionOutput ':' body=FunctionBody;
+
+FunctionParameter:
+    variable=VAR ':' type=ValueType (optional?='?')?;
+
+FunctionOutput:
+      stream?='{' types+=FunctionOutputType (',' types+=FunctionOutputType)* '}'
+    | types+=FunctionOutputType (',' types+=FunctionOutputType)*;
+
+FunctionOutputType:
+    type=ValueType (optional?='?')?;
+
+FunctionBody:
+    stages+=LeadStage stages+=Stage* returnStage=ReturnStage;
 
 LeadStage:
     GivenStage | MatchStage | InsertStage | PutStage | DeleteStage;
@@ -407,7 +429,13 @@ FetchAllAttributes:
     variable=VAR '.' '*';
 
 FetchValue:
-    FetchObject | FetchList | FetchAttribute | FetchExpression;
+    FetchObject | FetchList | FetchSingle | FetchAttribute | FetchExpression;
+
+// `( match …; return count($n); )` — a sub-query answering ONE value, where `[ … ]` collects a list
+// (fetch.feature L2174).
+// 🔴 A `return` sub-query only: `( match …; fetch { … }; )` is a PARSE failure (fetch.feature L989).
+FetchSingle:
+    '(' subquery=FunctionBody ')';
 
 // `$p.age` — scalar: `null`, or the one value; refused when the attribute can be owned more than once.
 FetchAttribute:
@@ -529,8 +557,10 @@ KindPattern:
 
 // `(owner: $s, step: $st) isa skill-composition;` — an unbound relation, never referred to again.
 // `(employee: $x);` — with no `isa`, a relation of any type (negation.feature L608).
+// `employment (employee: $p, employer: $e);` — the type before the players (fetch.feature L882).
 AnonRelationPattern:
-    players=RolePlayers ('isa' type=ID)? ';';
+      players=RolePlayers ('isa' type=ID)? ';'
+    | type=ID players=RolePlayers ';';
 
 Property:
     IsaProperty | HasProperty | LinksProperty | LabelProperty | SubProperty | OwnsProperty

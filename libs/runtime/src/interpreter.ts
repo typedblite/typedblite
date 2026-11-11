@@ -56,6 +56,8 @@ import {
   type SelectStage,
   type DeleteStage,
   type InsertStage,
+  type FunctionDefinition,
+  type ReturnStage,
   type UpdateStage,
   type ThingPattern,
   type OptionalPattern,
@@ -83,6 +85,7 @@ import {
 import { generateSchema } from './sqlite-generator.js';
 import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
+import { type SchemaContext } from './expressions.js';
 import { applyValueStatements, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
 import { applyReduce, checkReduce } from './reduce.js';
 import { canonicalTemporal } from './temporal.js';
@@ -485,6 +488,9 @@ export interface WriteReport extends ExecutionReport {
   /** When the pipeline ends in `fetch`: a document per answer, and `rows` is empty. */
   readonly documents?: ReadonlyArray<JsonValue>;
 }
+
+/** What the stage planner and runner read: a pipeline's stages, or a function body's. */
+type Stages = { readonly stages: ReadonlyArray<LeadStage | Stage> };
 
 /**
  * One `match` (and what used to follow it in a fixed order) — the unit the per-match machinery
@@ -1246,6 +1252,7 @@ export class TypeDBLiteInterpreter {
       // Each write stage runs once per row it receives (`d-20260905-match-delete-removes-one-match-of`,
       // `d-20260905-match-insert-writes-to-one-match`), and one that receives none reports
       // `emptyMatch`.
+      this.planFunctions(pipeline);
       const scopes = this.planStages(pipeline);
       const start = this.givenStart(pipeline, given);
       const final = scopes[scopes.length - 1];
@@ -1379,6 +1386,7 @@ export class TypeDBLiteInterpreter {
       if (write) {
         this.refuse(DiagnosticCode.writeInRead, `\`query()\` reads; this pipeline has a \`${write.$type.replace(/Stage$/, '').toLowerCase()}\` stage, which \`execute()\` runs.`, rangeOf(write));
       }
+      this.planFunctions(pipeline);
       const scopes = this.planStages(pipeline);
       const start = this.givenStart(pipeline, given);
       const final = scopes[scopes.length - 1];
@@ -1540,6 +1548,11 @@ export class TypeDBLiteInterpreter {
         return scopeFor(scopes[scopes.length - 1], parent);
       },
       rows: (pipeline, parent, seed) => this.runStages(pipeline, plan(pipeline, parent), [seed]),
+      returned: (pipeline, parent, seed) => {
+        const scopes = plan(pipeline, parent);
+        return this.returned(pipeline.returnStage as ReturnStage, this.runStages(pipeline, scopes, [seed]), scopes[scopes.length - 1], rangeOf(pipeline));
+      },
+      contextFor: (combination) => this.evaluationContext(combination),
       attributes: (owner, attribute) =>
         attribute === undefined
           ? (this.db.prepare('SELECT type, value FROM attr WHERE owner = ? ORDER BY rowid').all(owner) as Array<{ type: string; value: string }>).map((r) => ({ type: String(r.type), value: String(r.value) }))
@@ -1689,6 +1702,87 @@ export class TypeDBLiteInterpreter {
       : { kind: 'attribute', attributeType: attribute, valueType: wanted, value: this.canonicalValue(attribute, cell.asString(), undefined) };
   }
 
+  // ── query-local functions ───────────────────────────────────────────────────
+
+  /** What evaluating an expression in one combination may read: the schema, the bindings, and calls. */
+  evaluationContext(combination: Record<string, Binding>): SchemaContext {
+    return {
+      facts: this.schema,
+      typeOf: (variable) => {
+        const binding = combination[variable];
+        return typeof binding === 'string' ? binding : undefined;
+      },
+      bindingOf: (variable) => combination[variable],
+      call: (definition, args, at) => this.callFunction(definition, args, at),
+    };
+  }
+
+  /** Each function body, planned once — its stages checked before any row, as any pipeline's are. */
+  private readonly functionPlans = new WeakMap<FunctionDefinition, StreamScope[]>();
+
+  private planFunction(definition: FunctionDefinition): StreamScope[] {
+    const known = this.functionPlans.get(definition);
+    if (known !== undefined) return known;
+    const start = this.initialScope();
+    for (const parameter of definition.parameters) {
+      const type = parameter.type;
+      start.available.add(parameter.variable);
+      start.kinds.set(parameter.variable, this.schema.types.has(type) ? 'thing' : 'value');
+      if (this.schema.attributes.has(type)) start.attributeOf.set(parameter.variable, type);
+      start.valueTypes.set(parameter.variable, VALUE_TYPES.has(type) ? type : this.schema.attributes.has(type) ? this.valueTypeOfAttribute(type) : undefined);
+      if (!this.schema.types.has(type) && !this.schema.attributes.has(type) && !VALUE_TYPES.has(type)) this.checkKnown('type', type, rangeOf(parameter));
+    }
+    const plan = this.planStages(definition.body, start);
+    const last = plan[plan.length - 1];
+    const answered = [...definition.body.returnStage.streamed, ...definition.body.returnStage.selected, ...definition.body.returnStage.reductions.flatMap((r) => (r.argument === undefined ? [] : [r.argument]))];
+    for (const variable of answered) {
+      if (!last.available.has(variable)) this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used: '${definition.name}' returns it.`, rangeOf(definition.body.returnStage));
+    }
+    this.functionPlans.set(definition, plan);
+    return plan;
+  }
+
+  /** Every pipeline's functions, checked before the query runs — a refusal never waits for a call. */
+  private planFunctions(pipeline: Pipeline): void {
+    for (const definition of pipeline.functions) this.planFunction(definition);
+  }
+
+  /**
+   * One call: the body runs seeded with the arguments, and its `return` answers — `{ … }` a tuple per
+   * answer, `first`/`last` one tuple or none, reducers one tuple over every answer.
+   */
+  private callFunction(definition: FunctionDefinition, args: ReadonlyArray<Binding | undefined>, at: Range | undefined): Array<Array<ValueBinding | undefined>> {
+    if (args.length !== definition.parameters.length) {
+      this.refuse(DiagnosticCode.functionArity, `Function '${definition.name}' expects '${definition.parameters.length}' arguments but received '${args.length}'.`, at);
+    }
+    const seed: Record<string, Binding> = {};
+    definition.parameters.forEach((parameter, i) => {
+      const argument = args[i];
+      if (argument !== undefined) seed[parameter.variable] = argument;
+    });
+    const plan = this.planFunction(definition);
+    return this.returned(definition.body.returnStage, this.runStages(definition.body, plan, [seed]), plan[plan.length - 1], at);
+  }
+
+  /** What a `return` answers over a body's rows — shared by functions and fetch's return sub-queries. */
+  returned(stage: ReturnStage, rows: Array<Record<string, Binding>>, scope: StreamScope, at: Range | undefined): Array<Array<ValueBinding | undefined>> {
+    const value = (binding: Binding | undefined): ValueBinding | undefined => {
+      if (binding === undefined || typeof binding === 'object') return binding;
+      return this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not return a thing or a type from a function yet: return its attributes.', at);
+    };
+    if (stage.streamed.length > 0) return rows.map((row) => stage.streamed.map((variable) => value(row[variable])));
+    if (stage.selector !== undefined) {
+      const row = stage.selector === 'first' ? rows[0] : rows[rows.length - 1];
+      return row === undefined ? [] : [stage.selected.map((variable) => value(row[variable]))];
+    }
+    if (stage.reductions.length > 0) {
+      const reduce = { $type: 'ReduceStage', reductions: stage.reductions.map((r, i) => ({ variable: `$__returned${i}`, reducer: r.reducer, argument: r.argument, $cstNode: r.$cstNode })), groups: [] } as unknown as ReduceStage;
+      const [row] = this.reduceRows(reduce, rows, scope);
+      return [stage.reductions.map((_, i) => value(row?.[`$__returned${i}`]))];
+    }
+    return this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate `return check` yet.', at);
+  }
+
   // ── the stage pipeline ──────────────────────────────────────────────────────
 
   private initialScope(): StreamScope {
@@ -1700,7 +1794,7 @@ export class TypeDBLiteInterpreter {
    * before each stage, then the one after the last. `start` is a fetch sub-query's parent scope.
    * 🔴 Static by construction: a later stage is refused whether or not an earlier one answers.
    */
-  private planStages(pipeline: Pipeline, start: StreamScope = this.initialScope()): StreamScope[] {
+  private planStages(pipeline: Stages, start: StreamScope = this.initialScope()): StreamScope[] {
     const scopes = [start];
     for (const stage of pipeline.stages) scopes.push(this.planStage(stage, scopes[scopes.length - 1]));
     return scopes;
@@ -1850,7 +1944,7 @@ export class TypeDBLiteInterpreter {
   }
 
   /** Stream rows through each stage; `start` is the rows before the first (`[{}]`, or a parent answer). */
-  private runStages(pipeline: Pipeline, scopes: readonly StreamScope[], start: Array<Record<string, Binding>>): Array<Record<string, Binding>> {
+  private runStages(pipeline: Stages, scopes: readonly StreamScope[], start: Array<Record<string, Binding>>): Array<Record<string, Binding>> {
     let rows = start;
     pipeline.stages.forEach((stage, index) => {
       const before = scopes[index];
@@ -3563,7 +3657,7 @@ export class TypeDBLiteInterpreter {
         const binding = combination[variable];
         return typeof binding === 'string' ? binding : undefined;
       };
-      return applyValueStatements(statements, values, concept, this.refuse, { facts: this.schema, typeOf }).map((answered) => {
+      return applyValueStatements(statements, values, concept, this.refuse, this.evaluationContext(combination)).map((answered) => {
         const extended: Record<string, Binding> = { ...combination };
         for (const [variable, binding] of answered) extended[variable] = binding;
         return extended;

@@ -128,7 +128,17 @@ describe('fetch', () => {
     assert.deepEqual(engine.execute('insert $p isa person, has ref 9, has person-name "Zed"; fetch { "r": $p.ref, "n": [ $p.person-name ] };').documents, [{ r: 9, n: ['Zed'] }]);
   });
 
-  it('what later phases own is refused by name — return', () => {
-    assert.equal(refusal(() => engine.query('match $p isa person; fetch { "x": [ match $p has ref $r; return { $r }; ] };')).code, DiagnosticCode.notImplemented);
+  it('a return sub-query answers a list, or one value in parentheses — L2174', () => {
+    assert.deepEqual(documents('match $p isa person, has ref 0; fetch { "names": [ match $p has person-name $n; return { $n }; ], "count": ( match $p has person-name $n; return count($n); ) };'), [
+      { names: ['Alice', 'Allie'], count: 2 },
+    ]);
+    assert.match(refusal(() => engine.query('match $p isa person; fetch { "x": ( match $p has person-name $n; return { $n }; ) };')).message, /must be wrapped in `\[\]`/);
+  });
+
+  it('a query-local function answers by its shape — L1687, L1961', () => {
+    const fn = 'with fun names($p: person) -> { person-name }: match $p has person-name $n; return { $n }; ';
+    assert.deepEqual(documents(`${fn}match $p isa person, has ref 0; fetch { "n": [ names($p) ] };`), [{ n: ['Alice', 'Allie'] }]);
+    assert.match(refusal(() => engine.query(`${fn}match $p isa person; fetch { "n": names($p) };`)).message, /must be wrapped in `\[\]`/);
+    assert.deepEqual(engine.query(`${fn}match $p isa person, has ref 0; let $z in names($p);`).rows.map((r) => r['z'].asString()), ['Alice', 'Allie']);
   });
 });

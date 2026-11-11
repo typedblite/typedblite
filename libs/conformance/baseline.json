@@ -1,12 +1,12 @@
 {
   "define": 415,
   "delete": 15,
-  "disjunction": 7,
+  "disjunction": 8,
   "expression": 117,
-  "fetch": 40,
+  "fetch": 62,
   "given": 18,
   "insert": 42,
-  "match": 56,
+  "match": 58,
   "metadata": 107,
   "modifiers": 24,
   "negation": 14,
@@ -17,5 +17,5 @@
   "reduce": 63,
   "undefine": 131,
   "update": 30,
-  "variables": 11
+  "variables": 12
 }
