@@ -1282,7 +1282,7 @@ export class TypeDBLiteInterpreter {
         answered =
           pipeline.fetch !== undefined && fetchContext !== undefined && fetchScope !== undefined
             ? { rows: [], documents: streamed.map((row) => fetchDocument((pipeline.fetch as FetchStage).body, row, fetchScope, fetchContext)) }
-            : { rows: this.projectRows(streamed, final, false) };
+            : { rows: this.projectRows(streamed, final) };
         // 🔴 Inside the transaction, before COMMIT. This is the whole point of attaching the log
         // here rather than in `SqliteEngine`, which wraps this method and could only act once the
         // transaction had already closed.
@@ -1402,9 +1402,7 @@ export class TypeDBLiteInterpreter {
         this.diagnostics.fact(DiagnosticCode.projected, `Fetched ${fetched.length} document(s).`, rangeOf(pipeline.fetch));
         continue;
       }
-      // A `reduce` answers its row even when it holds no cell (`$m? = max(…)` over nothing).
-      const reduced = pipeline.stages.some((stage) => stage.$type === 'ReduceStage');
-      const projected = this.projectRows(this.runStages(pipeline, scopes, start), final, reduced);
+      const projected = this.projectRows(this.runStages(pipeline, scopes, start), final);
       rows.push(...projected);
       const firstMatch = pipeline.stages.find(isMatchStage);
       const select = [...pipeline.stages].reverse().find(isSelectStage);
@@ -2260,8 +2258,12 @@ export class TypeDBLiteInterpreter {
       : { kind: 'value', valueType: cell.type, value: cell.asString() };
   }
 
-  /** The rows a read answers: a cell per available variable the query wrote — never `__anonN`. */
-  private projectRows(rows: Array<Record<string, Binding>>, scope: StreamScope, keepEmpty: boolean): Array<Record<string, TypeDBLiteValue>> {
+  /**
+   * The rows a read answers: a cell per available variable the query wrote — never `__anonN`.
+   * 🔴 Every row, columns or not: `match not { … };` that holds is ONE answer with no variables
+   * (disjunction.feature L158), as `match person sub entity;` is. Column-less rows used to be dropped.
+   */
+  private projectRows(rows: Array<Record<string, Binding>>, scope: StreamScope): Array<Record<string, TypeDBLiteValue>> {
     const projected: Array<Record<string, TypeDBLiteValue>> = [];
     for (const row of rows) {
       const cells: Record<string, TypeDBLiteValue> = {};
@@ -2270,7 +2272,7 @@ export class TypeDBLiteInterpreter {
         // `select $x` — the caller reads `row.x`, without the `$`.
         cells[variable.slice(1)] = this.cellOf(binding);
       }
-      if (keepEmpty || Object.keys(cells).length > 0) projected.push(cells);
+      projected.push(cells);
     }
     return projected;
   }

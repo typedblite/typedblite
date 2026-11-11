@@ -133,6 +133,16 @@ describe('nested patterns', () => {
     assert.match(refusal(() => engine.query('with fun ident($x: integer) -> integer: match let $y = $x; return first $y; match let $x = ident($x);')).message, /The variable 'x' must be bound to a value before it's used/);
   });
 
+  it('`$x sub $y` binds both, reflexively — match L5229', () => {
+    const pairs = engine.query('match $x sub $y; $y label person;').rows.map((r) => r['x'].label);
+    assert.deepEqual(pairs, ['person']);
+  });
+
+  it('a match that holds with no variables answers one empty row — disjunction L158', () => {
+    assert.deepEqual(engine.query('match not { $p isa person, has ref 99; };').rows, [{}]);
+    assert.deepEqual(engine.query('match not { $p isa person, has ref 0; };').rows, []);
+  });
+
   it('a write states what it writes: not, or, try and is are refused there by name', () => {
     assert.equal(refusal(() => engine.execute('insert $p isa person, has ref 20; not { $p has age 1; };')).code, DiagnosticCode.notImplemented);
   });
