@@ -82,6 +82,24 @@ describe('write stages', () => {
     assert.equal(engine.query('match $f isa friendship;').rows.length, 0);
   });
 
+  it('an anonymous relation may own attributes, matched and written — delete L221', () => {
+    engine.execute('match $a isa person, has ref 0; insert (friend: $a) isa friendship, has ref 7;');
+    assert.equal(engine.query('match $a isa person, has ref 0; friendship (friend: $a), has ref 7;').rows.length, 1);
+  });
+
+  it('delete try runs where what it names is bound; a nested try does not parse — delete L2929, L2995', () => {
+    engine.execute('match $a isa person, has ref 0; insert $f isa friendship, links (friend: $a), has ref 8;');
+    engine.execute('match $p isa person; try { $f isa friendship, links ($p); }; delete try { $f; };');
+    assert.equal(engine.query('match $f isa friendship;').rows.length, 0);
+    assert.equal(refusal(() => engine.execute('match $p isa person; try { $p has name $n; }; delete try { has $n of $p; try { $p; }; };')).code, DiagnosticCode.parseFailed);
+    assert.match(refusal(() => engine.execute('match $p isa person; try { $p has name $n; }; delete has $n of $p;')).message, /optional variable 'n' outside a 'try' block/);
+  });
+
+  it('one player twice in one role is two edges, which one relation never holds here — match L1314', () => {
+    engine.execute('match $a isa person, has ref 0; $b isa person, has ref 1; insert (friend: $a, friend: $b) isa friendship, has ref 9;');
+    assert.equal(engine.query('match (friend: $x, friend: $x) isa friendship;').rows.length, 0);
+  });
+
   it('a delete names what the match bound, never a value — delete L1100', () => {
     assert.equal(refusal(() => engine.execute('match $p isa person, has ref 0; delete has name "Ann" of $p;')).code, DiagnosticCode.parseFailed);
   });

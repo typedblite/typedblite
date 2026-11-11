@@ -69,10 +69,13 @@ RelationDef:
 // `attribute email value string @regex("^.*@.*$");`      <- annotation on the VALUE TYPE
 // `attribute empty-sub-data @abstract, sub empty-data;`  <- annotation before `sub`
 // `attribute person-name sub name;`                      <- attribute subtyping, no value type
+// `sub` and `value` in either order: `attribute name value string, sub valueless-name;` (match.feature L4214).
 AttributeDef:
     'attribute' name=ID annotations+=Annotation*
-    (','? 'sub' superType=[AttributeDef:ID] subAnnotations+=Annotation*)?
-    (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)? ';';
+    (
+          (','? 'sub' superType=[AttributeDef:ID] subAnnotations+=Annotation*) (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
+        | (','? 'value' valueType=ValueType valueAnnotations+=Annotation*) (','? 'sub' superType=[AttributeDef:ID] subAnnotations+=Annotation*)?
+    )? ';';
 
 // `principal plays membership:member;` — a re-open of an already-defined type, with no kind
 // keyword. The spec re-opens with a whole trait list: `person plays employment:employee, owns
@@ -384,6 +387,16 @@ Reduction:
 // bound, never a value.
 Deletion:
     (
+          // `delete try { $f; };` — run only when what it names is bound (delete.feature L2929). A
+          // `try` inside it is a PARSE failure (L2995), so the block holds plain deletions only.
+          optional?='try' '{' block+=PlainDeletion+ '}'
+        | has?='has' (attribute=ID)? target=VAR 'of' owner=VAR
+        | links?='links' players=RolePlayers 'of' owner=VAR
+        | target=VAR ('of' owner=VAR)?
+    ) ';';
+
+PlainDeletion infers Deletion:
+    (
           has?='has' (attribute=ID)? target=VAR 'of' owner=VAR
         | links?='links' players=RolePlayers 'of' owner=VAR
         | target=VAR ('of' owner=VAR)?
@@ -558,9 +571,10 @@ KindPattern:
 // `(owner: $s, step: $st) isa skill-composition;` — an unbound relation, never referred to again.
 // `(employee: $x);` — with no `isa`, a relation of any type (negation.feature L608).
 // `employment (employee: $p, employer: $e);` — the type before the players (fetch.feature L882).
+// Either form may own attributes: `(friend: $x) isa friendship, has ref 0;` (delete.feature L221).
 AnonRelationPattern:
-      players=RolePlayers ('isa' type=ID)? ';'
-    | type=ID players=RolePlayers ';';
+      players=RolePlayers ('isa' type=ID)? (',' properties+=HasProperty)* ';'
+    | type=ID players=RolePlayers (',' properties+=HasProperty)* ';';
 
 Property:
     IsaProperty | HasProperty | LinksProperty | LabelProperty | SubProperty | OwnsProperty

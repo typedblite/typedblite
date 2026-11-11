@@ -60,6 +60,8 @@ import {
   type ReturnStage,
   type UpdateStage,
   type ThingPattern,
+  type Deletion,
+  type AnonRelationPattern,
   type OptionalPattern,
   type PutStage,
   type WriteStage,
@@ -1869,7 +1871,7 @@ export class TypeDBLiteInterpreter {
         this.checkWriteStage(before, stage);
         if (stage.$type === 'DeleteStage') {
           // pipelines.feature L324: a deleted thing is not visible in later stages.
-          for (const deletion of stage.deletions) if (deletion.owner === undefined && deletion.target !== undefined) drop(deletion.target);
+          for (const deletion of openDeletions(stage.deletions, this.refuse)) if (deletion.owner === undefined && deletion.target !== undefined) drop(deletion.target);
         } else {
           for (const pattern of stage.patterns) {
             if (!isThingPattern(pattern)) continue;
@@ -2200,7 +2202,7 @@ export class TypeDBLiteInterpreter {
     this.writeRan = true;
     const distinct = uniqueRows(rows, valueVariablesReadBy(stage));
     this.runDeletes(before.patterns, stage, resolveEveryMatch(distinct), distinct);
-    const deleted = new Set(stage.deletions.flatMap((d) => (d.owner === undefined && d.target !== undefined ? [d.target] : [])));
+    const deleted = new Set(openDeletions(stage.deletions, this.refuse).flatMap((d) => (d.owner === undefined && d.target !== undefined ? [d.target] : [])));
     return distinct.map((row) => Object.fromEntries(Object.entries(row).filter(([variable]) => !deleted.has(variable))));
   }
 
@@ -2603,13 +2605,14 @@ export class TypeDBLiteInterpreter {
       if (isTypeHead(pattern, this.refuse)) continue;
       if (isAnonRelationPattern(pattern)) {
         if (pattern.type !== undefined) this.checkKnown('type', pattern.type, rangeOf(pattern));
+        const owned = this.anonymousOwnership(pattern);
         constraints.push({
           variable: `__anon${constraints.length}`,
           type: pattern.type,
           isas: pattern.type === undefined ? [] : [{ type: pattern.type, exact: false }],
           range: rangeOf(pattern),
-          literals: [],
-          bindings: [],
+          literals: owned.literals,
+          bindings: owned.bindings,
           roles: rolesOf(pattern.players, (patternCounter += 1)),
         });
         continue;
@@ -3210,7 +3213,13 @@ export class TypeDBLiteInterpreter {
       return kind === 'value' ? undefined : kind;
     };
     if (write.$type === 'DeleteStage') {
+      // An optional variable is deleted only inside `try` (delete.feature L2929).
       for (const deletion of write.deletions) {
+        if (deletion.optional) continue;
+        const used = [deletion.target, deletion.owner, ...(deletion.players?.entries.map((e) => e.player) ?? [])].find((v) => v !== undefined && scope.optional.has(v));
+        if (used !== undefined) this.refuse(DiagnosticCode.unboundValue, `A write stage uses the optional variable '${used.slice(1)}' outside a 'try' block.`, rangeOf(deletion));
+      }
+      for (const deletion of openDeletions(write.deletions, this.refuse)) {
         // `delete links (friend: $x) of $r` — a relation the match bound, and things playing in it.
         if (deletion.links) {
           if (kindOf(deletion.owner as string) !== 'thing') {
@@ -3488,7 +3497,13 @@ export class TypeDBLiteInterpreter {
         // source must not be treated as one statement asking for two.
         const key = role.statement + ' ' + role.role;
         for (const [earlierIndex, earlierPlayer] of sameRoleSlots.get(key) ?? []) {
-          if (earlierPlayer === role.player) continue;
+          // `(friend: $x, friend: $x)` asks for $x as a friend TWICE — two edges, not one read twice
+          // (match.feature L1314). The primary key holds one edge per (rel, role, player), so no
+          // relation answers it here.
+          if (earlierPlayer === role.player) {
+            join += ` AND rp${index}.rowid <> rp${earlierIndex}.rowid`;
+            continue;
+          }
           join += ` AND rp${index}.player <> rp${earlierIndex}.player`;
         }
         const slots = sameRoleSlots.get(key);
@@ -3637,6 +3652,32 @@ export class TypeDBLiteInterpreter {
           // What a disjunction binds in EVERY branch, and what a `try` binds — never a negation's.
           ...this.nestedBound(patterns),
         ]);
+  }
+
+  /** An anonymous relation's own `has` properties, as a thing pattern's would be read. */
+  private anonymousOwnership(pattern: AnonRelationPattern): Pick<ThingConstraint, 'literals' | 'bindings'> {
+    const literals: ThingConstraint['literals'] = [];
+    const bindings: ThingConstraint['bindings'] = [];
+    for (const property of pattern.properties) {
+      if (property.attribute === undefined) {
+        if (property.valueVariable) bindings.push({ variable: property.valueVariable, range: rangeOf(property) });
+        continue;
+      }
+      this.checkKnown('attribute', property.attribute, rangeOf(property));
+      if (property.value) {
+        literals.push({
+          attribute: property.attribute,
+          value: this.checkedLiteralText(property.value, property.attribute, rangeOf(property)),
+          range: rangeOf(property),
+          alternatives: this.literalAlternatives(property.value, property.attribute, rangeOf(property)),
+        });
+      } else if (property.valueVariable) {
+        bindings.push({ attribute: property.attribute, variable: property.valueVariable, range: rangeOf(property) });
+      } else if (property.comparator !== undefined) {
+        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not compare an anonymous relation’s attribute yet: name the relation.', rangeOf(property));
+      }
+    }
+    return { literals, bindings };
   }
 
   /** Each `let` (in dependency order) and comparison, per combination — see `applyValueStatements`. */
@@ -4091,6 +4132,14 @@ export class TypeDBLiteInterpreter {
       this.checkKnown('type', pattern.type, rangeOf(pattern));
       const iid = this.insertThing(pattern.type, isPut, rangeOf(pattern));
       this.insertRoles(iid, rolesOf(pattern.players, 0), bindings);
+      // `(friend: $x) isa friendship, has ref 0;` — the relation's own attributes.
+      const owned = this.anonymousOwnership(pattern);
+      this.checkOwns({ variable: '__anon', type: pattern.type, isas: [{ type: pattern.type, exact: false }], literals: owned.literals, bindings: owned.bindings, roles: [] }, 'write');
+      for (const literal of owned.literals) this.insertAttribute(iid, literal.attribute, literal.value, literal.range);
+      for (const binding of owned.bindings) {
+        const written = this.writtenValue(binding, values);
+        this.insertAttribute(iid, written.attribute, written.value, binding.range);
+      }
       return;
     }
     if (!isThingPattern(pattern)) return;
@@ -4376,6 +4425,13 @@ export class TypeDBLiteInterpreter {
     const constraints = this.constraintsOf(patterns);
 
     for (const deletion of write.deletions) {
+      if (deletion.optional) {
+        // `delete try { $f; };` — on the rows where everything it names is bound, and nowhere else.
+        const named = deletion.block.flatMap((d) => [d.target, d.owner, ...(d.players?.entries.map((e) => e.player) ?? [])]).filter((v): v is string => v !== undefined);
+        const ready = combinations.filter((row) => named.every((variable) => row[variable] !== undefined));
+        this.runDeletes(patterns, { ...write, deletions: deletion.block } as DeleteStage, resolveEveryMatch(ready), ready);
+        continue;
+      }
       if (deletion.links) {
         // `delete links (friend: $x) of $r` — those edges, on every relation the match bound; a
         // relation left with no player is gone too (delete.feature L855).
@@ -4599,6 +4655,16 @@ function writtenPatterns(patterns: readonly Pattern[], refuse: Refuse): Pattern[
   });
 }
 
+/** A delete stage's deletions with each `try { … }` opened; a `try` inside a `try` is refused. */
+function openDeletions(deletions: readonly Deletion[], refuse: Refuse): Deletion[] {
+  return deletions.flatMap((deletion) => {
+    if (!deletion.optional) return [deletion];
+    const nested = deletion.block.find((d) => d.optional);
+    if (nested !== undefined) refuse(DiagnosticCode.mixedPattern, 'Nested try blocks are not allowed in a write stage.', rangeOf(nested));
+    return [...deletion.block];
+  });
+}
+
 /** A write stage — what `execute()` runs and `query()` refuses. */
 const isWriteStage = (stage: LeadStage | Stage): stage is WriteStage =>
   stage.$type === 'InsertStage' || stage.$type === 'PutStage' || stage.$type === 'DeleteStage' || stage.$type === 'UpdateStage';
@@ -4662,7 +4728,7 @@ function uniqueByConcepts(combinations: readonly Record<string, Binding>[], keep
 
 /** The variables a write stage reads as values: `has <attribute> $v` in an insert, `delete $v of $p`. */
 function valueVariablesReadBy(write: WriteStage): Set<string> {
-  if (write.$type === 'DeleteStage') return new Set(write.deletions.flatMap((d) => (d.owner !== undefined && d.target !== undefined ? [d.target] : [])));
+  if (write.$type === 'DeleteStage') return new Set(write.deletions.flatMap((d) => (d.optional ? d.block : [d])).flatMap((d) => (d.owner !== undefined && d.target !== undefined ? [d.target] : [])));
   return new Set(
     write.patterns.flatMap((p) => (isOptionalPattern(p) ? [...p.patterns] : [p])).flatMap((pattern) =>
       isThingPattern(pattern)
