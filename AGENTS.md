@@ -25,11 +25,14 @@ flowchart LR
 ```mermaid
 flowchart LR
   cli --> runtime
+  sync-demo --> runtime
   conformance --> runtime
   runtime --> language
   runtime --> content-revision
   vscode --> language
 ```
+
+`apps/sync-demo` (the offline-first sync demo) depends on `@typedblite/runtime` only, through its public entry points — never `src/` (its feature doc's invariant 3).
 
 Build order is enforced by Nx. `runtime` must build before `cli` and `conformance`. `language` and `content-revision` must build before `runtime`.
 
@@ -62,6 +65,7 @@ Nx project names (not the npm package names):
 - `typedblite-conformance` — also has `report`
 - `typedblite` — the CLI, `typedblite-cli`
 - `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
+- `sync-demo` — `typedblite-sync-demo`, the offline-first sync demo; also has `smoke`, `test-browser`, `serve`, `demo` and `android-setup`/`android-apk`/`android-emulator`
 
 Coverage is enabled only on CI (`CI=true`). Test suites time out at 30 seconds per test.
 

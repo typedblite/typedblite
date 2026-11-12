@@ -3,7 +3,7 @@
  *
  * 🔴 Its own profile directory is what makes it its own device. OPFS, the service worker and
  * `localStorage` all live in the profile, so a window that shared the browser's profile would share
- * its store. `--profile <dir>` sets it (default: `.data/electron-profile`); `--url` points at the
+ * its store. `--profile <dir>` sets it (default: `apps/sync-demo/.data/electron-profile`); `--url` points at the
  * demo server (default `http://localhost:4300`); `--fresh` wipes the device's store on open;
  * `--hidden` keeps the window off screen. `--x`, `--y` place it.
  */
@@ -16,7 +16,8 @@ const argument = (name: string): string | undefined => {
 };
 
 const base = argument('url') ?? process.env['DEMO_URL'] ?? 'http://localhost:4300';
-const profile = argument('profile') ?? join(process.cwd(), '.data', 'electron-profile');
+// Beside the build (`.build/../.data`), wherever it is started from.
+const profile = argument('profile') ?? join(__dirname, '..', '.data', 'electron-profile');
 app.setPath('userData', profile);
 
 void app.whenReady().then(() => {

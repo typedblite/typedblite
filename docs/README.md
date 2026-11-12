@@ -15,6 +15,7 @@ Choose your starting point by what you want to do.
 | [The TypeQLite language](guides/typeqlite-language.md) | What TypeQLite supports: schema, annotations, pipelines, patterns, expressions, functions, `fetch`, and the known gaps |
 | [Replication and search](guides/replication-and-search.md) | The change log, revisions, one-shot and hub-and-spoke replication, conflicts, compaction, full-text search |
 | [CLI](../apps/cli/README.md) | The `typedblite` REPL, file runner and one-shot executor |
+| [Sync demo](../apps/sync-demo/README.md) | A browser, a desktop app and a phone, each with its own store, syncing through a hub: setup, the story, and how to run it |
 | [VS Code extension](../apps/vscode/README.md) | The TypeQLite editor: diagnostics, navigation, completion, rename, quick fixes |
 | [Conformance status](../CONFORMANCE.md) | How closely TypeDBLite matches TypeDB, measured against TypeDB's own behaviour specification |
 

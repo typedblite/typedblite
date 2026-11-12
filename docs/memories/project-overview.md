@@ -18,6 +18,7 @@ TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) gr
 | `libs/conformance/` | `typedblite-conformance` | TypeDB behaviour spec vendored as Cucumber features |
 | `apps/cli/` | `typedblite-cli` | REPL and file runner |
 | `apps/vscode/` | `typeqlite` (private) | VS Code extension: the TypeQLite editor, a Langium language server (ADR-008) |
+| `apps/sync-demo/` | `typedblite-sync-demo` (private) | Offline-first sync demo: PWA, Electron and Android devices and a TypeDBLite hub (ADR-009) |
 
 ## Key architectural invariants
 
@@ -49,3 +50,4 @@ The repo is completely self-contained and self-referential:
 | ADR-006 | An attribute is stored once per type and value |
 | ADR-007 | A scenario TypeDB itself fails is a deviation, and the oracle decides which |
 | ADR-008 | The TypeQLite editor is a Langium language server in this repository; nothing it knows reaches the runtime |
+| ADR-009 | TypeDBLite runs in the browser on WASM SQLite: `@typedblite/runtime/wasm`, a browser entry, synchronous SHA-256 revisions |
