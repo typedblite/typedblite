@@ -43,14 +43,14 @@ const signatureOf = (bare: string): Signature | undefined => {
 };
 
 /** A schema function, by its bare name — what `expressions.ts` routes here instead of `builtin`. */
-export const isSchemaFunction = (bare: string): boolean => bare === 'label' || signatureOf(bare) !== undefined;
+export const isSchemaFunction = (bare: string): boolean => bare === 'label' || bare === 'iid' || signatureOf(bare) !== undefined;
 
 /** How many variables one answer binds: two for `…all_meta` (`$key, $value`), else one. */
 export const schemaFunctionWidth = (bare: string): number => (signatureOf(bare)?.reading === 'all_meta' ? 2 : 1);
 
 /** How many arguments it takes — a type per side of the capability, and the key for `…meta`. */
 const arityOf = (bare: string): number => {
-  if (bare === 'label') return 1;
+  if (bare === 'label' || bare === 'iid') return 1;
   const signature = signatureOf(bare);
   if (signature === undefined) return 0;
   // A function or a struct is ONE name; a struct field, a struct and a field; a capability, two types.
@@ -76,6 +76,11 @@ export function checkSchemaCall(name: string, args: readonly ArgumentShape[], fa
   const arity = arityOf(bare);
   if (args.length !== arity) {
     refuse(DiagnosticCode.functionArity, `Function '${bare}' expects '${arity}' arguments but received '${args.length}'.`, at);
+  }
+  // `iid($x)` takes a concept variable — a thing or an attribute, known per row.
+  if (bare === 'iid') {
+    if (args[0] !== undefined && args[0].kind !== 'variable') refuse(DiagnosticCode.valueTypeConflict, `Function 'iid' expects a thing or an attribute.`, at);
+    return;
   }
   // A function or a struct is named by a STRING — `get_fun_doc("get_random_number")` — not a label.
   if (signature?.capability === 'fun' || signature?.capability === 'struct' || signature?.capability === 'struct_field') {

@@ -62,18 +62,26 @@ StructField:
 // (Phase 03 of the conformance feature). `value` on an entity or relation parses because TypeQLite's
 // type-constraint grammar is kind-agnostic and TypeDB refuses it at `define`, not at parse —
 // `define.feature` L392 says `; fails`, not `parsing fails`.
+// `sub` may come after the traits too — `relation best-friendship relates best-friend as friend, sub
+// friendship;` (update.feature L2120, redefine.feature L418) — as TypeDB's grammar admits.
+// Between traits the comma stays required (`optional-trait-comma.spec.ts`); before the first, and before a
+// `sub` or `value` written ahead of the traits, it is optional.
 EntityDef:
-    'entity' name=ID annotations+=Annotation*
-    (','? 'sub' superType=[EntityDef:ID] subAnnotations+=Annotation*)?
-    (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
-    (','? traits+=Trait (',' traits+=Trait)*)? ';';
+    'entity' name=ID annotations+=Annotation* (','? EntityHead)*
+    (','? traits+=Trait (',' (traits+=Trait | EntityHead))*)? ';';
+
+fragment EntityHead:
+    'sub' superType=[EntityDef:ID] subAnnotations+=Annotation*
+    | 'value' valueType=ValueType valueAnnotations+=Annotation*;
 
 // `relation membership, relates member, relates org, owns membership-key @key;`
 RelationDef:
-    'relation' name=ID annotations+=Annotation*
-    (','? 'sub' superType=[RelationDef:ID] subAnnotations+=Annotation*)?
-    (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
-    (','? traits+=Trait (',' traits+=Trait)*)? ';';
+    'relation' name=ID annotations+=Annotation* (','? RelationHead)*
+    (','? traits+=Trait (',' (traits+=Trait | RelationHead))*)? ';';
+
+fragment RelationHead:
+    'sub' superType=[RelationDef:ID] subAnnotations+=Annotation*
+    | 'value' valueType=ValueType valueAnnotations+=Annotation*;
 
 // `attribute principal-id, value string;`
 // `attribute age @independent, value integer;`          <- annotation on the type
@@ -404,7 +412,8 @@ ReduceStage:
 Reduction:
     variable=VAR (optional?='?')? '=' reducer=ID ('(' (argument=VAR)? ')')?;
 
-// `delete $x;` (the thing), `delete has $n of $p;` (an ownership the match bound), `delete links
+// `delete $x;` (the thing), `delete has $n of $p;` (an ownership the match bound — never `has name $n
+// of $p`, which TypeDB fails at PARSE: delete.feature L1090), `delete links
 // (friend: $x) of $r;` (a role player), and the older `delete $n of $p;`. 🔴 Not `delete has name
 // "Alex" of $x;` — TypeDB fails that at PARSE (delete.feature L1100): a delete names what the match
 // bound, never a value.
@@ -413,14 +422,14 @@ Deletion:
           // `delete try { $f; };` — run only when what it names is bound (delete.feature L2929). A
           // `try` inside it is a PARSE failure (L2995), so the block holds plain deletions only.
           optional?='try' '{' block+=PlainDeletion+ '}'
-        | has?='has' (attribute=ID)? target=VAR 'of' owner=VAR
+        | has?='has' target=VAR 'of' owner=VAR
         | links?='links' players=RolePlayers 'of' owner=VAR
         | target=VAR ('of' owner=VAR)?
     ) ';';
 
 PlainDeletion infers Deletion:
     (
-          has?='has' (attribute=ID)? target=VAR 'of' owner=VAR
+          has?='has' target=VAR 'of' owner=VAR
         | links?='links' players=RolePlayers 'of' owner=VAR
         | target=VAR ('of' owner=VAR)?
     ) ';';
@@ -486,8 +495,8 @@ FetchExpression:
     expression=Expression;
 
 Pattern:
-    ThingPattern | AnonRelationPattern | TypePattern | KindPattern | LetPattern | ComparisonPattern
-    | NegationPattern | DisjunctionPattern | OptionalPattern | IsPattern;
+    ThingPattern | AnonRelationPattern | TypePattern | KindPattern | KindLabelPattern | LetPattern | ComparisonPattern
+    | CallComparisonPattern | NegationPattern | DisjunctionPattern | OptionalPattern | IsPattern;
 
 // ── nested patterns (negation.feature, disjunction.feature, optional.feature) ────────────────
 //
@@ -523,6 +532,19 @@ LetPattern:
 // `$a > 10;` `$v == $a;` — a predicate over bound values, filtering the match.
 ComparisonPattern:
     left=VAR comparator=Comparator right=Expression ';';
+
+// `iid($x) == "0x…"` — a call on the left (expression.feature L1351). Only `iid`: no other caller puts
+// an expression there. A pattern of its own, so `ComparisonPattern.left` stays a variable for every
+// reader: the engine rewrites this one to `let $v = iid($x); $v == "0x…";` before anything reads it.
+// `6 > 5` — a literal on the left (update.feature L207), rewritten the same way.
+CallComparisonPattern:
+    call=(IidCall | LeadLiteral) comparator=Comparator right=Expression ';';
+
+LeadLiteral infers Expression:
+    {infer LiteralExpression} literal=ExpressionLiteral;
+
+IidCall infers Expression:
+    {infer FunctionExpression} function='iid' '(' arguments+=FunctionArgument ')';
 
 // `contains` and `like` are string predicates: `$n contains "Fun"`, `$n like "^[0-9]+$"`
 // (match.feature L3889, L3948).
@@ -573,7 +595,7 @@ ScopedLabel returns string:
 // `label` is a keyword (`$t label person`), and also the schema function `label($t)`
 // (expression.feature L1334) — admitted here by name.
 FunctionName returns string:
-    (ValueType | 'label') ('::' ValueType)*;
+    (ValueType | 'label' | 'iid') ('::' ValueType)*;
 
 // `$s isa skill, has skill-id "x", has skill-name $n;`
 // `$r isa step-dependency (dependent: $d, prerequisite: $p);`
@@ -593,17 +615,31 @@ TypePattern:
 KindPattern:
     kind=Kind variable=VAR (properties+=Property (',' properties+=Property)*)? ';';
 
+// `entity person;` — a label's kind, asserted (update.feature L104, where a write refuses it).
+KindLabelPattern:
+    kind=Kind label=ID ';';
+
 // `(owner: $s, step: $st) isa skill-composition;` — an unbound relation, never referred to again.
 // `(employee: $x);` — with no `isa`, a relation of any type (negation.feature L608).
 // `employment (employee: $p, employer: $e);` — the type before the players (fetch.feature L882).
 // Either form may own attributes: `(friend: $x) isa friendship, has ref 0;` (delete.feature L221).
+// `(employee: $x) isa $r` — the type through a variable an earlier stage bound (insert.feature L2140).
 AnonRelationPattern:
-      players=RolePlayers ('isa' type=ID)? (',' properties+=HasProperty)* ';'
+      players=RolePlayers ('isa' (type=ID | typeVariable=VAR))? (',' properties+=HasProperty)* ';'
     | type=ID players=RolePlayers (',' properties+=HasProperty)* ';';
 
 Property:
     IsaProperty | HasProperty | LinksProperty | LabelProperty | SubProperty | OwnsProperty
-    | PlaysProperty | RelatesProperty;
+    | PlaysProperty | RelatesProperty | IidProperty | ValueProperty;
+
+// `$x value integer` — the attribute types holding that value type (match.feature L3764).
+ValueProperty:
+    'value' valueType=ValueType;
+
+// `$x iid 0x1e…` — the one concept with that iid, or none (match.feature L948). An iid is the engine's
+// to assign: a write refuses it, and `$x iid V123` does not parse (insert.feature L2715).
+IidProperty:
+    'iid' iid=IID;
 
 // `isa person`, `isa $t` (a type variable), `isa! person` (the exact type, no subtypes).
 // An attribute instance takes its value as `has` does (ADR-006): `$n isa name "John"`,
@@ -626,8 +662,9 @@ LabelProperty:
 SubProperty:
     (direct?='sub!' | 'sub') (type=ScopedLabel | typeVariable=VAR);
 
+// `$p owns name @card(5..)` parses — TypeDB's grammar admits it — and the engine refuses it.
 OwnsProperty:
-    'owns' (attribute=ID | attributeVariable=VAR);
+    'owns' (attribute=ID | attributeVariable=VAR) annotations+=Annotation*;
 
 PlaysProperty:
     'plays' (role=RoleName | roleVariable=VAR);
@@ -642,8 +679,10 @@ RelatesProperty:
 // `has age > 5`, `has name == $n` — a comparison on the owned value (a write takes `==` as the value).
 HasProperty:
     'has' (
-          attribute=ID (comparator=Comparator compared=Expression | value=Literal | valueVariable=VAR)?
-        | valueVariable=VAR
+          attribute=ID (comparator=Comparator compared=Expression | value=Literal | valueVariable=VAR | '(' expression=Expression ')')?
+        // `has $_ 9`, `has $a "value"` — an attribute of any type holding that value (match.feature L4501);
+        // `has $b < 15` parses too, and a write refuses `$b` as both a type and an attribute (update.feature L488).
+        | valueVariable=VAR (value=Literal | comparator=Comparator compared=Expression)?
     );
 
 LinksProperty:
@@ -687,14 +726,15 @@ ExpressionLiteral infers Literal:
 DurationLiteral:
     value=DURATION;
 
+// `+ 15` is a literal too — TypeDB reads `$p has $b + 15` as a value for `has $b` (update.feature L479).
 SignedDecimalLiteral infers DecimalLiteral:
-    (negative?='-')? value=DECIMAL;
+    (negative?='-' | '+')? value=DECIMAL;
 
 SignedDoubleLiteral infers DoubleLiteral:
-    (negative?='-')? value=DOUBLE;
+    (negative?='-' | '+')? value=DOUBLE;
 
 SignedIntLiteral infers IntLiteral:
-    (negative?='-')? value=INT;
+    (negative?='-' | '+')? value=INT;
 
 // `10.2dec`, `5dec` — TypeDB's exact decimal, before DOUBLE and INT which are its prefixes.
 DecimalLiteral:

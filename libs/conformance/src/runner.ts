@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
 import { featureName, type SpecFeature, type SpecScenario, type SpecStep } from './spec.js';
 import { findStep, UndefinedStep } from './steps.js';
-import { World } from './world.js';
+import { World, type Engine } from './world.js';
 
 /**
  * ADR-005 D3: every scenario ends as exactly one of four outcomes, and they sum to the total.
@@ -72,8 +72,8 @@ export const validateDeviations = (
   }
 };
 
-const runScenario = (scenario: SpecScenario): ScenarioResult['failure'] | undefined => {
-  const world = new World();
+const runScenario = (scenario: SpecScenario, open?: () => Engine): ScenarioResult['failure'] | undefined => {
+  const world = new World(open);
   try {
     for (const step of scenario.steps) {
       try {
@@ -96,6 +96,8 @@ export interface RunOptions {
   readonly notApplicable: ReadonlyArray<NotApplicable>;
   /** Owners that resolve — a deviation whose owner is not in here counts as a fail. */
   readonly ownerResolves: (owner: string) => boolean;
+  /** The engine each database is; TypeDBLite's unless an oracle run hands in TypeDB's. */
+  readonly open?: () => Engine;
 }
 
 export const runFeature = (feature: SpecFeature, options: RunOptions): ReadonlyArray<ScenarioResult> => {
@@ -116,7 +118,7 @@ export const runFeature = (feature: SpecFeature, options: RunOptions): ReadonlyA
     if (scenario.steps.some((step) => notApplicable.some((pattern) => pattern.test(step.text)))) {
       return { feature: name, scenario, outcome: 'not-applicable' };
     }
-    const failure = runScenario(scenario);
+    const failure = runScenario(scenario, options.open);
     const deviation = deviationFor(scenario);
     if (failure === undefined) {
       return { feature: name, scenario, outcome: 'pass', deviationNowPassing: deviation !== undefined };

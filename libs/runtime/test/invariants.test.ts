@@ -92,9 +92,10 @@ describe('a refusal never depends on the data', () => {
     ['match $p isa person, has ref R; let $v = 6; insert $p has measure $v;', DiagnosticCode.abstractType, 'write'],
     ['match $c isa company, has ref R; insert $c has age 1;', DiagnosticCode.unownedAttribute, 'write'],
     // `isa doc` may bind an `adr` that owns what `doc` does not: no refusal before the match, and
-    // none with the adr bound (round 18); `isa! doc` binds a `doc` alone, refused before (round 19).
+    // none with the adr bound (round 18). `isa! doc` names the abstract `doc` alone, which can have no
+    // instance — TypeDB's type inference refuses the match itself (match.feature L942, L4092).
     ['match $d isa doc, has ref R; insert $d has adr-status "Accepted";', 'no refusal', 'write', '3'],
-    ['match $d isa! doc, has ref R; insert $d has adr-status "Accepted";', DiagnosticCode.unownedAttribute, 'write', '3'],
+    ['match $d isa! doc, has ref R; insert $d has adr-status "Accepted";', DiagnosticCode.abstractType, 'write', '3'],
     // Every written `isa`, whichever comes first (round 20).
     ['match $d isa! memo, isa doc, has ref R; insert $d has adr-status "x";', DiagnosticCode.unownedAttribute, 'write', '4'],
     ['match $d isa doc, isa! memo, has ref R; insert $d has adr-status "x";', DiagnosticCode.unownedAttribute, 'write', '4'],

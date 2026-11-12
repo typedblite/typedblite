@@ -15,6 +15,8 @@ import {
   isOwnsTrait,
   isRelatesTrait,
   isHasProperty,
+  isIidProperty,
+  isCallComparisonPattern,
   isBooleanLiteral,
   isDurationLiteral,
   isDateLiteral,
@@ -61,6 +63,8 @@ import {
   type ReturnStage,
   type UpdateStage,
   type ThingPattern,
+  type Expression,
+  type Property,
   type IsaProperty,
   type Deletion,
   type AnonRelationPattern,
@@ -90,6 +94,7 @@ import {
 } from './diagnostics.js';
 import { OWNED, attributeId, ensureAttribute, ensureScopedUniqueness, hasAttributeTables, migrateAttrTable, ownAttribute, ownersOfValue, rescopeOwnerships, sweepAttributes } from './attribute-store.js';
 import { generateSchema } from './sqlite-generator.js';
+import { attributeIid, decodeIid, thingIid } from './iid.js';
 import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
 import { type SchemaContext } from './expressions.js';
@@ -108,6 +113,7 @@ import {
   traitSubject,
   typeSubject,
   valueSubject,
+  relatesSubject,
   ownsSubject,
 } from './schema-subjects.js';
 import { ChangeLog, type EntityIdentity } from './change-log.js';
@@ -202,6 +208,16 @@ export class TypeDBLiteValue {
       throw new Error(`Cannot extract iid from ${this.kind}('${this.raw}')`);
     }
     return this.id;
+  }
+
+  /**
+   * The concept's iid as TypeQL writes it — `0x…`, what `iid($x)` answers and `$x iid …` matches (see
+   * `iid.ts`). A thing or an attribute has one; a value or a type does not.
+   */
+  get iidHex(): string {
+    if (this.id !== undefined) return thingIid(this.kind === 'relation', this.id);
+    if (this.kind === 'attribute') return attributeIid(this.type, this.raw);
+    throw new Error(`Cannot extract iid from ${this.kind}('${this.type}')`);
   }
 
   /** 🔴 A thing, or a type, has no string value. Reading one as a string is the driver's error, not `''`. */
@@ -458,6 +474,8 @@ interface ThingConstraint {
   isas: Isa[];
   /** Where the pattern that introduced this constraint sits in the source. */
   range?: Range;
+  /** `$x iid 0x…` — the one concept with that iid (`iid.ts`); a thing's narrows the candidates. */
+  iids?: string[];
   /** `has skill-id "x"` — narrows the candidates. */
   literals: Array<{
     attribute: string;
@@ -555,6 +573,10 @@ interface StreamScope {
   readonly valueTypes: Map<string, string | undefined>;
   /** Variables that may be EMPTY — from a `try`, or a `given` declared `?` — which a write may read only inside `try`. */
   readonly optional: Set<string>;
+  /** A `given` thing variable's declared type — what a write's ownership is inferred from (given.feature L346). */
+  readonly declared?: Map<string, string>;
+  /** The type an insert or put stage wrote a variable as — what a later `update` is checked against. */
+  readonly inserted?: Map<string, string>;
 }
 
 export class TypeDBLiteInterpreter {
@@ -1866,6 +1888,11 @@ export class TypeDBLiteInterpreter {
         return typeof binding === 'string' ? binding : undefined;
       },
       bindingOf: (variable) => combination[variable],
+      iidOf: (variable) => {
+        const binding = combination[variable];
+        if (binding === undefined || typeof binding === 'string' || (typeof binding === 'object' && binding.kind !== 'attribute')) return undefined;
+        return this.cellOf(binding).iidHex;
+      },
       call: (definition, args, at) => this.callFunction(definition, args, at),
     };
   }
@@ -1967,6 +1994,8 @@ export class TypeDBLiteInterpreter {
       attributeOf: new Map(before.attributeOf),
       valueTypes: new Map(before.valueTypes),
       optional: new Set(before.optional),
+      declared: new Map(before.declared),
+      inserted: new Map(before.inserted),
     };
     const conceptOf = (variable: string): 'thing' | 'type' | undefined => {
       const kind = before.kinds.get(variable);
@@ -1987,6 +2016,7 @@ export class TypeDBLiteInterpreter {
           if (this.schema.attributes.has(type)) scope.attributeOf.set(declaration.variable, type);
           scope.valueTypes.set(declaration.variable, VALUE_TYPES.has(type) ? type : this.schema.attributes.has(type) ? this.valueTypeOfAttribute(type) : undefined);
           if (declaration.optional) scope.optional.add(declaration.variable);
+          if (isThingType) scope.declared?.set(declaration.variable, type);
         }
         return scope;
       }
@@ -1999,6 +2029,7 @@ export class TypeDBLiteInterpreter {
         // the order across branches, which only the whole stage can see.
         this.checkNested(patterns, new Set([...before.available, ...this.ownBound(patterns)]), conceptOf, 'conjunction', before.available, undefined, before.available);
         this.checkLetOrder(patterns);
+        this.checkBranchReuse(patterns, new Set(before.available));
         this.checkUntypedReads(patterns, constraints);
         const kind = this.nestedKind(patterns);
         for (const variable of this.selectedOf(segment, constraints)) {
@@ -2037,9 +2068,25 @@ export class TypeDBLiteInterpreter {
           for (const deletion of openDeletions(stage.deletions, this.refuse)) if (deletion.owner === undefined && deletion.target !== undefined) drop(deletion.target);
         } else {
           for (const pattern of stage.patterns) {
-            if (!isThingPattern(pattern)) continue;
-            scope.available.add(pattern.variable);
-            if (!scope.kinds.has(pattern.variable)) scope.kinds.set(pattern.variable, 'thing');
+            // What an insert's `try { … }` inserts is answered too — EMPTY where the block did not run
+            // (insert.feature L2816). A `put`'s is not: the spec answers it `none` (put.feature L696).
+            const inner = isOptionalPattern(pattern) ? (stage.$type === 'InsertStage' ? pattern.patterns.filter(isThingPattern) : []) : isThingPattern(pattern) ? [pattern] : [];
+            for (const thing of inner) {
+              scope.available.add(thing.variable);
+              // `$n isa person-name "John"` inserts an ATTRIBUTE, which a later `fetch` reads as one
+              // (fetch.feature L3047).
+              const instance = this.attributeInstanceOf(thing, 'write')?.instance;
+              if (instance !== undefined) {
+                scope.kinds.set(thing.variable, 'value');
+                scope.attributeOf.set(thing.variable, instance.type);
+                scope.valueTypes.set(thing.variable, this.valueTypeOfAttribute(instance.type));
+                continue;
+              }
+              if (!scope.kinds.has(thing.variable)) scope.kinds.set(thing.variable, 'thing');
+              const written = thing.properties.find(isIsaProperty)?.type;
+              if (written !== undefined) scope.inserted?.set(thing.variable, written);
+              if (isOptionalPattern(pattern) && !before.available.has(thing.variable)) scope.optional.add(thing.variable);
+            }
           }
         }
         return scope;
@@ -2183,23 +2230,76 @@ export class TypeDBLiteInterpreter {
     // insert, a set of statements and not a script, so `$n` exists before anything reads it.
     const written = insertionOrder(stage.patterns);
     const ordered = [...written.filter((p) => this.isAttributeInstance(p)), ...written.filter((p) => !this.isAttributeInstance(p))];
-    return uniqueRows(rows, valueVariablesReadBy(stage)).map((row) => {
+    // `put` is match-or-insert of the WHOLE stage: every answer its statements already have, or — when
+    // they have none — one insert of all of them (put.feature L103: two people, `put $x isa person;`
+    // answers both). A `try` block is put on its own, when its inputs are bound.
+    const required = stage.patterns.filter((p) => !isOptionalPattern(p));
+    const asMatch = stage.$type === 'PutStage' && required.length > 0 ? this.segmentFor(stage, required) : undefined;
+    return uniqueRows(rows, valueVariablesReadBy(stage)).flatMap((row): Array<Record<string, Binding>> => {
+      if (asMatch !== undefined) {
+        const found = this.combinations(asMatch, row);
+        if (found.length > 0) return found;
+      }
       const scoped = singleBinding(row);
       const values = valueBindingsOf(row);
       for (const pattern of ordered) {
         if (isOptionalPattern(pattern)) {
           // Runs only when what it reads is bound (given.feature L353).
-          if (this.blockReady(pattern, row)) for (const inner of insertionOrder(pattern.patterns)) this.runInsert(inner, scoped, values, stage.$type === 'PutStage');
+          if (this.blockReady(pattern, row)) for (const inner of insertionOrder(pattern.patterns)) this.runInsert(this.concreteWrite(inner, row), scoped, values, stage.$type === 'PutStage');
           continue;
         }
-        this.runInsert(pattern, scoped, values, stage.$type === 'PutStage');
+        this.runInsert(this.concreteWrite(pattern, row), scoped, values, stage.$type === 'PutStage');
       }
       const next: Record<string, Binding> = { ...row };
       for (const [variable, iids] of scoped) if (iids[0] !== undefined) next[variable] = iids[0];
       // The attributes this insert created are answered as concepts, as its things are (delete.feature L162).
       for (const [variable, value] of values) if (next[variable] === undefined) next[variable] = value;
-      return next;
+      return [next];
     });
+  }
+
+  /**
+   * A written statement with its type and role VARIABLES replaced by what this row bound them to —
+   * `insert $x isa $p;` with `$p label person` writes a person (insert.feature L2140). A role is
+   * written by its name; a role labelled through a relation that does not declare it (an alias,
+   * `part-time-employment:employee`, L2203) names no role there, and is refused.
+   */
+  private concreteWrite(pattern: Pattern, row: Record<string, Binding>): Pattern {
+    if (typeVariablesWritten(pattern).length === 0) return pattern;
+    const typeOf = (variable: string): string => {
+      const bound = row[variable];
+      if (typeof bound !== 'string') return this.refuse(DiagnosticCode.unboundValue, `The type variable '${variable.slice(1)}' is not bound to a type, so the write has no type to write.`, rangeOf(pattern));
+      return bound;
+    };
+    const players = (list: RolePlayers | undefined, relation: string | undefined): RolePlayers | undefined =>
+      list === undefined
+        ? undefined
+        : ({
+            ...list,
+            entries: list.entries.map((entry) => {
+              if (entry.roleVariable === undefined) return entry;
+              const label = typeOf(entry.roleVariable);
+              const separator = label.lastIndexOf(':');
+              const [declaring, name] = [label.slice(0, separator), label.slice(separator + 1)];
+              if (separator < 0 || !this.schema.roles.get(declaring)?.has(name) || (relation !== undefined && !this.typeFamily(relation, 'inherited').includes(declaring))) {
+                this.refuse(DiagnosticCode.unknownRole, `'${label}' is not a role ${relation === undefined ? 'a relation declares' : `of '${relation}'`}; a role is written as the relation that declares it names it.`, rangeOf(pattern));
+              }
+              return { ...entry, role: name, roleVariable: undefined };
+            }),
+          } as RolePlayers);
+    if (isAnonRelationPattern(pattern)) {
+      const type = pattern.type ?? (pattern.typeVariable === undefined ? undefined : typeOf(pattern.typeVariable));
+      return { ...pattern, type, typeVariable: undefined, players: players(pattern.players, type) } as Pattern;
+    }
+    if (!isThingPattern(pattern)) return pattern;
+    const isa = pattern.properties.find(isIsaProperty);
+    const type = isa?.type ?? (isa?.typeVariable === undefined ? undefined : typeOf(isa.typeVariable));
+    const properties = pattern.properties.map((property) => {
+      if (isIsaProperty(property)) return { ...property, type, typeVariable: undefined, players: players(property.players, type) } as Property;
+      if (isLinksProperty(property)) return { ...property, players: players(property.players, type) } as Property;
+      return property;
+    });
+    return { ...pattern, properties } as Pattern;
   }
 
   /**
@@ -2249,21 +2349,35 @@ export class TypeDBLiteInterpreter {
       }
       if (!before.available.has(thing.variable)) unavailable(thing.variable, rangeOf(pattern));
       if (before.kinds.get(thing.variable) !== 'thing') illegal(rangeOf(pattern));
-      const types = scope.typesOf(thing.variable);
+      const types = this.streamTypesOf(thing.variable, before, scope);
       for (const property of thing.properties) {
         const at = rangeOf(property);
         if (isIsaProperty(property)) {
           this.refuse(DiagnosticCode.mixedPattern, `Illegal 'isa' provided for variable '${thing.variable.slice(1)}' that is input from a previous stage: an update changes a thing, never its type.`, at);
         }
         if (isHasProperty(property)) {
+          if (property.expression !== undefined) {
+            this.refuse(DiagnosticCode.mixedPattern, `Illegal statement 'expression' provided for an update stage. Only 'has' and 'links' constraints are allowed.`, at);
+          }
+          // `has $b + 15`, `has $b < 15` — TypeDB reads `$b` as the attribute TYPE, and `$b` is an
+          // attribute already (update.feature L479, L488).
+          if (property.attribute === undefined && property.valueVariable !== undefined && (property.value !== undefined || property.comparator !== undefined)) {
+            this.refuse(DiagnosticCode.mixedPattern, `The variable '${property.valueVariable.slice(1)}' cannot be declared as both a 'ThingType' and as a 'Attribute'.`, at);
+          }
           const variable = property.valueVariable ?? (property.comparator === '==' && property.compared !== undefined && isVariableExpression(property.compared) ? property.compared.variable : undefined);
+          // `has name $n` with `$n` an earlier stage's attribute says `$n isa name` of an input — an update
+          // changes what a thing has, never what an input is (update.feature L391; `has $n` and
+          // `has name == $n` are the forms that read it).
+          if (property.attribute !== undefined && property.valueVariable !== undefined && before.available.has(property.valueVariable) && before.attributeOf.has(property.valueVariable)) {
+            this.refuse(DiagnosticCode.mixedPattern, `Illegal 'isa' provided for variable '${property.valueVariable.slice(1)}' that is input from a previous stage: write \`has ${property.valueVariable}\` or \`has ${property.attribute} == ${property.valueVariable}\`.`, at);
+          }
           if (property.comparator !== undefined && property.comparator !== '==') illegal(at);
           if (variable !== undefined && !before.available.has(variable)) unavailable(variable, at);
           const attribute = property.attribute ?? (variable === undefined ? undefined : before.attributeOf.get(variable));
           if (attribute === undefined) continue;
           this.checkKnown('attribute', attribute, at);
           if (this.schema.abstracts.has(attribute)) {
-            this.refuse(DiagnosticCode.abstractType, `'${attribute}' is abstract and cannot have a value of its own. Write a concrete subtype.`, at);
+            this.refuse(DiagnosticCode.abstractType, `Type-inference was unable to find compatible types for the pair of variables: '${attribute}' is abstract and cannot have a value of its own. Write a concrete subtype.`, at);
           }
           for (const type of types ?? []) {
             if (!this.typeFamily(type, 'inherited').some((t) => this.schema.owns.has(ownsKey(t, attribute)))) {
@@ -2282,6 +2396,46 @@ export class TypeDBLiteInterpreter {
           for (const entry of property.players.entries) {
             if (!before.available.has(entry.player)) unavailable(entry.player, at);
             if (entry.roleVariable !== undefined) this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not update through a role variable yet: name the role.', at);
+            // TypeDB's annotation check of the update, read off 3.10.4: each type the stream lets the
+            // relation be relates a live, concrete role the player's types can play — or, when none
+            // does, type inference finds nothing (update.feature L2106: an abstract `friend`, or one
+            // `best-friendship` specialised away); when some do, the others are "not compatible"
+            // (L2786: `$f has ref $_` may be a person, which relates nothing).
+            // A role no relation declares is "not found" before anything is inferred (update.feature L1536).
+            if (entry.role !== undefined && ![...this.schema.roles.values()].some((roles) => roles.has(entry.role as string))) {
+              this.refuse(DiagnosticCode.unknownRole, `Role label not found '${entry.role}'.`, at);
+            }
+            const playerTypes = this.streamTypesOf(entry.player, before, scope);
+            const fitting = (relation: string): string[] => {
+              if (!this.schema.relations.has(relation) && !this.typeFamily(relation, 'inherited').some((t) => this.schema.relations.has(t))) return [];
+              const names = entry.role !== undefined ? [entry.role] : [...new Set(this.typeFamily(relation, 'inherited').flatMap((t) => [...(this.schema.roles.get(t) ?? [])]))];
+              return names.flatMap((name) => {
+                const declared = this.unspecialisedRole(relation, name);
+                if (declared === undefined || !declared.live) return [];
+                const [declarer, roleName] = [declared.role.slice(0, declared.role.lastIndexOf(':')), name];
+                if (this.schema.annotations.get(relatesSubject(declarer, roleName))?.has('abstract')) return [];
+                if (playerTypes !== undefined && !playerTypes.some((p) => this.typeFamily(p, 'inherited').some((t) => this.schema.plays.has(playsSubject(t, declared.role))))) return [];
+                return [declared.role];
+              });
+            };
+            if (types !== undefined && types.length > 0) {
+              const fits = types.map((type) => ({ type, roles: fitting(type) }));
+              const anywhere = fits.find((f) => f.roles.length > 0)?.roles[0];
+              if (anywhere === undefined) {
+                this.refuse(DiagnosticCode.unknownRole, `Type-inference was unable to find compatible types for the pair of variables '${thing.variable.slice(1)}' & '${entry.player.slice(1)}' across a 'links' constraint.`, at);
+              }
+              const misfit = fits.find((f) => f.roles.length === 0);
+              if (misfit !== undefined) this.refuse(DiagnosticCode.unknownRole, `Left type '${misfit.type}' across constraint 'links' is not compatible with right type '${anywhere}'.`, at);
+              // A role the player may take, named or not, must hold ONE player for an update to replace it.
+              if (entry.role === undefined) {
+                for (const { type, roles } of fits) {
+                  for (const role of roles) {
+                    const name = role.slice(role.lastIndexOf(':') + 1);
+                    if (roleMax(type, name, this.schema) > 1) this.refuse(DiagnosticCode.valueTypeConflict, `'${type}' can relate more than one '${name}', and an update replaces one: its cardinality should not exceed 1.`, at);
+                  }
+                }
+              }
+            }
             if (entry.role === undefined) continue;
             const role = entry.role;
             const relations = (types ?? []).filter((t) => this.schema.relations.has(t));
@@ -2555,6 +2709,23 @@ export class TypeDBLiteInterpreter {
         fail(`Attribute type '${attribute}' has no value type; a concrete attribute type needs one, its own or inherited.`);
       }
     }
+    // An annotation a type restates on what it already inherits, unchanged, is TypeDB's "redeclared
+    // without specialisation" — `child owns email @key` under `person owns email @key`, a subtype's
+    // `value string @regex(…)` repeating its parent's (define.feature L2266). Narrowing one is fine.
+    for (const [subject, annotations] of whole ? this.schema.annotations : []) {
+      const parts = subject.split('\u001f');
+      const inherited = (ancestor: string): string | undefined =>
+        parts.length === 3 && parts[1] === 'owns' ? ownsSubject(ancestor, parts[2]) : parts.length === 2 && parts[1] === 'value' ? valueSubject(ancestor) : undefined;
+      if (inherited(parts[0]) === undefined) continue;
+      for (const ancestor of this.typeFamily(parts[0], 'inherited').filter((t) => t !== parts[0])) {
+        const theirs = this.schema.annotations.get(inherited(ancestor) as string);
+        for (const [category, text] of annotations) {
+          if (category === 'doc' || category.startsWith('meta:') || theirs?.get(category) !== text) continue;
+          const what = parts[1] === 'owns' ? `'${parts[0]} owns ${parts[2]}'` : `the value type of '${parts[0]}'`;
+          fail(`${what} redeclares ${text}, which it inherits from '${ancestor}', without specialisation.`);
+        }
+      }
+    }
     if (!whole && this.transactionTouched.size === 0) return;
     const touched = [...this.transactionTouched];
     const only = whole ? '' : ` AND t.iid IN (${touched.map(() => '?').join(', ')})`;
@@ -2564,7 +2735,7 @@ export class TypeDBLiteInterpreter {
         .prepare(`SELECT COUNT(*) AS n FROM thing t WHERE t.type IN ${SUBTYPES_OF}${only} AND (SELECT COUNT(*) FROM has h WHERE h.owner = t.iid AND h.type IN ${SUBTYPES_OF}) <> 1`)
         .get(owner, ...(whole ? [] : touched), attribute) as { n: number };
       if (Number(wrong.n) > 0) {
-        fail(`Commit failed: key constraint violation — ${wrong.n} instance(s) of '${owner}' do not hold exactly one '${attribute}' key.`);
+        fail(`Commit failed: key constraint violation — ${wrong.n} instance(s) of '${owner}' do not hold exactly one '${attribute}' key, and a key is @card(1..1).`);
       }
     }
   }
@@ -2671,7 +2842,54 @@ export class TypeDBLiteInterpreter {
     // annotations are what get truncated.
     this.deferredFacts = reported.filter((diagnostic) => diagnostic.severity !== 1);
     renameAnonymous(result.value);
+    this.mergeWrittenStatements(result.value);
     return result.value;
+  }
+
+  /**
+   * An insert is a SET of statements, so every statement about one variable is one statement:
+   * `$x has name "Bond"; $x isa person, has ref 0;` inserts ONE person with both (insert.feature
+   * L100), and `$x isa person; $x isa person;` one person (L243). Two different types for one
+   * variable cannot both be written — TypeDB's type inference finds no type for it (L227).
+   * Merged once, on the AST, so every reader of the stage sees one statement per variable.
+   */
+  private mergeWrittenStatements(root: TypeQLiteFile): void {
+    const merge = (patterns: Pattern[]): Pattern[] => {
+      const byVariable = new Map<string, ThingPattern>();
+      const merged: Pattern[] = [];
+      for (const pattern of patterns) {
+        if (isOptionalPattern(pattern)) {
+          (pattern as { patterns: Pattern[] }).patterns = merge(pattern.patterns);
+          merged.push(pattern);
+          continue;
+        }
+        if (!isThingPattern(pattern) || isAnonymous(pattern.variable)) {
+          merged.push(pattern);
+          continue;
+        }
+        const first = byVariable.get(pattern.variable);
+        if (first === undefined) {
+          byVariable.set(pattern.variable, pattern);
+          merged.push(pattern);
+          continue;
+        }
+        const types = new Set([...first.properties, ...pattern.properties].flatMap((p) => (isIsaProperty(p) ? [`${p.exact ? '!' : ''}${p.type ?? p.typeVariable}`] : [])));
+        if (types.size > 1) {
+          this.refuse(DiagnosticCode.mixedPattern, `Type-inference was unable to find compatible types for the pair of variables: '${pattern.variable}' is written as ${[...types].map((t) => `'${t.replace(/^!/, '')}'`).join(' and ')}, and one thing has one type.`, rangeOf(pattern));
+        }
+        // The `isa` once, first — the rest of both statements after it.
+        const isa = first.properties.find(isIsaProperty) ?? pattern.properties.find(isIsaProperty);
+        const rest = [...first.properties, ...pattern.properties].filter((p) => !isIsaProperty(p) || (p.players !== undefined && p !== isa));
+        (first as { properties: Property[] }).properties = isa === undefined ? rest : [isa, ...rest.filter((p) => p !== isa)];
+      }
+      return merged;
+    };
+    for (const node of AstUtils.streamAst(root)) {
+      if (node.$type === 'InsertStage' || node.$type === 'PutStage') {
+        const stage = node as unknown as { patterns: Pattern[] };
+        stage.patterns = merge(stage.patterns);
+      }
+    }
   }
 
   private pipelines(text: string): Pipeline[] {
@@ -2803,7 +3021,8 @@ export class TypeDBLiteInterpreter {
     if (known.size === 0) return; // No schema applied yet; `define` has not run.
     if (!known.has(name)) {
       const message =
-        `Unknown ${kind} '${name}'. The applied schema defines: ` +
+        // TypeDB says "Type label 'dog' not found." (define.feature L3458) — its words, then ours.
+        `Unknown ${kind} '${name}': type label '${name}' not found. The applied schema defines: ` +
         `${[...known].sort().join(', ')}`;
       throw attachDiagnostic(
         new Error(message),
@@ -2854,10 +3073,11 @@ export class TypeDBLiteInterpreter {
     }
     if (statement === 'write') {
       for (const pattern of patterns) {
-        const typed = isTypeHead(pattern, this.refuse) || (isThingPattern(pattern) && pattern.properties.some((p) => isIsaProperty(p) && p.typeVariable !== undefined));
-        if (typed) {
-          // `insert $x isa $t` / `insert $x sub person;` — a write cannot hold a type variable here (review, round 1).
-          this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not write through a type variable: an insert names its type.', rangeOf(pattern));
+        // `insert $x sub person;`, `put person owns name;` — a type statement writes schema, and a
+        // write stage writes data (put.feature L596). `insert $x isa $t` is a THING statement, its
+        // type through a variable an earlier stage bound — resolved per row (`concreteWrite`).
+        if (isTypeHead(pattern, this.refuse)) {
+          this.refuse(DiagnosticCode.mixedPattern, 'A write stage may only contain thing statements: a type statement belongs to `define`, `undefine` or `redefine`.', rangeOf(pattern));
         }
         // `insert $x isa person, isa writer;` — a write names ONE type (review, round 4): the
         // match side ANDs every `isa`, and an insert can only write one.
@@ -2877,7 +3097,7 @@ export class TypeDBLiteInterpreter {
         constraints.push({
           variable: `__anon${constraints.length}`,
           type: pattern.type,
-          isas: pattern.type === undefined ? [] : [{ type: pattern.type, exact: false }],
+          isas: pattern.type !== undefined ? [{ type: pattern.type, exact: false }] : pattern.typeVariable !== undefined ? [{ typeVariable: pattern.typeVariable, exact: false }] : [],
           range: rangeOf(pattern),
           literals: owned.literals,
           bindings: owned.bindings,
@@ -2887,6 +3107,17 @@ export class TypeDBLiteInterpreter {
       }
       if (!isThingPattern(pattern)) continue;
 
+      // `isa person` where person and everything below it is abstract — or `isa! name` on an abstract
+      // `name` — can have no instance: TypeDB's type inference finds no type for the variable
+      // (match.feature L942, L4092).
+      for (const property of pattern.properties) {
+        if (ownership !== 'match' || !isIsaProperty(property) || property.type === undefined) continue;
+        if (!this.schema.types.has(property.type) && !this.schema.attributes.has(property.type)) continue;
+        const candidates = property.exact ? [property.type] : this.subtypesOf(property.type);
+        if (candidates.every((t) => this.schema.abstracts.has(t))) {
+          this.refuse(DiagnosticCode.abstractType, `Type-inference was unable to find compatible types for the pair of variables: '${pattern.variable}' \`isa${property.exact ? '!' : ''} ${property.type}\` names only abstract types, which have no instances.`, rangeOf(property));
+        }
+      }
       const instance = this.attributeInstanceOf(pattern, ownership);
       if (instance !== undefined) {
         constraints.push(instance);
@@ -2907,12 +3138,17 @@ export class TypeDBLiteInterpreter {
       for (const property of pattern.properties) {
         if (isIsaProperty(property)) {
           if (property.type !== undefined) this.checkKnown('type', property.type, rangeOf(property));
+
           // Every `isa` is kept — two in one pattern, `isa! writer, isa person`, are two filters.
           constraint.isas.push({ type: property.type, typeVariable: property.typeVariable, exact: property.exact === true });
           constraint.type ??= property.type;
           if (property.players) constraint.roles.push(...rolesOf(property.players, statement));
         } else if (isLinksProperty(property)) {
           constraint.roles.push(...rolesOf(property.players, statement));
+        } else if (isIidProperty(property)) {
+          // An iid is the engine's to assign — TypeDB parses `insert $x iid 0x…` and refuses it.
+          if (ownership === 'write') this.refuse(DiagnosticCode.mixedPattern, `'${pattern.variable}' cannot be given an iid: an iid is assigned by the database, never written.`, rangeOf(property));
+          (constraint.iids ??= []).push(property.iid);
         } else if (isHasProperty(property)) {
           if (property.attribute === undefined) {
             // `has $a` — an attribute of any type (163 uses in the behaviour spec).
@@ -2976,6 +3212,7 @@ export class TypeDBLiteInterpreter {
         existing.literals.push(...constraint.literals);
         existing.bindings.push(...constraint.bindings);
         existing.roles.push(...constraint.roles);
+        if (constraint.iids !== undefined) (existing.iids ??= []).push(...constraint.iids);
         continue;
       }
       constraints.push(constraint);
@@ -3079,6 +3316,70 @@ export class TypeDBLiteInterpreter {
    * `hetero-marriage`'s husband, `isa civil-marriage` does not; a player whose type plays no role
    * of the relation. Only what is WRITTEN is judged; a type variable constrains nothing here.
    */
+  /**
+   * `delete has $e of $p` — every type the match lets `$p` be owns every type it lets `$e` be, or the
+   * write is refused before any row, in TypeDB's words: `$p isa person; $e isa email;` fails on
+   * `encrypted-email`, which a person does not own (delete.feature L1902, read off TypeDB 3.10.4).
+   * A match that already says `$p has … $e` pairs them itself, and is not checked again.
+   */
+  private checkDeletedOwnership(owner: string, target: string, constraints: readonly ThingConstraint[], at: Range | undefined): void {
+    const ownerConstraint = constraints.find((c) => c.variable === owner);
+    if (ownerConstraint?.bindings.some((b) => b.variable === target)) return;
+    const concrete = (types: string[]): string[] => [...new Set(types)].filter((t) => !this.schema.abstracts.has(t));
+    const ownerTypes = concrete((ownerConstraint?.isas ?? []).flatMap((isa) => (isa.type === undefined ? [] : isa.exact ? [isa.type] : this.subtypesOf(isa.type))));
+    const instance = constraints.find((c) => c.instance?.variable === target)?.instance;
+    const bound = constraints.flatMap((c) => c.bindings).find((b) => b.variable === target && b.attribute !== undefined)?.attribute;
+    const attribute = instance?.type ?? bound;
+    if (ownerTypes.length === 0 || attribute === undefined) return;
+    const attributeTypes = concrete(instance?.exact ? [attribute] : this.subtypesOf(attribute));
+    for (const type of ownerTypes) {
+      const family = this.typeFamily(type, 'inherited');
+      const unowned = attributeTypes.find((a) => !family.some((t) => this.schema.owns.has(ownsKey(t, a))));
+      if (unowned !== undefined) this.refuse(DiagnosticCode.unownedAttribute, `Left type '${type}' across constraint 'has' is not compatible with right type '${unowned}'.`, at);
+    }
+  }
+
+  /** The concrete thing types that can own an instance of every one of `attributes` (or a subtype of it). */
+  private ownersOfAll(attributes: readonly string[]): string[] {
+    return [...this.schema.types].filter((t) => !this.schema.abstracts.has(t) && attributes.every((a) => this.subtypesOf(a).some((sub) => this.typeFamily(t, 'inherited').some((up) => this.schema.owns.has(ownsKey(up, sub))))));
+  }
+
+  /**
+   * The types a thing variable can be after `before`'s stages: its `isa`s, else what an insert wrote
+   * it as, else — `$f has ref $_` alone — every type that can own what it has.
+   */
+  private streamTypesOf(variable: string, before: StreamScope, scope: FetchScope): readonly string[] | undefined {
+    const typed = scope.typesOf(variable);
+    if (typed !== undefined) return typed;
+    const inserted = before.inserted?.get(variable);
+    if (inserted !== undefined) return [inserted];
+    const matched = this.constraintsOf(before.patterns).find((c) => c.variable === variable);
+    if (matched === undefined || matched.isas.length > 0) return undefined;
+    const owned = [...matched.literals, ...matched.bindings].flatMap((n) => (n.attribute === undefined ? [] : [n.attribute]));
+    return owned.length === 0 ? undefined : this.ownersOfAll(owned);
+  }
+
+  /** A type and every type below it, at any depth. */
+  private subtypesOf(type: string): string[] {
+    return [...this.schema.types, ...this.schema.attributes].filter((t) => this.typeFamily(t, 'inherited').includes(type));
+  }
+
+  /**
+   * The role `name` as `relation` reaches it — declared by it or an ancestor (`role`, as
+   * `relation:role` of the declarer) — and whether it is still LIVE there: not specialised away by
+   * `relation` or any type between it and the declarer (`relates intern as employee`). `undefined`
+   * when nothing above `relation` declares it.
+   */
+  private unspecialisedRole(relation: string, name: string): { role: string; live: boolean } | undefined {
+    const chain = this.typeFamily(relation, 'inherited');
+    const declarer = chain.find((t) => this.schema.roles.get(t)?.has(name));
+    if (declarer === undefined) return undefined;
+    const role = roleRef(declarer, name);
+    const below = chain.slice(0, chain.indexOf(declarer));
+    const live = ![...this.schema.specialises].some(([child, parent]) => parent === role && below.includes(child.slice(0, child.lastIndexOf(':'))));
+    return { role, live };
+  }
+
   private checkRelationRoles(constraint: ThingConstraint, all: readonly ThingConstraint[]): void {
     if (constraint.roles.length === 0 || this.schema.relations.size === 0) return;
     const incompatible = (detail: string): never =>
@@ -3092,7 +3393,9 @@ export class TypeDBLiteInterpreter {
     }
     // The roles a relation type can link: those it or an ancestor declares, and — since `isa T`
     // answers T's subtypes — those its subtypes declare.
-    const related = (type: string): Set<string> => new Set(this.typeFamily(type, 'both').flatMap((t) => [...(this.schema.roles.get(t) ?? [])]));
+    // Above it and below it — never a SIBLING: `civil-marriage` relates no `wife` because
+    // `hetero-marriage`, beside it under `marriage`, does (match.feature L1512).
+    const related = (type: string): Set<string> => new Set([...this.typeFamily(type, 'inherited'), ...this.subtypesOf(type)].flatMap((t) => [...(this.schema.roles.get(t) ?? [])]));
     for (const role of constraint.roles) {
       if (role.role === undefined) continue;
       if (!declared(role.role)) {
@@ -3165,7 +3468,9 @@ export class TypeDBLiteInterpreter {
           statement === 'match'
             ? `\`${constraint.variable} isa ${type}, has ${attribute} …\` can never match.`
             : `\`${constraint.variable} isa ${type}, has ${attribute} …\` could never be read back.`;
+        // TypeDB's words first — a caller matching on them gets them (insert.feature L605) — then why.
         const message =
+          `Type-inference was unable to find compatible types for the pair of variables '${constraint.variable}' and its '${attribute}': ` +
           `'${type}' does not own '${attribute}', so ${consequence} ` +
           `Declare \`owns ${attribute}\` on '${type}', or name an attribute it has.`;
         throw attachDiagnostic(
@@ -3235,6 +3540,19 @@ export class TypeDBLiteInterpreter {
     // candidates; the unbound type variables bind afterwards, from the candidate's own type.
     const resolved = resolveIsas(constraint.isas, combination);
     const unbound = resolved.filter((isa) => isa.typeVariable !== undefined && isa.type === undefined);
+    // `$x iid 0x20…` names an ATTRIBUTE (ADR-006: its type and value): that one, if it exists and
+    // satisfies every `isa`. An attribute owns nothing and plays nothing, so a `has` or a role on it
+    // answers nothing.
+    const byIid = (constraint.iids ?? []).map(decodeIid).find((d) => d?.kind === 'attribute');
+    if (byIid?.kind === 'attribute') {
+      const named = (constraint.iids ?? []).map(decodeIid);
+      const same = named.every((d) => d?.kind === 'attribute' && d.type === byIid.type && d.value === byIid.value);
+      if (!same || constraint.literals.length > 0 || constraint.bindings.length > 0 || constraint.roles.length > 0) return [];
+      const binding: ValueBinding = { kind: 'attribute', attributeType: byIid.type, valueType: this.valueTypeOfAttribute(byIid.type) ?? 'string', value: byIid.value };
+      const already = combination[constraint.variable];
+      if (already !== undefined && !sameConcept(already, binding)) return [];
+      return this.bindAttributesThroughTypes(constraint.variable, resolved, unbound, { ...combination, [constraint.variable]: binding });
+    }
     // `$a isa $t` with nothing else said of `$a` may be an attribute instance too (ADR-006): `attribute
     // $t; $a isa $t;` answers every stored attribute (insert.feature L276, update.feature L1178).
     // An attribute plays no role in TypeDB 3, so a variable some relation links is a thing.
@@ -3357,6 +3675,16 @@ export class TypeDBLiteInterpreter {
       );
       params.push(literal.attribute, literal.value);
     }
+    // `$x iid 0x…` — that one thing, or nothing when the iid names no thing (`iid.ts`).
+    for (const iid of constraint.iids ?? []) {
+      const decoded = decodeIid(iid);
+      if (decoded?.kind !== 'thing') {
+        where.push('0');
+        continue;
+      }
+      where.push('t.iid = ?');
+      params.push(decoded.id);
+    }
     // A variable with a bound attribute must actually own that attribute.
     for (const binding of constraint.bindings) {
       if (binding.attribute === undefined) {
@@ -3430,7 +3758,11 @@ export class TypeDBLiteInterpreter {
     // Every `let` and comparison is checked before a single combination is evaluated — an unbound
     // operand or a cycle fails a match with no answers too (expression.feature).
     const attributeOf = new Map(constraints.flatMap((c) => c.bindings.map((b) => [b.variable, b.attribute] as const)));
-    const ownKind = this.conceptKindOf(constraints, patterns);
+    // `$x isa $t;` alone may be an attribute instance too (`bindThing`), so a comparison may read it:
+    // the rows decide, and one binding a thing is dropped (`applyStatements`, match.feature L4878).
+    const either = new Set(constraints.filter(isBareTypeIsa).map((c) => c.variable));
+    const conceptKind = this.conceptKindOf(constraints, patterns);
+    const ownKind = (variable: string): 'thing' | 'type' | undefined => (either.has(variable) ? undefined : conceptKind(variable));
     const statements = orderValueStatements(
       patterns,
       // What a `try` binds may be EMPTY, so the conjunction around it may not read it (expression.feature
@@ -3578,7 +3910,8 @@ export class TypeDBLiteInterpreter {
     for (const comparison of statements.comparisons) {
       ([comparison.left, ...variablesOf(comparison.right)].every((variable) => ready.has(variable)) ? early : late).comparisons.push(comparison);
     }
-    combinations = this.applyStatements(early, combinations);
+    const either = new Set(constraints.filter(isBareTypeIsa).map((c) => c.variable));
+    combinations = this.applyStatements(early, combinations, either);
     // Nested blocks that EXTEND an answer, each a sub-match seeded with it: every branch of a
     // disjunction answers its own extensions (disjunction.feature L38), and a `try` extends the
     // answer when it matches and keeps it unextended when it does not (optional.feature L66).
@@ -3616,7 +3949,7 @@ export class TypeDBLiteInterpreter {
         note('optional');
       }
     }
-    combinations = this.applyStatements(late, combinations);
+    combinations = this.applyStatements(late, combinations, either);
     // Then the FILTERS, last, so everything they read is bound: `$x is $y` holds when both are the
     // one concept (binding one from the other when only one is bound), and `not { … }` keeps the
     // answer only if its block, seeded with it, matches nothing (negation.feature).
@@ -3685,8 +4018,41 @@ export class TypeDBLiteInterpreter {
           if (kindOf(deletion.owner as string) !== 'thing') {
             this.refuse(DiagnosticCode.mixedPattern, `'${deletion.owner}' is not a relation the \`match\` bound; \`delete links … of ${deletion.owner}\` has nothing to remove from.`, rangeOf(deletion));
           }
+          // TypeDB's annotation check of the write, read off 3.10.4 (delete.feature L511, L793, L909,
+          // L947): no relation/player type pair that fits is "unable to find compatible types"; a
+          // relation type the match allows that cannot hold the role — `$e isa employment` may be an
+          // `internship`, which specialised `employee` into `intern` — is "Left type … not compatible".
+          const typesOf = (variable: string): string[] | undefined => {
+            const isas = matchConstraints.find((c) => c.variable === variable)?.isas.filter((isa) => isa.type !== undefined) ?? [];
+            if (isas.length === 0) return undefined;
+            return [...new Set(isas.flatMap((isa) => (isa.exact ? [isa.type as string] : this.subtypesOf(isa.type as string))))].filter((t) => !this.schema.abstracts.has(t));
+          };
+          // The match narrows them: `$e isa employment, links (intern: $p)` is an internship — a type
+          // must reach every role the match links on it, a specialised one included (L538).
+          const matchedRoles = (matchConstraints.find((c) => c.variable === deletion.owner)?.roles ?? []).flatMap((r) => (r.role === undefined ? [] : [r.role]));
+          const relationTypes = typesOf(deletion.owner as string)?.filter((type) => matchedRoles.every((role) => this.unspecialisedRole(type, role) !== undefined));
           for (const entry of deletion.players?.entries ?? []) {
-            if (entry.roleVariable !== undefined) this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not delete through a role variable yet: name the role.', rangeOf(deletion));
+            if (entry.role === undefined || relationTypes === undefined) continue;
+            const roles = relationTypes.map((type) => ({ type, role: this.unspecialisedRole(type, entry.role as string) }));
+            const playerTypes = typesOf(entry.player);
+            if (playerTypes !== undefined) {
+              const fits = roles.some(({ role }) => role?.live === true && playerTypes.some((p) => this.typeFamily(p, 'inherited').some((t) => this.schema.plays.has(playsSubject(t, role.role)))));
+              if (!fits) {
+                this.refuse(DiagnosticCode.unknownRole, `Type-inference was unable to find compatible types for the pair of variables '${entry.player.slice(1)}' & '${(deletion.owner as string).slice(1)}' across a 'links' constraint.`, rangeOf(deletion));
+              }
+            }
+            const declaredAnywhere = [...this.schema.roles].find(([, names]) => names.has(entry.role as string))?.[0];
+            for (const { type, role } of roles) {
+              if (role?.live === true) continue;
+              const right = role?.role ?? (declaredAnywhere === undefined ? entry.role : roleRef(declaredAnywhere, entry.role));
+              this.refuse(DiagnosticCode.unknownRole, `Left type '${type}' across constraint 'links' is not compatible with right type '${right}'.`, rangeOf(deletion));
+            }
+          }
+          for (const entry of deletion.players?.entries ?? []) {
+            // `links ($role: $x)` — the role the match bound `$role` to (delete.feature L998).
+            if (entry.roleVariable !== undefined && kindOf(entry.roleVariable) !== 'type') {
+              this.refuse(DiagnosticCode.mixedPattern, `'${entry.roleVariable}' is not a role type the \`match\` bound; it names no role to remove.`, rangeOf(deletion));
+            }
             if (kindOf(entry.player) !== 'thing') {
               this.refuse(DiagnosticCode.mixedPattern, `'${entry.player}' is not a thing the \`match\` bound; it plays no role to remove.`, rangeOf(deletion));
             }
@@ -3695,6 +4061,7 @@ export class TypeDBLiteInterpreter {
         }
         const target = deletion.target as string;
         if (deletion.owner !== undefined) {
+          this.checkDeletedOwnership(deletion.owner, target, matchConstraints, rangeOf(deletion));
           if (!attributeOf.has(target) && !scope.attributeOf.has(target)) {
             this.refuse(DiagnosticCode.mixedPattern, `'${target}' is not an attribute the \`match\` bound with \`has <attribute> ${target}\`; \`delete ${target} of ${deletion.owner}\` has nothing to remove.`, rangeOf(deletion));
           }
@@ -3725,8 +4092,9 @@ export class TypeDBLiteInterpreter {
       matchBinds.add(instance.variable);
       attributeOf.set(instance.variable, instance.type);
     }
+    const stageName = write.$type === 'PutStage' ? 'put' : 'insert';
     for (const pattern of writtenPatterns(write.patterns, this.refuse)) {
-      if (isLetPattern(pattern) || isComparisonPattern(pattern)) {
+      if (isLetPattern(pattern) || isComparisonPattern(pattern) || isCallComparisonPattern(pattern)) {
         this.refuse(DiagnosticCode.mixedPattern, 'A `let` or a comparison belongs to a `match`, not to a write stage.', rangeOf(pattern));
       }
       // A write states what it writes: `not`, `or` and `is` constrain a match, and an insert would
@@ -3734,11 +4102,24 @@ export class TypeDBLiteInterpreter {
       if (isNegationPattern(pattern) || isDisjunctionPattern(pattern) || isIsPattern(pattern)) {
         this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not write through `not`, `or` or `is`; they constrain a `match`.', rangeOf(pattern));
       }
-      if (/\(\s*\$[\w-]+\s*:/.test(pattern.$cstNode?.text ?? '')) {
-        // TypeDB writes through a role variable; this engine does not yet — refused by name, so a
-        // scenario TypeDB fails for another reason (an aliased role, insert.feature L2192) is not
-        // passed for this one.
-        this.refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not write through a role variable yet: name each role, `links (employee: $x)`.', rangeOf(pattern));
+      // `insert $x isa $p; ($rt: $x) isa $r;` — a type or a role through a variable, which an earlier
+      // stage must have bound to a type (insert.feature L2140); unbound, nothing names what to write
+      // (L2178). Each row writes the type it bound — `concreteWrite`.
+      for (const variable of typeVariablesWritten(pattern)) {
+        if (kindOf(variable) !== 'type') {
+          this.refuse(DiagnosticCode.unboundValue, `The type variable '${variable.slice(1)}' is not bound to a type by an earlier stage, so the write has no type to write.`, rangeOf(pattern));
+        }
+      }
+      // `put $p has age 10;` — no `isa`, and nothing before binds `$p`: there is no thing to give it
+      // to (put.feature L588). Statements about one variable are merged, so an `isa` anywhere counts.
+      const insertedHere = writtenPatterns(write.patterns, this.refuse).some((p) => isThingPattern(p) && p.variable === (pattern as ThingPattern).variable && p.properties.some(isIsaProperty));
+      if (isThingPattern(pattern) && !isTypeHead(pattern, this.refuse) && !insertedHere && !matchBinds.has(pattern.variable) && !scope.optional.has(pattern.variable)) {
+        const links = pattern.properties.some(isLinksProperty);
+        this.refuse(
+          links ? DiagnosticCode.danglingRelation : DiagnosticCode.unboundValue,
+          `${links ? 'Refusing a dangling relation: ' : ''}the variable '${pattern.variable.slice(1)}' is neither bound by an earlier stage nor inserted here. Ensure the variable is available from a previous stage or is inserted in this stage.`,
+          rangeOf(pattern),
+        );
       }
       // The literal checks — kind, spelling, range — run here as they do per combination.
       const [constraint] = this.constraintsOf([pattern], 'write');
@@ -3755,6 +4136,34 @@ export class TypeDBLiteInterpreter {
         // static pass refuses only when NOTHING in the type's closure owns the attribute; which
         // concrete type the match bound is the per-combination check's (review, round 18). An
         // `isa!` binds the one type, and that type's own closure decides here (round 19).
+        // A `given` thing is inferred as its DECLARED type, not as the thing passed: `given $p: animal;
+        // insert $p has age 12;` is refused though the person passed owns `age` (given.feature L346).
+        const declared = constraint.type === undefined ? scope.declared?.get(constraint.variable) : undefined;
+        if (declared !== undefined) {
+          const family = this.typeFamily(declared, 'inherited');
+          for (const named of [...constraint.literals, ...constraint.bindings]) {
+            if (named.attribute === undefined || family.some((t) => this.schema.owns.has(ownsKey(t, named.attribute as string)))) continue;
+            this.refuse(DiagnosticCode.unownedAttribute, `Left type '${declared}' across constraint 'has' is not compatible with right type '${named.attribute}'.`, named.range);
+          }
+        }
+        // A match variable with no `isa` is every type that can own what it `has`: `match $p has name
+        // $_;` may be a company, which owns no `first-name`, so `insert $p has first-name …` is refused
+        // before any row (insert.feature L560) — each such type must own what the write adds.
+        if (constraint.type === undefined && declared === undefined && (matchIsasOf.get(constraint.variable) ?? []).length === 0) {
+          const matched = matchConstraints.find((c) => c.variable === constraint.variable);
+          // `$p isa $pt; $pt owns first-name` narrows it through a type variable — left to the rows (L567).
+          const owned = matched === undefined || matched.isas.length > 0 ? [] : [...matched.literals, ...matched.bindings].flatMap((n) => (n.attribute === undefined ? [] : [n.attribute]));
+          if (owned.length > 0) {
+            const owners = [...this.schema.types].filter((t) => !this.schema.abstracts.has(t) && owned.every((a) => this.subtypesOf(a).some((sub) => this.typeFamily(t, 'inherited').some((up) => this.schema.owns.has(ownsKey(up, sub))))));
+            for (const type of owners) {
+              const family = this.typeFamily(type, 'inherited');
+              for (const named of [...constraint.literals, ...constraint.bindings]) {
+                if (named.attribute === undefined || family.some((t) => this.schema.owns.has(ownsKey(t, named.attribute as string)))) continue;
+                this.refuse(DiagnosticCode.unownedAttribute, `Left type '${type}' across constraint 'has' is not compatible with right type '${named.attribute}'.`, named.range);
+              }
+            }
+          }
+        }
         if (constraint.type === undefined) {
           for (const isa of matchIsasOf.get(constraint.variable) ?? []) {
             const type = isa.type as string;
@@ -3773,11 +4182,26 @@ export class TypeDBLiteInterpreter {
       }
       for (const property of pattern.properties) {
         if (!isHasProperty(property)) continue;
+        // `has age (10 + 5)` — an expression where a write takes a value (put.feature L610).
+        if (property.expression !== undefined) {
+          this.refuse(DiagnosticCode.mixedPattern, `Illegal statement 'expression' provided for a ${stageName} stage. Only 'has', 'links' and 'isa' constraints are allowed.`, rangeOf(property));
+        }
         // `has age $v`, or `has age == $v` — the write reads `$v`.
         const variable = property.valueVariable ?? (property.comparator === '==' && property.compared !== undefined && isVariableExpression(property.compared) ? property.compared.variable : undefined);
         if (variable === undefined) continue;
         if (!matchBinds.has(variable)) {
-          this.refuse(DiagnosticCode.unboundValue, unboundInWrite(variable), rangeOf(property));
+          // `has name $_` names the attribute and no value for it — TypeDB's words (insert.feature L2761).
+          const message = isAnonymous(variable) && property.attribute !== undefined
+            ? `Could not determine the value of the insert attribute '${property.attribute}': an anonymous variable \`$_\` holds no value.`
+            : unboundInWrite(variable);
+          this.refuse(DiagnosticCode.unboundValue, message, rangeOf(property));
+        }
+        // An ATTRIBUTE variable is written as itself, so its type must be the one named, or below it:
+        // `has ref $age` with `$age isa age 10` has no type both can be (insert.feature L235).
+        // `has age == $v` writes $v's VALUE, whatever holds it (L2884).
+        const attributeType = property.valueVariable === undefined ? undefined : (attributeOf.get(variable) ?? scope.attributeOf.get(variable));
+        if (attributeType !== undefined && property.attribute !== undefined && !this.typeFamily(attributeType, 'inherited').includes(property.attribute)) {
+          this.refuse(DiagnosticCode.valueTypeConflict, `Type-inference was unable to find compatible types for the pair of variables: '${variable}' is a '${attributeType}', and \`has ${property.attribute}\` writes a '${property.attribute}'.`, rangeOf(property));
         }
         const from = typeOfVariable(variable);
         if (from !== undefined && property.attribute !== undefined) this.checkValueFits(variable, from, property.attribute, rangeOf(property));
@@ -3791,7 +4215,9 @@ export class TypeDBLiteInterpreter {
     const declared = this.valueTypeOfAttribute(attribute);
     if (declared === undefined) return;
     const to = normalise(declared);
-    const fits = normalise(from) === to || (normalise(from) === 'integer' && (to === 'double' || to === 'decimal'));
+    // A date is a datetime at midnight — `let $x = 2020-01-01; insert $a isa published-date == $x;`
+    // (insert.feature L1288).
+    const fits = normalise(from) === to || (normalise(from) === 'integer' && (to === 'double' || to === 'decimal')) || (normalise(from) === 'date' && to === 'datetime');
     if (!fits) {
       this.refuse(DiagnosticCode.valueTypeConflict, `'${variable}' is a ${normalise(from)} and '${attribute}' holds a ${to}; the value cannot be written.`, at);
     }
@@ -3804,7 +4230,11 @@ export class TypeDBLiteInterpreter {
       ...constraints.flatMap((c) => c.isas.flatMap((isa) => (isa.typeVariable === undefined ? [] : [isa.typeVariable]))),
       ...constraints.flatMap((c) => c.roles.flatMap((r) => (r.roleVariable === undefined ? [] : [r.roleVariable]))),
     ]);
-    const thingVariables = new Set(constraints.flatMap((c) => [c.variable, ...c.roles.map((r) => r.player)]));
+    // `$y iid 0x…` alone says nothing of the kind: an iid may name an attribute (match.feature L4016,
+    // `$x has name $y; $y iid …`).
+    const onlyIid = (c: ThingConstraint): boolean =>
+      (c.iids?.length ?? 0) > 0 && c.isas.length === 0 && c.literals.length === 0 && c.bindings.length === 0 && c.roles.length === 0;
+    const thingVariables = new Set(constraints.flatMap((c) => [...(onlyIid(c) ? [] : [c.variable]), ...c.roles.map((r) => r.player)]));
     return (variable) => (thingVariables.has(variable) ? 'thing' : typeVariables.has(variable) ? 'type' : undefined);
   }
 
@@ -3823,7 +4253,7 @@ export class TypeDBLiteInterpreter {
         ...t.subs.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
         ...t.owns.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
         ...t.plays.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
-        ...t.relates.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+        ...t.relates.flatMap((o) => [o.variable, o.asVariable].filter((v): v is string => v !== undefined)),
       ]),
     ]);
   }
@@ -3971,6 +4401,9 @@ export class TypeDBLiteInterpreter {
           params.push(boundPlayer);
         }
         seenAtRole.set(role.player, index);
+        // `$l links (member: $l)` — the relation playing in ITSELF, not any loop with some member
+        // (match.feature L5298; TypeDB 3.10.4 itself answers every loop here, against its own spec).
+        if (role.player === relation.variable) join += ` AND rp${index}.player = t.iid`;
 
         // 🔴 …and two slots of the same ROLE need two different players — the mirror case.
         //
@@ -4138,7 +4571,7 @@ export class TypeDBLiteInterpreter {
             ...t.subs.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
             ...t.owns.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
             ...t.plays.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
-            ...t.relates.flatMap((o) => (o.variable === undefined ? [] : [o.variable])),
+            ...t.relates.flatMap((o) => [o.variable, o.asVariable].filter((v): v is string => v !== undefined)),
           ]),
           ...patterns.flatMap((p) => (isLetPattern(p) ? letVariables(p) : [])),
           // What a disjunction binds in EVERY branch, and what a `try` binds — never a negation's.
@@ -4173,11 +4606,16 @@ export class TypeDBLiteInterpreter {
   }
 
   /** Each `let` (in dependency order) and comparison, per combination — see `applyValueStatements`. */
-  private applyStatements(statements: ValueStatements, combinations: Array<Record<string, Binding>>): Array<Record<string, Binding>> {
+  private applyStatements(statements: ValueStatements, combinations: Array<Record<string, Binding>>, either: ReadonlySet<string> = new Set()): Array<Record<string, Binding>> {
     // `let $v = $a * 2; $v > 10;` — evaluated per combination, binding the value variables and
     // filtering (Phase 06).
     if (statements.lets.length === 0 && statements.comparisons.length === 0) return combinations;
+    // `$x isa $a; $x >= 1;` — a variable that may be a thing OR an attribute is narrowed by the
+    // comparison to the attributes it can compare: a row binding it to a thing answers nothing
+    // (match.feature L4878), as TypeDB's type inference excludes those types.
+    const compared = statements.comparisons.flatMap((c) => [c.left, ...(isVariableExpression(c.right) ? [c.right.variable] : [])]).filter((v) => either.has(v));
     return combinations.flatMap((combination) => {
+      if (compared.some((variable) => typeof combination[variable] === 'number')) return [];
       const values = new Map<string, ValueBinding>();
       for (const [variable, binding] of Object.entries(combination)) {
         if (typeof binding === 'object') values.set(variable, binding);
@@ -4257,6 +4695,28 @@ export class TypeDBLiteInterpreter {
   }
 
   /**
+   * `{ $x isa person; } or { $x isa company; } or { $a isa name; };` — `$x` in two branches and not the
+   * third, bound nowhere outside: the branches share no binding for it, which TypeDB refuses
+   * (match.feature L5065). Every disjunction, at every depth, against what its conjunction binds.
+   */
+  private checkBranchReuse(patterns: readonly Pattern[], outer: ReadonlySet<string>): void {
+    const bound = new Set([...outer, ...this.ownBound(patterns)]);
+    for (const pattern of patterns) {
+      const blocks = isDisjunctionPattern(pattern) ? pattern.branches : isNegationPattern(pattern) || isOptionalPattern(pattern) ? [pattern] : [];
+      for (const block of blocks) this.checkBranchReuse(block.patterns, bound);
+      if (!isDisjunctionPattern(pattern)) continue;
+      const mentions = pattern.branches.map((branch) => new Set(variablesWritten(branch)));
+      for (const variable of new Set(mentions.flatMap((m) => [...m]))) {
+        if (bound.has(variable) || isAnonymous(variable)) continue;
+        const count = mentions.filter((m) => m.has(variable)).length;
+        if (count > 1 && count < mentions.length) {
+          this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' is used in ${count} branches of a disjunction but not all of them, and nothing outside binds it: the branches have no common binding for it.`, rangeOf(pattern));
+        }
+      }
+    }
+  }
+
+  /**
    * `has $a` may bind attributes of several value types; an expression needs one (expression.feature
    * L281): the types the owner can own, through `has $a`, must agree.
    */
@@ -4264,7 +4724,14 @@ export class TypeDBLiteInterpreter {
     const untyped = new Map(constraints.flatMap((c) => c.bindings.filter((b) => b.attribute === undefined).map((b) => [b.variable, c] as const)));
     if (untyped.size === 0) return;
     for (const pattern of patterns) {
-      const read = isLetPattern(pattern) ? variablesOf(pattern.expression) : isComparisonPattern(pattern) ? [pattern.left, ...variablesOf(pattern.right)] : [];
+      // A comparison's own operands NARROW instead: `$x has $_ 9` and `$p has $pid; $pid == $id;` read
+      // only the attributes of a type the other side can be compared with (match.feature L4501, L5217).
+      // Arithmetic inside one still needs a single value type.
+      const read = isLetPattern(pattern)
+        ? variablesOf(pattern.expression)
+        : isComparisonPattern(pattern)
+          ? isVariableExpression(pattern.right) || isLiteralExpression(pattern.right) ? [] : variablesOf(pattern.right)
+          : [];
       for (const variable of read) {
         const owner = untyped.get(variable);
         if (owner === undefined) continue;
@@ -4605,6 +5072,28 @@ export class TypeDBLiteInterpreter {
 
   attributesOf(iid: number, attribute: string): ReadonlyArray<TypeDBLiteValue> {
     return this.readAttributes(iid, attribute).map((v) => TypeDBLiteValue.attribute(v.type, v.value));
+  }
+
+  /**
+   * The thing TypeDB numbers `<kind>:<type id>:<object id>` — the driver's iid cell in a given row
+   * (`iid:entity:0:1`, given.feature L114), so a harness can pass one. TypeDB allocates a type id per
+   * kind, in definition order, and an object id per type, in creation order (`ObjectVertex::
+   * build_entity(type_id, object_id)` in TypeDB's behaviour steps, read 2026-11-12); the spec's
+   * Backgrounds define and insert "first to guarantee numbering". Here that is the `type`th type of
+   * the kind as `schema_element` recorded it, and the `object`th thing of exactly that type by
+   * `thing.iid`.
+   *
+   * ⚠️ TypeDB never reuses an object id, and a deleted thing leaves no row here — after a delete, the
+   * numbering of later things in the type shifts down. No scenario numbers a thing after a delete.
+   */
+  thingNumbered(kind: 'entity' | 'relation', type: number, object: number): number | undefined {
+    const types = (this.db.prepare("SELECT name FROM schema_element WHERE kind = 'type' ORDER BY rowid").all() as Array<{ name: string }>)
+      .map((row) => String(row.name))
+      .filter((name) => this.schema.relations.has(name) === (kind === 'relation'));
+    const label = types[type];
+    if (label === undefined) return undefined;
+    const row = this.db.prepare('SELECT iid FROM thing WHERE type = ? ORDER BY iid LIMIT 1 OFFSET ?').get(label, object) as { iid: number } | undefined;
+    return row === undefined ? undefined : Number(row.iid);
   }
 
   /** The type a bound thing was inserted as — what an attach-form write checks ownership against. */
@@ -4949,8 +5438,10 @@ export class TypeDBLiteInterpreter {
       const message = `Role label not found '${role}': '${relationType}' has no such role.`;
       throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.unknownRole, message, at));
     }
-    // A schema that declares no `plays` at all predates the plays record; nothing to check against.
-    if (this.schema.plays.size === 0) return role;
+    // A schema that records no `plays` AND no roles predates the record; nothing to check against.
+    // Roles with no `plays` left is a schema whose last `plays` was undefined — and then nothing can
+    // play them (undefine.feature L1251). Every downstream-app store with roles records its `plays`.
+    if (this.schema.plays.size === 0 && this.schema.roles.size === 0) return role;
     const playerType = this.typeOfThing(player);
     if (!this.typeFamily(playerType, 'inherited').some((t) => this.schema.plays.has(playsSubject(t, roleRef(declaring, role))))) {
       const message = `'${playerType}' cannot play '${roleRef(declaring, role)}', so '${variable}' cannot be the ${role} of '${relationType}'.`;
@@ -5012,14 +5503,18 @@ export class TypeDBLiteInterpreter {
           for (const entry of deletion.players?.entries ?? []) {
             const player = combination[entry.player];
             if (typeof player !== 'number') continue;
+            const boundRole = entry.roleVariable === undefined ? undefined : combination[entry.roleVariable];
+            const role = entry.role ?? (typeof boundRole === 'string' ? boundRole.slice(boundRole.lastIndexOf(':') + 1) : undefined);
             // One occurrence per slot: `links (friend: $x)` of a twice-played friend leaves one
             // (delete.feature L626); `links (friend: $x, friend: $x)` removes both (L453).
-            if (entry.role === undefined) this.db.prepare('UPDATE role_player SET count = count - 1 WHERE rel = ? AND player = ?').run(relation, player);
-            else this.db.prepare('UPDATE role_player SET count = count - 1 WHERE rel = ? AND player = ? AND role = ?').run(relation, player, entry.role);
+            if (role === undefined) this.db.prepare('UPDATE role_player SET count = count - 1 WHERE rel = ? AND player = ?').run(relation, player);
+            else this.db.prepare('UPDATE role_player SET count = count - 1 WHERE rel = ? AND player = ? AND role = ?').run(relation, player, role);
             this.db.prepare('DELETE FROM role_player WHERE rel = ? AND count <= 0').run(relation);
           }
           this.touched.add(relation);
-          if (this.db.prepare('SELECT 1 FROM role_player WHERE rel = ?').get(relation) === undefined) this.deleteThing(relation);
+          // Left with no player: gone now outside a transaction, and at COMMIT inside one —
+          // `removePlayerlessRelations` — so the answers of this write still name it (delete.feature L2971).
+          if (!this.transactionOpen && this.db.prepare('SELECT 1 FROM role_player WHERE rel = ?').get(relation) === undefined) this.deleteThing(relation);
         }
         continue;
       }
@@ -5103,28 +5598,23 @@ export class TypeDBLiteInterpreter {
 
   /** A thing, and the relations it plays in — each tombstoned, as a follower must learn of each. */
   private deleteThing(iid: number): void {
-    // 🔴 Identity must be captured *before* the rows go, and the cascade below deletes relations
-    // this thing plays in — each of those is an entity in its own right and needs its own
-    // tombstone, or a follower would keep a relation whose player is gone.
-    const cascaded = this.db
-      .prepare('SELECT rel FROM role_player WHERE player = ?')
-      .all(iid) as Array<{ rel: number }>;
-    for (const row of cascaded) {
-      const identity = this.changeLog.identify(Number(row.rel));
-      if (identity) this.tombstones.push(identity);
-    }
+    // 🔴 A deleted thing leaves every relation it played in — and a relation is deleted with it only
+    // when that leaves it with no player at all (delete.feature L408: deleting Alex keeps Alex's
+    // friendship with Bob, which TypeDB 3.10.4 confirms). It used to delete every such relation
+    // outright; `skills-projection-target.ts`'s delete-then-insert of an invocation relied on that
+    // when its relation had the deleted thing as its ONLY player, which is still what happens.
+    const playedIn = (this.db.prepare('SELECT DISTINCT rel FROM role_player WHERE player = ? AND rel <> ?').all(iid, iid) as Array<{ rel: number }>).map((row) => Number(row.rel));
     const own = this.changeLog.identify(iid);
     if (own) this.tombstones.push(own);
-    // Relations this thing participates in go first: `role_player.player` has no ON DELETE
-    // CASCADE, so deleting a thing that still plays a role would be refused. TypeDB deletes the
-    // relation with it, and `skills-projection-target.ts` relies on exactly that when it
-    // delete-then-inserts an invocation.
-    this.db
-      .prepare(
-        'DELETE FROM thing WHERE iid IN (SELECT rel FROM role_player WHERE player = ?)',
-      )
-      .run(iid);
+    this.db.prepare('DELETE FROM role_player WHERE player = ?').run(iid);
     this.db.prepare('DELETE FROM thing WHERE iid = ?').run(iid);
+    for (const relation of playedIn) {
+      this.touched.add(relation);
+      // Each cascaded relation is a thing in its own right and needs its own tombstone, or a follower
+      // would keep a relation whose last player is gone — `deleteThing` records it.
+      // Inside a transaction, at COMMIT (`removePlayerlessRelations`), as `delete links` leaves one.
+      if (!this.transactionOpen && this.db.prepare('SELECT 1 FROM role_player WHERE rel = ?').get(relation) === undefined) this.deleteThing(relation);
+    }
   }
 }
 
@@ -5208,7 +5698,15 @@ function desugarHas(patterns: readonly Pattern[]): Pattern[] {
   const rewritten: Pattern[] = [];
   const comparisons: Pattern[] = [];
   for (const pattern of patterns) {
-    if (!isThingPattern(pattern) || !pattern.properties.some((p) => (isHasProperty(p) || isIsaProperty(p)) && p.comparator !== undefined)) {
+    // `iid($x) == "0x…"` — `let __iidN = iid($x); __iidN == "0x…";`, so a comparison's left stays a variable.
+    if (isCallComparisonPattern(pattern)) {
+      const variable = `__call${(hasCounter += 1)}`;
+      rewritten.push({ $type: 'LetPattern', variable, others: [], iterate: false, expression: pattern.call, $container: pattern.$container, $cstNode: pattern.$cstNode } as unknown as Pattern);
+      comparisons.push({ $type: 'ComparisonPattern', left: variable, comparator: pattern.comparator, right: pattern.right, $container: pattern.$container, $cstNode: pattern.$cstNode } as unknown as Pattern);
+      continue;
+    }
+    const anyValued = (p: Property): boolean => isHasProperty(p) && ((p.attribute === undefined && p.value !== undefined) || p.expression !== undefined);
+    if (!isThingPattern(pattern) || !pattern.properties.some((p) => ((isHasProperty(p) || isIsaProperty(p)) && p.comparator !== undefined) || anyValued(p))) {
       rewritten.push(pattern);
       continue;
     }
@@ -5219,6 +5717,23 @@ function desugarHas(patterns: readonly Pattern[]): Pattern[] {
         comparisons.push({ $type: 'ComparisonPattern', left: pattern.variable, comparator: property.comparator, right: property.compared, $cstNode: property.$cstNode } as unknown as Pattern);
         return { ...property, comparator: undefined, compared: undefined };
       }
+      // `has age (10 + 5)` in a match — `has age == 10 + 5`.
+      if (isHasProperty(property) && property.expression !== undefined) {
+        const variable = `__has${(hasCounter += 1)}`;
+        comparisons.push({ $type: 'ComparisonPattern', left: variable, comparator: '==', right: property.expression, $cstNode: property.$cstNode } as unknown as Pattern);
+        return { ...property, expression: undefined, valueVariable: variable };
+      }
+      // `has $a > 5` — `has $a; $a > 5;`, on the variable itself.
+      if (isHasProperty(property) && property.attribute === undefined && property.valueVariable !== undefined && property.comparator !== undefined && property.compared !== undefined) {
+        comparisons.push({ $type: 'ComparisonPattern', left: property.valueVariable, comparator: property.comparator, right: property.compared, $cstNode: property.$cstNode } as unknown as Pattern);
+        return { ...property, comparator: undefined, compared: undefined };
+      }
+      // `has $a "value"` — `has $a; $a == "value";`, an attribute of any type that holds it.
+      if (isHasProperty(property) && property.attribute === undefined && property.value !== undefined && property.valueVariable !== undefined) {
+        const right = { $type: 'LiteralExpression', literal: property.value, $cstNode: property.value.$cstNode } as unknown as Expression;
+        comparisons.push({ $type: 'ComparisonPattern', left: property.valueVariable, comparator: '==', right, $cstNode: property.$cstNode } as unknown as Pattern);
+        return { ...property, value: undefined };
+      }
       if (!isHasProperty(property) || property.comparator === undefined || property.compared === undefined) return property;
       // Named like `__anonN` — no `$`, so no query can write it and the projection never shows it.
       const variable = `__has${(hasCounter += 1)}`;
@@ -5228,6 +5743,20 @@ function desugarHas(patterns: readonly Pattern[]): Pattern[] {
     rewritten.push({ ...pattern, properties } as Pattern);
   }
   return [...rewritten, ...comparisons];
+}
+
+/** `$x isa $t;` and nothing else said of `$x` — a thing or an attribute instance, per row. */
+function isBareTypeIsa(c: ThingConstraint): boolean {
+  return c.isas.length > 0 && c.isas.every((isa) => isa.type === undefined) && c.literals.length === 0 && c.bindings.length === 0 && c.roles.length === 0 && c.instance === undefined;
+}
+
+/** The type and role variables a written statement names — `isa $t`, `($r: $x)`. */
+function typeVariablesWritten(pattern: Pattern): string[] {
+  const roleVariables = (list: RolePlayers | undefined): string[] => (list?.entries ?? []).flatMap((e) => (e.roleVariable === undefined ? [] : [e.roleVariable]));
+  if (isAnonRelationPattern(pattern)) return [...(pattern.typeVariable === undefined ? [] : [pattern.typeVariable]), ...roleVariables(pattern.players)];
+  if (!isThingPattern(pattern)) return [];
+  return pattern.properties.flatMap((p) =>
+    isIsaProperty(p) ? [...(p.typeVariable === undefined ? [] : [p.typeVariable]), ...roleVariables(p.players)] : isLinksProperty(p) ? roleVariables(p.players) : []);
 }
 
 /**
@@ -5253,6 +5782,22 @@ function insertionOrder(patterns: readonly Pattern[]): Pattern[] {
   const ordered: Pattern[] = [];
   while (remaining.length > 0) {
     const index = remaining.findIndex((p) => needs(p).every((v) => !introducedHere.has(v) || placed.has(v) || v === introduces(p)));
+    // A CYCLE — `$l1 isa loop, links (member: $l2); $l2 isa loop, links (member: $l1);` (match.feature
+    // L5327). Nothing can go first whole, so the first relation goes first WITHOUT its players, and its
+    // `links` come back as a statement of their own on the now-bound relation, placed when its players are.
+    if (index < 0) {
+      const at = remaining.findIndex((p) => isThingPattern(p) && needs(p).length > 0 && p.properties.some(isIsaProperty));
+      if (at >= 0) {
+        const pattern = remaining[at] as ThingPattern;
+        const links = pattern.properties.flatMap((p): Property[] =>
+          isLinksProperty(p) ? [p] : isIsaProperty(p) && p.players ? [{ $type: 'LinksProperty', players: p.players, $cstNode: p.$cstNode, $container: pattern } as unknown as Property] : []);
+        const head = pattern.properties.filter((p) => !isLinksProperty(p)).map((p) => (isIsaProperty(p) && p.players ? ({ ...p, players: undefined } as Property) : p));
+        remaining.splice(at, 1, { ...pattern, properties: links } as Pattern);
+        ordered.push({ ...pattern, properties: head } as Pattern);
+        placed.add(pattern.variable);
+        continue;
+      }
+    }
     const [next] = remaining.splice(index < 0 ? 0 : index, 1);
     ordered.push(next);
     const variable = introduces(next);

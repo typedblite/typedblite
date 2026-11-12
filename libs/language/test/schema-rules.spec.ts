@@ -31,10 +31,10 @@ describe('reserved TypeQLite keywords are rejected as identifiers', () => {
 });
 
 describe('a type is not defined twice', () => {
-  it('rejects two entities with the same name', async () => {
-    expect(await messages('define entity skill; entity skill;')).toMatch(
-      /skill/,
-    );
+  // The same label as the same kind is one type stated twice — additive, a no-op where it repeats, as on
+  // TypeDB (define.feature L2529). A second KIND is a second type, and refused (below).
+  it('accepts the same entity stated twice', async () => {
+    expect(await messages('define entity skill; entity skill;')).toBe('');
   });
 
   it('rejects an entity and a relation sharing a name', async () => {

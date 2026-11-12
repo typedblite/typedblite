@@ -27,6 +27,10 @@ terminal ID returns string: /[A-Za-z_\u0080-\uFFFF][A-Za-z0-9_\-\u0080-\uFFFF]*/
 // Double- or single-quoted — `has name 'Steve'` (expression.feature L1002) beside `"Alice"`.
 terminal STRING returns string: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
 
+// `0x1e00000000001234567890` — a concept's iid (match.feature L734). Before every numeric terminal,
+// which would otherwise take the `0` and leave `x1e…` to ID.
+terminal IID returns string: /0x[0-9a-fA-F]+/;
+
 // `2024-06-04T00:00:00+0010`, `…Z`, `… Europe/Belfast` — a datetime WITH its zone, TypeDB's
 // `datetime-tz` value type. Declared before DATETIME because DATETIME is its prefix and Chevrotain
 // takes the first match. The space before an IANA zone name is part of the token, and a zone

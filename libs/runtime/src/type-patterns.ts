@@ -7,6 +7,8 @@ import {
   isOwnsProperty,
   isPlaysProperty,
   isRelatesProperty,
+  isValueProperty,
+  isKindLabelPattern,
   isSubProperty,
   isThingPattern,
   isTypePattern,
@@ -16,7 +18,7 @@ import {
 import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf } from './diagnostics.js';
 import type { ValueBinding } from './expressions.js';
-import type { Refuse, SchemaFacts } from './schema-rules.js';
+import { valueTypeOf, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { ownsKey, playsSubject, roleRef } from './schema-subjects.js';
 
 /**
@@ -46,6 +48,8 @@ export interface TypeConstraint {
   plays: Array<{ readonly role?: string; readonly variable?: string }>;
   /** `relates $r as parent` — `as` is the role the related role is, or specialises (by name, or `relation:role`). */
   relates: Array<{ readonly role?: string; readonly variable?: string; readonly as?: string; readonly asVariable?: string }>;
+  /** `$x value integer` — an attribute type holding that value type, its own or inherited. */
+  values?: string[];
   readonly range: Range | undefined;
 }
 
@@ -57,11 +61,11 @@ export type Binding = number | string | ValueBinding;
 
 const TYPE_PROPERTY = (property: Property): boolean =>
   isLabelProperty(property) || isSubProperty(property) || isOwnsProperty(property) ||
-  isPlaysProperty(property) || isRelatesProperty(property);
+  isPlaysProperty(property) || isRelatesProperty(property) || isValueProperty(property);
 
 /** Whether a variable-headed pattern is a type pattern — and a refusal when it is both. */
 export function isTypeHead(pattern: Pattern, refuse: Refuse): boolean {
-  if (isKindPattern(pattern) || isTypePattern(pattern)) return true;
+  if (isKindPattern(pattern) || isTypePattern(pattern) || isKindLabelPattern(pattern)) return true;
   if (!isThingPattern(pattern)) return false;
   const typed = pattern.properties.some(TYPE_PROPERTY);
   const thinged = pattern.properties.some((p) => isHasProperty(p) || isLinksProperty(p) || (isIsaProperty(p) && p.players !== undefined));
@@ -92,6 +96,12 @@ export function typeConstraintsOf(patterns: readonly Pattern[], refuse: Refuse):
     if (isTypePattern(pattern)) {
       constraint = constraintFor(`__type${synthetic++}`, rangeOf(pattern));
       constraint.fixed = pattern.subject;
+    } else if (isKindLabelPattern(pattern)) {
+      // `entity person;` — that label, of that kind: answered once, or not at all.
+      constraint = constraintFor(`__type${synthetic++}`, rangeOf(pattern));
+      constraint.fixed = pattern.label;
+      constraint.kind = pattern.kind as TypeConstraint['kind'];
+      continue;
     } else if (isKindPattern(pattern)) {
       constraint = constraintFor(pattern.variable, rangeOf(pattern));
       if (constraint.kind !== undefined && constraint.kind !== pattern.kind) constraint.impossible = true;
@@ -111,13 +121,19 @@ export function typeConstraintsOf(patterns: readonly Pattern[], refuse: Refuse):
         // constraint on `$y` filters what this bound.
         // A repeated `sub` NARROWS — `$x sub writer; $x sub person;` is writer's family (review, round 1).
         constraint.subs.push({ type: property.type, variable: property.typeVariable, direct: property.direct === true });
-      } else if (isOwnsProperty(property)) constraint.owns.push({ attribute: property.attribute, variable: property.attributeVariable });
+      } else if (isOwnsProperty(property)) {
+        // `$p owns name @card(5..)` parses, as TypeDB's grammar admits it; neither a match nor a write
+        // can act on an annotation there (update.feature L86 — TypeDB's own match leaves it a TODO).
+        if (property.annotations.length > 0) refuse(DiagnosticCode.mixedPattern, `An annotation on \`owns\` in a pattern is not supported: annotations are schema, written by \`define\`.`, rangeOf(property));
+        constraint.owns.push({ attribute: property.attribute, variable: property.attributeVariable });
+      }
       else if (isPlaysProperty(property)) {
         constraint.plays.push({
           role: property.role ? roleRef(property.role.relation, property.role.role) : undefined,
           variable: property.roleVariable,
         });
-      } else if (isRelatesProperty(property)) constraint.relates.push({ role: property.role, variable: property.roleVariable, as: property.specialises, asVariable: property.specialisesVariable });
+      } else if (isValueProperty(property)) (constraint.values ??= []).push(property.valueType === 'long' ? 'integer' : property.valueType);
+      else if (isRelatesProperty(property)) constraint.relates.push({ role: property.role, variable: property.roleVariable, as: property.specialises, asVariable: property.specialisesVariable });
       else if (isIsaProperty(property) || isHasProperty(property) || isLinksProperty(property)) {
         // `person has name $n;` — a thing property on a type subject (review, round 1).
         refuse(DiagnosticCode.mixedPattern, `'${constraint.fixed ?? constraint.variable}' is a type pattern and cannot carry \`isa\`, \`has\` or \`links\`.`, rangeOf(property));
@@ -216,7 +232,7 @@ export function solveTypes(
       if (fixed !== undefined && !labels.includes(fixed)) {
         refuse(
           DiagnosticCode.unknownType,
-          `Unknown type '${fixed}'. The applied schema defines: ${[...facts.types, ...facts.attributes].sort().join(', ') || '(nothing)'}`,
+          `Unknown type '${fixed}': type label '${fixed}' not found. The applied schema defines: ${[...facts.types, ...facts.attributes].sort().join(', ') || '(nothing)'}`,
           constraint.range,
         );
       }
@@ -258,6 +274,12 @@ function solveOne(
   if (constraint.fixed !== undefined && constraint.fixed !== label) return [];
   const kind = kindOf(label, facts);
   if (constraint.kind !== undefined && kind !== constraint.kind) return [];
+
+  for (const valueType of constraint.values ?? []) {
+    if (kind !== 'attribute') return [];
+    const held = valueTypeOf(label, facts);
+    if ((held === 'long' ? 'integer' : held) !== valueType) return [];
+  }
 
   let results: Array<Record<string, Binding>> = [{ ...combination, [constraint.variable]: label }];
 

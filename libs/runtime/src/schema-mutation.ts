@@ -700,6 +700,10 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
         at,
       );
     }
+    // A concrete relation that relates nothing of its own would relate nothing at all (L2477).
+    if (kind === 'relation' && !schema.annotations.get(typeSubject(type))?.has('abstract') && (schema.roles.get(type)?.size ?? 0) === 0) {
+      refuse(DiagnosticCode.notDefined, `Relation type '${type}' would not have any role types related without '${target.superType}': undefine its supertype only once it relates a role of its own, or make it @abstract.`, at);
+    }
     refuseIfInstancesLoseCapabilities(type, ancestorsOf(type, schema), [], node, context);
     // An attribute with only an inherited value type would be left with values and no type for them.
     if (kind === 'attribute' && schema.valueTypes.get(type) === undefined && attributeValuesInheriting(db, type, schema) > 0) {
@@ -851,6 +855,11 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
     const recorded = schema.annotations.get(subject)?.get(category);
     if (recorded === undefined) {
       refuse(DiagnosticCode.notDefined, `${where} has no defined \`${target.category}\` to undefine.`, at);
+    }
+    // A concrete relation type relates a role: `@abstract` comes off one that relates none, own or
+    // inherited, only by refusal (undefine.feature L2456).
+    if (category === 'abstract' && capability === undefined && schema.relations.has(type) && ![type, ...ancestorsOf(type, schema)].some((t) => (schema.roles.get(t)?.size ?? 0) > 0)) {
+      refuse(DiagnosticCode.notDefined, `Relation type '${type}' does not have any role types related, so it cannot be made concrete: it must stay @abstract until it relates a role.`, at);
     }
     {
       db.prepare('DELETE FROM schema_annotation WHERE subject = ? AND category = ?').run(subject, category);

@@ -1,4 +1,4 @@
-import { DiagnosticCode, TypeDBLiteInterpreter, diagnosticOf, type GivenRows, type JsonValue, type TypeDBLiteValue } from '@typedblite/runtime';
+import { DiagnosticCode, TypeDBLiteInterpreter, diagnosticOf, type ExecutionReport, type GivenRows, type JsonValue, type TypeDBLiteValue } from '@typedblite/runtime';
 
 export type TransactionKind = 'schema' | 'write' | 'read';
 
@@ -14,6 +14,32 @@ export interface Answers {
   readonly documents?: ReadonlyArray<JsonValue>;
   /** The value type an attribute type holds — how an `attr:` identifier's literal is read. */
   readonly valueTypeOf?: (attribute: string) => string | undefined;
+}
+
+/** What a query answers the harness: rows, or a document each, and the facts saying it ran. */
+export interface EngineAnswers extends ExecutionReport {
+  readonly rows: ReadonlyArray<AnswerRow>;
+  readonly documents?: ReadonlyArray<JsonValue>;
+}
+
+/**
+ * The engine a database is — TypeDBLite's interpreter, or (`typedb-oracle.ts`) a live TypeDB the same
+ * steps drive as the oracle. Exactly what the harness asks of one, and no more.
+ */
+export interface Engine {
+  define(text: string): unknown;
+  execute(text: string, given?: GivenRows): EngineAnswers;
+  query(text: string, given?: GivenRows): EngineAnswers;
+  /** A write or schema transaction; TypeDBLite's has one kind, TypeDB's is opened as the one named. */
+  beginTransaction(kind?: 'schema' | 'write'): void;
+  commitTransaction(): void;
+  rollbackTransaction(): void;
+  close(): void;
+  attributeValueType(attribute: string): string | undefined;
+  attributesOf(iid: number, attribute: string): ReadonlyArray<TypeDBLiteValue>;
+  thingNumbered(kind: 'entity' | 'relation', type: number, object: number): number | undefined;
+  /** A thing's iid as the engine writes it in a query; TypeDBLite's cell carries its own. */
+  iidText?(cell: TypeDBLiteValue): string;
 }
 
 /** A step's failure, distinguished from an engine failure so the report can say which it was. */
@@ -44,7 +70,7 @@ export class EvaluatedNothing extends HarnessError {}
  * - **`set time-zone` is recorded and has no effect.** Datetime-with-zone scenarios fail honestly.
  */
 export class World {
-  private readonly databases = new Map<string, TypeDBLiteInterpreter>();
+  private readonly databases = new Map<string, Engine>();
   private transaction: { database: string; kind: TransactionKind; open: boolean } | undefined;
   public answers: Answers | undefined;
   /** What `set query given rows` set, for the next `… with given rows` step. */
@@ -56,7 +82,7 @@ export class World {
    * harness's own tests can hand in an engine that projects nothing and prove the guards below
    * still refuse it, now that no query the real engine runs is skipped.
    */
-  constructor(private readonly open: () => TypeDBLiteInterpreter = () => new TypeDBLiteInterpreter(':memory:')) {}
+  constructor(private readonly open: () => Engine = () => new TypeDBLiteInterpreter(':memory:')) {}
 
   databaseCount(): number {
     return this.databases.size;
@@ -79,7 +105,7 @@ export class World {
     }
     this.closeTransaction();
     this.transaction = { database, kind, open: true };
-    if (kind !== 'read') this.databases.get(database)?.beginTransaction();
+    if (kind !== 'read') this.databases.get(database)?.beginTransaction(kind);
   }
 
   transactionIsOpen(): boolean {
@@ -119,7 +145,7 @@ export class World {
   }
 
   /** The engine the open transaction addresses — refusing, as the server would, when there is none. */
-  private engineFor(needs: TransactionKind): TypeDBLiteInterpreter {
+  private engineFor(needs: TransactionKind): Engine {
     if (!this.transaction?.open) throw new HarnessError('no open transaction');
     const { kind, database } = this.transaction;
     const permitted: Record<TransactionKind, ReadonlyArray<TransactionKind>> = {
@@ -178,6 +204,17 @@ export class World {
   /** An attribute type's value type, from the engine the open transaction reads. */
   attributeValueType(attribute: string): string | undefined {
     return this.engineFor('read').attributeValueType(attribute);
+  }
+
+  /** A thing's iid as the engine reads it back in a query — what `<answer.x.iid>` is replaced by. */
+  iidOf(cell: TypeDBLiteValue): string {
+    const engine = this.engineFor('read');
+    return engine.iidText?.(cell) ?? cell.iidHex;
+  }
+
+  /** The thing TypeDB would number so — a given row's iid cell (see `givenRows`). */
+  thingNumbered(kind: 'entity' | 'relation', type: number, object: number): number | undefined {
+    return this.engineFor('read').thingNumbered(kind, type, object);
   }
 
   /** A thing's attributes of one type, from the engine the open transaction reads. */
