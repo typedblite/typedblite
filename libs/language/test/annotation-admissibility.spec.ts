@@ -43,7 +43,11 @@ const STATEMENT: Readonly<
   'value type': (a) => `define attribute description value string ${a};`,
   owns: (a) =>
     `define attribute name value string; entity player owns name ${a};`,
+  'owns list': (a) =>
+    `define attribute name value string; entity player owns name[] ${a};`,
   relates: (a) => `define relation parentship @abstract, relates parent ${a};`,
+  'relates list': (a) =>
+    `define relation parentship @abstract, relates parent[] ${a};`,
   plays: (a) =>
     `define relation employment relates employee; entity player plays employment:employee ${a};`,
 };

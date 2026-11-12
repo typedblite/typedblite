@@ -92,7 +92,7 @@ one-time install. CI, when it exists, needs a virtual display (`xvfb`).
 | 6 | `documentSelector: [{ scheme: 'file', language }]` | **Adopted** |
 | 7 | `deactivate()` stops the client | **Adopted** |
 | 8 | Server: `createConnection(ProposedFeatures.all)`, `NodeFileSystem`, `startLanguageServer(shared)` | **Adopted**, over `createTypeQLiteServices` |
-| 9 | `vscode-languageclient ~10.0.0`, `vscode-languageserver ~10.0.0`, `@types/vscode ~1.91.0`, `engines.vscode ^1.91.0`, `@vscode/vsce ~3.9.2`, `esbuild ~0.28.1` | **Adopted.** `@typedblite/language` moves to `vscode-languageserver ~10.0.1`, the version `langium@4.3.1` uses, so there is one copy |
+| 9 | `vscode-languageclient ~10.0.0`, `vscode-languageserver ~10.0.0`, `@types/vscode ~1.91.0`, `engines.vscode ^1.91.0`, `@vscode/vsce ~3.9.2`, `esbuild ~0.28.1` | **Adopted.** `@typedblite/language` and `@typedblite/runtime` (for ADR-004's `Diagnostic` type) both move to `vscode-languageserver ~10.0.1`, the version `langium@4.3.1` uses, so there is one copy |
 | 10 | `vsce.dependencies: false` and a `.vscodeignore` | **Adopted.** The bundle is self-contained |
 | 11 | `WorkspaceManager` subclass and a `build.ignorePatterns` setting | **Deferred.** The default already skips `node_modules`, `out` and dot-folders |
 | 12 | Railroad-diagram command and webview | **Declined.** TypeQLite is not a grammar language |
