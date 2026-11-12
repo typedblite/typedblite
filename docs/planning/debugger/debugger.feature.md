@@ -45,8 +45,8 @@ trying to make that one fact name the cause.
 
 A debugger answers the question directly. Step through the pipeline and watch the row count at
 each stage, and at each pattern inside a `match`, and stop at the first point where it reaches
-zero. The same applies to writes: see the rows an `insert` or `delete` will run over, one row at a
-time, before anything is committed.
+zero. The same applies to writes: see the rows an `insert` or `delete` runs over, one row at a
+time, in a `:memory:` store that no real database ever sees.
 
 ## Why the interpreter makes this possible
 
@@ -75,8 +75,10 @@ You are right that the interpreter can carry this. Verified on disk on 2026-11-1
    carries a stable `DiagnosticCode`. An empty write gets a fact (`typedblite.empty-match`). Both
    fit a debugger's exception breakpoints, for example "break on refusal" and "break when a stage
    empties".
-7. **Writes can be undone.** `beginTransaction` and `rollbackTransaction` exist, so a debug
-   session can run writes and then discard them.
+7. **An in-memory store is the default.** Both `TypeDBLiteInterpreter` and `SqliteEngine` take
+   `location = ':memory:'` unless given a path, and `applyJournalMode` already skips `:memory:`.
+   A debug session therefore never needs to open a database file, so it **cannot change an
+   existing database** (invariant 4).
 
 ### 🔴 The one obstacle, and three ways around it
 
@@ -132,9 +134,12 @@ does not depend on `@vscode/debugadapter` and does not know about stack frames. 
 ADR-004's rule ("returned, never emitted") and keeps the runtime usable wherever it is used now.
 That includes downstream-app, which loads the runtime's `out/` folder.
 
-**4. Writes are discarded unless the user asks to keep them.** A debug session runs inside a
-transaction and rolls it back at the end. Committing is an explicit launch setting. A debugger
-that silently writes to a real store is a hazard, not a feature.
+**4. A debug session runs against `:memory:` and never opens an existing database.** Decided by
+the founder on 2026-11-12. The adapter constructs the engine at `:memory:`, loads the workspace
+schema and the launch's seed files into it, and then runs the program. Writes in the program
+behave as they would anywhere else, including commits, because they land in a store that
+disappears when the session ends. This needs no rollback rule and no `commit` setting, and it is
+not possible for a debugger to write to a real store by accident.
 
 **5. A recording is bounded.** A single `match` has produced more than 200,000 combinations
 before (the Skills-catalog defect `QueryTrace` was built for). The step counts are always
@@ -151,7 +156,7 @@ How DAP's concepts map onto TypeQLite. Phase 00 confirms or changes this table.
 
 | DAP | TypeQLite |
 | --- | --------- |
-| Program | A `.tql` or `.typeqlite` file, run from top to bottom: `define` blocks, then write pipelines, then reads |
+| Program | A `.tql` or `.typeqlite` file, run from top to bottom (`define` blocks, write pipelines, reads) against a fresh `:memory:` store. The store first receives the workspace schema (ADR-008 D3), then any `seed` files the launch configuration names |
 | Thread | One. The interpreter is single-threaded |
 | Stack frames | Statement › stage › step inside the `match`. A function call or a `fetch` sub-query pushes a frame and runs its own stages |
 | Step over | The next stage, or the next statement when on a statement |
@@ -176,8 +181,8 @@ How DAP's concepts map onto TypeQLite. Phase 00 confirms or changes this table.
    iid and attributes are shown, paged when large.
 4. **Breakpoints that answer "where did my rows go?"**: line breakpoints on stages and patterns,
    row-count conditions, break when a stage empties, and break on refusal.
-5. **Writes are safe by default:** rolled back unless the launch configuration says otherwise
-   (invariant 4).
+5. **No existing database is touched:** every session runs in a fresh `:memory:` store, built from
+   the workspace schema and the launch's seed files (invariant 4).
 6. **The editor gains a debugger.** `apps/vscode` contributes the `typeqlite` debug type, launch
    configuration snippets, and breakpoints in `.tql` and `.typeqlite` files. F5 on a file runs it
    under the debugger.
@@ -196,7 +201,8 @@ packaged `.vsix`.
       boundary, and a breakpoint hit by line.
 - [ ] A query whose rows disappear at the third pattern of its `match` stops there under "break
       when a stage empties". Asserted in the adapter specs **and** in the e2e.
-- [ ] A write pipeline run under the debugger leaves the store unchanged unless `commit: true`.
+- [ ] The adapter only ever constructs its engine at `:memory:`. A spec asserts this, and a session
+      whose program writes and commits leaves every file in the workspace byte-for-byte unchanged.
 - [ ] The e2e starts a session with `vscode.debug.startDebugging` on a fixture file, hits a
       breakpoint, reads the variables, steps, and the session ends cleanly.
 - [ ] `AGENTS.md`'s layout and dependency graph, the README, and the project overview memory name
@@ -221,8 +227,13 @@ These are for the founder.
 
 1. **Execution model:** A (record, then replay), B (a worker that blocks), or A now and B later.
    The recommendation is A, then B if a real case needs it.
-2. **Which database a launch runs against:** a fresh in-memory store with the workspace schema
-   applied (the editor's one-schema rule, ADR-008 D3), a file named in `launch.json`, or both.
+2. ~~**Which database a launch runs against.**~~ **Decided 2026-11-12: `:memory:`** (invariant 4).
+   What remains is **how data gets in**. Seed files of `insert` statements are the plan. Should a
+   launch also be able to **copy an existing store into memory**, so you can debug against real
+   data without touching it? `node:sqlite` exposes `backup()` and `DatabaseSync#deserialize` on the
+   Node 24 used here, but their availability on the workspace's minimum Node (22.12) is not
+   verified. Either would also need the `SqliteDatabase` binding to accept something other than a
+   location.
 3. **Where the adapter runs:** in-process in the extension host (which needs `node:sqlite` in
    Electron's Node, not yet verified), or as a separate Node process (`DebugAdapterExecutable`),
    which needs a `node` on the user's PATH.
@@ -272,7 +283,8 @@ on, and the performance suites unchanged with it off.
 **02 — Adapter shell.** A DAP session that launches a file, splits it into statements, and runs
 each through the interpreter: define, read or write, using classification shared with the CLI
 (invariant 6). It stops on entry and steps over statements. Facts go to the console. Run Without
-Debugging works. Writes run in a transaction that is rolled back.
+Debugging works. Every session runs in a fresh `:memory:` store, loaded with the workspace schema
+and the seed files.
 
 **03 — Stages and rows.** Steps at stage boundaries. The Rows variables, paged, with concepts
 expanded through `attributesOf` and `typeOfThing`. The Scope variables from `StreamScope`. Line
