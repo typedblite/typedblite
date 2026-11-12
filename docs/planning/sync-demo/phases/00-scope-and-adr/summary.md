@@ -26,7 +26,7 @@ The feature's open questions were answered under the founder's delegation:
 | -------- | ------ |
 | Browser floor | Documented (Chromium 117+). The demo polyfills `Object.groupBy` for Android 14's WebView |
 | Where the hub runs | A child process of the demo server, so it can really go down |
-| Versions | Proven on this machine: Electron 38.2.0, Capacitor 7.4.3, playwright-core 1.62.1, sqlite-wasm 3.54.1-build1. Apache-2.0 or MIT |
+| Versions | Proven on this machine: Electron 38.2.0, Capacitor 7.4.3, playwright-core 1.62.1, sqlite-wasm 3.54.1-build1. Apache-2.0 or MIT. ⚠️ Corrected in Phase 06, for security advisories, to **Electron 42.11.18** and **Capacitor 7.6.10** |
 | Android | On when `adb devices` lists a device, else skipped with a message |
 
 ## What later phases must know

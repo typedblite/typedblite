@@ -22,6 +22,8 @@ const common = { bundle: true, platform: 'browser', target: 'es2022', logLevel: 
 await build({ ...common, format: 'esm', entryPoints: [join(CLIENT, 'worker.ts')], outfile: join(OUT, 'worker.js') });
 await build({ ...common, format: 'esm', entryPoints: [join(CLIENT, 'main.ts')], outfile: join(OUT, 'main.js') });
 await build({ ...common, format: 'iife', entryPoints: [join(CLIENT, 'sw.ts')], outfile: join(OUT, 'sw.js') });
+// The desktop shell: Electron's main process, CommonJS, with Electron itself left to the runtime.
+await build({ ...common, sourcemap: false, platform: 'node', format: 'cjs', external: ['electron'], entryPoints: [join(HERE, 'src/electron/main.ts')], outfile: join(OUT, 'electron-main.cjs') });
 copyFileSync(WASM, join(OUT, 'sqlite3.wasm'));
 for (const file of ['index.html', 'manifest.webmanifest', 'icon.svg']) copyFileSync(join(CLIENT, file), join(OUT, file));
 console.log(`client built into ${OUT}`);
