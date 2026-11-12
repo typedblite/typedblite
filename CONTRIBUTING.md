@@ -55,6 +55,7 @@ npm exec nx -- run <project>:<target>
 | `typedblite-conformance` | `libs/conformance` | `build`, `test`, `typecheck`, `report` |
 | `typedblite` (CLI) | `apps/cli` | `build`, `test`, `typecheck` |
 | `typeqlite-vscode` | `apps/vscode` | `build`, `test`, `typecheck`, `package`, `e2e` |
+| `sync-demo` | `apps/sync-demo` | `build`, `test`, `typecheck`, `smoke`, `test-browser`, `serve`, `demo`, `android-*` |
 
 For VS Code, the repository includes launch configurations. **Run TypeQLite Editor** starts a second
 window with the extension loaded from source.

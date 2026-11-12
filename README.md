@@ -67,6 +67,7 @@ TypeDB's native server is a standalone Rust binary. TypeDBLite brings the same p
 | [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
 | [`typedblite-conformance`](libs/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
 | [`typedblite-cli`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
+| [`typedblite-sync-demo`](apps/sync-demo/) | Offline-first sync, shown end to end: a browser, a desktop app and an Android phone, each with its own TypeDBLite store, replicating through a TypeDBLite hub. Cut any link or stop the hub, and watch them converge. |
 | [`typeqlite` (VS Code extension)](apps/vscode/) | The TypeQLite editor: diagnostics, cross-file navigation, hover, completion, rename, quick fixes, formatting and semantic highlighting, from a Langium language server that runs the language library unchanged (ADR-008). |
 
 ## Quick start
@@ -175,6 +176,8 @@ TypeDBLite includes a hub-and-spoke replication model (ADR-003):
 - **Spokes** subscribe and replicate bidirectionally or in one direction (`push` / `pull` / `duplex`).
 - Identical edits applied independently on two nodes produce the same revision, so they converge without conflict.
 
+See it working: the [sync demo](apps/sync-demo/) runs a browser, a desktop app and an Android phone against one hub (`npm exec nx -- run sync-demo:demo -- --fresh`). TypeDBLite runs in the browser on WASM SQLite through `@typedblite/runtime/wasm` ([ADR-009](docs/architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md)).
+
 ## Conformance
 
 The `typedblite-conformance` package vendors TypeDB's own behaviour specification and runs every Cucumber scenario against the TypeDBLite runtime. The result is a report card — passes, failures, and declared deviations.
@@ -202,7 +205,7 @@ npm exec nx -- run typedblite-runtime:build
 npm exec nx -- run typedblite-runtime:test
 ```
 
-Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-conformance`, `typedblite` (the CLI) and `typeqlite-vscode`. Set `CI=true` to collect coverage into `coverage/`. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
+Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode` and `sync-demo`. Set `CI=true` to collect coverage into `coverage/`. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
 
 ## Test fixtures
 

@@ -1,6 +1,6 @@
 ---
 kind: feature
-status: in-progress
+status: complete
 decided-by: [adr-009]
 title: TypeDBLite Sync Demo
 feature: sync-demo
@@ -9,7 +9,7 @@ branch: feat/sync-demo
 
 # TypeDBLite Sync Demo — Feature Doc
 
-> **Status:** 🚧 In progress · **Written:** 2026-11-12 · **Branch:** `feat/sync-demo`, from
+> **Status:** ✅ Complete, 2026-11-12 · **Written:** 2026-11-12 · **Branch:** `feat/sync-demo`, from
 > `main` · **Governed by:** [ADR-009](../../architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md)
 >
 > Request, 2026-11-12: *a sync demo like the one in `downstream-app`, with every dependency it needs
@@ -89,7 +89,7 @@ The defects found while building the original matter here:
 
 | Thing | State |
 | ----- | ----- |
-| WASM binding | [`libs/runtime/spike/wasm-sqlite.ts`](../../../libs/runtime/spike/wasm-sqlite.ts) (243 lines): `initWasmSqlite({ sahPool, moduleOptions })` and `openWasmSqlite`, using SQLite's in-memory `memdb`, or OPFS through the SAH-pool VFS (worker-only, with no `SharedArrayBuffer` and so no COOP/COEP). It also has `wipeOpfsPool` and `poolInfo`. **Unsupported**: it is not exported, and has no tests of its own |
+| WASM binding | `libs/runtime/spike/wasm-sqlite.ts` (243 lines; ⚠️ moved to [`src/wasm.ts`](../../../libs/runtime/src/wasm.ts) in Phase 02): `initWasmSqlite({ sahPool, moduleOptions })` and `openWasmSqlite`, using SQLite's in-memory `memdb`, or OPFS through the SAH-pool VFS (worker-only, with no `SharedArrayBuffer` and so no COOP/COEP). It also has `wipeOpfsPool` and `poolInfo`. **Unsupported**: it is not exported, and has no tests of its own |
 | `@sqlite.org/sqlite-wasm` | **Not a dependency of this repository.** The spike has only ever resolved it from downstream-app's `node_modules` (3.54.1-build1 there) |
 | Browser test harness | `libs/runtime/spike/browser/`: about 2,300 lines of console, crash, failure, idempotency, tab and WAL runners, with a `node-crypto-shim.ts` |
 | WASM test config | [`vitest.wasm.config.ts`](../../../libs/runtime/vitest.wasm.config.ts) runs the runtime suite with `node-sqlite.ts` redirected to the WASM opener. 🔴 **It does not start**: it imports `vitest.shared` from `../../../../`, outside the repository. It cites `docs/analysis/typedblite-wasm-engine-spike.md`, which is not in this repository |
@@ -143,26 +143,34 @@ or the emulator's reversed port. The demo needs no account, no cloud service and
 
 ## Definition of done
 
-- [ ] `@typedblite/runtime`'s browser entry, bundled by esbuild for the browser platform, contains no
-      `node:` import.
-- [ ] The WASM export has a test suite running in Node (memdb) and in Chromium (OPFS), including a
-      store that survives a page reload.
-- [ ] The runtime suite passes against the WASM binding, except for the documented limits of the
+- [x] `@typedblite/runtime`'s browser entry, bundled by esbuild for the browser platform, contains no
+      `node:` import. *`browser-entry.test.ts` (Phase 01).*
+- [x] The WASM export has a test suite running in Node (memdb) and in Chromium (OPFS), including a
+      store that survives a page reload. *`test-wasm`, and `test-browser/opfs.test.ts`: the store
+      survives closing the whole browser (Phase 02).*
+- [x] The runtime suite passes against the WASM binding, except for the documented limits of the
       binding: a real file that survives a restart, and several processes sharing one file. Each
-      exception is listed with its reason.
-- [ ] 🔴 Revisions computed in a browser equal those computed on Node, over a differential corpus.
-- [ ] 🔴 Conformance is unchanged at 1742 of 1756, and the Node runtime suite is green.
-- [ ] A spoke whose hub answers 5xx, or does not answer within its timeout, reports an error. Proven
-      by a runtime test.
-- [ ] `nx run sync-demo:smoke` runs three headless spokes and a hub through the story's network
-      events (cut, write, restore, hub down, hub up), and asserts convergence each time.
-- [ ] `nx run sync-demo:demo -- --auto --fresh` runs the whole story with the PWA and Electron, and
-      with Android when an emulator is available. Every step's convergence check passes.
-- [ ] The demo's README covers setup from a cold machine, running, the story, and troubleshooting.
-      The root README and the replication guide link to it.
-- [ ] `AGENTS.md`, the project overview memory, and `CONTRIBUTING.md`'s project table name the new
-      project.
-- [ ] Build, typecheck and test are green from a clean tree.
+      exception is listed with its reason. *`test-wasm`: 579 passed and 1 skipped. The exclusions are
+      named in `vitest.wasm.config.ts` (Phases 02–03).*
+- [x] 🔴 Revisions computed in a browser equal those computed on Node, over a differential corpus.
+      *`sha256.spec.ts` (300 chained revisions against the `node:crypto` algorithm), and
+      `opfs.test.ts` (Chromium's revisions equal Node's) (Phases 01–02).*
+- [x] 🔴 Conformance is unchanged at 1742 of 1756, and the Node runtime suite is green. *Every phase
+      close, from a clean tree.*
+- [x] A spoke whose hub answers 5xx, or does not answer within its timeout, reports an error. Proven
+      by a runtime test. *`honest-replication.test.ts` (Phase 03).*
+- [x] `nx run sync-demo:smoke` runs three headless spokes and a hub through the story's network
+      events (cut, write, restore, hub down, hub up), and asserts convergence each time. *8 steps,
+      plus a device restart while offline (Phase 04).*
+- [x] `nx run sync-demo:demo -- --auto --fresh` runs the whole story with the PWA and Electron, and
+      with Android when an emulator is available. Every step's convergence check passes. *Run
+      headless, and as `test-browser/story.test.ts`. ⚠️ No emulator was available in this session (no
+      KVM), so the Android path is built (the APK) but has not been run (Phases 06–07).*
+- [x] The demo's README covers setup from a cold machine, running, the story, and troubleshooting.
+      The root README and the replication guide link to it. *Phase 08.*
+- [x] `AGENTS.md`, the project overview memory, and `CONTRIBUTING.md`'s project table name the new
+      project. *Phase 08.*
+- [x] Build, typecheck and test are green from a clean tree. *Phase 08's close.*
 
 ## Out of scope
 
@@ -215,7 +223,7 @@ because every store holds the same tasks, which is what the original's driver ch
 | 05 | [The PWA client and its service worker](phases/05-pwa/summary.md) | Complete | [summary](phases/05-pwa/summary.md) |
 | 06 | [Electron and Android](phases/06-electron-android/summary.md) | Complete | [summary](phases/06-electron-android/summary.md) |
 | 07 | [The story: the Playwright driver, captions, Pause and Play, silent recording](phases/07-story/summary.md) | Complete | [summary](phases/07-story/summary.md) |
-| 08 | Setup scripts, the README, and the docs | Not started | |
+| 08 | [Setup scripts, the README, and the docs](phases/08-docs/summary.md) | Complete | [summary](phases/08-docs/summary.md) |
 
 ## Phase Intent
 

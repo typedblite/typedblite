@@ -26,7 +26,7 @@ npm exec nx -- run typedblite-runtime:test -- interpreter   # files matching a n
 ```
 
 The Nx project names are `typeqlite-language`, `content-revision`, `typedblite-runtime`,
-`typedblite-conformance`, `typedblite` (the CLI) and `typeqlite-vscode`.
+`typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode` and `sync-demo`.
 
 Every suite runs on [Vitest](https://vitest.dev), with a 30-second timeout per test. Set `CI=true`
 to collect coverage into `coverage/<project>/`.
@@ -41,6 +41,7 @@ to collect coverage into `coverage/<project>/`.
 | `typedblite-conformance` | `libs/conformance/test/*.test.ts` | The [report card](#the-conformance-report-card) has not regressed, plus the harness itself |
 | `typedblite` | `apps/cli/test/*.test.mts` | The CLI. `repl.test.mts` spawns the real binary and pipes input into it |
 | `typeqlite-vscode` | `apps/vscode/test/*.test.ts` | The manifest matches the language library, and the bundled language server answers over stdio |
+| `sync-demo` | `apps/sync-demo/test/smoke.test.ts` | The sync demo's story with headless devices, a real hub process and the real switchboard: convergence after every network event. `test-browser` adds the PWA in Chromium, the Electron app, and the whole story headless |
 
 ## The clean-tree gate
 

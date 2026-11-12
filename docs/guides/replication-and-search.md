@@ -17,6 +17,9 @@ TypeDBLite's own, so TypeDBLite does not replicate with CouchDB itself.
 - [Compaction](#compaction)
 - [Full-text search](#full-text-search)
 
+To see all of this working across a browser, a desktop app and a phone, run the
+[sync demo](../../apps/sync-demo/README.md).
+
 ## What gets replicated
 
 **A thing replicates when its type has a `@key`.** Its identity across stores is `type/key-value`,
