@@ -82,10 +82,10 @@ Rules:
 
 | Feature | Passing |
 |---|---|
-| define | 463 |
+| define | 464 |
 | redefine | 194 |
 | undefine | 171 |
-| expression | 124 |
+| expression | 128 |
 | reduce | 65 |
 | insert | 122 |
 | match | 106 |
@@ -97,7 +97,7 @@ Rules:
 | variables | 12 |
 | disjunction | 9 |
 | given | 18 |
-| metadata | 107 |
+| metadata | 122 |
 | negation | 15 |
 | optional | 10 |
 | put | 11 |

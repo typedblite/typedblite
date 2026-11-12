@@ -349,7 +349,8 @@ describe('value expressions', () => {
   });
 
   it('what this engine does not have is refused by name: schema functions — metadata L833', () => {
-    assert.equal(refusal(() => engine.query('match let $d = get_fun_doc("nothing");')).code, DiagnosticCode.notImplemented);
+    // A schema function the schema does not define is refused by name (metadata.feature L833).
+    assert.equal(refusal(() => engine.query('match let $d = get_fun_doc("nothing");')).code, DiagnosticCode.unknownFunction);
   });
 
   it('a second `match` is a later stage, and reads what the first selected — variables L26, L38', () => {

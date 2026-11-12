@@ -26,7 +26,9 @@ import {
   type RelatesTrait,
   type TypeExtensionDef,
   type TypeQLiteFile,
+  type TypeDefinition,
 } from '@typedblite/language';
+import { isTypeDefinition } from './type-definitions.js';
 import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf, type DiagnosticCodeValue } from './diagnostics.js';
 import { ownsSubject, relatesSubject } from './schema-subjects.js';
@@ -66,6 +68,10 @@ export interface SchemaFacts {
    * the role it specialises as its DECLARING relation's `relation:role` — the role types' parents.
    */
   readonly specialises: ReadonlyMap<string, string>;
+  /** The schema's functions, by name (`define fun …`). */
+  readonly functions: ReadonlySet<string>;
+  /** The schema's structs, each with its field names (`define struct …`). */
+  readonly structs: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 /** One key for `keyOwnerships`, the shape `SchemaModel.owns` already uses. */
@@ -120,7 +126,7 @@ export function checkSchemaRules(
   const soFar = { parents: new Map(applied.parents), valueTypes: new Map(applied.valueTypes) };
   for (const clause of file.clauses) {
     if (!isDefineClause(clause)) continue;
-    for (const definition of clause.definitions) {
+    for (const definition of clause.definitions.filter(isTypeDefinition)) {
       const name = nameOf(definition);
       const before: SchemaFacts = { ...proposed, parents: soFar.parents, valueTypes: soFar.valueTypes };
       checkKindUnchanged(definition, name, applied, refuse);
@@ -154,7 +160,7 @@ export function checkSchemaRules(
   }
 }
 
-const nameOf = (definition: Definition): string =>
+const nameOf = (definition: TypeDefinition): string =>
   isTypeExtensionDef(definition) ? definition.type : definition.name;
 
 /** The applied facts with this statement's declarations laid over them. */
@@ -173,7 +179,7 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
   };
   for (const clause of file.clauses) {
     if (!isDefineClause(clause)) continue;
-    for (const definition of clause.definitions) {
+    for (const definition of clause.definitions.filter(isTypeDefinition)) {
       const name = nameOf(definition);
       if (isEntityDef(definition) || isRelationDef(definition)) {
         types.add(name);
@@ -215,6 +221,8 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
     plays: applied.plays,
     ordered: applied.ordered,
     specialises,
+    functions: applied.functions,
+    structs: applied.structs,
   };
 }
 
@@ -265,7 +273,7 @@ function roleDeclaredBy(relation: string, role: string, facts: SchemaFacts): str
  * `employment` is a relation — a label keeps its kind (`define.feature` L2610, L2619, L2626).
  * A re-open has no kind keyword and cannot contradict one.
  */
-function checkKindUnchanged(definition: Definition, name: string, applied: SchemaFacts, refuse: Refuse): void {
+function checkKindUnchanged(definition: TypeDefinition, name: string, applied: SchemaFacts, refuse: Refuse): void {
   if (isTypeExtensionDef(definition)) return;
   const before = kindOf(name, applied);
   const now: Kind = isEntityDef(definition) ? 'entity' : isRelationDef(definition) ? 'relation' : 'attribute';
@@ -285,7 +293,7 @@ function checkKindUnchanged(definition: Definition, name: string, applied: Schem
  * is how the spec re-opens types. `facts` is the chain before this definition, so `entity c sub
  * a; c sub b;` in one statement is the switch it is.
  */
-function checkSupertypeUnchanged(definition: Definition, name: string, facts: SchemaFacts, refuse: Refuse): void {
+function checkSupertypeUnchanged(definition: TypeDefinition, name: string, facts: SchemaFacts, refuse: Refuse): void {
   const declared = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
   const before = facts.parents.get(name);
   if (declared === undefined || before === undefined || declared === before) return;
@@ -303,7 +311,7 @@ function checkSupertypeUnchanged(definition: Definition, name: string, facts: Sc
  * that the parent exists; this settles what it is. Without it the `isa` closure answered entities
  * for a relation type (review, round 1).
  */
-function checkSupertypeKind(definition: Definition, name: string, proposed: SchemaFacts, refuse: Refuse): void {
+function checkSupertypeKind(definition: TypeDefinition, name: string, proposed: SchemaFacts, refuse: Refuse): void {
   const declared = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
   if (declared === undefined) return;
   const childKind = isEntityDef(definition)
@@ -328,7 +336,7 @@ function checkSupertypeKind(definition: Definition, name: string, proposed: Sche
  * that definition (L3474; `dog sub dog` at L3467). `facts.parents` is the chain before this
  * definition, so the one that closes the loop is the one named.
  */
-function checkNoCycle(definition: Definition, name: string, facts: SchemaFacts, refuse: Refuse): void {
+function checkNoCycle(definition: TypeDefinition, name: string, facts: SchemaFacts, refuse: Refuse): void {
   const declared = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
   if (declared === undefined) return;
   if (declared !== name && !ancestorsOf(declared, facts).includes(name)) return;
@@ -357,7 +365,7 @@ function checkNoCycle(definition: Definition, name: string, facts: SchemaFacts, 
  * this is a named edge and not a live one.
  */
 function checkAnnotationsForKind(
-  definition: Definition,
+  definition: TypeDefinition,
   name: string,
   proposed: SchemaFacts,
   data: DataFacts,

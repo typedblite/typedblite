@@ -404,7 +404,17 @@ export function userFunctionOf(expression: Expression): FunctionDefinition | und
       if (found !== undefined) return found;
     }
   }
-  return undefined;
+  // Then the schema's own — `define fun …` — which every query may call (expression.feature L1382).
+  return schemaFunctions.get(name);
+}
+
+/**
+ * The functions the schema defines, for the engine running now. The engine sets it at the start of
+ * each `query`/`execute`/`define`; the calls below it are synchronous, so it is always that engine's.
+ */
+let schemaFunctions: ReadonlyMap<string, FunctionDefinition> = new Map();
+export function useSchemaFunctions(functions: ReadonlyMap<string, FunctionDefinition>): void {
+  schemaFunctions = functions;
 }
 
 /** What a function or a `return` answers: a stream or one tuple, of how many values, by reduction or not. */
@@ -744,7 +754,9 @@ export function checkExpression(expression: Expression, variableType: (variable:
       if (isLabelExpression(argument)) return { kind: 'label', label: argument.label };
       if (isVariableExpression(argument)) return { kind: 'variable' };
       checkExpression(argument, variableType, refuse, facts);
-      return { kind: 'value', valueType: inferValueType(argument, variableType) };
+      // A string literal's text too: `get_fun_doc("f")` names a function the schema may not have.
+      const text = isLiteralExpression(argument) && isStringLiteral(argument.literal) ? argument.literal.value : undefined;
+      return { kind: 'value', valueType: inferValueType(argument, variableType), text };
     });
     checkSchemaCall(expression.function, shapes, facts, refuse, at);
     return;
@@ -1057,6 +1069,38 @@ export function applyValueStatements(
     return next;
   };
   let rows: Array<Map<string, ValueBinding>> = [new Map(bindings)];
+  // 🔴 A comparison filters as soon as what it reads is bound — before the `let`s that come after
+  // it, not after them all. Filtering early answers the same rows, and it is what stops recursion:
+  // `{ $len > 1; let $a_ in names_helper($len - 1); … }` called itself forever when the `let` ran
+  // before the comparison that ends it (expression.feature L1382).
+  const pending = [...statements.comparisons];
+  const ready = (comparison: ComparisonPattern, values: ReadonlyMap<string, ValueBinding>): boolean =>
+    [comparison.left, ...variablesOf(comparison.right)].every((variable) => values.has(variable));
+  const filterReady = (): void => {
+    const first = rows[0];
+    if (first === undefined) return;
+    const now = pending.filter((comparison) => ready(comparison, first));
+    if (now.length === 0) return;
+    for (const comparison of now) pending.splice(pending.indexOf(comparison), 1);
+    rows = rows.filter((values) => passes(values, now));
+  };
+  const passes = (values: ReadonlyMap<string, ValueBinding>, comparisons: readonly ComparisonPattern[]): boolean => {
+    const env = envOf(values);
+    for (const comparison of comparisons) {
+      const left = env(comparison.left);
+      if (left === undefined) {
+        return refuse(
+          DiagnosticCode.unboundValue,
+          `The variable '${comparison.left.slice(1)}' must be bound to a value before it's used.`,
+          rangeOf(comparison),
+        );
+      }
+      const right = evaluate(comparison.right, env, refuse, schema);
+      if (!compare(comparison.comparator, left, right, refuse, rangeOf(comparison))) return false;
+    }
+    return true;
+  };
+  filterReady();
   for (const statement of statements.lets) {
     rows = rows.flatMap((values) => {
       const env = envOf(values);
@@ -1080,23 +1124,9 @@ export function applyValueStatements(
       }
       return [bind(values, [statement.variable], [evaluate(statement.expression, env, refuse, schema)])];
     });
+    filterReady();
   }
-  return rows.filter((values) => {
-    const env = envOf(values);
-    for (const comparison of statements.comparisons) {
-      const left = env(comparison.left);
-      if (left === undefined) {
-        return refuse(
-          DiagnosticCode.unboundValue,
-          `The variable '${comparison.left.slice(1)}' must be bound to a value before it's used.`,
-          rangeOf(comparison),
-        );
-      }
-      const right = evaluate(comparison.right, env, refuse, schema);
-      if (!compare(comparison.comparator, left, right, refuse, rangeOf(comparison))) return false;
-    }
-    return true;
-  });
+  return rows.filter((values) => passes(values, pending));
 }
 
 export { arithmetic as operate, compareNumeric as compareValues, toNumeric as numericOf, toValue as valueOf };

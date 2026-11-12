@@ -26,11 +26,22 @@ Clause:
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 
+// `define` alone is valid, and defines nothing (define.feature L36).
 DefineClause:
-    'define' definitions+=Definition+;
+    {infer DefineClause} 'define' definitions+=Definition*;
 
+// `fun` and `struct` are schema definitions too — a function the schema stores, callable from any
+// query (expression.feature L1382), and a struct, whose metadata the schema functions read
+// (metadata.feature L113).
 Definition:
-    EntityDef | RelationDef | AttributeDef | TypeExtensionDef;
+    EntityDef | RelationDef | AttributeDef | TypeExtensionDef | SchemaFunction | StructDef;
+
+// `struct location @doc("…"): latitude value double @doc("…"), longitude value double;`
+StructDef:
+    'struct' name=ID annotations+=Annotation* ':' fields+=StructField (',' fields+=StructField)* ';';
+
+StructField:
+    name=ID 'value' valueType=ValueType (optional?='?')? annotations+=Annotation*;
 
 // `entity skill, owns skill-id @key, plays skill-composition:owner;`
 // `entity adr sub doc;`                     <- downstream-store's subtyping
@@ -292,9 +303,14 @@ Pipeline:
 // `with fun get_names($p: person) -> { name }: match $p has name $n; return { $n };` — a function the
 // query that follows may call (fetch.feature L1687). `-> { T, … }` answers a stream of tuples,
 // `-> T, …` one tuple (or none); a `?` marks a value that may be absent. The body is a pipeline that
-// ends in `return`. 🔴 `define fun …` — a function the SCHEMA stores — is not this, and does not parse.
+// ends in `return`. `define fun …` is the same definition without `with`, stored by the schema, and
+// may carry `@doc`/`@meta` before its body (metadata.feature L153).
 FunctionDefinition:
-    'with' 'fun' name=ID '(' (parameters+=FunctionParameter (',' parameters+=FunctionParameter)*)? ')' '->' output=FunctionOutput ':' body=FunctionBody;
+    with?='with' 'fun' name=ID '(' (parameters+=FunctionParameter (',' parameters+=FunctionParameter)*)? ')' '->' output=FunctionOutput annotations+=Annotation* ':' body=FunctionBody;
+
+// The schema's own: no `with`, the same node type, so one evaluator serves both.
+SchemaFunction infers FunctionDefinition:
+    'fun' name=ID '(' (parameters+=FunctionParameter (',' parameters+=FunctionParameter)*)? ')' '->' output=FunctionOutput annotations+=Annotation* ':' body=FunctionBody;
 
 FunctionParameter:
     variable=VAR ':' type=ValueType (optional?='?')?;

@@ -74,7 +74,9 @@ import {
   type RolePlayers,
   type TypeQLiteFile,
   type UndefineClause,
+  type TypeDefinition,
 } from '@typedblite/language';
+import { isTypeDefinition } from './type-definitions.js';
 import type { Range } from 'vscode-languageserver';
 import {
   attachDiagnostic,
@@ -91,7 +93,7 @@ import { generateSchema } from './sqlite-generator.js';
 import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
 import { type SchemaContext } from './expressions.js';
-import { applyValueStatements, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
+import { applyValueStatements, useSchemaFunctions, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
 import { applyReduce, checkReduce } from './reduce.js';
 import { canonicalTemporal } from './temporal.js';
 import { checkFetch, fetchDocument, ownershipMax, roleMax, type FetchContext, type FetchScope, type JsonValue } from './fetch.js';
@@ -310,6 +312,10 @@ interface SchemaModel extends SchemaFacts {
   readonly ordered: Set<string>;
   /** `relates father as parent` — `relation:role` to the specialised `relation:role`, from `schema_specialises`. */
   readonly specialises: Map<string, string>;
+  /** `define fun …`, by name, from `schema_function`. */
+  readonly functions: Set<string>;
+  /** `define struct …`, each with its fields, from `schema_struct`. */
+  readonly structs: Map<string, Set<string>>;
 }
 
 /**
@@ -566,7 +572,13 @@ export class TypeDBLiteInterpreter {
     plays: new Set(),
     ordered: new Set(),
     specialises: new Map(),
+    functions: new Set(),
+    structs: new Map(),
   };
+  /** The schema's functions, parsed from `schema_function` — what a call in any query may name. */
+  private schemaFunctionDefinitions = new Map<string, FunctionDefinition>();
+  /** Functions whose planning is under way — a recursive call is not planned again. */
+  private readonly planningFunctions = new Set<FunctionDefinition>();
 
   /**
    * The change log (ADR-003 D1). Its rows are written inside `execute`'s existing transaction, so a
@@ -998,6 +1010,53 @@ export class TypeDBLiteInterpreter {
     } catch {
       // Before `schema_specialises`: no role was ever specialised.
     }
+    this.loadFunctionsAndStructs();
+  }
+
+  /**
+   * `schema_function` and `schema_struct` into the model. A function is parsed again from its stored
+   * definition — one evaluator serves it and a query's `with fun` — and made callable from every query.
+   */
+  private loadFunctionsAndStructs(): void {
+    // Every annotation, from the table: `define` records a type's in memory as it applies them, but a
+    // function's, a struct's and a `#!` doc comment's reach only the table (metadata.feature L153, L189).
+    try {
+      const rows = this.db.prepare('SELECT subject, category, text FROM schema_annotation').all() as Array<{ subject: string; category: string; text: string }>;
+      this.schema.annotations.clear();
+      for (const row of rows) this.rememberAnnotation(String(row.subject), String(row.category), String(row.text));
+    } catch {
+      // Before `schema_annotation`: nothing to read.
+    }
+    this.schema.functions.clear();
+    this.schema.structs.clear();
+    this.schemaFunctionDefinitions = new Map();
+    try {
+      const rows = this.db.prepare('SELECT name, source FROM schema_function ORDER BY name').all() as Array<{ name: string; source: string }>;
+      if (rows.length > 0) {
+        const file = this.parse(`define\n${rows.map((r) => String(r.source)).join('\n')}`);
+        for (const clause of file.clauses) {
+          if (!isDefineClause(clause)) continue;
+          for (const definition of clause.definitions) {
+            if (definition.$type !== 'FunctionDefinition') continue;
+            const fn = definition as FunctionDefinition;
+            this.schemaFunctionDefinitions.set(fn.name, fn);
+            this.schema.functions.add(fn.name);
+          }
+        }
+      }
+    } catch {
+      // Before `schema_function`: no function was ever defined.
+    }
+    try {
+      const rows = this.db.prepare('SELECT name, fields FROM schema_struct').all() as Array<{ name: string; fields: string }>;
+      for (const row of rows) {
+        const fields = JSON.parse(String(row.fields)) as Array<{ name: string }>;
+        this.schema.structs.set(String(row.name), new Set(fields.map((f) => f.name)));
+      }
+    } catch {
+      // Before `schema_struct`: no struct was ever defined.
+    }
+    useSchemaFunctions(this.schemaFunctionDefinitions);
   }
 
   private rememberAnnotation(subject: string, category: string, text: string): void {
@@ -1007,7 +1066,7 @@ export class TypeDBLiteInterpreter {
   }
 
   /** What `define` records for one definition's annotations and traits — the same rows the DDL writes. */
-  private recordDefinition(name: string, definition: Definition): void {
+  private recordDefinition(name: string, definition: TypeDefinition): void {
     const record = (subject: string, list: readonly Annotation[]): void => {
       for (const annotation of list) this.rememberAnnotation(subject, recordCategory(annotation), recordText(annotation));
     };
@@ -1029,8 +1088,8 @@ export class TypeDBLiteInterpreter {
    * read a schema that is not the one applied.
    */
   private reloadSchema(): void {
-    for (const set of [this.schema.types, this.schema.relations, this.schema.attributes, this.schema.owns, this.schema.abstracts, this.schema.keyOwnerships, this.schema.plays, this.schema.ordered]) set.clear();
-    for (const map of [this.schema.parents, this.schema.valueTypes, this.schema.roles, this.schema.annotations, this.schema.specialises]) map.clear();
+    for (const set of [this.schema.types, this.schema.relations, this.schema.attributes, this.schema.owns, this.schema.abstracts, this.schema.keyOwnerships, this.schema.plays, this.schema.ordered, this.schema.functions]) set.clear();
+    for (const map of [this.schema.parents, this.schema.valueTypes, this.schema.roles, this.schema.annotations, this.schema.specialises, this.schema.structs]) map.clear();
     this.loadSchema();
   }
 
@@ -1042,6 +1101,7 @@ export class TypeDBLiteInterpreter {
 
   /** Apply a schema. Re-applying is normal — a projector replays, and `IF NOT EXISTS` carries it. */
   define(text: string): ExecutionReport {
+    useSchemaFunctions(this.schemaFunctionDefinitions);
     // Inside a caller's transaction the schema change is a savepoint within it (applySchemaDdl,
     // schema-mutation's `transaction`), so the caller's COMMIT or ROLLBACK decides for the schema too
     // — TypeDB's schema transaction, where a define and the writes beside it commit together.
@@ -1107,7 +1167,7 @@ export class TypeDBLiteInterpreter {
     let alreadyPresent = 0;
     for (const clause of file.clauses) {
       if (!isDefineClause(clause)) continue;
-      for (const definition of clause.definitions) {
+      for (const definition of clause.definitions.filter(isTypeDefinition)) {
         const name = 'name' in definition ? definition.name : undefined;
         if (name === undefined) continue;
         declared += 1;
@@ -1119,7 +1179,7 @@ export class TypeDBLiteInterpreter {
 
     for (const clause of file.clauses) {
       if (!isDefineClause(clause)) continue;
-      for (const definition of clause.definitions) {
+      for (const definition of clause.definitions.filter(isTypeDefinition)) {
         if (isEntityDef(definition) || isRelationDef(definition) || isTypeExtensionDef(definition)) {
           // A re-open names an existing type; its traits register as a definition's do.
           const name = isTypeExtensionDef(definition) ? definition.type : definition.name;
@@ -1314,6 +1374,7 @@ export class TypeDBLiteInterpreter {
    * attribute, and therefore accumulating unnoticed. Unobservable is not the same as harmless.
    */
   execute(text: string, given?: GivenRows): WriteReport {
+    useSchemaFunctions(this.schemaFunctionDefinitions);
     this.diagnostics = this.freshDiagnostics();
     this.written = { things: 0, attributes: 0, roles: 0 };
     // What the LAST write pipeline answers — its rows, or its documents when it ends in `fetch`
@@ -1440,6 +1501,7 @@ export class TypeDBLiteInterpreter {
     diagnostics: ExecutionReport['diagnostics'];
     documents?: JsonValue[];
   } {
+    useSchemaFunctions(this.schemaFunctionDefinitions);
     if (!this.tracing) return this.runQuery(text, given);
     this.trace = newTrace();
     this.lastTrace = this.trace;
@@ -1814,6 +1876,10 @@ export class TypeDBLiteInterpreter {
     const known = this.functionPlans.get(definition);
     if (known !== undefined) return known;
     const start = this.initialScope();
+    // A function that calls itself (expression.feature L1382, `names_helper`) is being planned when
+    // its own call is checked: that call reads the parameters' scope, and planning goes on.
+    if (this.planningFunctions.has(definition)) return [start];
+    this.planningFunctions.add(definition);
     for (const parameter of definition.parameters) {
       const type = parameter.type;
       start.available.add(parameter.variable);
@@ -1829,6 +1895,7 @@ export class TypeDBLiteInterpreter {
       if (!last.available.has(variable)) this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used: '${definition.name}' returns it.`, rangeOf(definition.body.returnStage));
     }
     this.functionPlans.set(definition, plan);
+    this.planningFunctions.delete(definition);
     return plan;
   }
 
@@ -2636,14 +2703,14 @@ export class TypeDBLiteInterpreter {
     const attributes = new Set(this.schema.attributes);
     for (const clause of file.clauses) {
       if (!isDefineClause(clause)) continue;
-      for (const definition of clause.definitions) {
+      for (const definition of clause.definitions.filter(isTypeDefinition)) {
         if (isEntityDef(definition) || isRelationDef(definition)) types.add(definition.name);
         if (isAttributeDef(definition)) attributes.add(definition.name);
       }
     }
     for (const clause of file.clauses) {
       if (!isDefineClause(clause)) continue;
-      for (const definition of clause.definitions) {
+      for (const definition of clause.definitions.filter(isTypeDefinition)) {
         if (isTypeExtensionDef(definition)) {
           // An attribute is a type too: `name @abstract;`, `email @independent;` re-open one — with
           // annotations only. A trait on an attribute (`email owns name @key;`) is refused, as
