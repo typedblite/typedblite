@@ -506,8 +506,10 @@ LetPattern:
 ComparisonPattern:
     left=VAR comparator=Comparator right=Expression ';';
 
+// `contains` and `like` are string predicates: `$n contains "Fun"`, `$n like "^[0-9]+$"`
+// (match.feature L3889, L3948).
 Comparator returns string:
-    '==' | '!=' | '<=' | '>=' | '<' | '>';
+    '==' | '!=' | '<=' | '>=' | '<' | '>' | 'contains' | 'like';
 
 // Precedence climbing: `+ -` < `* / %` < unary `-` < `^` (right-associative) < atoms.
 Expression:

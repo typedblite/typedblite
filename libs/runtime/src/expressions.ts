@@ -614,6 +614,12 @@ export function compareStrings(a: string, b: string): number {
 }
 
 export function compare(comparator: string, left: ValueBinding, right: Value, refuse: Refuse, at: Range | undefined): boolean {
+  // String predicates: `contains` ignores case (match.feature L3919); `like` is a regular expression
+  // found anywhere in the value, as TypeDB's is — anchor it with ^…$ to match the whole.
+  if (comparator === 'contains' || comparator === 'like') {
+    if (left.valueType !== 'string' || right.valueType !== 'string') return false;
+    return comparator === 'contains' ? left.value.toLowerCase().includes(right.text.toLowerCase()) : new RegExp(right.text, 'v').test(left.value);
+  }
   let order: number;
   if (isNumericType(left.valueType) && isNumericType(right.valueType)) {
     order = compareNumeric(toNumeric(left.valueType, left.value, refuse, at), toNumeric(right.valueType, right.text, refuse, at));
@@ -805,6 +811,16 @@ export function checkExpression(expression: Expression, variableType: (variable:
 
 /** A comparison's two sides can be compared at all — checked from their inferred types (review, round 14). */
 export function checkComparison(comparison: ComparisonPattern, variableType: (variable: string) => string | undefined, refuse: Refuse, facts?: SchemaFacts): void {
+  // `like` takes its pattern as a string LITERAL, compiled before any row (match.feature L3977).
+  if (comparison.comparator === 'like') {
+    const literal = isLiteralExpression(comparison.right) && isStringLiteral(comparison.right.literal) ? comparison.right.literal.value : undefined;
+    if (literal === undefined) refuse(DiagnosticCode.valueTypeConflict, 'Expected a string literal as regex: `like` takes its pattern written in the query.', rangeOf(comparison));
+    try {
+      new RegExp(literal as string, 'v');
+    } catch {
+      refuse(DiagnosticCode.valueTypeConflict, `The regular expression failed compilation: '${literal}'.`, rangeOf(comparison));
+    }
+  }
   checkExpression(comparison.right, variableType, refuse, facts);
   const left = variableType(comparison.left);
   const right = inferValueType(comparison.right, variableType);
@@ -813,6 +829,9 @@ export function checkComparison(comparison: ComparisonPattern, variableType: (va
   if (ORDERED_TEMPORAL.has(left) && ORDERED_TEMPORAL.has(right)) return;
   if (TEMPORAL_TYPES.has(left) || TEMPORAL_TYPES.has(right)) {
     refuse(DiagnosticCode.notImplemented, `TypeDBLite does not compare ${TEMPORAL_TYPES.has(left) ? left : right} values yet.`, at);
+  }
+  if ((comparison.comparator === 'contains' || comparison.comparator === 'like') && (left !== 'string' || right !== 'string')) {
+    refuse(DiagnosticCode.valueTypeConflict, `\`${comparison.comparator}\` compares strings, and this is a ${left === 'string' ? right : left}.`, at);
   }
   if (isNumericType(left) && isNumericType(right)) return;
   if (left === right && left === 'string') return;
