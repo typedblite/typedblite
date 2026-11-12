@@ -1,8 +1,8 @@
-// 🔴 **If you change the semantics in this file, re-run the parity oracle.**
-// CouchDB's revision-tree behaviour is kept here on purpose (ADR-003), and it was proven against
-// real CouchDB 3.4.3 in TypeDBLite Sync Phase 03. That check is **no longer part of the routine
-// suite** — it skipped on every CI run for want of the stack, reporting nothing. Bring the stack up
-// and run `nx run typedblite-runtime:test-oracle`. Nothing else will tell you the semantics drifted.
+// 🔴 **If you change the semantics in this file, every store stops converging with every other.**
+// CouchDB's revision-tree behaviour is kept here on purpose (ADR-003), and it was proven against real
+// CouchDB 3.4.3 in TypeDBLite Sync Phase 03. That differential suite has since been removed, so
+// nothing re-checks CouchDB parity. `revision.spec.ts` and `sha256.spec.ts` pin today's behaviour,
+// including that the digest equals what `node:crypto` gave before ADR-009; keep them green.
 /**
  * Revision identifiers for the change log.
  *
@@ -12,8 +12,8 @@
  * the same revision — so independent identical edits converge instead of manufacturing a conflict
  * for two writers who agreed.
  */
-import { createHash } from 'node:crypto';
 import { canonical, type EntityState } from './canonical.js';
+import { sha256Hex } from './sha256.js';
 
 /** `generation-digest`, e.g. `2-9f86d081884c7d659a2feaa0c55ad015`. */
 export type Revision = string;
@@ -49,13 +49,8 @@ export function digestOf(rev: Revision): string {
 export function computeRevision(input: RevisionInput): Revision {
   const generation = input.parent ? generationOf(input.parent) + 1 : 1;
   const body = input.state ? canonical(input.state) : '';
-  const digest = createHash('sha256')
-    .update(body)
-    .update('\0')
-    .update(input.parent ?? '')
-    .update('\0')
-    .update(input.deleted ? '1' : '0')
-    .digest('hex')
+  // One string, hashed once: the same bytes `update(body).update('\0')…` fed `node:crypto`.
+  const digest = sha256Hex(`${body}\0${input.parent ?? ''}\0${input.deleted ? '1' : '0'}`)
     .slice(0, DIGEST_LENGTH);
   return `${generation}-${digest}`;
 }

@@ -208,7 +208,7 @@ because every store holds the same tasks, which is what the original's driver ch
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
 | 00 | [Scope, the survey of the original, ADR-009, versions and licences](phases/00-scope-and-adr/summary.md) | Complete | [summary](phases/00-scope-and-adr/summary.md) |
-| 01 | The runtime in a browser: a browser-safe entry, synchronous SHA-256, `Object.groupBy` | Not started | |
+| 01 | [The runtime in a browser: a browser-safe entry, synchronous SHA-256, `Object.groupBy`](phases/01-runtime-in-browser/summary.md) | Complete | [summary](phases/01-runtime-in-browser/summary.md) |
 | 02 | The WASM binding, promoted: the export, the peer dependency, tests in Node and Chromium | Not started | |
 | 03 | Replication that fails honestly: 5xx and timeouts, and a warning on a reopened store | Not started | |
 | 04 | The hub, the switchboard, the control page, and `smoke` | Not started | |
@@ -263,7 +263,10 @@ Play, the flags, and a silent recording.
 
 Anything a phase defers is recorded here, not only in a commit message.
 
-- *(none yet)*
+- **A lighter browser bundle.** Phase 01. `diagnostics.ts` imports `DiagnosticSeverity` from
+  `vscode-languageserver`, which pulls about a megabyte of protocol code into a browser bundle.
+  Importing it from `vscode-languageserver-types` would avoid that, at the cost of a direct
+  dependency. To be picked up when a browser user asks about bundle size.
 
 ## Key Documents
 
