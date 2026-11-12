@@ -52,32 +52,63 @@ function render(state: State): void {
   $('status').textContent = text;
   $('status').dataset['tone'] = tone;
   $('pending').textContent = state.pending === 0 ? '' : `${state.pending} change${state.pending === 1 ? '' : 's'} waiting to sync`;
-  const flash = new Set(state.synced);
+  renderTasks(state.tasks, new Set(state.synced));
+  $('empty').hidden = state.tasks.length > 0;
+}
+
+/**
+ * Update the list in place, keyed by task id.
+ *
+ * 🔴 Not `replaceChildren` on every state: the worker publishes on every sync, twice a cycle, and
+ * rebuilding the rows detached the very checkbox a user was clicking — the click was lost. Found by
+ * the story driver, whose click on a desktop row timed out once the rebuilds lined up with it. A row
+ * is created once, changed in place, and moved only when the order changes.
+ */
+const rows = new Map<string, { item: HTMLLIElement; box: HTMLInputElement; title: HTMLSpanElement; done: boolean }>();
+
+function renderTasks(tasks: State['tasks'], flash: ReadonlySet<string>): void {
   const list = $('tasks');
-  list.replaceChildren(
-    ...state.tasks.map((task) => {
+  const current = new Set(tasks.map((task) => task.id));
+  for (const [id, row] of rows) {
+    if (!current.has(id)) {
+      row.item.remove();
+      rows.delete(id);
+    }
+  }
+  tasks.forEach((task, index) => {
+    let row = rows.get(task.id);
+    if (!row) {
       const item = document.createElement('li');
       item.dataset['id'] = task.id;
-      if (flash.has(task.id)) item.classList.add('flash');
       const box = document.createElement('input');
       box.type = 'checkbox';
-      box.checked = task.done;
-      box.setAttribute('aria-label', task.title);
       box.onchange = () => send({ type: 'toggle', id: task.id, done: box.checked });
       const title = document.createElement('span');
       title.className = 'title';
-      title.textContent = task.title;
       const origin = document.createElement('span');
       origin.className = 'origin';
       origin.textContent = LABELS[task.origin] ?? task.origin;
-      const row = document.createElement('label');
-      row.append(box, title, origin);
-      item.append(row);
-      item.classList.toggle('done', task.done);
-      return item;
-    }),
-  );
-  $('empty').hidden = state.tasks.length > 0;
+      const label = document.createElement('label');
+      label.append(box, title, origin);
+      item.append(label);
+      row = { item, box, title, done: !task.done };
+      rows.set(task.id, row);
+    }
+    if (row.title.textContent !== task.title) {
+      row.title.textContent = task.title;
+      row.box.setAttribute('aria-label', task.title);
+    }
+    if (row.done !== task.done) {
+      row.done = task.done;
+      row.box.checked = task.done;
+      row.item.classList.toggle('done', task.done);
+    }
+    if (flash.has(task.id)) {
+      row.item.classList.add('flash');
+      requestAnimationFrame(() => requestAnimationFrame(() => row?.item.classList.remove('flash')));
+    }
+    if (list.children[index] !== row.item) list.insertBefore(row.item, list.children[index] ?? null);
+  });
 }
 
 worker.onmessage = (event: MessageEvent<FromWorker>) => {
