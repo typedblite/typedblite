@@ -144,8 +144,11 @@ nx run typedblite-conformance:cli -- --update-baseline
 - Test files for `libs/runtime` live in `libs/runtime/test/` with `.test.ts` extension.
 - Test files for `apps/cli` live in `apps/cli/test/` with `.test.mts` extension.
 - Test files for `apps/vscode` live in `apps/vscode/test/` (`.test.ts`, run by vitest against the built
-  bundle). Its e2e (`nx run typeqlite-vscode:e2e`) launches a real VS Code through
-  `@vscode/test-electron` and is off by default. Run it when changing anything an editor sees.
+  bundle). Its e2e (`nx run typeqlite-vscode:e2e`) packages the extension, installs the `.vsix` into a
+  downloaded VS Code through `@vscode/test-electron`, and runs the cases there. It is off by default:
+  run it when changing anything an editor sees. It needs a display (`xvfb-run` when headless).
+- Language-service specs that involve more than one file use `libs/language/test/workspace.ts`, which
+  builds several documents into one workspace with its own services and an in-memory file system.
 
 ## The editor
 
@@ -155,6 +158,11 @@ nx run typedblite-conformance:cli -- --update-baseline
 `ValidationRegistry` (through `validateSync`), so a check registered there is a runtime rule. An
 editor-only diagnostic belongs in a `DocumentValidator` subclass, which the runtime never runs. The
 file extensions it claims come from `langium-config.json`, and a test fails if the manifest differs.
+
+Labels in queries (`isa person`, `has name`, role players) are plain `ID`s, not cross-references, and
+must stay so (ADR-008 D5). The editor resolves them through `TypeQLiteLabels`, whose position table
+(`sitesOf`, and `LABEL_POSITIONS` for completion) must change whenever the grammar gains a position
+that names a type. `nx run typeqlite-vscode:package` builds `apps/vscode/dist/typeqlite-0.0.1.vsix`.
 - Shared TypeQLite schema fixtures used by multiple suites live in `test-fixtures/schemas/`.
 - The runtime has an optional oracle test suite (`vitest.oracle.config.ts`) and a WASM test suite (`vitest.wasm.config.ts`), both off by default. Run them explicitly when changing the SQLite binding or the revision algorithm.
 

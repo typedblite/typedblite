@@ -1,18 +1,26 @@
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { cpSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { runTests } from '@vscode/test-electron';
+import {
+  downloadAndUnzipVSCode,
+  resolveCliArgsFromVSCodeExecutablePath,
+  runTests,
+} from '@vscode/test-electron';
 
 /**
- * Launch a real VS Code with this extension in development mode and run `suite.cjs` in its
- * extension host (ADR-008 D7).
+ * Launch a real VS Code with this extension and run `suite.cjs` in its extension host (ADR-008 D7).
  *
- * The workspace is a fresh copy, so a case that edits a document cannot leak into the next run. The
- * user-data directory is fresh too, so no setting or extension of the developer's own takes part.
+ * Given a `.vsix` (`node e2e/out/run.cjs dist/typeqlite-0.0.1.vsix`, which is what `nx e2e` does),
+ * the downloaded VS Code's own CLI installs it into a fresh extensions folder, and the cases run
+ * against **the installed copy**: the artifact a user would install, not the source folder. Without
+ * one, the cases run against the source folder, which is quicker when iterating.
  *
- * 🔴 An Electron VS Code needs a display and these system libraries:
- * `libatk-bridge2.0-0` and `libsecret-1-0`. WSLg provides the display on the development host. A
- * headless machine needs `xvfb-run`.
+ * The workspace and the user-data folder are fresh copies, so no case can leak into the next run, and
+ * no setting or extension of the developer's own takes part.
+ *
+ * 🔴 An Electron VS Code needs a display. WSLg provides one on the development host; a headless
+ * machine needs `xvfb-run`.
  */
 async function main(): Promise<void> {
   // 🔴 Run from a VS Code terminal, this process inherits that editor's environment, and
@@ -23,20 +31,55 @@ async function main(): Promise<void> {
     if (name === 'ELECTRON_RUN_AS_NODE' || name.startsWith('VSCODE_')) delete process.env[name];
   }
   const app = resolve(__dirname, '../..');
+  const vsix = process.argv[2] ? resolve(app, process.argv[2]) : undefined;
   const root = mkdtempSync(join(tmpdir(), 'typeqlite-e2e-'));
   const workspace = join(root, 'workspace');
+  const userData = join(root, 'user-data');
+  const extensions = join(root, 'extensions');
   cpSync(join(app, 'e2e/workspace'), workspace, { recursive: true });
   try {
+    const vscode = await downloadAndUnzipVSCode();
+    let extension = app;
+    if (vsix) {
+      if (!existsSync(vsix)) throw new Error(`No package at ${vsix}. Run the package target first.`);
+      const [cli, ...cliArgs] = resolveCliArgsFromVSCodeExecutablePath(vscode);
+      const installed = spawnSync(
+        cli!,
+        [
+          ...cliArgs.filter((arg) => !arg.startsWith('--extensions-dir') && !arg.startsWith('--user-data-dir')),
+          `--extensions-dir=${extensions}`,
+          `--user-data-dir=${userData}`,
+          '--install-extension',
+          vsix,
+        ],
+        {
+          encoding: 'utf8',
+          shell: process.platform === 'win32',
+          // Under WSL, VS Code's `bin/code` stops to ask whether to continue; this answers it.
+          env: { ...process.env, DONT_PROMPT_WSL_INSTALL: '1' },
+        },
+      );
+      if (installed.status !== 0) {
+        throw new Error(`Installing ${vsix} failed:\n${installed.stdout}\n${installed.stderr}`);
+      }
+      extension = join(extensions, 'typedblite.typeqlite-0.0.1');
+      if (!existsSync(join(extension, 'out/language-server/main.cjs'))) {
+        throw new Error(`The installed extension at ${extension} has no language server.`);
+      }
+      console.log(`Installed ${vsix} into ${extension}`);
+    }
     await runTests({
-      extensionDevelopmentPath: app,
+      vscodeExecutablePath: vscode,
+      extensionDevelopmentPath: extension,
       extensionTestsPath: resolve(__dirname, 'suite.cjs'),
       launchArgs: [
         workspace,
         '--disable-extensions',
         '--disable-workspace-trust',
-        `--user-data-dir=${join(root, 'user-data')}`,
+        `--user-data-dir=${userData}`,
+        `--extensions-dir=${extensions}`,
       ],
-      extensionTestsEnv: { TYPEQLITE_E2E_WORKSPACE: workspace },
+      extensionTestsEnv: { TYPEQLITE_E2E_WORKSPACE: workspace, TYPEQLITE_E2E_EXTENSION: extension },
     });
   } finally {
     rmSync(root, { recursive: true, force: true });

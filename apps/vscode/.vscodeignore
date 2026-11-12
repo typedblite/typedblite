@@ -9,3 +9,4 @@ project.json
 esbuild*.mjs
 vitest.config.ts
 .gitignore
+dist/**

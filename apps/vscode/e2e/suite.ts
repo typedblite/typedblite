@@ -64,6 +64,8 @@ const cases: Record<string, () => Promise<void>> = {
     assert.equal(document.languageId, 'typeqlite', '.tql is claimed (ADR-008 D4)');
     const extension = vscode.extensions.getExtension('typedblite.typeqlite');
     assert.ok(extension, 'the extension is installed under its ADR-008 D1 id');
+    // The copy under test is the one the runner chose: the installed `.vsix` under `nx e2e`.
+    assert.equal(extension.extensionPath, process.env['TYPEQLITE_E2E_EXTENSION']);
     await extension.activate();
     assert.ok(extension.isActive);
   },
@@ -289,6 +291,34 @@ const cases: Record<string, () => Promise<void>> = {
     assert.ok(await vscode.workspace.applyEdit(edit));
     const query = await vscode.workspace.openTextDocument(uriOf('rename-query.tql'));
     assert.equal(query.getText(), 'match\n$x isa ren-object;\n');
+  },
+
+  async 'semantic tokens colour a resolved query label and not an unknown one'() {
+    const document = await open('labels.tql');
+    await settledOn(document.uri, 1);
+    const legend = await vscode.commands.executeCommand<vscode.SemanticTokensLegend>(
+      'vscode.provideDocumentSemanticTokensLegend',
+      document.uri,
+    );
+    const tokens = await vscode.commands.executeCommand<vscode.SemanticTokens>(
+      'vscode.provideDocumentSemanticTokens',
+      document.uri,
+    );
+    assert.ok(legend && tokens);
+    const byText = new Map<string, string>();
+    let line = 0;
+    let character = 0;
+    for (let i = 0; i < tokens.data.length; i += 5) {
+      line += tokens.data[i]!;
+      character = tokens.data[i] === 0 ? character + tokens.data[i + 1]! : tokens.data[i + 1]!;
+      const start = new vscode.Position(line, character);
+      const text = document.getText(new vscode.Range(start, start.translate(0, tokens.data[i + 2]!)));
+      byText.set(text, legend.tokenTypes[tokens.data[i + 3]!]!);
+    }
+    // The workspace has a schema, so a label is coloured only when it resolves (ADR-008 D6).
+    assert.equal(byText.get('nav-person'), 'type');
+    assert.equal(byText.get('nav-name'), 'property');
+    assert.equal(byText.has('nav-persn'), false);
   },
 
   // Last, because it deletes a file from the workspace.
