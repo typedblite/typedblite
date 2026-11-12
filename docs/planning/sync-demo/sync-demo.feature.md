@@ -214,7 +214,7 @@ because every store holds the same tasks, which is what the original's driver ch
 | 04 | [The hub, the switchboard, the control page, and `smoke`](phases/04-hub-and-switchboard/summary.md) | Complete | [summary](phases/04-hub-and-switchboard/summary.md) |
 | 05 | [The PWA client and its service worker](phases/05-pwa/summary.md) | Complete | [summary](phases/05-pwa/summary.md) |
 | 06 | [Electron and Android](phases/06-electron-android/summary.md) | Complete | [summary](phases/06-electron-android/summary.md) |
-| 07 | The story: the Playwright driver, captions, Pause and Play, silent recording | Not started | |
+| 07 | [The story: the Playwright driver, captions, Pause and Play, silent recording](phases/07-story/summary.md) | Complete | [summary](phases/07-story/summary.md) |
 | 08 | Setup scripts, the README, and the docs | Not started | |
 
 ## Phase Intent

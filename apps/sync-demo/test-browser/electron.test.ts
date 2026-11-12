@@ -5,29 +5,17 @@
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron, type ElectronApplication, type Page } from 'playwright-core';
 import { TypeDBLiteInterpreter } from '@typedblite/runtime';
 
+import { cleanEnvironment, electronPath } from '../src/driver/environment.js';
 import { DemoDevice } from '../src/shared/device.js';
 import { startDemoServer, type DemoServer } from '../src/server/server.js';
 
 const BUILD = fileURLToPath(new URL('../.build', import.meta.url));
-const electronPath = createRequire(import.meta.url)('electron') as unknown as string;
-
-/** 🔴 Run from a VS Code terminal, `ELECTRON_RUN_AS_NODE` would start Electron as plain Node. */
-export function cleanEnvironment(): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [name, value] of Object.entries(process.env)) {
-    if (value === undefined || name === 'ELECTRON_RUN_AS_NODE' || name.startsWith('VSCODE_')) continue;
-    env[name] = value;
-  }
-  return env;
-}
-
 let root: string;
 let server: DemoServer;
 let app: ElectronApplication;
@@ -39,7 +27,7 @@ beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), 'typedblite-sync-electron-'));
   server = await startDemoServer({ port: 0, hubPort: 0, dataDir: join(root, 'hub'), clientDir: BUILD, log: () => undefined });
   app = await _electron.launch({
-    executablePath: electronPath,
+    executablePath: electronPath(),
     args: [join(BUILD, 'electron-main.cjs'), '--url', server.url, '--profile', join(root, 'electron-profile'), '--fresh'],
     env: cleanEnvironment(),
   });

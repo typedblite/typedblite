@@ -50,19 +50,31 @@
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
+  const LABELS = { pwa: 'Browser', electron: 'Desktop', android: 'Phone' };
+  const named = (device) => LABELS[device] ? `${LABELS[device]} (${device})` : device;
   const post = (path) => fetch(path, { method: 'POST' }).then(refresh);
   let running = false;
   $('hub-toggle').onclick = () => post(`/api/hub/${running ? 'stop' : 'start'}`);
+  $('play').onclick = () => post('/api/story/toggle');
+  document.addEventListener('keydown', (event) => {
+    if (event.code === 'Space' && $('play').classList.contains('on')) { event.preventDefault(); post('/api/story/toggle'); }
+  });
 
   function render(state) {
     running = state.hub.running;
+    const story = state.story ?? {};
+    $('play').classList.toggle('on', !!story.active);
+    $('play').textContent = story.paused ? '▶ Play' : '⏸ Pause';
+    $('paused').classList.toggle('on', !!story.active && !!story.paused);
+    $('caption').classList.toggle('on', !!story.caption);
+    $('caption').textContent = story.step ? `${story.step} — ${story.caption ?? ''}` : (story.caption ?? '');
     $('hub-state').textContent = running ? 'running' : 'stopped';
     $('hub-toggle').textContent = running ? 'Stop hub' : 'Start hub';
     $('links').replaceChildren(...Object.entries(state.links).map(([device, up]) => {
       const row = document.createElement('div');
       row.className = `row ${up ? 'up' : 'down'}`;
       row.innerHTML = '<span class="dot"></span><span class="name"></span><button></button>';
-      row.querySelector('.name').textContent = device;
+      row.querySelector('.name').textContent = named(device);
       const button = row.querySelector('button');
       button.textContent = up ? 'Cut link' : 'Restore link';
       button.onclick = () => post(`/api/link/${device}/${up ? 'down' : 'up'}`);
@@ -77,7 +89,7 @@
       row.innerHTML = '<span class="name"></span><span class="muted"></span>';
       row.querySelector('.name').textContent = task.title;
       row.querySelector('.name').classList.toggle('done', task.done);
-      row.querySelector('.muted').textContent = `from ${task.origin}`;
+      row.querySelector('.muted').textContent = `from ${LABELS[task.origin] ?? task.origin}`;
       return row;
     }));
   }

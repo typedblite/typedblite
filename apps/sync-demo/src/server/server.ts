@@ -34,9 +34,19 @@ export interface DemoServerOptions {
   readonly log?: (line: string) => void;
 }
 
+/** What the story driver shows on the control page, and whether the presenter has paused it. */
+export interface StoryState {
+  readonly active: boolean;
+  readonly paused: boolean;
+  readonly step?: string;
+  readonly caption?: string;
+}
+
 export interface DemoServer {
   readonly url: string;
   readonly port: number;
+  story(): StoryState;
+  setStory(update: Partial<StoryState>): void;
   hubRunning(): boolean;
   startHub(): Promise<void>;
   stopHub(): Promise<void>;
@@ -66,6 +76,7 @@ export async function startDemoServer(options: DemoServerOptions): Promise<DemoS
   const live = new Map<string, Set<Socket>>();
   let hub: ChildProcess | undefined;
   let hubPort = options.hubPort ?? 4310;
+  let story: StoryState = { active: false, paused: false };
 
   const startHub = async (): Promise<void> => {
     if (hub) return;
@@ -154,7 +165,14 @@ export async function startDemoServer(options: DemoServerOptions): Promise<DemoS
     if (net) return proxy(net[1] as string, `${net[2]}${url.search}`, req, res);
 
     if (path === '/api/state' && req.method === 'GET') {
-      return void hubTasks().then((tasks) => json(res, { hub: { running: hub !== undefined, tasks }, links: Object.fromEntries(linkUp) }));
+      return void hubTasks().then((tasks) => json(res, { hub: { running: hub !== undefined, tasks }, links: Object.fromEntries(linkUp), story }));
+    }
+    const storySwitch = /^\/api\/story\/(pause|play|toggle)$/.exec(path);
+    if (storySwitch && req.method === 'POST') {
+      const paused = storySwitch[1] === 'toggle' ? !story.paused : storySwitch[1] === 'pause';
+      story = { ...story, paused };
+      log(paused ? 'story paused' : 'story playing');
+      return json(res, { story });
     }
     const link = /^\/api\/link\/([a-z0-9-]+)\/(up|down)$/.exec(path);
     if (link && req.method === 'POST') {
@@ -187,6 +205,10 @@ export async function startDemoServer(options: DemoServerOptions): Promise<DemoS
   return {
     url,
     port,
+    story: () => story,
+    setStory: (update) => {
+      story = { ...story, ...update };
+    },
     hubRunning: () => hub !== undefined,
     startHub,
     stopHub,

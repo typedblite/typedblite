@@ -105,6 +105,16 @@
         "command": "bash mobile/start-emulator.sh",
         "cwd": "apps/sync-demo"
       }
+    },
+    "demo": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "command": "node out/driver/demo.js",
+        "cwd": "apps/sync-demo"
+      }
     }
   }
 }
