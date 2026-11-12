@@ -946,6 +946,10 @@ export class TypeDBLiteInterpreter {
    * ending the transaction around it.
    */
   private transactionOpen = false;
+  /** What the caller's open transaction has written — what `validateCommit` checks, as TypeDB checks what changed. */
+  private transactionTouched = new Set<number>();
+  /** Whether the open transaction changed the schema — then the whole store is checked at commit. */
+  private transactionChangedSchema = false;
   private savepointSeq = 0;
 
   private loadRecords(): void {
@@ -1035,12 +1039,11 @@ export class TypeDBLiteInterpreter {
 
   /** Apply a schema. Re-applying is normal — a projector replays, and `IF NOT EXISTS` carries it. */
   define(text: string): ExecutionReport {
-    if (this.transactionOpen) {
-      // DDL runs in its own `BEGIN IMMEDIATE` (applySchemaDdl) and a producer's state-plus-event
-      // write has no business changing the schema, so this is refused rather than nested.
-      throw new Error('define() cannot run inside a transaction: the schema changes in its own.');
-    }
+    // Inside a caller's transaction the schema change is a savepoint within it (applySchemaDdl,
+    // schema-mutation's `transaction`), so the caller's COMMIT or ROLLBACK decides for the schema too
+    // — TypeDB's schema transaction, where a define and the writes beside it commit together.
     this.diagnostics = this.freshDiagnostics();
+    if (this.transactionOpen) this.transactionChangedSchema = true;
     // 🔴 No second `@card`/`@unique` walk here. `parse()` runs `TypeQLiteValidator`, which owns
     // those rules — they were defined twice, with two different diagnostic codes.
     const file = this.parse(text);
@@ -1063,7 +1066,7 @@ export class TypeDBLiteInterpreter {
       };
       let changed = 0;
       for (const clause of mutations) {
-        const context = { db: this.db, schema: this.schema, data: this.dataFacts(), refuse, reload: () => this.reloadSchema() };
+        const context = { db: this.db, schema: this.schema, data: this.dataFacts(), refuse, reload: () => this.reloadSchema(), nested: this.transactionOpen };
         if (clause.$type === 'UndefineClause') {
           applyUndefine(clause, context);
           changed += clause.undefinitions.length;
@@ -1249,8 +1252,9 @@ export class TypeDBLiteInterpreter {
    * waits instead.
    */
   private applySchemaDdl(ddl: string, file: TypeQLiteFile): void {
-    this.db.exec('PRAGMA foreign_keys = ON');
-    this.db.exec('BEGIN IMMEDIATE');
+    const nested = this.transactionOpen;
+    if (!nested) this.db.exec('PRAGMA foreign_keys = ON');
+    this.db.exec(nested ? 'SAVEPOINT schema_ddl' : 'BEGIN IMMEDIATE');
     try {
       this.db.exec(ddl);
       if (this.persistKeyOwnerships) {
@@ -1273,11 +1277,16 @@ export class TypeDBLiteInterpreter {
       // Inside the DDL's transaction: a new `@key`/`@unique` the data repeats fails the scoped index
       // here, and the whole define rolls back (ADR-006 amendment).
       rescopeOwnerships(this.db);
-      this.db.exec('COMMIT');
+      this.db.exec(nested ? 'RELEASE schema_ddl' : 'COMMIT');
       this.persistKeyOwnerships = false;
       this.persistRelations = false;
     } catch (error) {
-      this.db.exec('ROLLBACK');
+      if (nested) {
+        this.db.exec('ROLLBACK TO schema_ddl');
+        this.db.exec('RELEASE schema_ddl');
+      } else {
+        this.db.exec('ROLLBACK');
+      }
       const text = error instanceof Error ? error.message : String(error);
       if (!/UNIQUE constraint failed/.test(text)) throw error;
       // The rule in `schema-rules.ts` names the attribute before the DDL runs; this is the backstop
@@ -1368,6 +1377,7 @@ export class TypeDBLiteInterpreter {
         }
         for (const iid of this.touched) {
           this.changeLog.recordWrite(iid);
+          if (this.transactionOpen) this.transactionTouched.add(iid);
         }
         this.db.exec(savepoint ? `RELEASE ${savepoint}` : 'COMMIT');
       } catch (error) {
@@ -2397,13 +2407,88 @@ export class TypeDBLiteInterpreter {
     if (this.transactionOpen) throw new Error('A transaction is already open on this handle.');
     this.db.exec('BEGIN IMMEDIATE');
     this.transactionOpen = true;
+    this.transactionTouched = new Set();
+    this.transactionChangedSchema = false;
   }
 
+  /**
+   * Commit — after what TypeDB checks at commit, which no single statement could: a relation left
+   * with no player is removed (insert.feature L1061), and the schema and data must stand as a whole
+   * (`validateCommit`). A commit that fails rolls the whole transaction back, as TypeDB's does.
+   */
   commitTransaction(): void {
+    try {
+      this.removePlayerlessRelations();
+      this.validateCommit();
+    } catch (error) {
+      this.rollbackTransaction();
+      throw error;
+    }
     try {
       this.db.exec('COMMIT');
     } finally {
       this.transactionOpen = false;
+    }
+  }
+
+  /** Relations this transaction wrote that have no player left — tombstoned, as `deleteThing` does. */
+  private removePlayerlessRelations(): void {
+    if (!this.schema.relations.size || this.transactionTouched.size === 0) return;
+    const marks = [...this.schema.relations].map(() => '?').join(', ');
+    const touched = [...this.transactionTouched];
+    const empty = this.db
+      .prepare(`SELECT t.iid AS iid FROM thing t WHERE t.iid IN (${touched.map(() => '?').join(', ')}) AND t.type IN (${marks}) AND NOT EXISTS (SELECT 1 FROM role_player rp WHERE rp.rel = t.iid)`)
+      .all(...touched, ...this.schema.relations) as Array<{ iid: number }>;
+    if (empty.length === 0) return;
+    this.tombstones = [];
+    for (const row of empty) this.deleteThing(Number(row.iid));
+    for (const identity of this.tombstones) this.changeLog.recordTombstone(identity);
+    sweepAttributes(this.db);
+  }
+
+  /**
+   * What TypeDB refuses at commit (define.feature L507, L1118; insert.feature L1126, L1646, L1654;
+   * delete.feature L2735; undefine.feature L1049):
+   * - a relation type that is not abstract relates at least one role, its own or inherited;
+   * - an attribute type that is not abstract has a value type, its own or inherited;
+   * - every instance of a type with a `@key` ownership holds exactly one key value.
+   */
+  private validateCommit(): void {
+    const fail = (message: string): never => {
+      throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.constraintViolated, message, undefined));
+    };
+    // The schema is checked when this transaction changed it; the data, where this transaction wrote —
+    // or everywhere, when the schema moved under it.
+    const whole = this.transactionChangedSchema;
+    // ⚠️ Silent on a store that never recorded what a check reads — roles before `schema_relates`,
+    // value types before `schema_value_type` — as the ownership check is before `schema_owns`: an
+    // empty record means "not recorded", never "relates nothing" (a 2026-10 downstream-app store).
+    const recorded = (table: string): boolean => this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) !== undefined;
+    const rolesRecorded = recorded('schema_relates');
+    const valueTypesRecorded = recorded('schema_value_type');
+    for (const relation of whole && rolesRecorded ? this.schema.relations : []) {
+      if (this.schema.abstracts.has(relation)) continue;
+      if (!this.typeFamily(relation, 'inherited').some((t) => (this.schema.roles.get(t)?.size ?? 0) > 0)) {
+        fail(`Relation type '${relation}' must relate at least one role; make it @abstract, or give it a role.`);
+      }
+    }
+    for (const attribute of whole && valueTypesRecorded ? this.schema.attributes : []) {
+      if (this.schema.abstracts.has(attribute)) continue;
+      if (this.valueTypeOfAttribute(attribute) === undefined) {
+        fail(`Attribute type '${attribute}' has no value type; a concrete attribute type needs one, its own or inherited.`);
+      }
+    }
+    if (!whole && this.transactionTouched.size === 0) return;
+    const touched = [...this.transactionTouched];
+    const only = whole ? '' : ` AND t.iid IN (${touched.map(() => '?').join(', ')})`;
+    for (const ownership of this.schema.keyOwnerships) {
+      const [owner, attribute] = ownership.split('\u0000');
+      const wrong = this.db
+        .prepare(`SELECT COUNT(*) AS n FROM thing t WHERE t.type IN ${SUBTYPES_OF}${only} AND (SELECT COUNT(*) FROM has h WHERE h.owner = t.iid AND h.type IN ${SUBTYPES_OF}) <> 1`)
+        .get(owner, ...(whole ? [] : touched), attribute) as { n: number };
+      if (Number(wrong.n) > 0) {
+        fail(`Commit failed: key constraint violation — ${wrong.n} instance(s) of '${owner}' do not hold exactly one '${attribute}' key.`);
+      }
     }
   }
 
@@ -2415,6 +2500,8 @@ export class TypeDBLiteInterpreter {
       // SQLite has already rolled back (for example after SQLITE_FULL); nothing is left to undo.
     } finally {
       this.transactionOpen = false;
+      // A schema change made inside the transaction is undone in the tables; the model follows them.
+      this.reloadSchema();
     }
   }
 
@@ -4847,7 +4934,9 @@ export class TypeDBLiteInterpreter {
     if (id === undefined) return;
     const owners = this.db.prepare('SELECT h.owner AS owner, t.type AS type FROM has h JOIN thing t ON t.iid = h.owner WHERE h.attribute = ?').all(id) as Array<{ owner: number; type: string }>;
     const attributeTypes = this.typeFamily(type, 'inherited');
-    for (const owner of owners) {
+    // In a caller's transaction the commit decides, as on TypeDB (`validateCommit`); a lone write has
+    // no commit of its own to fail, so it is refused here.
+    for (const owner of this.transactionOpen ? [] : owners) {
       const keyed = this.typeFamily(String(owner.type), 'inherited').some((ownerType) => attributeTypes.some((attribute) => this.schema.keyOwnerships.has(ownsKey(ownerType, attribute))));
       if (keyed) {
         const message = `'${type}' is the @key of a '${owner.type}', which cannot be left without its key; delete the owner, or give it another key first.`;

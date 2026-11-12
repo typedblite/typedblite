@@ -71,6 +71,8 @@ export interface MutationContext {
   readonly refuse: Refuse;
   /** Rebuild `schema` from the tables — called between the lines of one statement, inside its transaction. */
   readonly reload: () => void;
+  /** A caller's transaction is open: each statement is a savepoint inside it, not a transaction of its own. */
+  readonly nested?: boolean;
 }
 
 type Kind = 'entity' | 'relation' | 'attribute';
@@ -108,7 +110,7 @@ const article = (word: string): string => (/^[aeiou]/.test(word) ? 'an' : 'a');
 export function applyRedefine(clause: RedefineClause, context: MutationContext): void {
   const redefinition = clause.redefinition;
   if (redefinition === undefined) return; // `redefine` alone is valid, and changes nothing (L46).
-  transaction(context.db, () => {
+  transaction(context.db, context.nested === true, () => {
     if (isRedefineRoleLabel(redefinition)) {
       renameRole(redefinition.role.relation, redefinition.role.role, redefinition.newLabel, redefinition, context);
     } else {
@@ -609,7 +611,7 @@ function renameInSubjects(db: SqliteDatabase, name: string, newLabel: string): v
  */
 export function applyUndefine(clause: UndefineClause, context: MutationContext): void {
   try {
-    transaction(context.db, () => {
+    transaction(context.db, context.nested === true, () => {
       for (const undefinition of clause.undefinitions) {
         if (isUndefineType(undefinition)) undefineType(undefinition.type, undefinition, context);
         else if (isUndefineFrom(undefinition)) undefineFrom(undefinition, context);
@@ -983,7 +985,23 @@ function dropUniqueIfUnowned(db: SqliteDatabase, attribute: string): void {
 // ── plumbing ────────────────────────────────────────────────────────────────
 
 /** One transaction per statement, `IMMEDIATE` for the reason `applySchemaDdl` gives. */
-function transaction(db: SqliteDatabase, body: () => void): void {
+function transaction(db: SqliteDatabase, nested: boolean, body: () => void): void {
+  // Inside a caller's transaction (a schema transaction that also writes, the conformance harness's
+  // `connection open schema transaction`) the statement is a savepoint: it undoes alone, and the
+  // caller's COMMIT or ROLLBACK decides for all of it.
+  if (nested) {
+    db.exec('SAVEPOINT schema_change');
+    try {
+      body();
+      if (hasAttributeTables(db)) rescopeOwnerships(db);
+      db.exec('RELEASE schema_change');
+    } catch (error) {
+      db.exec('ROLLBACK TO schema_change');
+      db.exec('RELEASE schema_change');
+      throw error;
+    }
+    return;
+  }
   db.exec('BEGIN IMMEDIATE');
   try {
     body();

@@ -82,14 +82,14 @@ Rules:
 
 | Feature | Passing |
 |---|---|
-| define | 460 |
+| define | 463 |
 | redefine | 194 |
-| undefine | 170 |
+| undefine | 171 |
 | expression | 124 |
 | reduce | 65 |
-| insert | 112 |
+| insert | 121 |
 | match | 95 |
-| delete | 30 |
+| delete | 33 |
 | fetch | 65 |
 | pipelines | 11 |
 | modifiers | 34 |
