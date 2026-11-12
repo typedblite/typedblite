@@ -162,8 +162,8 @@ const replicator = new TypeDBLiteReplicator(
   async () => ({ authorization: `Bearer ${token}` }), // headers for each request
 );
 
-// Catch up once…
-await replicator.replicateOnce({ direction: 'duplex' });
+// Catch up once, giving up if the hub has not answered within 8 seconds…
+await replicator.replicateOnce({ direction: 'duplex', timeoutMs: 8_000 });
 
 // …or keep replicating until cancelled.
 const session = replicator.replicateContinuously(
@@ -177,6 +177,16 @@ const session = replicator.replicateContinuously(
 session.status; // 'syncing' | 'ready' | 'idle' | 'failed'
 await session.cancel();
 ```
+
+**A sync that did not happen fails; it never reports success.** `replicateOnce` rejects when:
+- the hub refuses the spoke (401 or 403);
+- the hub answers with any other error status, such as a 503 from a proxy whose hub is down;
+- the stream ends before the hub says it is caught up;
+- or, with `timeoutMs`, the hub accepts the connection and then says nothing.
+
+An offline-first app should treat any of these as "offline", keep its cursor, and try again
+later. The next successful sync sends everything after the push cursor, and pulls everything after
+the pull cursor.
 
 A continuous session reconnects after a network failure, and resumes from the last change it
 applied. Catching up does not end it: it reports `onPaused` and keeps listening. `onFailed`

@@ -210,7 +210,7 @@ because every store holds the same tasks, which is what the original's driver ch
 | 00 | [Scope, the survey of the original, ADR-009, versions and licences](phases/00-scope-and-adr/summary.md) | Complete | [summary](phases/00-scope-and-adr/summary.md) |
 | 01 | [The runtime in a browser: a browser-safe entry, synchronous SHA-256, `Object.groupBy`](phases/01-runtime-in-browser/summary.md) | Complete | [summary](phases/01-runtime-in-browser/summary.md) |
 | 02 | [The WASM binding, promoted: the export, the peer dependency, tests in Node and Chromium](phases/02-wasm-binding/summary.md) | Complete | [summary](phases/02-wasm-binding/summary.md) |
-| 03 | Replication that fails honestly: 5xx and timeouts, and a warning on a reopened store | Not started | |
+| 03 | [Replication that fails honestly: 5xx and timeouts, and a warning on a reopened store](phases/03-honest-replication/summary.md) | Complete | [summary](phases/03-honest-replication/summary.md) |
 | 04 | The hub, the switchboard, the control page, and `smoke` | Not started | |
 | 05 | The PWA client and its service worker | Not started | |
 | 06 | Electron and Android | Not started | |
