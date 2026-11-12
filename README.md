@@ -1,5 +1,44 @@
 # TypeDBLite
 
+## Built on TypeDB, with thanks
+
+**TypeDBLite exists because of [TypeDB](https://typedb.com).** The data model, the query language and
+the behaviour that TypeDBLite implements are the work of [TypeDB Ltd](https://typedb.com) and the
+TypeDB community.
+
+Thank you to the team at TypeDB Ltd for an amazing product suite and ecosystem:
+- a database whose type system makes modelling a domain a pleasure;
+- a query language that reads like the domain it describes;
+- tooling such as TypeDB Studio;
+- and the generosity of publishing it all as open source.
+
+**A special thank-you for the [TypeDB Behaviour Specification](https://github.com/typedb/typedb-behaviour).**
+Its Cucumber scenarios are an executable definition of how TypeDB behaves. TypeDBLite runs 1,756 of
+them as its conformance suite, and is built and tested against them. Without that suite, this project
+could not say how closely it matches TypeDB, and could not have got as close as it has.
+
+| Created by TypeDB Ltd | What it is | Links | How TypeDBLite uses it |
+|---|---|---|---|
+| **TypeDB™** | The polymorphic database | [typedb.com](https://typedb.com) · [GitHub](https://github.com/typedb/typedb) | TypeDBLite reimplements its data model and behaviour in TypeScript, over SQLite |
+| **TypeQL™** | TypeDB's query language | [Reference](https://typedb.com/docs/typeql-reference/) · [GitHub](https://github.com/typedb/typeql) | TypeQLite is a dialect of TypeQL 3.x, and follows its syntax |
+| **TypeDB Studio** | TypeDB's IDE | [Docs](https://typedb.com/docs/tools/studio) · [GitHub](https://github.com/typedb/typedb-studio) | The model for TypeDBLite's proposed [graph explorer](docs/planning/graph-explorer/graph-explorer.feature.md) |
+| **TypeDB Behaviour Specification** | TypeDB's Cucumber conformance suite | [GitHub](https://github.com/typedb/typedb-behaviour) | Vendored unmodified in [`libs/conformance/spec/`](libs/conformance/spec/) as TypeDBLite's [conformance oracle](CONFORMANCE.md) |
+
+**Trademarks.** TypeDB™ and TypeQL™ are trademarks of TypeDB Ltd. TypeDB Studio is a product of
+TypeDB Ltd. These names are used here only to identify TypeDB Ltd's products, and to describe what
+TypeDBLite is compatible with.
+
+**Copyright.** TypeDB, TypeQL, TypeDB Studio and the TypeDB Behaviour Specification are copyright
+TypeDB Ltd and their contributors, and are published under the
+[Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/). The specification files in
+[`libs/conformance/spec/`](libs/conformance/spec/) are TypeDB Ltd's work. They keep their original
+licence headers and [`LICENSE`](libs/conformance/spec/LICENSE).
+
+**Independence.** TypeDBLite is an independent open-source project. It is not affiliated with,
+sponsored by, or endorsed by TypeDB Ltd. For TypeDB itself, visit [typedb.com](https://typedb.com).
+
+## About
+
 TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) graph database engine backed by SQLite. It parses and executes **TypeQLite** — a dialect of TypeQL 3.x — and stores the result in a SQLite database that can be opened with `node:sqlite`, a WASM build in a browser, or any binding that satisfies the `SqliteDatabase` interface.
 
 ## Why
