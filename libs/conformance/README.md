@@ -82,12 +82,12 @@ Rules:
 
 | Feature | Passing |
 |---|---|
-| define | 467 |
-| redefine | 194 |
+| define | 469 |
+| redefine | 196 |
 | undefine | 174 |
 | expression | 129 |
 | reduce | 65 |
-| insert | 124 |
+| insert | 125 |
 | match | 110 |
 | delete | 40 |
 | fetch | 65 |

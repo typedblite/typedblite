@@ -153,8 +153,8 @@ describe('undefine', () => {
     it('removes a key ownership and its index — L1365', () => {
       engine.define('undefine owns email from person;');
       engine.define('define person owns email;');
-      engine.execute('insert $p isa person, has email "same";');
-      engine.execute('insert $p isa person, has email "same";'); // no longer unique
+      engine.execute('insert $p isa person, has email "same@x";');
+      engine.execute('insert $p isa person, has email "same@x";'); // no longer unique
     });
   });
 
@@ -185,8 +185,8 @@ describe('undefine', () => {
 
     it('removes @key, and the index goes with it', () => {
       engine.define('undefine @key from person owns email;');
-      engine.execute('insert $p isa person, has email "same";');
-      engine.execute('insert $p isa person, has email "same";');
+      engine.execute('insert $p isa person, has email "same@x";');
+      engine.execute('insert $p isa person, has email "same@x";');
     });
 
     it('refuses an annotation the type could never carry — "Illegal annotation" — L858', () => {

@@ -31,7 +31,7 @@ import {
 import { isTypeDefinition } from './type-definitions.js';
 import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf, type DiagnosticCodeValue } from './diagnostics.js';
-import { ownsSubject, relatesSubject } from './schema-subjects.js';
+import { ownsSubject, relatesSubject, typeSubject } from './schema-subjects.js';
 
 /**
  * What `define` has applied, as the schema rules need to read it.
@@ -134,6 +134,7 @@ export function checkSchemaRules(
       checkSupertypeKind(definition, name, proposed, refuse);
       checkNoCycle(definition, name, before, refuse);
       checkAnnotationsForKind(definition, name, proposed, data, refuse);
+      checkAbstractUnderConcrete(definition, name, file, proposed, refuse);
       const declaredParent = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
       if (isAttributeDef(definition) || (isTypeExtensionDef(definition) && proposed.attributes.has(name))) {
         checkAttributeValueType(definition, name, declaredParent, before, proposed, refuse);
@@ -158,6 +159,25 @@ export function checkSchemaRules(
       }
     }
   }
+}
+
+/**
+ * An abstract type is not a subtype of a concrete one (define.feature L2366, L2434): `entity
+ * typedb-exception @abstract, sub exception;` under a concrete `exception` is refused.
+ */
+function checkAbstractUnderConcrete(definition: TypeDefinition, name: string, file: TypeQLiteFile, proposed: SchemaFacts, refuse: Refuse): void {
+  if (!definition.annotations.some((a) => a.$type === 'AbstractAnnotation')) return;
+  const parent = proposed.parents.get(name);
+  if (parent === undefined) return;
+  const declaredAbstractHere = file.clauses.some((clause) =>
+    isDefineClause(clause) && clause.definitions.filter(isTypeDefinition).some((d) => nameOf(d) === parent && d.annotations.some((a) => a.$type === 'AbstractAnnotation')),
+  );
+  if (declaredAbstractHere || proposed.annotations.get(typeSubject(parent))?.has('abstract')) return;
+  refuse(
+    DiagnosticCode.abstractType,
+    `'${name}' is abstract and cannot be a subtype of '${parent}', which is not: an abstract type sits above concrete ones, not below.`,
+    rangeOf(definition),
+  );
 }
 
 const nameOf = (definition: TypeDefinition): string =>

@@ -108,6 +108,7 @@ import {
   traitSubject,
   typeSubject,
   valueSubject,
+  ownsSubject,
 } from './schema-subjects.js';
 import { ChangeLog, type EntityIdentity } from './change-log.js';
 
@@ -4821,6 +4822,7 @@ export class TypeDBLiteInterpreter {
       instance.literal !== undefined
         ? instance.literal.value
         : this.valueFor(instance.valueVariable as string, type, values, range);
+    this.checkWrittenValue(type, undefined, value, range);
     if (ensureAttribute(this.db, type, value).created) this.written.attributes += 1;
     values.set(variable, { kind: 'attribute', attributeType: type, valueType: this.valueTypeOfAttribute(type) ?? 'string', value });
   }
@@ -4846,6 +4848,33 @@ export class TypeDBLiteInterpreter {
     return iid;
   }
 
+  /**
+   * A written value meets the `@regex` its attribute type or the ownership states — the whole value
+   * matches, as TypeDB matches it (insert.feature L1357). The pattern is the annotation's text as
+   * written, never unescaped: `\d` is a digit class, not a `d`.
+   */
+  private checkWrittenValue(attribute: string, ownerType: string | undefined, value: string, at: Range | undefined): void {
+    const subjects = [
+      ...this.typeFamily(attribute, 'inherited').map((a) => valueSubject(a)),
+      ...(ownerType === undefined ? [] : this.typeFamily(ownerType, 'inherited').flatMap((o) => this.typeFamily(attribute, 'inherited').map((a) => ownsSubject(o, a)))),
+    ];
+    for (const subject of subjects) {
+      const text = this.schema.annotations.get(subject)?.get('regex');
+      if (text === undefined) continue;
+      const pattern = /^@regex\(\s*"((?:\\.|[^"\\])*)"\s*\)$/.exec(text)?.[1]?.replace(/\\"/g, '"');
+      if (pattern === undefined) continue;
+      let matches: boolean;
+      try {
+        matches = new RegExp(`^(?:${pattern})$`, 'u').test(value);
+      } catch {
+        continue;
+      }
+      if (!matches) {
+        this.refuse(DiagnosticCode.constraintViolated, `'${attribute}' does not admit this value: it must match ${text}.`, at);
+      }
+    }
+  }
+
   private insertAttribute(
     owner: number,
     attribute: string,
@@ -4853,6 +4882,7 @@ export class TypeDBLiteInterpreter {
     at?: Range,
   ): void {
     this.checkKnown('attribute', attribute, at);
+    this.checkWrittenValue(attribute, this.typeOfThing(owner), value, at);
     // An abstract attribute type has no values of its own, as an abstract entity has no instances.
     if (this.schema.abstracts.has(attribute)) {
       const message = `'${attribute}' is abstract and cannot have a value of its own. Write a concrete subtype.`;

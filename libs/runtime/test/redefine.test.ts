@@ -52,8 +52,10 @@ describe('redefine', () => {
       const s = refusal(() => engine.define('redefine child sub person;'));
       assert.equal(s.code, DiagnosticCode.alreadyDefined);
       assert.match(s.message, /already defined/);
-      const t = refusal(() => engine.define('redefine entity person owns name @regex("^.*$") @card(0..);'));
+      const t = refusal(() => engine.define('redefine entity person owns name @card(0..);'));
       assert.equal(t.code, DiagnosticCode.alreadyDefined);
+      // And one change at a time: two annotations in one redefine are refused (L1831).
+      assert.match(refusal(() => engine.define('redefine entity person owns name @regex("^.*$") @card(0..);')).message, /one change/);
     });
 
     it('refuses what was never defined — "Try define instead" — L171, L289', () => {

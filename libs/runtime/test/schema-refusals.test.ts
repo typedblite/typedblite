@@ -122,11 +122,11 @@ describe('define refuses what TypeDB refuses', () => {
       engine.execute('insert $p isa person, has email "a", has name "Al";');
       assert.equal(refusal(() => engine.define('define person @abstract;')).code, DiagnosticCode.abstractWithInstances);
       assert.equal(refusal(() => engine.define('define name @abstract;')).code, DiagnosticCode.abstractWithInstances);
-      // A subtype's instances are not the parent's own: `entity writer sub person` with a writer
-      // leaves `person` abstract-able.
-      engine.define('define entity writer sub person; entity editor sub person;');
-      engine.execute('insert $w isa writer, has email "b";');
-      engine.define('define editor @abstract;');
+      // A subtype's instances are not the parent's own: `entity writer sub creator` with a writer
+      // leaves `creator` abstract-able. (An abstract type under a concrete one is refused — L2366.)
+      engine.define('define entity creator, owns name; entity writer sub creator;');
+      engine.execute('insert $w isa writer, has name "b";');
+      engine.define('define creator @abstract;');
     });
 
     it('@key on an ownership whose data repeats — L2735, with a diagnostic and nothing half-applied', () => {

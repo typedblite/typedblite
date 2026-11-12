@@ -170,6 +170,9 @@ function redefineType(node: RedefineType, context: MutationContext): void {
     if (isRelatesTrait(trait) && trait.specialises !== undefined) {
       const key = roleRef(name, trait.name);
       const before = context.schema.specialises.get(key)?.split(':')[1];
+      if (before === undefined) {
+        refuse(DiagnosticCode.notDefined, `'${capability}' specialises nothing, so there is no specialisation to redefine. Try define instead.`, rangeOf(node));
+      }
       if (before === trait.specialises) {
         refuse(DiagnosticCode.alreadyDefined, `'${capability} as ${trait.specialises}' is already defined; a redefine changes something. Nothing was redefined.`, rangeOf(node));
       }
@@ -217,6 +220,10 @@ function redefineAnnotations(
   valueTypeNow?: string,
 ): void {
   const { db, schema, refuse } = context;
+  // A redefine makes ONE change (redefine.feature L1831): one annotation at a time.
+  if (annotations.length > 1) {
+    refuse(DiagnosticCode.mixedPattern, `A redefine makes one change: ${where} names ${annotations.length} annotations here; redefine them one at a time.`, rangeOf(node));
+  }
   const recorded = schema.annotations.get(subject) ?? new Map<string, string>();
   const changes: Array<[string, string, Annotation]> = [];
   const [owner, capability, attribute] = subject.split(SEP);
