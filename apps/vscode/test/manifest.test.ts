@@ -1,0 +1,54 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const APP = resolve(__dirname, '..');
+const read = (path: string) => JSON.parse(readFileSync(resolve(APP, path), 'utf8'));
+
+const manifest = read('package.json');
+const config = read('../../libs/language/langium-config.json');
+
+/**
+ * 🔴 `langium-config.json` is the only source of the language's id and file extensions (ADR-008
+ * D4). The manifest has to restate them, because VS Code reads them before any code runs. So this
+ * spec is what keeps the two from drifting: a fixed list in a second place drifts the first time
+ * the first one changes.
+ */
+describe('the manifest agrees with langium-config.json', () => {
+  const [language] = config.languages;
+  const [contributed] = manifest.contributes.languages;
+
+  it('contributes exactly one language, with the id langium-config.json declares', () => {
+    expect(manifest.contributes.languages).toHaveLength(1);
+    expect(contributed.id).toBe(language.id);
+  });
+
+  it('claims exactly the file extensions langium-config.json declares', () => {
+    expect([...contributed.extensions].sort()).toEqual([...language.fileExtensions].sort());
+  });
+
+  it('activates on that language', () => {
+    expect(manifest.activationEvents).toEqual([`onLanguage:${language.id}`]);
+  });
+
+  it('points its grammar at the generated TextMate file, under the scope that file declares', () => {
+    const [grammar] = manifest.contributes.grammars;
+    expect(grammar.language).toBe(language.id);
+    expect(grammar.path).toBe(`./syntaxes/${language.textMate.out.split('/').pop()}`);
+    // `build` runs `sync-grammar`, which copies the file in, so it exists by the time this runs.
+    const tmLanguage = read(grammar.path);
+    expect(grammar.scopeName).toBe(tmLanguage.scopeName);
+  });
+
+  it('has a language configuration file where it says', () => {
+    expect(existsSync(resolve(APP, contributed.configuration))).toBe(true);
+  });
+
+  it('is the extension ADR-008 D1 names: VS Code builds the id from publisher.name', () => {
+    expect(`${manifest.publisher}.${manifest.name}`).toBe('typedblite.typeqlite');
+  });
+
+  it('bundles its dependencies rather than shipping node_modules', () => {
+    expect(manifest.vsce).toEqual({ dependencies: false });
+    expect(manifest.main).toBe('./out/extension.cjs');
+  });
+});

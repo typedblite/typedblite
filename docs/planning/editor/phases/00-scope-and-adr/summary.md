@@ -62,9 +62,9 @@ Each was taken as recommended. The rest of ADR-008 records measurements, not cho
 
 ## Handoff to Phase 01
 
-- 🔴 **Before the e2e can run on this machine:**
-  `sudo apt install libatk-bridge2.0-0 libsecret-1-0`. An Electron VS Code cannot start without
-  these (ADR-008 D7).
+- ~~Before the e2e can run on this machine: `sudo apt install libatk-bridge2.0-0 libsecret-1-0`.~~
+  This was wrong, and Phase 01 corrected it: the search pattern could not match the library's real
+  name. The e2e runs on this host as it is (see ADR-008 D7).
 - Move `@typedblite/language` to `vscode-languageserver ~10.0.1` first, and prove the language suite
   and the conformance run unchanged before any extension code exists (ADR-008 D8, row 9).
 - The manifest's file extensions must come from `langium-config.json` (ADR-008 D4). Either generate

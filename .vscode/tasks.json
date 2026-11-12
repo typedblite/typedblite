@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build: typeqlite-vscode",
+      "type": "shell",
+      "command": "npm exec nx -- run typeqlite-vscode:build",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -39,8 +39,9 @@ Measured on 2026-11-12, before deciding:
 
 ## Decision
 
-**D1. The extension lives at `apps/vscode/`.** Its Nx project is `typeqlite-vscode`, and its npm
-package is private. Its extension id is `typedblite.typeqlite`, with the display name *TypeQLite*.
+**D1. The extension lives at `apps/vscode/`.** Its Nx project is `typeqlite-vscode`. Its npm
+package is private and named `typeqlite`, because VS Code builds the id from `publisher.name`. Its
+extension id is `typedblite.typeqlite`, with the display name *TypeQLite*.
 That id cannot be mistaken for downstream-app's `downstream-app.typeqlite-vscode`. It depends on
 `@typedblite/language` only, never on the runtime: `vscode → language`.
 
@@ -76,8 +77,13 @@ database may know types the workspace does not.
 
 **D7. Editor features are proven in a real VS Code through `@vscode/test-electron`.** Tests run in the
 extension host and assert through the `vscode.execute*Provider` commands, not by scraping a
-rendered page. On this development host this needs `libatk-bridge2.0-0` and `libsecret-1-0`, a
-one-time install. CI, when it exists, needs a virtual display (`xvfb`).
+rendered page. CI, when it exists, needs a virtual display (`xvfb`).
+
+  *Corrected 2026-11-12, in Phase 01.* As accepted, this decision said the development host needed
+  `libatk-bridge2.0-0` and `libsecret-1-0` installed. That was a bad measurement. The search pattern
+  could not match the library's real name, `libatk-bridge-2.0.so.0`, which is installed. `libsecret`
+  is absent, but VS Code runs without it, because it is only for the keychain. The e2e runs on this
+  host as it is.
 
 **D8. Upstream is the specification: `langium-vscode` at `v4.3.0`.** This repository pins
 `langium@4.3.1` and `langium-cli@4.3.0`, and there is no `v4.3.1` tag. The diff:
@@ -117,7 +123,7 @@ one-time install. CI, when it exists, needs a virtual display (`xvfb`).
   rather than built.
 - **D6 is a heuristic.** A workspace that holds part of a schema warns on labels from the part it
   lacks.
-- **D7 needs system libraries** on any machine that runs the e2e, and a virtual display in headless CI.
+- **D7 needs a display.** On a headless CI machine, that is a virtual one.
 - **Two extensions may claim `.tql`** (D4), and the user resolves it, not the extension.
 
 ## References

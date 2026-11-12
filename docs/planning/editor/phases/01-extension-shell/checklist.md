@@ -1,6 +1,6 @@
 ---
 kind: checklist
-status: in-progress
+status: complete
 feature: editor
 phase: 01-extension-shell
 ---
@@ -36,27 +36,33 @@ On `main` at `20649bc`, `nx run-many -t typecheck` failed in two places:
 
 ## The extension (ADR-008 D1, D8)
 
-- [ ] `apps/vscode/` as Nx project `typeqlite-vscode`, extension `typedblite.typeqlite`, private
-- [ ] `src/extension.ts`: the client over IPC, with the debug server on `--inspect`, and
+- [x] `apps/vscode/` as Nx project `typeqlite-vscode`, extension `typedblite.typeqlite`, private. The npm
+      name is `typeqlite`, because VS Code builds the id from `publisher.name`, and a test pins it
+- [x] `src/extension.ts`: the client over IPC, with the debug server on `--inspect`, and
       `deactivate()` stopping the client (upstream rows 5–7)
-- [ ] `src/language-server/main.ts`: `createTypeQLiteServices` over `NodeFileSystem` (row 8)
-- [ ] `esbuild.mjs`: two CommonJS entries, `vscode` external, sourcemaps unless minified (row 4)
-- [ ] `language-configuration.json`: `#` comments, brackets, auto-closing quotes (row 2)
-- [ ] The TextMate grammar copied from `libs/language/syntaxes/` by a target, and gitignored (row 3)
-- [ ] `.vscodeignore`, and `vsce.dependencies: false` (row 10)
-- [ ] 🔴 The manifest's extensions and language id are checked against `langium-config.json` by a test
-      (ADR-008 D4)
+- [x] `src/language-server/main.ts`: `createTypeQLiteServices` over `NodeFileSystem` (row 8)
+- [x] `esbuild.mjs`: two CommonJS entries, `vscode` external, sourcemaps unless minified (row 4)
+- [x] `language-configuration.json`: `#` comments, brackets, auto-closing quotes (row 2), and a
+      `wordPattern` that keeps `skill-id` and `$x` whole on a double-click
+- [x] The TextMate grammar copied from `libs/language/syntaxes/` by `sync-grammar`, and gitignored (row 3)
+- [x] `.vscodeignore`, and `vsce.dependencies: false` (row 10)
+- [x] 🔴 The manifest's extensions, language id, activation event and grammar scope are checked against
+      `langium-config.json` and the generated grammar by `test/manifest.test.ts` (ADR-008 D4)
+- [x] `.vscode/launch.json` gains "Run TypeQLite Editor" and "Attach to TypeQLite Language Server", which
+      the client's `--inspect=6009` was useless without
 
 ## Proof
 
-- [ ] Unit: the manifest test, and the bundle's server starting under Node and answering
-      `initialize` with the formatting and semantic-token capabilities
-- [ ] e2e through `@vscode/test-electron`: a validator diagnostic, a format edit, and semantic tokens,
-      each asserted in the extension host. 🔴 This needs `libatk-bridge2.0-0` and `libsecret-1-0` on
-      this machine
-- [ ] Gate green, and the report card unchanged
+- [x] Unit (`test/server.test.ts`): the bundled server, driven over stdio, advertises formatting and
+      semantic tokens; publishes `typedblite.duplicate-owns` at the right position; formats; and gives
+      a resolved `owns` a `property` token while an unresolved one gets none
+- [x] e2e through `@vscode/test-electron`, in VS Code 1.146.0: activation (with `.tql` mapped), the
+      validator diagnostic, Format Document (and idempotence), and semantic tokens. **4 passed, 0
+      failed.** ~~This needs `libatk-bridge2.0-0` and `libsecret-1-0` on this machine~~: it does not.
+      See the summary
+- [x] Gate green across 6 projects, and the report card unchanged at 1742 of 1756
 
 ## Close
 
-- [ ] `summary.md`
-- [ ] Merged into `feat/editor`, and the Phase Plan row reads `Complete` with a link to the summary
+- [x] `summary.md`
+- [x] Merged into `feat/editor`, and the Phase Plan row reads `Complete` with a link to the summary

@@ -1,0 +1,24 @@
+{
+  // The TypeQLite editor (apps/vscode). "Run TypeQLite Editor" builds the extension and opens a second
+  // VS Code window with it loaded; open any .typeqlite or .tql file there. The language server runs
+  // with --inspect=6009 in that window, so "Attach to TypeQLite Language Server" can debug it.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run TypeQLite Editor",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/apps/vscode"],
+      "outFiles": ["${workspaceFolder}/apps/vscode/out/**/*.cjs"],
+      "preLaunchTask": "build: typeqlite-vscode"
+    },
+    {
+      "name": "Attach to TypeQLite Language Server",
+      "type": "node",
+      "request": "attach",
+      "port": 6009,
+      "restart": true,
+      "outFiles": ["${workspaceFolder}/apps/vscode/out/**/*.cjs"]
+    }
+  ]
+}
