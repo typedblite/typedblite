@@ -44,7 +44,8 @@ export interface TypeConstraint {
   subs: Array<{ readonly type?: string; readonly variable?: string; readonly direct: boolean }>;
   owns: Array<{ readonly attribute?: string; readonly variable?: string }>;
   plays: Array<{ readonly role?: string; readonly variable?: string }>;
-  relates: Array<{ readonly role?: string; readonly variable?: string }>;
+  /** `relates $r as parent` — `as` is the role the related role is, or specialises (by name, or `relation:role`). */
+  relates: Array<{ readonly role?: string; readonly variable?: string; readonly as?: string; readonly asVariable?: string }>;
   readonly range: Range | undefined;
 }
 
@@ -116,7 +117,7 @@ export function typeConstraintsOf(patterns: readonly Pattern[], refuse: Refuse):
           role: property.role ? roleRef(property.role.relation, property.role.role) : undefined,
           variable: property.roleVariable,
         });
-      } else if (isRelatesProperty(property)) constraint.relates.push({ role: property.role, variable: property.roleVariable });
+      } else if (isRelatesProperty(property)) constraint.relates.push({ role: property.role, variable: property.roleVariable, as: property.specialises, asVariable: property.specialisesVariable });
       else if (isIsaProperty(property) || isHasProperty(property) || isLinksProperty(property)) {
         // `person has name $n;` — a thing property on a type subject (review, round 1).
         refuse(DiagnosticCode.mixedPattern, `'${constraint.fixed ?? constraint.variable}' is a type pattern and cannot carry \`isa\`, \`has\` or \`links\`.`, rangeOf(property));
@@ -205,6 +206,9 @@ export function solveTypes(
   refuse: Refuse,
 ): Array<Record<string, Binding>> {
   const labels = universe(facts);
+  // Role types have parents too: `fathership:father` is below `parentship:parent` once it specialises
+  // it, so `sub` and `as` walk one graph (define.feature L635, match.feature L3546).
+  facts = { ...facts, parents: new Map([...facts.parents, ...facts.specialises]) };
   // Every constraint's names are checked before any is solved, so a contradiction in one cannot
   // hide a typo in another (review, round 2).
   for (const constraint of constraints) {
@@ -224,12 +228,12 @@ export function solveTypes(
     }
     for (const plays of constraint.plays) {
       if (plays.role !== undefined && !labels.includes(plays.role)) {
-        refuse(DiagnosticCode.unknownRole, `Unknown role '${plays.role}': no relation declares it.`, constraint.range);
+        refuse(DiagnosticCode.unknownRole, `Role label not found '${plays.role}': no relation declares it.`, constraint.range);
       }
     }
     for (const relates of constraint.relates) {
       if (relates.role !== undefined && ![...facts.roles.values()].some((roles) => roles.has(relates.role as string))) {
-        refuse(DiagnosticCode.unknownRole, `Unknown role '${relates.role}': no relation declares it.`, constraint.range);
+        refuse(DiagnosticCode.unknownRole, `Role label not found '${relates.role}': no relation declares it.`, constraint.range);
       }
     }
   }
@@ -288,11 +292,22 @@ function solveOne(
   }
   for (const relates of constraint.relates) {
     if (kind !== 'relation') return [];
-    const related = relatedBy(label, facts);
+    // `relates $r as parent` keeps the related roles that are `parent`, or specialise it, at any depth.
+    const chain = (role: string): string[] => [role, ...ancestorsOf(role, facts)];
+    const matchesAs = (role: string): boolean =>
+      relates.as === undefined || chain(role).some((r) => (relates.as as string).includes(':') ? r === relates.as : r.split(':')[1] === relates.as);
+    const related = relatedBy(label, facts).filter(matchesAs);
     if (relates.role !== undefined) {
       if (!related.some((r) => r.split(':')[1] === relates.role)) return [];
     } else if (relates.variable !== undefined) {
       results = bindEach(results, relates.variable, related);
+    }
+    if (relates.asVariable !== undefined) {
+      // `relates $r as $p` — `$p` is each role the related one is or specialises.
+      results = results.flatMap((row) => {
+        const bound = typeof row[relates.variable ?? ''] === 'string' ? [row[relates.variable as string] as string] : related.filter((r) => relates.role === undefined || r.split(':')[1] === relates.role);
+        return bindEach([row], relates.asVariable as string, bound.flatMap(chain));
+      });
     }
   }
   return results;

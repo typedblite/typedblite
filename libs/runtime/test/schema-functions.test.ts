@@ -110,7 +110,7 @@ describe('schema functions', () => {
     assert.equal(refusal(() => engine.query('match $t label id; let $d = $t + "x";')), DiagnosticCode.valueTypeConflict);
   });
 
-  it('get_fun_… needs schema functions, which TypeDBLite does not store, and is refused by name — L833', () => {
-    assert.equal(refusal(() => engine.query('match let $d = get_fun_doc("f");')), DiagnosticCode.notImplemented);
+  it('get_fun_… of a function the schema does not define is refused by name — L833', () => {
+    assert.equal(refusal(() => engine.query('match let $d = get_fun_doc("f");')), DiagnosticCode.unknownFunction);
   });
 });

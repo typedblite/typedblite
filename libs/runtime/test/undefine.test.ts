@@ -123,10 +123,10 @@ describe('undefine', () => {
       assert.equal(refusal(() => engine.execute('insert $p isa person, has email "b@x", has name "B";')).code, DiagnosticCode.unownedAttribute);
     });
 
-    it('refuses an inherited ownership — "not allowed" — L1351, L1444', () => {
+    it('refuses an inherited ownership, in TypeDB\'s words — L1351, L1444', () => {
       const r = refusal(() => engine.define('undefine owns name from child;'));
       assert.equal(r.code, DiagnosticCode.inheritedCapability);
-      assert.match(r.message, /not allowed/);
+      assert.match(r.message, /Cannot unset 'owns name' constraint for 'child' inherited from 'person'/);
     });
 
     it('refuses a capability that is not defined, in TypeDB\'s words — L246, L217, L588', () => {
@@ -153,8 +153,8 @@ describe('undefine', () => {
     it('removes a key ownership and its index — L1365', () => {
       engine.define('undefine owns email from person;');
       engine.define('define person owns email;');
-      engine.execute('insert $p isa person, has email "same";');
-      engine.execute('insert $p isa person, has email "same";'); // no longer unique
+      engine.execute('insert $p isa person, has email "same@x";');
+      engine.execute('insert $p isa person, has email "same@x";'); // no longer unique
     });
   });
 
@@ -164,6 +164,9 @@ describe('undefine', () => {
       engine.execute('insert $p isa person, has email "a@x", has name "A";');
       assert.equal(refusal(() => engine.define('undefine value string from name;')).code, DiagnosticCode.hasInstances);
       engine.execute('match $p isa person, has name $n; delete $n of $p;');
+      // A concrete attribute type keeps a value type — `@abstract` first (L886).
+      assert.match(refusal(() => engine.define('undefine value string from name;')).message, /should be abstract/);
+      engine.define('define name @abstract;');
       engine.define('undefine value string from name;');
     });
   });
@@ -182,8 +185,8 @@ describe('undefine', () => {
 
     it('removes @key, and the index goes with it', () => {
       engine.define('undefine @key from person owns email;');
-      engine.execute('insert $p isa person, has email "same";');
-      engine.execute('insert $p isa person, has email "same";');
+      engine.execute('insert $p isa person, has email "same@x";');
+      engine.execute('insert $p isa person, has email "same@x";');
     });
 
     it('refuses an annotation the type could never carry — "Illegal annotation" — L858', () => {
@@ -227,7 +230,7 @@ describe('undefine', () => {
     });
   });
 
-  it('role specialisation is not this engine\'s — refused by name', () => {
-    assert.equal(refusal(() => engine.define('undefine as employee from employment relates employer;')).code, DiagnosticCode.notImplemented);
+  it('undefines a role specialisation only as it is defined — L631', () => {
+    assert.match(refusal(() => engine.define('undefine as employee from employment relates employer;')).message, /there is no defined 'employment relates employer as employee'/);
   });
 });

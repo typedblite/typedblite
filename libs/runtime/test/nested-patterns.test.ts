@@ -103,9 +103,9 @@ describe('nested patterns', () => {
 
   it('scoping is refused before any row — variables L156, L252, optional L169, L176', () => {
     for (const [query, pattern] of [
-      ['match not { let $x = 1; $x > 10; }; not { let $x = 2; $x < 0; };', /two nested blocks here use it/],
+      ['match not { let $x = 1; $x > 10; }; not { let $x = 2; $x < 0; };', /[Tt]wo nested blocks here use it/],
       ['match $p isa person; not { try { $p has age $a; }; };', /Optionals are not allowed in negations/],
-      ['match $p isa person; try { $c isa company; }; try { $c isa company; };', /two nested blocks here use it/],
+      ['match $p isa person; try { $c isa company; }; try { $c isa company; };', /[Tt]wo nested blocks here use it/],
       ['match { let $x = 1; } or { let $z = 2; }; let $y = $x + 1;', /must be bound to a value before it's used/],
     ] as const) {
       assert.match(refusal(() => engine.query(query)).message, pattern, query);

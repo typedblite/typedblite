@@ -12,7 +12,11 @@ import {
   isPlaysTrait,
   type Annotation,
   type TypeQLiteFile,
+  type TypeDefinition,
+  type FunctionDefinition,
+  type StructDef,
 } from '@typedblite/language';
+import { isTypeDefinition } from './type-definitions.js';
 import {
   recordCategory,
   recordText,
@@ -20,6 +24,9 @@ import {
   subSubject,
   traitSubject,
   typeSubject,
+  funSubject,
+  structSubject,
+  structFieldSubject,
   valueSubject,
 } from './schema-subjects.js';
 import { ATTRIBUTE_DDL } from './attribute-store.js';
@@ -142,10 +149,41 @@ CREATE TABLE IF NOT EXISTS schema_plays (
   PRIMARY KEY (type, role)
 );
 
+-- Which owns and relates are ORDERED, lists: owns name[], relates parent[] (define.feature L338). Keyed
+-- by the capability's subject (schema-subjects.ts), so a rename, an undefine and a redefine each
+-- find it where they find the capability's annotations. Additive, like the tables above.
+CREATE TABLE IF NOT EXISTS schema_ordered (
+  subject TEXT PRIMARY KEY
+);
+
+-- relates father as parent: the role a relation's own role SPECIALISES, by name; the relation above it
+-- that declares that name is resolved on load (define.feature L635). Additive, like the tables above.
+CREATE TABLE IF NOT EXISTS schema_specialises (
+  relation    TEXT NOT NULL,
+  role        TEXT NOT NULL,
+  specialises TEXT NOT NULL,
+  PRIMARY KEY (relation, role)
+);
+
+-- count: how many times the player plays the role in this relation — TypeDB's repeated role players,
+-- (friend: $x, friend: $x), a multiset (match.feature L1185, delete.feature L453).
+-- define fun: each schema function's definition as written, parsed again when the schema loads.
+CREATE TABLE IF NOT EXISTS schema_function (
+  name   TEXT PRIMARY KEY,
+  source TEXT NOT NULL
+);
+
+-- define struct: each struct's fields, as JSON — name, value type, and whether optional.
+CREATE TABLE IF NOT EXISTS schema_struct (
+  name   TEXT PRIMARY KEY,
+  fields TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS role_player (
   rel    INTEGER NOT NULL REFERENCES thing(iid) ON DELETE CASCADE,
   role   TEXT NOT NULL,
   player INTEGER NOT NULL REFERENCES thing(iid),
+  count  INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY (rel, role, player)
 );
 
@@ -153,6 +191,25 @@ CREATE TABLE IF NOT EXISTS role_player (
 -- check): the primary key starts with rel, so without this each lookup scans the whole table. An existing
 -- store gets it when it is next opened (the interpreter ensures it). Not a rule; a lookup path.
 CREATE INDEX IF NOT EXISTS role_player_by_player ON role_player(player, role, rel);`;
+
+/**
+ * `#! This represents a person` on the line(s) directly above a definition — TypeDB's doc comment,
+ * read from the source text because comments are hidden from the AST. `undefined` when there is none.
+ */
+function docCommentOf(definition: { $cstNode?: { offset: number; root: { fullText: string } } }): string | undefined {
+  const node = definition.$cstNode;
+  if (node === undefined) return undefined;
+  const lines = node.root.fullText.slice(0, node.offset).split(/\r?\n/);
+  // The definition's own line, up to where it starts, holds nothing but indentation.
+  lines.pop();
+  const comment: string[] = [];
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = /^\s*#!\s?(.*)$/.exec(lines[i]);
+    if (line === null) break;
+    comment.unshift(line[1].trimEnd());
+  }
+  return comment.length === 0 ? undefined : comment.join('\n');
+}
 
 export interface SchemaSql {
   readonly ddl: string;
@@ -175,6 +232,13 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
   const keyOwns: Array<[string, string]> = [];
   const annotations: Array<[string, string, string]> = [];
   const plays: Array<[string, string]> = [];
+  /** `owns name[]`, `relates parent[]` — their subjects. */
+  const ordered: string[] = [];
+  /** `relates father as parent` — [relation, role, the role it specialises]. */
+  const specialises: Array<[string, string, string]> = [];
+  /** `define fun …` — [name, its definition as written]; `define struct …` — [name, its fields as JSON]. */
+  const functions: Array<[string, string]> = [];
+  const structs: Array<[string, string]> = [];
   const record = (subject: string, list: readonly Annotation[]): void => {
     for (const annotation of list) annotations.push([subject, recordCategory(annotation), recordText(annotation)]);
   };
@@ -182,7 +246,30 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
   for (const clause of file.clauses) {
     if (!isDefineClause(clause)) continue;
 
+    // Schema functions and structs, and every definition's `#!` doc comment (metadata.feature L189):
+    // a comment line directly above is its `@doc`, unless it states one itself.
     for (const definition of clause.definitions) {
+      const doc = docCommentOf(definition);
+      const hasDoc = (list: readonly Annotation[]): boolean => list.some((a) => a.$type === 'DocAnnotation');
+      if (definition.$type === 'FunctionDefinition') {
+        const fn = definition as FunctionDefinition;
+        functions.push([fn.name, fn.$cstNode?.text ?? '']);
+        record(funSubject(fn.name), fn.annotations);
+        if (doc !== undefined && !hasDoc(fn.annotations)) annotations.push([funSubject(fn.name), 'doc', `@doc(${JSON.stringify(doc)})`]);
+      } else if (definition.$type === 'StructDef') {
+        const struct = definition as StructDef;
+        structs.push([struct.name, JSON.stringify(struct.fields.map((f) => ({ name: f.name, valueType: f.valueType, optional: f.optional === true })))]);
+        record(structSubject(struct.name), struct.annotations);
+        for (const field of struct.fields) record(structFieldSubject(struct.name, field.name), field.annotations);
+        if (doc !== undefined && !hasDoc(struct.annotations)) annotations.push([structSubject(struct.name), 'doc', `@doc(${JSON.stringify(doc)})`]);
+      } else if (doc !== undefined) {
+        const typeDefinition = definition as TypeDefinition;
+        const name = isTypeExtensionDef(typeDefinition) ? typeDefinition.type : typeDefinition.name;
+        if (!hasDoc(typeDefinition.annotations)) annotations.push([typeSubject(name), 'doc', `@doc(${JSON.stringify(doc)})`]);
+      }
+    }
+
+    for (const definition of clause.definitions.filter(isTypeDefinition)) {
       if (isEntityDef(definition) || isRelationDef(definition) || isTypeExtensionDef(definition)) {
         // A re-open (`person owns ref @key;`, no kind keyword) names an existing type and adds
         // traits to it. Its owns and keys register exactly as a definition's do; only the element
@@ -209,6 +296,8 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
         record(valueSubject(name), definition.valueAnnotations);
         for (const trait of definition.traits) {
           record(traitSubject(name, trait).subject, trait.annotations);
+          if ((isOwnsTrait(trait) || isRelatesTrait(trait)) && trait.ordered === true) ordered.push(traitSubject(name, trait).subject);
+          if (isRelatesTrait(trait) && trait.specialises !== undefined) specialises.push([name, trait.name, trait.specialises]);
           if (isPlaysTrait(trait)) {
             plays.push([name, roleRef(trait.role.relation.$refText, trait.role.role.$refText)]);
           }
@@ -299,25 +388,25 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
     statements.push(`INSERT OR IGNORE INTO schema_plays(type, role) VALUES (${q(type)}, ${q(role)});`);
   }
 
-  for (const key of keys) {
-    // Partial index: uniqueness applies within the attribute type, which is what @key means for
-    // these schemas — `skill-id` unique across skills, `step-id` globally, as its comment states.
-    statements.push(
-      `CREATE UNIQUE INDEX IF NOT EXISTS key_${ident(key)} ON has(attribute) WHERE type = ${q(key)};`,
-    );
+  for (const subject of ordered) {
+    statements.push(`INSERT OR IGNORE INTO schema_ordered(subject) VALUES (${q(subject)});`);
   }
 
-  // `@unique` is the same index without the identity: the value is unique among owners, and
-  // nothing else is claimed. Enforced since Phase 03 of the conformance feature — it was parsed
-  // and reported as not enforced — and, like `@key`, refused at define when the existing rows
-  // repeat (`define.feature` L2949). ⚠️ Per attribute type, not per owner type, as the `@key`
-  // index above already simplifies: TypeDB's `@unique` is among owners of ONE type.
-  for (const attribute of uniques) {
-    if (keys.includes(attribute)) continue;
-    statements.push(
-      `CREATE UNIQUE INDEX IF NOT EXISTS unique_${ident(attribute)} ON has(attribute) WHERE type = ${q(attribute)};`,
-    );
+  for (const [name, source] of functions) {
+    statements.push(`INSERT OR REPLACE INTO schema_function(name, source) VALUES (${q(name)}, ${q(source)});`);
   }
+
+  for (const [name, fields] of structs) {
+    statements.push(`INSERT OR REPLACE INTO schema_struct(name, fields) VALUES (${q(name)}, ${q(fields)});`);
+  }
+
+  for (const [relation, role, parent] of specialises) {
+    statements.push(`INSERT OR IGNORE INTO schema_specialises(relation, role, specialises) VALUES (${q(relation)}, ${q(role)}, ${q(parent)});`);
+  }
+
+  // `@key` and `@unique` need no index of their own: `has_unique_in_scope` enforces every one, among
+  // the instances of the type that declares it (ADR-006 amendment). The interpreter rescopes the
+  // stored ownerships inside this same transaction, so data that does not conform refuses the define.
 
   return { ddl: statements.join('\n\n'), keys };
 }

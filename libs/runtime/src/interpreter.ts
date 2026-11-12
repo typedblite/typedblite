@@ -74,7 +74,9 @@ import {
   type RolePlayers,
   type TypeQLiteFile,
   type UndefineClause,
+  type TypeDefinition,
 } from '@typedblite/language';
+import { isTypeDefinition } from './type-definitions.js';
 import type { Range } from 'vscode-languageserver';
 import {
   attachDiagnostic,
@@ -86,12 +88,12 @@ import {
   rangeOf,
   type ExecutionReport,
 } from './diagnostics.js';
-import { OWNED, attributeId, ensureAttribute, hasAttributeTables, migrateAttrTable, ownAttribute, ownersOfValue, sweepAttributes } from './attribute-store.js';
+import { OWNED, attributeId, ensureAttribute, ensureScopedUniqueness, hasAttributeTables, migrateAttrTable, ownAttribute, ownersOfValue, rescopeOwnerships, sweepAttributes } from './attribute-store.js';
 import { generateSchema } from './sqlite-generator.js';
 import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
 import { type SchemaContext } from './expressions.js';
-import { applyValueStatements, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
+import { applyValueStatements, useSchemaFunctions, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
 import { applyReduce, checkReduce } from './reduce.js';
 import { canonicalTemporal } from './temporal.js';
 import { checkFetch, fetchDocument, ownershipMax, roleMax, type FetchContext, type FetchScope, type JsonValue } from './fetch.js';
@@ -106,6 +108,7 @@ import {
   traitSubject,
   typeSubject,
   valueSubject,
+  ownsSubject,
 } from './schema-subjects.js';
 import { ChangeLog, type EntityIdentity } from './change-log.js';
 
@@ -306,6 +309,14 @@ interface SchemaModel extends SchemaFacts {
   readonly annotations: Map<string, Map<string, string>>;
   /** Which types play which roles, from `schema_plays`, as `playsSubject`-shaped `type\u0000plays\u0000rel:role`. */
   readonly plays: Set<string>;
+  /** The ordered capabilities — `owns name[]`, `relates parent[]` — by subject, from `schema_ordered`. */
+  readonly ordered: Set<string>;
+  /** `relates father as parent` — `relation:role` to the specialised `relation:role`, from `schema_specialises`. */
+  readonly specialises: Map<string, string>;
+  /** `define fun …`, by name, from `schema_function`. */
+  readonly functions: Set<string>;
+  /** `define struct …`, each with its fields, from `schema_struct`. */
+  readonly structs: Map<string, Set<string>>;
 }
 
 /**
@@ -560,7 +571,15 @@ export class TypeDBLiteInterpreter {
     keyOwnerships: new Set(),
     annotations: new Map(),
     plays: new Set(),
+    ordered: new Set(),
+    specialises: new Map(),
+    functions: new Set(),
+    structs: new Map(),
   };
+  /** The schema's functions, parsed from `schema_function` — what a call in any query may name. */
+  private schemaFunctionDefinitions = new Map<string, FunctionDefinition>();
+  /** Functions whose planning is under way — a recursive call is not planned again. */
+  private readonly planningFunctions = new Set<FunctionDefinition>();
 
   /**
    * The change log (ADR-003 D1). Its rows are written inside `execute`'s existing transaction, so a
@@ -642,6 +661,7 @@ export class TypeDBLiteInterpreter {
     // A store written before ADR-006 keeps its attributes in `attr`; move them, once, before anything
     // reads the store. A store `define` never reached has neither table and nothing to move.
     migrateAttrTable(this.db);
+    ensureScopedUniqueness(this.db);
     this.loadSchema();
     this.ensureRolePlayerIndex();
   }
@@ -654,7 +674,16 @@ export class TypeDBLiteInterpreter {
   private ensureRolePlayerIndex(): void {
     try {
       const table = this.db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'role_player'").get();
-      if (table !== undefined) this.db.exec('CREATE INDEX IF NOT EXISTS role_player_by_player ON role_player(player, role, rel)');
+      if (table !== undefined) {
+        this.db.exec('CREATE INDEX IF NOT EXISTS role_player_by_player ON role_player(player, role, rel)');
+        // Repeated role players: a store from before them holds each edge once, which is a count of one.
+        const columns = (this.db.prepare("SELECT name FROM pragma_table_info('role_player')").all() as Array<{ name: string }>).map((c) => String(c.name));
+        if (!columns.includes('count')) this.db.exec('ALTER TABLE role_player ADD COLUMN count INTEGER NOT NULL DEFAULT 1');
+        // A store defined before lists existed has no `schema_ordered`; `undefine` and `redefine`
+        // write to it whether or not a list was ever declared. Additive and empty: no list was.
+        this.db.exec('CREATE TABLE IF NOT EXISTS schema_ordered (subject TEXT PRIMARY KEY)');
+        this.db.exec('CREATE TABLE IF NOT EXISTS schema_specialises (relation TEXT NOT NULL, role TEXT NOT NULL, specialises TEXT NOT NULL, PRIMARY KEY (relation, role))');
+      }
     } catch {
       /* slower, not wrong */
     }
@@ -933,6 +962,10 @@ export class TypeDBLiteInterpreter {
    * ending the transaction around it.
    */
   private transactionOpen = false;
+  /** What the caller's open transaction has written — what `validateCommit` checks, as TypeDB checks what changed. */
+  private transactionTouched = new Set<number>();
+  /** Whether the open transaction changed the schema — then the whole store is checked at commit. */
+  private transactionChangedSchema = false;
   private savepointSeq = 0;
 
   private loadRecords(): void {
@@ -951,6 +984,80 @@ export class TypeDBLiteInterpreter {
     } catch {
       // Before `schema_plays` — the same degradation.
     }
+    this.loadOrdered();
+  }
+
+  /**
+   * `schema_ordered` and `schema_specialises` into the model — none before the tables existed, which
+   * is none declared. A specialised role is resolved to the relation above that declares it, so the
+   * model holds role TYPES (`parentship:parent`), not names.
+   */
+  private loadOrdered(): void {
+    this.schema.ordered.clear();
+    this.schema.specialises.clear();
+    try {
+      const rows = this.db.prepare('SELECT subject FROM schema_ordered').all() as Array<{ subject: string }>;
+      for (const row of rows) this.schema.ordered.add(String(row.subject));
+    } catch {
+      // Before `schema_ordered`: no list was ever declared.
+    }
+    try {
+      const rows = this.db.prepare('SELECT relation, role, specialises FROM schema_specialises').all() as Array<{ relation: string; role: string; specialises: string }>;
+      for (const row of rows) {
+        const relation = String(row.relation);
+        const declaring = this.typeFamily(relation, 'inherited').slice(1).find((t) => this.schema.roles.get(t)?.has(String(row.specialises)));
+        if (declaring !== undefined) this.schema.specialises.set(roleRef(relation, String(row.role)), roleRef(declaring, String(row.specialises)));
+      }
+    } catch {
+      // Before `schema_specialises`: no role was ever specialised.
+    }
+    this.loadFunctionsAndStructs();
+  }
+
+  /**
+   * `schema_function` and `schema_struct` into the model. A function is parsed again from its stored
+   * definition — one evaluator serves it and a query's `with fun` — and made callable from every query.
+   */
+  private loadFunctionsAndStructs(): void {
+    // Every annotation, from the table: `define` records a type's in memory as it applies them, but a
+    // function's, a struct's and a `#!` doc comment's reach only the table (metadata.feature L153, L189).
+    try {
+      const rows = this.db.prepare('SELECT subject, category, text FROM schema_annotation').all() as Array<{ subject: string; category: string; text: string }>;
+      this.schema.annotations.clear();
+      for (const row of rows) this.rememberAnnotation(String(row.subject), String(row.category), String(row.text));
+    } catch {
+      // Before `schema_annotation`: nothing to read.
+    }
+    this.schema.functions.clear();
+    this.schema.structs.clear();
+    this.schemaFunctionDefinitions = new Map();
+    try {
+      const rows = this.db.prepare('SELECT name, source FROM schema_function ORDER BY name').all() as Array<{ name: string; source: string }>;
+      if (rows.length > 0) {
+        const file = this.parse(`define\n${rows.map((r) => String(r.source)).join('\n')}`);
+        for (const clause of file.clauses) {
+          if (!isDefineClause(clause)) continue;
+          for (const definition of clause.definitions) {
+            if (definition.$type !== 'FunctionDefinition') continue;
+            const fn = definition as FunctionDefinition;
+            this.schemaFunctionDefinitions.set(fn.name, fn);
+            this.schema.functions.add(fn.name);
+          }
+        }
+      }
+    } catch {
+      // Before `schema_function`: no function was ever defined.
+    }
+    try {
+      const rows = this.db.prepare('SELECT name, fields FROM schema_struct').all() as Array<{ name: string; fields: string }>;
+      for (const row of rows) {
+        const fields = JSON.parse(String(row.fields)) as Array<{ name: string }>;
+        this.schema.structs.set(String(row.name), new Set(fields.map((f) => f.name)));
+      }
+    } catch {
+      // Before `schema_struct`: no struct was ever defined.
+    }
+    useSchemaFunctions(this.schemaFunctionDefinitions);
   }
 
   private rememberAnnotation(subject: string, category: string, text: string): void {
@@ -960,7 +1067,7 @@ export class TypeDBLiteInterpreter {
   }
 
   /** What `define` records for one definition's annotations and traits — the same rows the DDL writes. */
-  private recordDefinition(name: string, definition: Definition): void {
+  private recordDefinition(name: string, definition: TypeDefinition): void {
     const record = (subject: string, list: readonly Annotation[]): void => {
       for (const annotation of list) this.rememberAnnotation(subject, recordCategory(annotation), recordText(annotation));
     };
@@ -982,8 +1089,8 @@ export class TypeDBLiteInterpreter {
    * read a schema that is not the one applied.
    */
   private reloadSchema(): void {
-    for (const set of [this.schema.types, this.schema.relations, this.schema.attributes, this.schema.owns, this.schema.abstracts, this.schema.keyOwnerships, this.schema.plays]) set.clear();
-    for (const map of [this.schema.parents, this.schema.valueTypes, this.schema.roles, this.schema.annotations]) map.clear();
+    for (const set of [this.schema.types, this.schema.relations, this.schema.attributes, this.schema.owns, this.schema.abstracts, this.schema.keyOwnerships, this.schema.plays, this.schema.ordered, this.schema.functions]) set.clear();
+    for (const map of [this.schema.parents, this.schema.valueTypes, this.schema.roles, this.schema.annotations, this.schema.specialises, this.schema.structs]) map.clear();
     this.loadSchema();
   }
 
@@ -995,12 +1102,12 @@ export class TypeDBLiteInterpreter {
 
   /** Apply a schema. Re-applying is normal — a projector replays, and `IF NOT EXISTS` carries it. */
   define(text: string): ExecutionReport {
-    if (this.transactionOpen) {
-      // DDL runs in its own `BEGIN IMMEDIATE` (applySchemaDdl) and a producer's state-plus-event
-      // write has no business changing the schema, so this is refused rather than nested.
-      throw new Error('define() cannot run inside a transaction: the schema changes in its own.');
-    }
+    useSchemaFunctions(this.schemaFunctionDefinitions);
+    // Inside a caller's transaction the schema change is a savepoint within it (applySchemaDdl,
+    // schema-mutation's `transaction`), so the caller's COMMIT or ROLLBACK decides for the schema too
+    // — TypeDB's schema transaction, where a define and the writes beside it commit together.
     this.diagnostics = this.freshDiagnostics();
+    if (this.transactionOpen) this.transactionChangedSchema = true;
     // 🔴 No second `@card`/`@unique` walk here. `parse()` runs `TypeQLiteValidator`, which owns
     // those rules — they were defined twice, with two different diagnostic codes.
     const file = this.parse(text);
@@ -1023,7 +1130,7 @@ export class TypeDBLiteInterpreter {
       };
       let changed = 0;
       for (const clause of mutations) {
-        const context = { db: this.db, schema: this.schema, data: this.dataFacts(), refuse, reload: () => this.reloadSchema() };
+        const context = { db: this.db, schema: this.schema, data: this.dataFacts(), refuse, reload: () => this.reloadSchema(), nested: this.transactionOpen };
         if (clause.$type === 'UndefineClause') {
           applyUndefine(clause, context);
           changed += clause.undefinitions.length;
@@ -1061,7 +1168,7 @@ export class TypeDBLiteInterpreter {
     let alreadyPresent = 0;
     for (const clause of file.clauses) {
       if (!isDefineClause(clause)) continue;
-      for (const definition of clause.definitions) {
+      for (const definition of clause.definitions.filter(isTypeDefinition)) {
         const name = 'name' in definition ? definition.name : undefined;
         if (name === undefined) continue;
         declared += 1;
@@ -1073,7 +1180,7 @@ export class TypeDBLiteInterpreter {
 
     for (const clause of file.clauses) {
       if (!isDefineClause(clause)) continue;
-      for (const definition of clause.definitions) {
+      for (const definition of clause.definitions.filter(isTypeDefinition)) {
         if (isEntityDef(definition) || isRelationDef(definition) || isTypeExtensionDef(definition)) {
           // A re-open names an existing type; its traits register as a definition's do.
           const name = isTypeExtensionDef(definition) ? definition.type : definition.name;
@@ -1124,6 +1231,8 @@ export class TypeDBLiteInterpreter {
     // a `define` that changed nothing is today indistinguishable from one that did. That is the
     // fact worth reporting, not the success.
     const applied = declared - alreadyPresent;
+    // After the in-memory roles and parents above: a specialisation resolves through them.
+    this.loadOrdered();
     this.diagnostics.fact(
       DiagnosticCode.schemaApplied,
       `\`define\` applied ${applied} new definition(s); ${alreadyPresent} already present.`,
@@ -1175,12 +1284,13 @@ export class TypeDBLiteInterpreter {
           return 0; // As above: no tables, no data.
         }
       },
-      repeatedValueOf: (attribute: string): string | undefined => {
+      repeatedValueOf: (attribute: string, owner: string): string | undefined => {
         try {
           const row = this.db
-            // One attribute instance owned more than once — what a `@key`/`@unique` index refuses.
-            .prepare(`SELECT v.value AS value FROM ${OWNED} WHERE h.type = ? GROUP BY h.attribute HAVING COUNT(*) > 1 LIMIT 1`)
-            .get(attribute) as { value: string } | undefined;
+            // One attribute instance owned more than once among the owner type and its subtypes —
+            // what the scoped `@key`/`@unique` index would refuse (ADR-006 amendment).
+            .prepare(`SELECT v.value AS value FROM ${OWNED} JOIN thing t ON t.iid = h.owner WHERE h.type = ? AND t.type IN ${SUBTYPES_OF} GROUP BY h.attribute HAVING COUNT(*) > 1 LIMIT 1`)
+            .get(attribute, owner) as { value: string } | undefined;
           return row === undefined ? undefined : JSON.stringify(String(row.value));
         } catch {
           return undefined; // As above: no tables, no data.
@@ -1206,8 +1316,9 @@ export class TypeDBLiteInterpreter {
    * waits instead.
    */
   private applySchemaDdl(ddl: string, file: TypeQLiteFile): void {
-    this.db.exec('PRAGMA foreign_keys = ON');
-    this.db.exec('BEGIN IMMEDIATE');
+    const nested = this.transactionOpen;
+    if (!nested) this.db.exec('PRAGMA foreign_keys = ON');
+    this.db.exec(nested ? 'SAVEPOINT schema_ddl' : 'BEGIN IMMEDIATE');
     try {
       this.db.exec(ddl);
       if (this.persistKeyOwnerships) {
@@ -1227,11 +1338,19 @@ export class TypeDBLiteInterpreter {
         const insert = this.db.prepare('INSERT OR IGNORE INTO schema_relation(name) VALUES (?)');
         for (const name of this.schema.relations) insert.run(name);
       }
-      this.db.exec('COMMIT');
+      // Inside the DDL's transaction: a new `@key`/`@unique` the data repeats fails the scoped index
+      // here, and the whole define rolls back (ADR-006 amendment).
+      rescopeOwnerships(this.db);
+      this.db.exec(nested ? 'RELEASE schema_ddl' : 'COMMIT');
       this.persistKeyOwnerships = false;
       this.persistRelations = false;
     } catch (error) {
-      this.db.exec('ROLLBACK');
+      if (nested) {
+        this.db.exec('ROLLBACK TO schema_ddl');
+        this.db.exec('RELEASE schema_ddl');
+      } else {
+        this.db.exec('ROLLBACK');
+      }
       const text = error instanceof Error ? error.message : String(error);
       if (!/UNIQUE constraint failed/.test(text)) throw error;
       // The rule in `schema-rules.ts` names the attribute before the DDL runs; this is the backstop
@@ -1256,6 +1375,7 @@ export class TypeDBLiteInterpreter {
    * attribute, and therefore accumulating unnoticed. Unobservable is not the same as harmless.
    */
   execute(text: string, given?: GivenRows): WriteReport {
+    useSchemaFunctions(this.schemaFunctionDefinitions);
     this.diagnostics = this.freshDiagnostics();
     this.written = { things: 0, attributes: 0, roles: 0 };
     // What the LAST write pipeline answers — its rows, or its documents when it ends in `fetch`
@@ -1322,6 +1442,7 @@ export class TypeDBLiteInterpreter {
         }
         for (const iid of this.touched) {
           this.changeLog.recordWrite(iid);
+          if (this.transactionOpen) this.transactionTouched.add(iid);
         }
         this.db.exec(savepoint ? `RELEASE ${savepoint}` : 'COMMIT');
       } catch (error) {
@@ -1381,6 +1502,7 @@ export class TypeDBLiteInterpreter {
     diagnostics: ExecutionReport['diagnostics'];
     documents?: JsonValue[];
   } {
+    useSchemaFunctions(this.schemaFunctionDefinitions);
     if (!this.tracing) return this.runQuery(text, given);
     this.trace = newTrace();
     this.lastTrace = this.trace;
@@ -1755,6 +1877,10 @@ export class TypeDBLiteInterpreter {
     const known = this.functionPlans.get(definition);
     if (known !== undefined) return known;
     const start = this.initialScope();
+    // A function that calls itself (expression.feature L1382, `names_helper`) is being planned when
+    // its own call is checked: that call reads the parameters' scope, and planning goes on.
+    if (this.planningFunctions.has(definition)) return [start];
+    this.planningFunctions.add(definition);
     for (const parameter of definition.parameters) {
       const type = parameter.type;
       start.available.add(parameter.variable);
@@ -1770,6 +1896,7 @@ export class TypeDBLiteInterpreter {
       if (!last.available.has(variable)) this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used: '${definition.name}' returns it.`, rangeOf(definition.body.returnStage));
     }
     this.functionPlans.set(definition, plan);
+    this.planningFunctions.delete(definition);
     return plan;
   }
 
@@ -2105,7 +2232,13 @@ export class TypeDBLiteInterpreter {
   private checkUpdateStage(stage: UpdateStage, before: StreamScope): void {
     const illegal = (at: Range | undefined): never => this.refuse(DiagnosticCode.mixedPattern, 'Illegal statement provided for an update stage: it changes the `has` and `links` of things an earlier stage bound.', at);
     const unavailable = (variable: string, at: Range | undefined): never =>
-      this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' referenced in the update stage is unavailable: no earlier stage binds it.`, at);
+      this.refuse(
+        DiagnosticCode.unboundValue,
+        isAnonymous(variable)
+          ? 'An anonymous variable cannot be updated: `$_` names nothing an earlier stage bound (update.feature L2585).'
+          : `The variable '${variable.slice(1)}' referenced in the update stage is unavailable: no earlier stage binds it.`,
+        at,
+      );
     const scope = this.fetchScope(before);
     this.checkOptionalUse(stage.patterns, before);
     for (const pattern of writtenPatterns(stage.patterns, this.refuse)) {
@@ -2308,12 +2441,25 @@ export class TypeDBLiteInterpreter {
    */
   private projectRows(rows: Array<Record<string, Binding>>, scope: StreamScope): Array<Record<string, TypeDBLiteValue>> {
     const projected: Array<Record<string, TypeDBLiteValue>> = [];
+    // 🔴 A row that differed from another only in a `$_` is the same ANSWER once `$_` is dropped:
+    // `match $_ relates $x as member;` answers each role once, however many relations relate it
+    // (define.feature L943, match.feature L3546). Only then — rows the query's own variables tell
+    // apart are never merged.
+    let droppedAnonymous = false;
+    const seen = new Set<string>();
     for (const row of rows) {
       const cells: Record<string, TypeDBLiteValue> = {};
       for (const [variable, binding] of Object.entries(row)) {
+        if (isAnonymous(variable) && binding !== undefined) droppedAnonymous = true;
         if (!scope.available.has(variable) || variable.startsWith('__') || isAnonymous(variable) || binding === undefined) continue;
         // `select $x` — the caller reads `row.x`, without the `$`.
         cells[variable.slice(1)] = this.cellOf(binding);
+      }
+      if (droppedAnonymous) {
+        // `type` beside the rendering: an attribute `name "W"` and a string value "W" render alike.
+        const key = Object.keys(cells).sort().map((k) => `${k}=${cells[k].isAttribute() ? 'a' : cells[k].isValue() ? 'v' : 't'}:${cells[k].type}:${String(cells[k])}`).join(String.fromCharCode(30));
+        if (seen.has(key)) continue;
+        seen.add(key);
       }
       projected.push(cells);
     }
@@ -2338,13 +2484,88 @@ export class TypeDBLiteInterpreter {
     if (this.transactionOpen) throw new Error('A transaction is already open on this handle.');
     this.db.exec('BEGIN IMMEDIATE');
     this.transactionOpen = true;
+    this.transactionTouched = new Set();
+    this.transactionChangedSchema = false;
   }
 
+  /**
+   * Commit — after what TypeDB checks at commit, which no single statement could: a relation left
+   * with no player is removed (insert.feature L1061), and the schema and data must stand as a whole
+   * (`validateCommit`). A commit that fails rolls the whole transaction back, as TypeDB's does.
+   */
   commitTransaction(): void {
+    try {
+      this.removePlayerlessRelations();
+      this.validateCommit();
+    } catch (error) {
+      this.rollbackTransaction();
+      throw error;
+    }
     try {
       this.db.exec('COMMIT');
     } finally {
       this.transactionOpen = false;
+    }
+  }
+
+  /** Relations this transaction wrote that have no player left — tombstoned, as `deleteThing` does. */
+  private removePlayerlessRelations(): void {
+    if (!this.schema.relations.size || this.transactionTouched.size === 0) return;
+    const marks = [...this.schema.relations].map(() => '?').join(', ');
+    const touched = [...this.transactionTouched];
+    const empty = this.db
+      .prepare(`SELECT t.iid AS iid FROM thing t WHERE t.iid IN (${touched.map(() => '?').join(', ')}) AND t.type IN (${marks}) AND NOT EXISTS (SELECT 1 FROM role_player rp WHERE rp.rel = t.iid)`)
+      .all(...touched, ...this.schema.relations) as Array<{ iid: number }>;
+    if (empty.length === 0) return;
+    this.tombstones = [];
+    for (const row of empty) this.deleteThing(Number(row.iid));
+    for (const identity of this.tombstones) this.changeLog.recordTombstone(identity);
+    sweepAttributes(this.db);
+  }
+
+  /**
+   * What TypeDB refuses at commit (define.feature L507, L1118; insert.feature L1126, L1646, L1654;
+   * delete.feature L2735; undefine.feature L1049):
+   * - a relation type that is not abstract relates at least one role, its own or inherited;
+   * - an attribute type that is not abstract has a value type, its own or inherited;
+   * - every instance of a type with a `@key` ownership holds exactly one key value.
+   */
+  private validateCommit(): void {
+    const fail = (message: string): never => {
+      throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.constraintViolated, message, undefined));
+    };
+    // The schema is checked when this transaction changed it; the data, where this transaction wrote —
+    // or everywhere, when the schema moved under it.
+    const whole = this.transactionChangedSchema;
+    // ⚠️ Silent on a store that never recorded what a check reads — roles before `schema_relates`,
+    // value types before `schema_value_type` — as the ownership check is before `schema_owns`: an
+    // empty record means "not recorded", never "relates nothing" (a 2026-10 downstream-app store).
+    const recorded = (table: string): boolean => this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) !== undefined;
+    const rolesRecorded = recorded('schema_relates');
+    const valueTypesRecorded = recorded('schema_value_type');
+    for (const relation of whole && rolesRecorded ? this.schema.relations : []) {
+      if (this.schema.abstracts.has(relation)) continue;
+      if (!this.typeFamily(relation, 'inherited').some((t) => (this.schema.roles.get(t)?.size ?? 0) > 0)) {
+        fail(`Relation type '${relation}' must relate at least one role; make it @abstract, or give it a role.`);
+      }
+    }
+    for (const attribute of whole && valueTypesRecorded ? this.schema.attributes : []) {
+      if (this.schema.abstracts.has(attribute)) continue;
+      if (this.valueTypeOfAttribute(attribute) === undefined) {
+        fail(`Attribute type '${attribute}' has no value type; a concrete attribute type needs one, its own or inherited.`);
+      }
+    }
+    if (!whole && this.transactionTouched.size === 0) return;
+    const touched = [...this.transactionTouched];
+    const only = whole ? '' : ` AND t.iid IN (${touched.map(() => '?').join(', ')})`;
+    for (const ownership of this.schema.keyOwnerships) {
+      const [owner, attribute] = ownership.split('\u0000');
+      const wrong = this.db
+        .prepare(`SELECT COUNT(*) AS n FROM thing t WHERE t.type IN ${SUBTYPES_OF}${only} AND (SELECT COUNT(*) FROM has h WHERE h.owner = t.iid AND h.type IN ${SUBTYPES_OF}) <> 1`)
+        .get(owner, ...(whole ? [] : touched), attribute) as { n: number };
+      if (Number(wrong.n) > 0) {
+        fail(`Commit failed: key constraint violation — ${wrong.n} instance(s) of '${owner}' do not hold exactly one '${attribute}' key.`);
+      }
     }
   }
 
@@ -2356,6 +2577,8 @@ export class TypeDBLiteInterpreter {
       // SQLite has already rolled back (for example after SQLITE_FULL); nothing is left to undo.
     } finally {
       this.transactionOpen = false;
+      // A schema change made inside the transaction is undone in the tables; the model follows them.
+      this.reloadSchema();
     }
   }
 
@@ -2487,14 +2710,14 @@ export class TypeDBLiteInterpreter {
     const attributes = new Set(this.schema.attributes);
     for (const clause of file.clauses) {
       if (!isDefineClause(clause)) continue;
-      for (const definition of clause.definitions) {
+      for (const definition of clause.definitions.filter(isTypeDefinition)) {
         if (isEntityDef(definition) || isRelationDef(definition)) types.add(definition.name);
         if (isAttributeDef(definition)) attributes.add(definition.name);
       }
     }
     for (const clause of file.clauses) {
       if (!isDefineClause(clause)) continue;
-      for (const definition of clause.definitions) {
+      for (const definition of clause.definitions.filter(isTypeDefinition)) {
         if (isTypeExtensionDef(definition)) {
           // An attribute is a type too: `name @abstract;`, `email @independent;` re-open one — with
           // annotations only. A trait on an attribute (`email owns name @key;`) is refused, as
@@ -2762,6 +2985,7 @@ export class TypeDBLiteInterpreter {
     // would accuse `$p has principal-type "user";` of naming an unowned attribute purely because
     // its type had not been seen yet.
     for (const constraint of constraints) this.checkOwns(constraint, statement);
+    if (statement === 'match') for (const constraint of constraints) this.checkRelationRoles(constraint, constraints);
     return constraints;
   }
 
@@ -2846,6 +3070,50 @@ export class TypeDBLiteInterpreter {
       const bound: ValueBinding = { kind: 'attribute', attributeType: type, valueType: this.valueTypeOfAttribute(type) ?? 'string', value: String(row.value) };
       return { ...combination, [instance.variable]: bound };
     });
+  }
+
+  /**
+   * A relation pattern that can never match is refused, as TypeDB's type inference refuses it
+   * (match.feature L1433–L1484): a role no relation declares; a relation type that is no relation;
+   * a role the named relation type relates nowhere in its hierarchy — `isa marriage` reaches a
+   * `hetero-marriage`'s husband, `isa civil-marriage` does not; a player whose type plays no role
+   * of the relation. Only what is WRITTEN is judged; a type variable constrains nothing here.
+   */
+  private checkRelationRoles(constraint: ThingConstraint, all: readonly ThingConstraint[]): void {
+    if (constraint.roles.length === 0 || this.schema.relations.size === 0) return;
+    const incompatible = (detail: string): never =>
+      this.refuse(DiagnosticCode.unknownRole, `Type-inference was unable to find compatible types for the pair of variables: ${detail}`, constraint.range);
+    const declared = (role: string): boolean => [...this.schema.roles.values()].some((roles) => roles.has(role));
+    const relationTypes = constraint.isas.flatMap((isa) => (isa.type === undefined ? [] : [isa.type]));
+    for (const type of relationTypes) {
+      if (!this.typeFamily(type, 'inherited').some((t) => this.schema.relations.has(t))) {
+        incompatible(`'${type}' is not a relation type, so it has no roles to link.`);
+      }
+    }
+    // The roles a relation type can link: those it or an ancestor declares, and — since `isa T`
+    // answers T's subtypes — those its subtypes declare.
+    const related = (type: string): Set<string> => new Set(this.typeFamily(type, 'both').flatMap((t) => [...(this.schema.roles.get(t) ?? [])]));
+    for (const role of constraint.roles) {
+      if (role.role === undefined) continue;
+      if (!declared(role.role)) {
+        this.refuse(DiagnosticCode.unknownRole, `Role label not found '${role.role}': no relation type relates it.`, role.range ?? constraint.range);
+      }
+      for (const type of relationTypes) {
+        if (!related(type).has(role.role)) incompatible(`'${type}' relates no role '${role.role}', nor does any type above or below it.`);
+      }
+    }
+    // A player with a written type that can play no role of the relation — `$x isa company;
+    // friendship ($x);` (L1473). Both directions of each hierarchy count, as `isa` does.
+    if (relationTypes.length === 0 || this.schema.plays.size === 0) return;
+    const roles = new Set(relationTypes.flatMap((type) => this.typeFamily(type, 'both').flatMap((t) => [...(this.schema.roles.get(t) ?? [])].map((r) => roleRef(t, r)))));
+    for (const role of constraint.roles) {
+      const playerTypes = all.find((c) => c.variable === role.player)?.isas.flatMap((isa) => (isa.type === undefined ? [] : [isa.type])) ?? [];
+      for (const playerType of playerTypes) {
+        if (!this.schema.types.has(playerType)) continue;
+        const plays = this.typeFamily(playerType, 'both').some((t) => [...roles].some((r) => (role.role === undefined || r.split(':')[1] === role.role) && this.schema.plays.has(playsSubject(t, r))));
+        if (!plays) incompatible(`'${playerType}' plays no role of '${relationTypes.join("', '")}'${role.role === undefined ? '' : ` as '${role.role}'`}.`);
+      }
+    }
   }
 
   /**
@@ -3408,6 +3676,10 @@ export class TypeDBLiteInterpreter {
         if (used !== undefined) this.refuse(DiagnosticCode.unboundValue, `A write stage uses the optional variable '${used.slice(1)}' outside a 'try' block.`, rangeOf(deletion));
       }
       for (const deletion of openDeletions(write.deletions, this.refuse)) {
+        // `delete has $_ of $_` deletes nothing anyone named (delete.feature L2791).
+        if ([deletion.target, deletion.owner].some((v) => v !== undefined && isAnonymous(v))) {
+          this.refuse(DiagnosticCode.mixedPattern, 'A delete names what it deletes: an anonymous variable `$_` cannot be deleted, or deleted from.', rangeOf(deletion));
+        }
         // `delete links (friend: $x) of $r` — a relation the match bound, and things playing in it.
         if (deletion.links) {
           if (kindOf(deletion.owner as string) !== 'thing') {
@@ -3494,7 +3766,7 @@ export class TypeDBLiteInterpreter {
       const read = constraint?.instance?.valueVariable;
       if (read !== undefined && constraint?.instance !== undefined) {
         if (!matchBinds.has(read)) {
-          this.refuse(DiagnosticCode.unboundValue, `The variable '${read.slice(1)}' must be bound to a value before it's used in a write.`, constraint.instance.range);
+          this.refuse(DiagnosticCode.unboundValue, unboundInWrite(read), constraint.instance.range);
         }
         const from = typeOfVariable(read);
         if (from !== undefined) this.checkValueFits(read, from, constraint.instance.type, constraint.instance.range);
@@ -3505,7 +3777,7 @@ export class TypeDBLiteInterpreter {
         const variable = property.valueVariable ?? (property.comparator === '==' && property.compared !== undefined && isVariableExpression(property.compared) ? property.compared.variable : undefined);
         if (variable === undefined) continue;
         if (!matchBinds.has(variable)) {
-          this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used in a write.`, rangeOf(property));
+          this.refuse(DiagnosticCode.unboundValue, unboundInWrite(variable), rangeOf(property));
         }
         const from = typeOfVariable(variable);
         if (from !== undefined && property.attribute !== undefined) this.checkValueFits(variable, from, property.attribute, rangeOf(property));
@@ -3609,11 +3881,7 @@ export class TypeDBLiteInterpreter {
       const params: Array<string | number> = [];
       const joins: string[] = [];
       // A roleless slot (`($p)`) joins on any role (optional.feature L46).
-      const roleOf = (alias: string, role: string | undefined): string => {
-        if (role === undefined) return '';
-        params.push(role);
-        return ` AND ${alias}.role = ?`;
-      };
+      const roleOf = (alias: string, role: string | undefined): string => (role === undefined ? '' : this.roleFilter(alias, role, params));
       mine.forEach((role, index) => {
         joins.push(
           index === 0
@@ -3635,6 +3903,27 @@ export class TypeDBLiteInterpreter {
       return { sql: `SELECT rv0.player FROM thing t ${joins.join(' ')}${where}`, params };
     }
     return undefined;
+  }
+
+  /**
+   * A role in `links (…)` matches the role and every role that specialises it, at any depth:
+   * `(spouse: $x)` finds a `husband` of a `hetero-marriage` (match.feature L1484). `role_player`
+   * holds role NAMES, so the family is a set of names; the relation's own `isa` keeps it honest.
+   */
+  private roleFilter(alias: string, role: string, params: Array<string | number>): string {
+    const family = new Set([role]);
+    for (const [child] of this.schema.specialises) {
+      let current: string | undefined = child;
+      while (current !== undefined) {
+        if (current.split(':')[1] === role) {
+          family.add(child.split(':')[1]);
+          break;
+        }
+        current = this.schema.specialises.get(current);
+      }
+    }
+    params.push(...family);
+    return family.size === 1 ? ` AND ${alias}.role = ?` : ` AND ${alias}.role IN (${[...family].map(() => '?').join(', ')})`;
   }
 
   /**
@@ -3666,10 +3955,7 @@ export class TypeDBLiteInterpreter {
         const boundPlayer = typeof player === 'number' ? player : undefined;
         // A roleless slot (`($p, $c)`) joins on any role (optional.feature L46).
         let join = `JOIN role_player rp${index} ON rp${index}.rel = t.iid`;
-        if (role.role !== undefined) {
-          join += ` AND rp${index}.role = ?`;
-          params.push(role.role);
-        }
+        if (role.role !== undefined) join += this.roleFilter(`rp${index}`, role.role, params);
 
         // 🔴 One variable in two roles must be the SAME thing in both.
         //
@@ -3704,11 +3990,10 @@ export class TypeDBLiteInterpreter {
         // source must not be treated as one statement asking for two.
         const key = role.statement + ' ' + role.role;
         for (const [earlierIndex, earlierPlayer] of sameRoleSlots.get(key) ?? []) {
-          // `(friend: $x, friend: $x)` asks for $x as a friend TWICE — two edges, not one read twice
-          // (match.feature L1314). The primary key holds one edge per (rel, role, player), so no
-          // relation answers it here.
+          // `(friend: $x, friend: $x)` asks for $x as a friend TWICE: one edge counted twice or more
+          // answers it (match.feature L1185); one edge played once does not (L1314).
           if (earlierPlayer === role.player) {
-            join += ` AND rp${index}.rowid <> rp${earlierIndex}.rowid`;
+            join += ` AND (rp${index}.rowid <> rp${earlierIndex}.rowid OR rp${index}.count >= 2)`;
             continue;
           }
           join += ` AND rp${index}.player <> rp${earlierIndex}.player`;
@@ -4054,7 +4339,7 @@ export class TypeDBLiteInterpreter {
         if (variable === '$_' || bound.has(variable)) continue;
         const first = owner.get(variable);
         if (first !== undefined && first !== group) {
-          this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used: two nested blocks here use it, and nothing around them binds it.`, rangeOf(block.node));
+          this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used. Two nested blocks here use it, and nothing around them binds it.`, rangeOf(block.node));
         }
         owner.set(variable, group);
       }
@@ -4478,8 +4763,10 @@ export class TypeDBLiteInterpreter {
       const written = this.writtenValue(binding, values);
       this.insertAttribute(iid, written.attribute, written.value, binding.range);
     }
-    this.insertRoles(iid, constraint.roles, bindings);
+    // Bound before its players are linked: a relation may play a role in itself —
+    // `$r isa comparison, links (compared: $r)` (match.feature L1259).
     bindings.set(constraint.variable, [iid]);
+    this.insertRoles(iid, constraint.roles, bindings);
   }
 
   /**
@@ -4491,7 +4778,7 @@ export class TypeDBLiteInterpreter {
   private valueFor(variable: string, attribute: string, values: ReadonlyMap<string, ValueBinding>, at: Range | undefined): string {
     const bound = values.get(variable);
     if (bound === undefined) {
-      return this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used in a write.`, at);
+      return this.refuse(DiagnosticCode.unboundValue, unboundInWrite(variable), at);
     }
     this.checkValueFits(variable, bound.valueType, attribute, at);
     // Stored as the attribute's type spells it — `canonicalValue` — so an integer `10` on a
@@ -4537,6 +4824,7 @@ export class TypeDBLiteInterpreter {
       instance.literal !== undefined
         ? instance.literal.value
         : this.valueFor(instance.valueVariable as string, type, values, range);
+    this.checkWrittenValue(type, undefined, value, range);
     if (ensureAttribute(this.db, type, value).created) this.written.attributes += 1;
     values.set(variable, { kind: 'attribute', attributeType: type, valueType: this.valueTypeOfAttribute(type) ?? 'string', value });
   }
@@ -4562,6 +4850,33 @@ export class TypeDBLiteInterpreter {
     return iid;
   }
 
+  /**
+   * A written value meets the `@regex` its attribute type or the ownership states — the whole value
+   * matches, as TypeDB matches it (insert.feature L1357). The pattern is the annotation's text as
+   * written, never unescaped: `\d` is a digit class, not a `d`.
+   */
+  private checkWrittenValue(attribute: string, ownerType: string | undefined, value: string, at: Range | undefined): void {
+    const subjects = [
+      ...this.typeFamily(attribute, 'inherited').map((a) => valueSubject(a)),
+      ...(ownerType === undefined ? [] : this.typeFamily(ownerType, 'inherited').flatMap((o) => this.typeFamily(attribute, 'inherited').map((a) => ownsSubject(o, a)))),
+    ];
+    for (const subject of subjects) {
+      const text = this.schema.annotations.get(subject)?.get('regex');
+      if (text === undefined) continue;
+      const pattern = /^@regex\(\s*"((?:\\.|[^"\\])*)"\s*\)$/.exec(text)?.[1]?.replace(/\\"/g, '"');
+      if (pattern === undefined) continue;
+      let matches: boolean;
+      try {
+        matches = new RegExp(`^(?:${pattern})$`, 'u').test(value);
+      } catch {
+        continue;
+      }
+      if (!matches) {
+        this.refuse(DiagnosticCode.constraintViolated, `'${attribute}' does not admit this value: it must match ${text}.`, at);
+      }
+    }
+  }
+
   private insertAttribute(
     owner: number,
     attribute: string,
@@ -4569,6 +4884,7 @@ export class TypeDBLiteInterpreter {
     at?: Range,
   ): void {
     this.checkKnown('attribute', attribute, at);
+    this.checkWrittenValue(attribute, this.typeOfThing(owner), value, at);
     // An abstract attribute type has no values of its own, as an abstract entity has no instances.
     if (this.schema.abstracts.has(attribute)) {
       const message = `'${attribute}' is abstract and cannot have a value of its own. Write a concrete subtype.`;
@@ -4630,7 +4946,7 @@ export class TypeDBLiteInterpreter {
     const relationType = this.typeOfThing(relation);
     const declaring = this.typeFamily(relationType, 'inherited').find((t) => this.schema.roles.get(t)?.has(role));
     if (declaring === undefined) {
-      const message = `'${relationType}' has no role '${role}'.`;
+      const message = `Role label not found '${role}': '${relationType}' has no such role.`;
       throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.unknownRole, message, at));
     }
     // A schema that declares no `plays` at all predates the plays record; nothing to check against.
@@ -4651,9 +4967,10 @@ export class TypeDBLiteInterpreter {
     for (const role of roles) {
       const player = bindings.get(role.player)?.[0];
       if (player === undefined) {
-        const message =
-          `Refusing a dangling relation: '${role.player}' is not bound, so ${role.role === undefined ? 'it' : `role '${role.role}'`} ` +
-          'has nothing to relate.';
+        const message = isAnonymous(role.player)
+          ? 'An anonymous variable is not available to a write: `$_` binds no player for a relation to link. Name it.'
+          : `Refusing a dangling relation: '${role.player}' is not bound, so ${role.role === undefined ? 'it' : `role '${role.role}'`} ` +
+            'has nothing to relate.';
         throw attachDiagnostic(
           new Error(message),
           this.diagnostics.error(
@@ -4668,15 +4985,9 @@ export class TypeDBLiteInterpreter {
       // one path that did NOT create it is now refused above rather than left to skip the log.
       this.touched.add(relation);
       const name = role.role === undefined ? this.inferRole(relation, player, role.player, role.range) : this.checkPlays(relation, player, role.role, role.player, role.range);
-      try {
-        this.db.prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?)').run(relation, name, player);
-      } catch (error) {
-        // 🔴 Only the duplicate edge is named as one — a foreign-key or busy failure is not a
-        // duplicate, and is rethrown as SQLite raised it (add-role-player.test.ts).
-        if (!/UNIQUE constraint failed: role_player/.test(String(error))) throw error;
-        const message = `'${role.player}' already plays '${name}' in this relation; a player holds a role in one relation once.`;
-        throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.constraintViolated, message, role.range));
-      }
+      // A player may hold one role more than once — `(friend: $x, friend: $x)` — and each is counted
+      // (insert.feature L938). A foreign-key or busy failure is rethrown as SQLite raised it.
+      this.db.prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?) ON CONFLICT(rel, role, player) DO UPDATE SET count = count + 1').run(relation, name, player);
       this.written.roles += 1;
     }
   }
@@ -4701,8 +5012,11 @@ export class TypeDBLiteInterpreter {
           for (const entry of deletion.players?.entries ?? []) {
             const player = combination[entry.player];
             if (typeof player !== 'number') continue;
-            if (entry.role === undefined) this.db.prepare('DELETE FROM role_player WHERE rel = ? AND player = ?').run(relation, player);
-            else this.db.prepare('DELETE FROM role_player WHERE rel = ? AND player = ? AND role = ?').run(relation, player, entry.role);
+            // One occurrence per slot: `links (friend: $x)` of a twice-played friend leaves one
+            // (delete.feature L626); `links (friend: $x, friend: $x)` removes both (L453).
+            if (entry.role === undefined) this.db.prepare('UPDATE role_player SET count = count - 1 WHERE rel = ? AND player = ?').run(relation, player);
+            else this.db.prepare('UPDATE role_player SET count = count - 1 WHERE rel = ? AND player = ? AND role = ?').run(relation, player, entry.role);
+            this.db.prepare('DELETE FROM role_player WHERE rel = ? AND count <= 0').run(relation);
           }
           this.touched.add(relation);
           if (this.db.prepare('SELECT 1 FROM role_player WHERE rel = ?').get(relation) === undefined) this.deleteThing(relation);
@@ -4774,7 +5088,9 @@ export class TypeDBLiteInterpreter {
     if (id === undefined) return;
     const owners = this.db.prepare('SELECT h.owner AS owner, t.type AS type FROM has h JOIN thing t ON t.iid = h.owner WHERE h.attribute = ?').all(id) as Array<{ owner: number; type: string }>;
     const attributeTypes = this.typeFamily(type, 'inherited');
-    for (const owner of owners) {
+    // In a caller's transaction the commit decides, as on TypeDB (`validateCommit`); a lone write has
+    // no commit of its own to fail, so it is refused here.
+    for (const owner of this.transactionOpen ? [] : owners) {
       const keyed = this.typeFamily(String(owner.type), 'inherited').some((ownerType) => attributeTypes.some((attribute) => this.schema.keyOwnerships.has(ownsKey(ownerType, attribute))));
       if (keyed) {
         const message = `'${type}' is the @key of a '${owner.type}', which cannot be left without its key; delete the owner, or give it another key first.`;
@@ -4843,6 +5159,12 @@ function resolveEveryMatch(
 
 /** What an anonymous `$_` becomes — `$_#N`, which no query can write, so it collides with nothing. */
 const isAnonymous = (variable: string): boolean => variable.startsWith('$_#');
+
+/** A write reading what nothing binds — an anonymous `$_` never binds a value (insert.feature L2733). */
+const unboundInWrite = (variable: string): string =>
+  isAnonymous(variable)
+    ? 'An anonymous variable is not available to a write: `$_` binds nothing a write could read. Name it.'
+    : `The variable '${variable.slice(1)}' must be bound to a value before it's used in a write.`;
 
 /**
  * 🔴 Each `$_` is its OWN variable — "something", never "the same something as the last `$_`".

@@ -40,6 +40,11 @@ export const valueSubject = (attribute: string): string => `${attribute}${SEP}va
 export const ownsSubject = (owner: string, attribute: string): string => `${owner}${SEP}owns${SEP}${attribute}`;
 export const relatesSubject = (relation: string, role: string): string => `${relation}${SEP}relates${SEP}${role}`;
 export const playsSubject = (player: string, role: string): string => `${player}${SEP}plays${SEP}${role}`;
+/** A schema function's annotations, `fun get_random_number() -> integer @doc("…")`. */
+export const funSubject = (name: string): string => `${name}${SEP}fun`;
+/** A struct's annotations, and each field's (metadata.feature L113). */
+export const structSubject = (name: string): string => `${name}${SEP}struct`;
+export const structFieldSubject = (struct: string, field: string): string => `${struct}${SEP}field${SEP}${field}`;
 
 /** `employment:employee` — how a played role is named, in the record and in the text. */
 export const roleRef = (relation: string, role: string): string => `${relation}:${role}`;

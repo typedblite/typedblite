@@ -215,7 +215,7 @@ function arithmetic(operator: string, left: Numeric, right: Numeric, refuse: Ref
   if (operator === '^') return checkedDouble(toDouble(left) ** toDouble(right), refuse, at);
   if (operator === '/') {
     const divisor = toDouble(right);
-    if (divisor === 0) return refuse(DiagnosticCode.valueOutOfRange, 'Division by zero.', at);
+    if (divisor === 0) return refuse(DiagnosticCode.valueOutOfRange, 'Division failed: division by zero.', at);
     return checkedDouble(toDouble(left) / divisor, refuse, at);
   }
   if (left.kind === 'double' || right.kind === 'double') {
@@ -404,7 +404,17 @@ export function userFunctionOf(expression: Expression): FunctionDefinition | und
       if (found !== undefined) return found;
     }
   }
-  return undefined;
+  // Then the schema's own — `define fun …` — which every query may call (expression.feature L1382).
+  return schemaFunctions.get(name);
+}
+
+/**
+ * The functions the schema defines, for the engine running now. The engine sets it at the start of
+ * each `query`/`execute`/`define`; the calls below it are synchronous, so it is always that engine's.
+ */
+let schemaFunctions: ReadonlyMap<string, FunctionDefinition> = new Map();
+export function useSchemaFunctions(functions: ReadonlyMap<string, FunctionDefinition>): void {
+  schemaFunctions = functions;
 }
 
 /** What a function or a `return` answers: a stream or one tuple, of how many values, by reduction or not. */
@@ -614,6 +624,12 @@ export function compareStrings(a: string, b: string): number {
 }
 
 export function compare(comparator: string, left: ValueBinding, right: Value, refuse: Refuse, at: Range | undefined): boolean {
+  // String predicates: `contains` ignores case (match.feature L3919); `like` is a regular expression
+  // found anywhere in the value, as TypeDB's is — anchor it with ^…$ to match the whole.
+  if (comparator === 'contains' || comparator === 'like') {
+    if (left.valueType !== 'string' || right.valueType !== 'string') return false;
+    return comparator === 'contains' ? left.value.toLowerCase().includes(right.text.toLowerCase()) : new RegExp(right.text, 'v').test(left.value);
+  }
   let order: number;
   if (isNumericType(left.valueType) && isNumericType(right.valueType)) {
     order = compareNumeric(toNumeric(left.valueType, left.value, refuse, at), toNumeric(right.valueType, right.text, refuse, at));
@@ -738,7 +754,9 @@ export function checkExpression(expression: Expression, variableType: (variable:
       if (isLabelExpression(argument)) return { kind: 'label', label: argument.label };
       if (isVariableExpression(argument)) return { kind: 'variable' };
       checkExpression(argument, variableType, refuse, facts);
-      return { kind: 'value', valueType: inferValueType(argument, variableType) };
+      // A string literal's text too: `get_fun_doc("f")` names a function the schema may not have.
+      const text = isLiteralExpression(argument) && isStringLiteral(argument.literal) ? argument.literal.value : undefined;
+      return { kind: 'value', valueType: inferValueType(argument, variableType), text };
     });
     checkSchemaCall(expression.function, shapes, facts, refuse, at);
     return;
@@ -805,6 +823,16 @@ export function checkExpression(expression: Expression, variableType: (variable:
 
 /** A comparison's two sides can be compared at all — checked from their inferred types (review, round 14). */
 export function checkComparison(comparison: ComparisonPattern, variableType: (variable: string) => string | undefined, refuse: Refuse, facts?: SchemaFacts): void {
+  // `like` takes its pattern as a string LITERAL, compiled before any row (match.feature L3977).
+  if (comparison.comparator === 'like') {
+    const literal = isLiteralExpression(comparison.right) && isStringLiteral(comparison.right.literal) ? comparison.right.literal.value : undefined;
+    if (literal === undefined) refuse(DiagnosticCode.valueTypeConflict, 'Expected a string literal as regex: `like` takes its pattern written in the query.', rangeOf(comparison));
+    try {
+      new RegExp(literal as string, 'v');
+    } catch {
+      refuse(DiagnosticCode.valueTypeConflict, `The regular expression failed compilation: '${literal}'.`, rangeOf(comparison));
+    }
+  }
   checkExpression(comparison.right, variableType, refuse, facts);
   const left = variableType(comparison.left);
   const right = inferValueType(comparison.right, variableType);
@@ -813,6 +841,9 @@ export function checkComparison(comparison: ComparisonPattern, variableType: (va
   if (ORDERED_TEMPORAL.has(left) && ORDERED_TEMPORAL.has(right)) return;
   if (TEMPORAL_TYPES.has(left) || TEMPORAL_TYPES.has(right)) {
     refuse(DiagnosticCode.notImplemented, `TypeDBLite does not compare ${TEMPORAL_TYPES.has(left) ? left : right} values yet.`, at);
+  }
+  if ((comparison.comparator === 'contains' || comparison.comparator === 'like') && (left !== 'string' || right !== 'string')) {
+    refuse(DiagnosticCode.valueTypeConflict, `\`${comparison.comparator}\` compares strings, and this is a ${left === 'string' ? right : left}.`, at);
   }
   if (isNumericType(left) && isNumericType(right)) return;
   if (left === right && left === 'string') return;
@@ -1038,6 +1069,38 @@ export function applyValueStatements(
     return next;
   };
   let rows: Array<Map<string, ValueBinding>> = [new Map(bindings)];
+  // 🔴 A comparison filters as soon as what it reads is bound — before the `let`s that come after
+  // it, not after them all. Filtering early answers the same rows, and it is what stops recursion:
+  // `{ $len > 1; let $a_ in names_helper($len - 1); … }` called itself forever when the `let` ran
+  // before the comparison that ends it (expression.feature L1382).
+  const pending = [...statements.comparisons];
+  const ready = (comparison: ComparisonPattern, values: ReadonlyMap<string, ValueBinding>): boolean =>
+    [comparison.left, ...variablesOf(comparison.right)].every((variable) => values.has(variable));
+  const filterReady = (): void => {
+    const first = rows[0];
+    if (first === undefined) return;
+    const now = pending.filter((comparison) => ready(comparison, first));
+    if (now.length === 0) return;
+    for (const comparison of now) pending.splice(pending.indexOf(comparison), 1);
+    rows = rows.filter((values) => passes(values, now));
+  };
+  const passes = (values: ReadonlyMap<string, ValueBinding>, comparisons: readonly ComparisonPattern[]): boolean => {
+    const env = envOf(values);
+    for (const comparison of comparisons) {
+      const left = env(comparison.left);
+      if (left === undefined) {
+        return refuse(
+          DiagnosticCode.unboundValue,
+          `The variable '${comparison.left.slice(1)}' must be bound to a value before it's used.`,
+          rangeOf(comparison),
+        );
+      }
+      const right = evaluate(comparison.right, env, refuse, schema);
+      if (!compare(comparison.comparator, left, right, refuse, rangeOf(comparison))) return false;
+    }
+    return true;
+  };
+  filterReady();
   for (const statement of statements.lets) {
     rows = rows.flatMap((values) => {
       const env = envOf(values);
@@ -1061,23 +1124,9 @@ export function applyValueStatements(
       }
       return [bind(values, [statement.variable], [evaluate(statement.expression, env, refuse, schema)])];
     });
+    filterReady();
   }
-  return rows.filter((values) => {
-    const env = envOf(values);
-    for (const comparison of statements.comparisons) {
-      const left = env(comparison.left);
-      if (left === undefined) {
-        return refuse(
-          DiagnosticCode.unboundValue,
-          `The variable '${comparison.left.slice(1)}' must be bound to a value before it's used.`,
-          rangeOf(comparison),
-        );
-      }
-      const right = evaluate(comparison.right, env, refuse, schema);
-      if (!compare(comparison.comparator, left, right, refuse, rangeOf(comparison))) return false;
-    }
-    return true;
-  });
+  return rows.filter((values) => passes(values, pending));
 }
 
 export { arithmetic as operate, compareNumeric as compareValues, toNumeric as numericOf, toValue as valueOf };

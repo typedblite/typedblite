@@ -1,4 +1,4 @@
-import { DiagnosticCode, TypeDBLiteInterpreter, type GivenRows, type JsonValue, type TypeDBLiteValue } from '@typedblite/runtime';
+import { DiagnosticCode, TypeDBLiteInterpreter, diagnosticOf, type GivenRows, type JsonValue, type TypeDBLiteValue } from '@typedblite/runtime';
 
 export type TransactionKind = 'schema' | 'write' | 'read';
 
@@ -36,10 +36,11 @@ export class EvaluatedNothing extends HarnessError {}
  * a query with no transaction open fails — and **nothing else is**. What the harness does not do,
  * on purpose:
  *
- * - **No rollback on `transaction closes`.** A write not committed stays written. A scenario that
- *   asserts it is gone will *fail*, never pass, so the omission cannot flatter the score.
- * - **No commit-time validation.** `transaction commits; fails` cannot be produced here, and is
- *   reported as a fail.
+ * - **A write or schema transaction is the engine's transaction.** `transaction commits` commits it
+ *   — after the engine's commit-time checks, which can fail it (`transaction commits; fails`) —
+ *   and `transaction closes`, opening another, or a query that fails, rolls it back: TypeDB ends a
+ *   transaction whose query failed (match.feature L1484, *"transaction is open: false"*).
+ * - A read transaction holds no engine transaction: it reads what is committed.
  * - **`set time-zone` is recorded and has no effect.** Datetime-with-zone scenarios fail honestly.
  */
 export class World {
@@ -76,7 +77,9 @@ export class World {
     if (!this.databases.has(database)) {
       throw new HarnessError(`database '${database}' does not exist`);
     }
+    this.closeTransaction();
     this.transaction = { database, kind, open: true };
+    if (kind !== 'read') this.databases.get(database)?.beginTransaction();
   }
 
   transactionIsOpen(): boolean {
@@ -85,11 +88,34 @@ export class World {
 
   commit(): void {
     if (!this.transaction?.open) throw new HarnessError('no open transaction to commit');
+    const { kind, database } = this.transaction;
     this.transaction.open = false;
+    // The engine rolls back a commit that fails its checks; the transaction is over either way.
+    if (kind !== 'read') this.databases.get(database)?.commitTransaction();
   }
 
   closeTransaction(): void {
-    if (this.transaction) this.transaction.open = false;
+    if (!this.transaction?.open) return;
+    const { kind, database } = this.transaction;
+    this.transaction.open = false;
+    if (kind !== 'read') this.databases.get(database)?.rollbackTransaction();
+  }
+
+  /**
+   * A write or schema query that fails in evaluation ends its transaction, as TypeDB's does: nothing
+   * it held is kept (put.feature L592).
+   * One that fails to PARSE never reached the transaction, which stays open — the spec runs several
+   * `; parsing fails` steps in one transaction (define.feature L2031).
+   */
+  private failing<T>(query: TransactionKind, run: () => T): T {
+    try {
+      return run();
+    } catch (error) {
+      // A refused READ leaves its transaction open, whatever kind it is (match.feature L1009, a read in
+      // the Background's write transaction: "transaction is open: true"); L1516 alone expects otherwise.
+      if (diagnosticOf(error)?.code !== DiagnosticCode.parseFailed && query !== 'read') this.closeTransaction();
+      throw error;
+    }
   }
 
   /** The engine the open transaction addresses — refusing, as the server would, when there is none. */
@@ -110,7 +136,7 @@ export class World {
   }
 
   schemaQuery(text: string): void {
-    this.engineFor('schema').define(text);
+    this.failing('schema', () => this.engineFor('schema').define(text));
   }
 
   /**
@@ -118,7 +144,7 @@ export class World {
    * with no write stage, and reports a fact for each one it ran — no fact, nothing ran.
    */
   writeQuery(text: string, given?: GivenRows): { rows: ReadonlyArray<AnswerRow>; documents?: ReadonlyArray<JsonValue> } {
-    const report = this.engineFor('write').execute(text, given);
+    const report = this.failing('write', () => this.engineFor('write').execute(text, given));
     // `emptyMatch` is a write that RAN, zero times — `match` bound nothing — which is a success on
     // TypeDB too. Only a pipeline that was skipped altogether reports neither fact.
     const ran = report.diagnostics.some(
@@ -142,7 +168,7 @@ export class World {
 
   /** A read's rows, and its documents when it ends in `fetch` — under the same evaluated-nothing guard. */
   readAnswers(text: string, given?: GivenRows): { rows: ReadonlyArray<AnswerRow>; documents?: ReadonlyArray<JsonValue> } {
-    const { rows, diagnostics, documents } = this.engineFor('read').query(text, given);
+    const { rows, diagnostics, documents } = this.failing('read', () => this.engineFor('read').query(text, given));
     if (!diagnostics.some((d) => d.code === DiagnosticCode.projected)) {
       throw new EvaluatedNothing('TypeDBLite evaluated nothing: no pipeline reported a projection');
     }

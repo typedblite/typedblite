@@ -2,7 +2,7 @@ import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode } from './diagnostics.js';
 import type { Value } from './expressions.js';
 import type { Refuse, SchemaFacts } from './schema-rules.js';
-import { ownsKey, ownsSubject, playsSubject, relatesSubject, subSubject, typeSubject } from './schema-subjects.js';
+import { funSubject, ownsKey, ownsSubject, playsSubject, relatesSubject, structFieldSubject, structSubject, subSubject, typeSubject } from './schema-subjects.js';
 
 /**
  * The schema functions — `get_doc(person)`, `get_meta("key", person)`, `get_all_meta(person)`,
@@ -53,14 +53,15 @@ const arityOf = (bare: string): number => {
   if (bare === 'label') return 1;
   const signature = signatureOf(bare);
   if (signature === undefined) return 0;
-  const types = signature.capability === undefined ? 1 : 2;
+  // A function or a struct is ONE name; a struct field, a struct and a field; a capability, two types.
+  const types = signature.capability === undefined || signature.capability === 'fun' || signature.capability === 'struct' ? 1 : 2;
   return types + (signature.reading === 'meta' ? 1 : 0);
 };
 
 const string = (text: string): Value => ({ valueType: 'string', text });
 
 /** What an argument is, from its shape alone — a label, a variable (a type or a value), or a value. */
-export type ArgumentShape = { readonly kind: 'label'; readonly label: string } | { readonly kind: 'variable' } | { readonly kind: 'value'; readonly valueType: string | undefined };
+export type ArgumentShape = { readonly kind: 'label'; readonly label: string } | { readonly kind: 'variable' } | { readonly kind: 'value'; readonly valueType: string | undefined; readonly text?: string };
 
 /**
  * Everything a schema call can be refused for WITHOUT a row — the arity, a value where a type
@@ -72,12 +73,24 @@ export function checkSchemaCall(name: string, args: readonly ArgumentShape[], fa
   const separator = name.lastIndexOf('::');
   const bare = separator < 0 ? name : name.slice(separator + 2);
   const signature = signatureOf(bare);
-  if (signature?.capability === 'fun' || signature?.capability === 'struct' || signature?.capability === 'struct_field') {
-    refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate the metadata function '${name}' yet.`, at);
-  }
   const arity = arityOf(bare);
   if (args.length !== arity) {
     refuse(DiagnosticCode.functionArity, `Function '${bare}' expects '${arity}' arguments but received '${args.length}'.`, at);
+  }
+  // A function or a struct is named by a STRING — `get_fun_doc("get_random_number")` — not a label.
+  if (signature?.capability === 'fun' || signature?.capability === 'struct' || signature?.capability === 'struct_field') {
+    for (const argument of args) {
+      if (argument.kind === 'label' || (argument.kind === 'value' && argument.valueType !== undefined && argument.valueType !== 'string')) {
+        refuse(DiagnosticCode.valueTypeConflict, `Function '${bare}' names a ${signature.capability === 'fun' ? 'function' : 'struct'} by a string.`, at);
+      }
+    }
+    // A name written in the query is checked now, whether or not a row reaches it (L833).
+    const named = signature.reading === 'meta' ? args[1] : args[0];
+    if (facts !== undefined && named?.kind === 'value' && named.text !== undefined) {
+      if (signature.capability === 'fun' && !facts.functions.has(named.text)) refuse(DiagnosticCode.unknownFunction, `Function '${named.text}' not found.`, at);
+      if (signature.capability !== 'fun' && !facts.structs.has(named.text)) refuse(DiagnosticCode.unknownType, `Struct '${named.text}' not found.`, at);
+    }
+    return;
   }
   const keyed = signature?.reading === 'meta';
   args.forEach((argument, i) => {
@@ -147,6 +160,58 @@ const subjectOf = (capability: Capability | undefined, types: readonly string[],
 };
 
 /**
+ * `get_fun_doc("f")`, `get_struct_meta("key", "location")`, `get_struct_field_all_meta("location",
+ * "latitude")` — metadata of a schema function, a struct or a struct field, each named by a string.
+ * One that does not exist is refused (metadata.feature L833–L847); a missing annotation is `""`.
+ */
+function readNamedMetadata(
+  bare: string,
+  capability: 'fun' | 'struct' | 'struct_field',
+  reading: Reading,
+  args: readonly SchemaArgument[],
+  facts: SchemaFacts,
+  refuse: Refuse,
+  at: Range | undefined,
+): ReadonlyArray<ReadonlyArray<Value>> {
+  const names = args.map((argument) => {
+    if (argument.kind !== 'value' || argument.value.valueType !== 'string') {
+      return refuse(DiagnosticCode.valueTypeConflict, `Function '${bare}' names a ${capability === 'fun' ? 'function' : 'struct'} by a string.`, at);
+    }
+    return argument.value.text;
+  });
+  const key = reading === 'meta' ? names[0] : undefined;
+  const named: string[] = reading === 'meta' ? names.slice(1) : names;
+  let subject: string;
+  if (capability === 'fun') {
+    if (!facts.functions.has(named[0])) return refuse(DiagnosticCode.unknownFunction, `Function '${named[0]}' not found.`, at);
+    subject = funSubject(named[0]);
+  } else {
+    const fields = facts.structs.get(named[0]);
+    if (fields === undefined) return refuse(DiagnosticCode.unknownType, `Struct '${named[0]}' not found.`, at);
+    if (capability === 'struct_field' && !fields.has(named[1])) return refuse(DiagnosticCode.unknownType, `Struct '${named[0]}' has no field '${named[1]}'.`, at);
+    subject = capability === 'struct' ? structSubject(named[0]) : structFieldSubject(named[0], named[1]);
+  }
+  const recorded = facts.annotations.get(subject);
+  switch (reading) {
+    case 'doc': {
+      const text = recorded?.get('doc');
+      return [[string(text === undefined ? '' : (stringsOf(text)[0] ?? ''))]];
+    }
+    case 'meta': {
+      const text = recorded?.get(`meta:${key}`);
+      return [[string(text === undefined ? '' : (stringsOf(text)[1] ?? ''))]];
+    }
+    case 'all_meta':
+      return [...(recorded ?? new Map<string, string>())]
+        .filter(([category]) => category.startsWith('meta:'))
+        .map(([, text]) => {
+          const [k = '', v = ''] = stringsOf(text);
+          return [string(k), string(v)];
+        });
+  }
+}
+
+/**
  * Evaluate a schema function: every tuple it answers, each `schemaFunctionWidth` values wide.
  * Refuses an unknown label, a value where a type belongs (and the reverse), and the wrong arity.
  */
@@ -160,12 +225,12 @@ export function callSchemaFunction(
   const separator = name.lastIndexOf('::');
   const bare = separator < 0 ? name : name.slice(separator + 2);
   const signature = signatureOf(bare);
-  if (signature?.capability === 'fun' || signature?.capability === 'struct' || signature?.capability === 'struct_field') {
-    return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate the metadata function '${name}' yet.`, at);
-  }
   const arity = arityOf(bare);
   if (args.length !== arity) {
     return refuse(DiagnosticCode.functionArity, `Function '${bare}' expects '${arity}' arguments but received '${args.length}'.`, at);
+  }
+  if (signature?.capability === 'fun' || signature?.capability === 'struct' || signature?.capability === 'struct_field') {
+    return readNamedMetadata(bare, signature.capability, signature.reading, args, facts, refuse, at);
   }
   // `…meta` takes its key first, as a string value; the rest are types.
   const keyed = signature?.reading === 'meta';

@@ -26,11 +26,22 @@ Clause:
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 
+// `define` alone is valid, and defines nothing (define.feature L36).
 DefineClause:
-    'define' definitions+=Definition+;
+    {infer DefineClause} 'define' definitions+=Definition*;
 
+// `fun` and `struct` are schema definitions too — a function the schema stores, callable from any
+// query (expression.feature L1382), and a struct, whose metadata the schema functions read
+// (metadata.feature L113).
 Definition:
-    EntityDef | RelationDef | AttributeDef | TypeExtensionDef;
+    EntityDef | RelationDef | AttributeDef | TypeExtensionDef | SchemaFunction | StructDef;
+
+// `struct location @doc("…"): latitude value double @doc("…"), longitude value double;`
+StructDef:
+    'struct' name=ID annotations+=Annotation* ':' fields+=StructField (',' fields+=StructField)* ';';
+
+StructField:
+    name=ID 'value' valueType=ValueType (optional?='?')? annotations+=Annotation*;
 
 // `entity skill, owns skill-id @key, plays skill-composition:owner;`
 // `entity adr sub doc;`                     <- downstream-store's subtyping
@@ -120,17 +131,17 @@ UndefineFrom:
 UndefineTarget:
       {infer UndefineAnnotation} category=AnnotationKeyword ('(' key=STRING ')')?
     | {infer UndefineSub} 'sub' superType=ID
-    | {infer UndefineOwns} 'owns' attribute=ID
+    | {infer UndefineOwns} 'owns' attribute=ID (ordered?='[' ']')?
     | {infer UndefinePlays} 'plays' role=RoleName
-    | {infer UndefineRelates} 'relates' role=ID
+    | {infer UndefineRelates} 'relates' role=ID (ordered?='[' ']')?
     | {infer UndefineValue} 'value' valueType=ValueType
     | {infer UndefineSpecialise} 'as' role=ID;
 
 // The capability an annotation or a specialisation is removed from: `… from person owns name`.
 Capability:
-      {infer CapabilityOwns} 'owns' attribute=ID
+      {infer CapabilityOwns} 'owns' attribute=ID (ordered?='[' ']')?
     | {infer CapabilityPlays} 'plays' role=RoleName
-    | {infer CapabilityRelates} 'relates' role=ID
+    | {infer CapabilityRelates} 'relates' role=ID (ordered?='[' ']')?
     | {infer CapabilitySub} 'sub' superType=ID
     | {infer CapabilityValue} 'value' valueType=ValueType;
 
@@ -182,12 +193,17 @@ Trait:
 // 🔴 These are real Langium cross-references, not strings. Langium then resolves them, and an
 // unresolved name becomes an error for free — along with go-to-definition and find-references in
 // any editor. A grammar that merely parses `owns nonexistent-attribute` is not checking anything.
+// `owns name[]` — an ORDERED ownership, a list (define.feature L338). A different definition from
+// `owns name`, not a variant of it: one type cannot have both.
 OwnsTrait:
-    'owns' attribute=[AttributeDef:ID] annotations+=Annotation*;
+    'owns' attribute=[AttributeDef:ID] (ordered?='[' ']')? annotations+=Annotation*;
 
 // `name`, not `role`, so the role is a *named element* other references can resolve to.
+// `relates parent[]` — an ordered role, as `owns name[]` is an ordered ownership.
+// `relates father as parent` — a role SPECIALISING an inherited one: `fathership:father` is a sub-role
+// of `parentship:parent` (define.feature L635).
 RelatesTrait:
-    'relates' name=ID annotations+=Annotation*;
+    'relates' name=ID (ordered?='[' ']')? ('as' specialises=ID)? annotations+=Annotation*;
 
 // `plays employment:employee @card(0..)` — the spec annotates plays as it does owns.
 PlaysTrait:
@@ -287,9 +303,14 @@ Pipeline:
 // `with fun get_names($p: person) -> { name }: match $p has name $n; return { $n };` — a function the
 // query that follows may call (fetch.feature L1687). `-> { T, … }` answers a stream of tuples,
 // `-> T, …` one tuple (or none); a `?` marks a value that may be absent. The body is a pipeline that
-// ends in `return`. 🔴 `define fun …` — a function the SCHEMA stores — is not this, and does not parse.
+// ends in `return`. `define fun …` is the same definition without `with`, stored by the schema, and
+// may carry `@doc`/`@meta` before its body (metadata.feature L153).
 FunctionDefinition:
-    'with' 'fun' name=ID '(' (parameters+=FunctionParameter (',' parameters+=FunctionParameter)*)? ')' '->' output=FunctionOutput ':' body=FunctionBody;
+    with?='with' 'fun' name=ID '(' (parameters+=FunctionParameter (',' parameters+=FunctionParameter)*)? ')' '->' output=FunctionOutput annotations+=Annotation* ':' body=FunctionBody;
+
+// The schema's own: no `with`, the same node type, so one evaluator serves both.
+SchemaFunction infers FunctionDefinition:
+    'fun' name=ID '(' (parameters+=FunctionParameter (',' parameters+=FunctionParameter)*)? ')' '->' output=FunctionOutput annotations+=Annotation* ':' body=FunctionBody;
 
 FunctionParameter:
     variable=VAR ':' type=ValueType (optional?='?')?;
@@ -304,8 +325,10 @@ FunctionOutputType:
 FunctionBody:
     stages+=LeadStage stages+=Stage* returnStage=ReturnStage;
 
+// `update` may lead too — and is refused for what it names unbound, as TypeDB refuses it, rather than
+// failing to parse (update.feature L1097, L2046).
 LeadStage:
-    GivenStage | MatchStage | InsertStage | PutStage | DeleteStage;
+    GivenStage | MatchStage | InsertStage | PutStage | DeleteStage | UpdateStage;
 
 // `given $n: string, $p: person, $y: integer?;` — the rows the caller passes in, each variable typed
 // and `?` when it may be absent (given.feature). Only ever the first stage.
@@ -501,8 +524,10 @@ LetPattern:
 ComparisonPattern:
     left=VAR comparator=Comparator right=Expression ';';
 
+// `contains` and `like` are string predicates: `$n contains "Fun"`, `$n like "^[0-9]+$"`
+// (match.feature L3889, L3948).
 Comparator returns string:
-    '==' | '!=' | '<=' | '>=' | '<' | '>';
+    '==' | '!=' | '<=' | '>=' | '<' | '>' | 'contains' | 'like';
 
 // Precedence climbing: `+ -` < `* / %` < unary `-` < `^` (right-associative) < atoms.
 Expression:
@@ -597,8 +622,9 @@ IsaProperty:
 LabelProperty:
     'label' label=ScopedLabel;
 
+// `$x sub parenthood:parent` — a role type, under the roles that specialise it (define.feature L635).
 SubProperty:
-    (direct?='sub!' | 'sub') (type=ID | typeVariable=VAR);
+    (direct?='sub!' | 'sub') (type=ScopedLabel | typeVariable=VAR);
 
 OwnsProperty:
     'owns' (attribute=ID | attributeVariable=VAR);
@@ -606,8 +632,10 @@ OwnsProperty:
 PlaysProperty:
     'plays' (role=RoleName | roleVariable=VAR);
 
+// `$x relates $_ as child` — a role that is, or specialises, one named `child`; `as parentship:child`
+// names the one role (match.feature L3546). `as` is to roles what `sub` is to types.
 RelatesProperty:
-    'relates' (role=ID | roleVariable=VAR);
+    'relates' (role=ID | roleVariable=VAR) ('as' (specialises=ScopedLabel | specialisesVariable=VAR))?;
 
 // The value is a literal when constraining, a variable when binding for output.
 // `has $a` — any attribute, of whatever type (163 uses in the behaviour spec).

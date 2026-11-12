@@ -128,17 +128,25 @@ describe('SqliteEngine.transaction', () => {
     expect(engine.changeLog.since(0)).toHaveLength(1);
   });
 
-  it('refuses define inside a transaction, with a clear error, and rolls the transaction back', async () => {
+  it('runs define inside a transaction, which commits or rolls back with the writes beside it', async () => {
+    // TypeDB's schema transaction: a define and the writes beside it stand or fall together. The
+    // schema change is a savepoint inside the caller's transaction, not a transaction of its own.
     const engine = await fresh();
 
     await expect(
       engine.transaction(async () => {
         await engine.execute(insert('a'));
         await engine.define(schema);
+        throw new Error('abandoned');
       }),
-    ).rejects.toThrow(/define.*inside a transaction/i);
-
+    ).rejects.toThrow('abandoned');
     expect(await ids(engine)).toEqual([]);
+
+    await engine.transaction(async () => {
+      await engine.define(schema);
+      await engine.execute(insert('b'));
+    });
+    expect(await ids(engine)).toEqual(['b']);
   });
 
   it('🔴 reports the real error when SQLite has already ended the transaction under a failing pipeline', async () => {

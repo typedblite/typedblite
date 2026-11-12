@@ -26,9 +26,12 @@ import {
   type RelatesTrait,
   type TypeExtensionDef,
   type TypeQLiteFile,
+  type TypeDefinition,
 } from '@typedblite/language';
+import { isTypeDefinition } from './type-definitions.js';
 import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf, type DiagnosticCodeValue } from './diagnostics.js';
+import { ownsSubject, relatesSubject, typeSubject } from './schema-subjects.js';
 
 /**
  * What `define` has applied, as the schema rules need to read it.
@@ -58,6 +61,17 @@ export interface SchemaFacts {
   readonly annotations: ReadonlyMap<string, ReadonlyMap<string, string>>;
   /** Which types play which roles, as `playsSubject(type, "relation:role")`. */
   readonly plays: ReadonlySet<string>;
+  /** The ordered capabilities, `owns name[]` and `relates parent[]`, as their subjects. */
+  readonly ordered: ReadonlySet<string>;
+  /**
+   * Role specialisation, `relates father as parent`: each specialising role as `relation:role`, to
+   * the role it specialises as its DECLARING relation's `relation:role` — the role types' parents.
+   */
+  readonly specialises: ReadonlyMap<string, string>;
+  /** The schema's functions, by name (`define fun …`). */
+  readonly functions: ReadonlySet<string>;
+  /** The schema's structs, each with its field names (`define struct …`). */
+  readonly structs: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 /** One key for `keyOwnerships`, the shape `SchemaModel.owns` already uses. */
@@ -72,7 +86,8 @@ export interface DataFacts {
   /** Direct instances of a thing type, or values of an attribute type. */
   readonly instancesOf: (type: string) => number;
   /** A value of the attribute type held by more than one owner, if any. */
-  readonly repeatedValueOf: (attribute: string) => string | undefined;
+  /** A value of `attribute` held more than once among `owner`'s instances and its subtypes'. */
+  readonly repeatedValueOf: (attribute: string, owner: string) => string | undefined;
   /** Instances of the owner type (subtypes included) that do not hold exactly one value of the attribute. */
   readonly ownersWithoutExactlyOne: (owner: string, attribute: string) => number;
 }
@@ -111,7 +126,7 @@ export function checkSchemaRules(
   const soFar = { parents: new Map(applied.parents), valueTypes: new Map(applied.valueTypes) };
   for (const clause of file.clauses) {
     if (!isDefineClause(clause)) continue;
-    for (const definition of clause.definitions) {
+    for (const definition of clause.definitions.filter(isTypeDefinition)) {
       const name = nameOf(definition);
       const before: SchemaFacts = { ...proposed, parents: soFar.parents, valueTypes: soFar.valueTypes };
       checkKindUnchanged(definition, name, applied, refuse);
@@ -119,6 +134,7 @@ export function checkSchemaRules(
       checkSupertypeKind(definition, name, proposed, refuse);
       checkNoCycle(definition, name, before, refuse);
       checkAnnotationsForKind(definition, name, proposed, data, refuse);
+      checkAbstractUnderConcrete(definition, name, file, proposed, refuse);
       const declaredParent = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
       if (isAttributeDef(definition) || (isTypeExtensionDef(definition) && proposed.attributes.has(name))) {
         checkAttributeValueType(definition, name, declaredParent, before, proposed, refuse);
@@ -139,13 +155,32 @@ export function checkSchemaRules(
       for (const trait of definition.traits) {
         if (isOwnsTrait(trait)) checkOwns(trait, name, proposed, data, refuse);
         if (isPlaysTrait(trait)) checkPlays(trait, name, proposed, refuse);
-        if (isRelatesTrait(trait)) checkRelates(trait, name, proposed, refuse);
+        if (isRelatesTrait(trait)) checkRelates(trait, name, proposed, refuse, applied);
       }
     }
   }
 }
 
-const nameOf = (definition: Definition): string =>
+/**
+ * An abstract type is not a subtype of a concrete one (define.feature L2366, L2434): `entity
+ * typedb-exception @abstract, sub exception;` under a concrete `exception` is refused.
+ */
+function checkAbstractUnderConcrete(definition: TypeDefinition, name: string, file: TypeQLiteFile, proposed: SchemaFacts, refuse: Refuse): void {
+  if (!definition.annotations.some((a) => a.$type === 'AbstractAnnotation')) return;
+  const parent = proposed.parents.get(name);
+  if (parent === undefined) return;
+  const declaredAbstractHere = file.clauses.some((clause) =>
+    isDefineClause(clause) && clause.definitions.filter(isTypeDefinition).some((d) => nameOf(d) === parent && d.annotations.some((a) => a.$type === 'AbstractAnnotation')),
+  );
+  if (declaredAbstractHere || proposed.annotations.get(typeSubject(parent))?.has('abstract')) return;
+  refuse(
+    DiagnosticCode.abstractType,
+    `'${name}' is abstract and cannot be a subtype of '${parent}', which is not: an abstract type sits above concrete ones, not below.`,
+    rangeOf(definition),
+  );
+}
+
+const nameOf = (definition: TypeDefinition): string =>
   isTypeExtensionDef(definition) ? definition.type : definition.name;
 
 /** The applied facts with this statement's declarations laid over them. */
@@ -156,6 +191,7 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
   const parents = new Map(applied.parents);
   const valueTypes = new Map(applied.valueTypes);
   const roles = new Map([...applied.roles].map(([relation, set]) => [relation, new Set(set)]));
+  const specialising: Array<[string, string, string]> = [];
   const declareRole = (relation: string, role: string): void => {
     const set = roles.get(relation) ?? new Set<string>();
     set.add(role);
@@ -163,7 +199,7 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
   };
   for (const clause of file.clauses) {
     if (!isDefineClause(clause)) continue;
-    for (const definition of clause.definitions) {
+    for (const definition of clause.definitions.filter(isTypeDefinition)) {
       const name = nameOf(definition);
       if (isEntityDef(definition) || isRelationDef(definition)) {
         types.add(name);
@@ -182,9 +218,18 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
       if (!isAttributeDef(definition)) {
         for (const trait of definition.traits) {
           if (isRelatesTrait(trait)) declareRole(name, trait.name);
+          if (isRelatesTrait(trait) && trait.specialises !== undefined) specialising.push([name, trait.name, trait.specialises]);
         }
       }
     }
+  }
+  // Resolved once every parent and role of the statement is known: `relation b sub a, relates x as y;
+  // relation a relates y;` is one statement, in either order.
+  const specialises = new Map(applied.specialises);
+  const resolving = { ...applied, parents } as SchemaFacts;
+  for (const [relation, role, parent] of specialising) {
+    const declaring = ancestorsOf(relation, resolving).find((t) => roles.get(t)?.has(parent));
+    if (declaring !== undefined) specialises.set(`${relation}:${role}`, `${declaring}:${parent}`);
   }
   // `keyOwnerships` is the APPLIED set on purpose: the rule that reads it asks whether this
   // statement adds a key, which the statement's own annotations cannot answer.
@@ -194,6 +239,10 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
     keyOwnerships: applied.keyOwnerships,
     annotations: applied.annotations,
     plays: applied.plays,
+    ordered: applied.ordered,
+    specialises,
+    functions: applied.functions,
+    structs: applied.structs,
   };
 }
 
@@ -244,7 +293,7 @@ function roleDeclaredBy(relation: string, role: string, facts: SchemaFacts): str
  * `employment` is a relation — a label keeps its kind (`define.feature` L2610, L2619, L2626).
  * A re-open has no kind keyword and cannot contradict one.
  */
-function checkKindUnchanged(definition: Definition, name: string, applied: SchemaFacts, refuse: Refuse): void {
+function checkKindUnchanged(definition: TypeDefinition, name: string, applied: SchemaFacts, refuse: Refuse): void {
   if (isTypeExtensionDef(definition)) return;
   const before = kindOf(name, applied);
   const now: Kind = isEntityDef(definition) ? 'entity' : isRelationDef(definition) ? 'relation' : 'attribute';
@@ -264,13 +313,13 @@ function checkKindUnchanged(definition: Definition, name: string, applied: Schem
  * is how the spec re-opens types. `facts` is the chain before this definition, so `entity c sub
  * a; c sub b;` in one statement is the switch it is.
  */
-function checkSupertypeUnchanged(definition: Definition, name: string, facts: SchemaFacts, refuse: Refuse): void {
+function checkSupertypeUnchanged(definition: TypeDefinition, name: string, facts: SchemaFacts, refuse: Refuse): void {
   const declared = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
   const before = facts.parents.get(name);
   if (declared === undefined || before === undefined || declared === before) return;
   refuse(
     DiagnosticCode.supertypeChanged,
-    `'${name}' already has supertype '${before}' and cannot be switched to '${declared}' through ` +
+    `A different '${name} sub ${before}' is already defined: '${name}' cannot be switched to '${declared}' through ` +
       `define. Use redefine to change a supertype.`,
     rangeOf(definition),
   );
@@ -282,7 +331,7 @@ function checkSupertypeUnchanged(definition: Definition, name: string, facts: Sc
  * that the parent exists; this settles what it is. Without it the `isa` closure answered entities
  * for a relation type (review, round 1).
  */
-function checkSupertypeKind(definition: Definition, name: string, proposed: SchemaFacts, refuse: Refuse): void {
+function checkSupertypeKind(definition: TypeDefinition, name: string, proposed: SchemaFacts, refuse: Refuse): void {
   const declared = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
   if (declared === undefined) return;
   const childKind = isEntityDef(definition)
@@ -307,7 +356,7 @@ function checkSupertypeKind(definition: Definition, name: string, proposed: Sche
  * that definition (L3474; `dog sub dog` at L3467). `facts.parents` is the chain before this
  * definition, so the one that closes the loop is the one named.
  */
-function checkNoCycle(definition: Definition, name: string, facts: SchemaFacts, refuse: Refuse): void {
+function checkNoCycle(definition: TypeDefinition, name: string, facts: SchemaFacts, refuse: Refuse): void {
   const declared = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
   if (declared === undefined) return;
   if (declared !== name && !ancestorsOf(declared, facts).includes(name)) return;
@@ -336,7 +385,7 @@ function checkNoCycle(definition: Definition, name: string, facts: SchemaFacts, 
  * this is a named edge and not a live one.
  */
 function checkAnnotationsForKind(
-  definition: Definition,
+  definition: TypeDefinition,
   name: string,
   proposed: SchemaFacts,
   data: DataFacts,
@@ -477,6 +526,10 @@ function checkOwns(trait: OwnsTrait, owner: string, proposed: SchemaFacts, data:
       rangeOf(trait),
     );
   }
+  // `owns name[]` and `owns name` are two definitions of one capability, and a type has one (L338).
+  if (proposed.owns.has(ownershipKey(owner, attribute))) {
+    checkOrderUnchanged(`${owner} owns ${attribute}`, proposed.ordered.has(ownsSubject(owner, attribute)), trait.ordered === true, trait, refuse);
+  }
   const valueType = valueTypeOf(attribute, proposed);
   for (const annotation of trait.annotations) {
     checkArgumentsFit(annotation, attribute, valueType, refuse);
@@ -485,7 +538,7 @@ function checkOwns(trait: OwnsTrait, owner: string, proposed: SchemaFacts, data:
     // before the DDL, so the refusal names the attribute; the UNIQUE index failing to build is
     // the backstop, not the rule.
     if (isKeyAnnotation(annotation) || isUniqueAnnotation(annotation)) {
-      const repeated = data.repeatedValueOf(attribute);
+      const repeated = data.repeatedValueOf(attribute, owner);
       if (repeated !== undefined) {
         refuse(
           DiagnosticCode.dataDoesNotConform,
@@ -592,7 +645,37 @@ function checkPlays(trait: PlaysTrait, player: string, proposed: SchemaFacts, re
  * parent;` when `parentship relates parent` is above it is refused with the message the scenario
  * matches on (L1003).
  */
-function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFacts, refuse: Refuse): void {
+/**
+ * A restated `owns`/`relates` keeps its ordering: TypeDB's *"different 'person owns name' is already
+ * defined"* (define.feature L338, L599) names the one APPLIED. Changing it is `redefine`'s.
+ */
+function checkOrderUnchanged(capability: string, appliedOrdered: boolean, statedOrdered: boolean, trait: OwnsTrait | RelatesTrait, refuse: Refuse): void {
+  if (appliedOrdered === statedOrdered) return;
+  refuse(
+    DiagnosticCode.alreadyDefined,
+    `'${capability}${statedOrdered ? '[]' : ''}' cannot be defined: a different '${capability}${appliedOrdered ? '[]' : ''}' ` +
+      `is already defined, and \`define\` does not change an ordering. Try redefine instead.`,
+    rangeOf(trait),
+  );
+}
+
+function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFacts, refuse: Refuse, applied: SchemaFacts): void {
+  if (applied.roles.get(relation)?.has(trait.name) === true) {
+    checkOrderUnchanged(`${relation} relates ${trait.name}`, applied.ordered.has(relatesSubject(relation, trait.name)), trait.ordered === true, trait, refuse);
+    // A restatement keeps its specialisation (define.feature L619) — changing it is `redefine`'s.
+    // Adding one to a role defined without one is a definition, not a change (redefine.feature L630).
+    const before = applied.specialises.get(`${relation}:${trait.name}`);
+    const stated = trait.specialises;
+    if (before !== undefined && stated !== undefined && before.split(':')[1] !== stated) {
+      refuse(
+        DiagnosticCode.alreadyDefined,
+        `'${relation} relates ${trait.name}${stated === undefined ? '' : ` as ${stated}`}' cannot be defined: a different ` +
+          `'${relation} relates ${trait.name}${before === undefined ? '' : ` as ${before.split(':')[1]}`}' is already defined. Try redefine instead.`,
+        rangeOf(trait),
+      );
+    }
+  }
+  if (trait.specialises !== undefined) checkSpecialisation(trait, trait.specialises, relation, proposed, refuse);
   const kind = kindOf(relation, proposed) ?? 'entity';
   if (kind !== 'relation') {
     refuse(
@@ -613,6 +696,35 @@ function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFac
       `or use the inherited role.`,
     rangeOf(trait),
   );
+}
+
+/**
+ * `relates father as parent`: `parent` must be a role the relation INHERITS — declared above it
+ * (define.feature L685) — and inherited without specialisation: once `parentship` specialises
+ * `family-relation:member`, a relation below it cannot specialise `member` again (L985). Several
+ * roles of ONE relation may specialise the same role (L943).
+ */
+export function checkSpecialisation(trait: RelatesTrait, parent: string, relation: string, proposed: SchemaFacts, refuse: Refuse): void {
+  const above = ancestorsOf(relation, proposed);
+  const declaring = above.find((type) => proposed.roles.get(type)?.has(parent));
+  if (declaring === undefined) {
+    refuse(
+      DiagnosticCode.unknownRole,
+      `'${relation} relates ${trait.name} as ${parent}': no supertype of '${relation}' relates '${parent}', so there is no role to specialise.`,
+      rangeOf(trait),
+    );
+    return;
+  }
+  const between = above.slice(0, above.indexOf(declaring));
+  const specialisedBy = between.find((type) => [...proposed.specialises].some(([child, of]) => child.startsWith(`${type}:`) && of === `${declaring}:${parent}`));
+  if (specialisedBy !== undefined) {
+    refuse(
+      DiagnosticCode.roleRedeclared,
+      `'${relation} relates ${trait.name} as ${parent}': '${declaring}:${parent}' must be inherited without specialization, ` +
+        `and '${specialisedBy}' already specialises it.`,
+      rangeOf(trait),
+    );
+  }
 }
 
 const article = (word: string): string => (/^[aeiou]/.test(word) ? 'an' : 'a');

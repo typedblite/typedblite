@@ -70,9 +70,9 @@ describe('a refusal never depends on the data', () => {
     ['match $p isa person, has ref R, has born $b; $b == 2000-01-01T00:00:00;', 'no refusal', 'read'],
     ['match $p isa person, has ref R, has stamp $b; $b == 2000-01-01T00:00:00Z;', DiagnosticCode.notImplemented, 'read'],
     ['match $p isa person, has ref R, has age $b; $b == 2000-01-01;', DiagnosticCode.notImplemented, 'read'],
-    // Schema functions (metadata.feature): `get_fun_…` is not implemented; the rest refuse their
+    // Schema functions (metadata.feature): `get_fun_…` of no function is refused by name; the rest refuse their
     // arity, argument kinds and labels from the query's shape, before a row exists.
-    ['match $p isa person, has ref R; let $v = get_fun_doc("f");', DiagnosticCode.notImplemented, 'read'],
+    ['match $p isa person, has ref R; let $v = get_fun_doc("f");', DiagnosticCode.unknownFunction, 'read'],
     ['match $p isa person, has ref R; let $v = get_owns_doc(1);', DiagnosticCode.functionArity, 'read'],
     ['match $p isa person, has ref R; let $v = get_doc(1);', DiagnosticCode.valueTypeConflict, 'read'],
     ['match $p isa person, has ref R; let $v = get_meta(person, person);', DiagnosticCode.valueTypeConflict, 'read'],

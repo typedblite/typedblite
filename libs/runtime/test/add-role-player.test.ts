@@ -87,11 +87,11 @@ describe('adding a role player to an existing relation', () => {
     assert.throws(() => engine.execute('match $x isa node, has node-id "b"; insert $nope links (source: $x);'), /dangling/);
   });
 
-  it('a duplicate edge is reported as one, and nothing else is', () => {
-    assert.throws(
-      () => engine.execute('match $l isa link, has edge-id "e"; $a isa node, has node-id "a"; insert $l links (source: $a);'),
-      /already plays 'source'/,
-    );
+  it('a player added again in the same role is a repeated role player, counted — insert.feature L938', () => {
+    engine.execute('match $l isa link, has edge-id "e"; $a isa node, has node-id "a"; insert $l links (source: $a);');
+    // Still one source by distinct player, and now twice over: `(source: $x, source: $x)` holds.
+    assert.deepEqual(sourcesOf('e'), ['a']);
+    assert.equal(engine.query('match $l isa link, has edge-id "e"; $l links (source: $x, source: $x); select $x;').rows.length, 1);
   });
 
   it('the one-statement form still works', () => {

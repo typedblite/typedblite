@@ -9,8 +9,10 @@ import type { SqliteDatabase } from './sqlite-database.js';
  *
  * - `attribute.id` is a local join key. It never appears in an answer, a change-log document or a
  *   replicated revision — an attribute's identity is its type and value, the same on every node.
- * - `has.type` copies the attribute's type so `@key`/`@unique` stay partial unique indexes on
- *   `has(attribute)`, and "does this owner have a T" reads `has` alone.
+ * - `has.type` copies the attribute's type, so "does this owner have a T" reads `has` alone.
+ * - `has.scope` names the type a `@key`/`@unique` holds among (`uniquenessScope`), and one partial
+ *   unique index on `(attribute, scope)` enforces every such ownership — scoped per owner type, as
+ *   TypeDB's are (insert.feature L1662–L1729; ADR-006 amendment).
  * - A lookup by value starts from the value: `attribute(type, value)` finds the one instance and
  *   `has(attribute)` its owners — see `OWNERS_OF_VALUE`.
  * - `attribute_sweep` collects every attribute that was created or lost an ownership, by trigger, so
@@ -30,8 +32,14 @@ CREATE TABLE IF NOT EXISTS has (
   owner     INTEGER NOT NULL REFERENCES thing(iid) ON DELETE CASCADE,
   attribute INTEGER NOT NULL REFERENCES attribute(id) ON DELETE CASCADE,
   type      TEXT NOT NULL,
+  -- For a @key or @unique ownership, the type the uniqueness is among: the top-most type declaring
+  -- it, whose instances and subtypes' instances may not share the value. NULL otherwise.
+  scope     TEXT,
   PRIMARY KEY (owner, attribute)
 );
+-- @key and @unique, for every owner type at once: one owner per value within a scope (ADR-006,
+-- amendment). A person and a friendship may each have ref 0; a base and its derived may not.
+CREATE UNIQUE INDEX IF NOT EXISTS has_unique_in_scope ON has(attribute, scope) WHERE scope IS NOT NULL;
 -- has(owner) and not (owner, type): an owner's ownerships are read in the order they were made
 -- (ORDER BY rowid), and only an index on owner alone yields that order without a sort. Measured on
 -- the downstream-app stores, the sort cost ~10% of every query (2026-11-11).
@@ -76,16 +84,86 @@ export function attributeId(db: SqliteDatabase, type: string, value: string): nu
 }
 
 /**
+ * The type a `@key`/`@unique` on `(ownerType, attributeType)` holds among, or `null` when the
+ * ownership is neither: the TOP-MOST type in the owner's ancestry that declares a key or unique
+ * ownership of the attribute or one of its supertypes — so a `derived` and a `base` share the
+ * scope `base` declared (insert.feature L1671, L1704). Read from the stored schema, so the change
+ * log's replication path computes the same scope as a local write.
+ */
+export function uniquenessScope(db: SqliteDatabase, ownerType: string, attributeType: string): string | null {
+  // A store from before `schema_owns`/`schema_annotation` records no key to scope by; its next
+  // `define` (every repository re-defines on open) records them and rescopes.
+  const recorded = db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN ('schema_owns', 'schema_annotation')").get() as { n: number };
+  if (Number(recorded.n) < 2) return null;
+  const row = db
+    .prepare(
+      `WITH RECURSIVE owner_chain(type, depth) AS (
+         SELECT ?, 0 UNION ALL SELECT p.parent, c.depth + 1 FROM type_parent p JOIN owner_chain c ON p.type = c.type WHERE c.depth < 64
+       ),
+       attribute_chain(type, depth) AS (
+         SELECT ?, 0 UNION ALL SELECT p.parent, c.depth + 1 FROM type_parent p JOIN attribute_chain c ON p.type = c.type WHERE c.depth < 64
+       )
+       SELECT o.type AS scope FROM owner_chain o
+       JOIN schema_owns so ON so.type = o.type
+       JOIN attribute_chain a ON a.type = so.attribute
+       JOIN schema_annotation sa ON sa.subject = so.type || char(31) || 'owns' || char(31) || so.attribute AND sa.category IN ('key', 'unique')
+       ORDER BY o.depth DESC LIMIT 1`,
+    )
+    .get(ownerType, attributeType) as { scope: string } | undefined;
+  return row === undefined ? null : String(row.scope);
+}
+
+/**
+ * Every ownership's scope, recomputed — after a schema change that may add, move or remove a
+ * `@key`/`@unique`. Run inside the change's transaction: a scope the data does not satisfy fails
+ * the unique index and the change rolls back with it. Writes only rows whose scope changes.
+ */
+export function rescopeOwnerships(db: SqliteDatabase): void {
+  const pairs = db.prepare('SELECT DISTINCT t.type AS owner, h.type AS attribute FROM has h JOIN thing t ON t.iid = h.owner').all() as Array<{ owner: string; attribute: string }>;
+  const update = db.prepare('UPDATE has SET scope = ? WHERE type = ? AND scope IS NOT ? AND owner IN (SELECT iid FROM thing WHERE type = ?)');
+  for (const pair of pairs) {
+    const scope = uniquenessScope(db, String(pair.owner), String(pair.attribute));
+    update.run(scope, String(pair.attribute), scope, String(pair.owner));
+  }
+}
+
+/**
+ * A store whose `has` predates `has.scope` — written by an earlier build of ADR-006 — gets the column
+ * and the scoped index, loses the per-attribute `key_*`/`unique_*` indexes they replace, and has its
+ * ownerships scoped. Idempotent; a store with no `has` is left alone.
+ */
+export function ensureScopedUniqueness(db: SqliteDatabase): void {
+  if (!hasAttributeTables(db)) return;
+  const columns = (db.prepare("SELECT name FROM pragma_table_info('has')").all() as Array<{ name: string }>).map((c) => String(c.name));
+  const legacyIndexes = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'has'").all() as Array<{ name: string }>)
+    .map((r) => String(r.name))
+    .filter((name) => name.startsWith('key_') || name.startsWith('unique_'));
+  if (columns.includes('scope') && legacyIndexes.length === 0) return;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    if (!columns.includes('scope')) db.exec('ALTER TABLE has ADD COLUMN scope TEXT');
+    for (const name of legacyIndexes) db.exec(`DROP INDEX IF EXISTS "${name}"`);
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS has_unique_in_scope ON has(attribute, scope) WHERE scope IS NOT NULL');
+    rescopeOwnerships(db);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+/**
  * Make `owner` own the attribute; `false` when it already did — ownership is a set.
  *
  * 🔴 Checked, then a plain INSERT — never `INSERT OR IGNORE`. OR IGNORE swallows a UNIQUE-index
  * conflict too, and the `@key`/`@unique` indexes are UNIQUE indexes on `has`: a duplicate key
  * would have been dropped in silence instead of refused.
  */
-export function ownAttribute(db: SqliteDatabase, owner: number, type: string, value: string): boolean {
+export function ownAttribute(db: SqliteDatabase, owner: number, type: string, value: string, ownerType?: string): boolean {
   const { id } = ensureAttribute(db, type, value);
   if (db.prepare('SELECT 1 FROM has WHERE owner = ? AND attribute = ?').get(owner, id) !== undefined) return false;
-  db.prepare('INSERT INTO has(owner, attribute, type) VALUES (?, ?, ?)').run(owner, id, type);
+  const thingType = ownerType ?? String((db.prepare('SELECT type FROM thing WHERE iid = ?').get(owner) as { type: string }).type);
+  db.prepare('INSERT INTO has(owner, attribute, type, scope) VALUES (?, ?, ?, ?)').run(owner, id, type, uniquenessScope(db, thingType, type));
   return true;
 }
 
@@ -125,10 +203,10 @@ export function hasAttributeTables(db: SqliteDatabase): boolean {
 /**
  * Move a store written before ADR-006 off `attr`, once, in one transaction (ADR-006 Decision 6).
  *
- * Every attribute in such a store has an owner, so nothing is swept. The `@key`/`@unique` indexes
- * are rebuilt from their own SQL — the same name and the same `WHERE type = …`, now on
- * `has(attribute)` — so no schema knowledge is needed here. ⚠️ One-way: a build from before ADR-006
- * cannot read the store afterwards.
+ * Every attribute in such a store has an owner, so nothing is swept. The per-attribute `@key`/
+ * `@unique` indexes are not rebuilt: the scoped index replaces them, and every ownership is scoped
+ * from the stored schema (ADR-006 amendment). ⚠️ One-way: a build from before ADR-006 cannot read
+ * the store afterwards.
  */
 export function migrateAttrTable(db: SqliteDatabase): boolean {
   const legacy = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'attr'").get();
@@ -141,18 +219,9 @@ export function migrateAttrTable(db: SqliteDatabase): boolean {
       'INSERT OR IGNORE INTO has(owner, attribute, type) ' +
         'SELECT a.owner, v.id, a.type FROM attr a JOIN attribute v ON v.type = a.type AND v.value = a.value ORDER BY a.rowid',
     );
-    const indexes = db
-      .prepare(
-        "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'attr' AND sql IS NOT NULL " +
-          "AND (name LIKE 'key\\_%' ESCAPE '\\' OR name LIKE 'unique\\_%' ESCAPE '\\')",
-      )
-      .all() as Array<{ name: string; sql: string }>;
+    // The per-attribute `key_*`/`unique_*` indexes go with `attr`; the scoped index replaces them.
     db.exec('DROP TABLE attr');
-    for (const index of indexes) {
-      const rebuilt = String(index.sql).replace(/\bON\s+"?attr"?\s*\(\s*value\s*\)/i, 'ON has(attribute)');
-      if (rebuilt === index.sql) throw new Error(`TypeDBLite: cannot move index '${index.name}' off attr: ${index.sql}`);
-      db.exec(rebuilt);
-    }
+    rescopeOwnerships(db);
     db.exec('DELETE FROM attribute_sweep');
     db.exec('COMMIT');
     return true;

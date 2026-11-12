@@ -81,14 +81,16 @@ describe('the admissibility table, row by row', () => {
 
   it('names where a misplaced annotation belongs', async () => {
     const [refusal] = await notAdmitted('define entity player @card(1..1);');
-    expect(refusal.message).toMatch(/applies to `owns`, `relates`, `plays`/);
+    expect(refusal.message).toMatch(/applies to `owns`, `owns list`, `relates`, `relates list`, `plays`/);
   });
 
-  it('has no home for @distinct until lists exist, and says so', async () => {
+  it('admits @distinct on a list only, and says where it goes — define.feature L1728, L1608', async () => {
     const [refusal] = await notAdmitted(
       'define attribute name value string; entity player owns name @distinct;',
     );
-    expect(refusal.message).toMatch(/Nothing in this grammar admits it yet/);
+    expect(refusal.message).toMatch(/applies to `owns list`, `relates list`/);
+    expect(await notAdmitted('define attribute name value string; entity player owns name[] @distinct;')).toEqual([]);
+    expect(await notAdmitted('define relation parentship relates parent[] @distinct;')).toEqual([]);
   });
 });
 

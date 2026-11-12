@@ -82,25 +82,25 @@ Rules:
 
 | Feature | Passing |
 |---|---|
-| define | 417 |
-| redefine | 155 |
-| undefine | 133 |
-| expression | 124 |
+| define | 469 |
+| redefine | 196 |
+| undefine | 174 |
+| expression | 129 |
 | reduce | 65 |
-| insert | 107 |
-| match | 85 |
-| delete | 30 |
+| insert | 125 |
+| match | 111 |
+| delete | 40 |
 | fetch | 65 |
-| pipelines | 10 |
+| pipelines | 12 |
 | modifiers | 34 |
-| update | 34 |
+| update | 59 |
 | variables | 12 |
 | disjunction | 9 |
 | given | 18 |
-| metadata | 107 |
+| metadata | 122 |
 | negation | 15 |
 | optional | 10 |
-| put | 9 |
+| put | 11 |
 
 ## Tests
 
