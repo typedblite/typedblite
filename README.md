@@ -222,6 +222,7 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 | [ADR-006](docs/architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md) | An Attribute Is Stored Once per Type and Value |
 | [ADR-007](docs/architecture/adr-007-a-scenario-typedb-itself-fails-is-a-deviation.md) | A Scenario TypeDB Itself Fails Is a Deviation |
 | [ADR-008](docs/architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md) | The TypeQLite Editor Is a Langium Language Server in This Repository |
+| [ADR-009](docs/architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md) | TypeDBLite Runs in the Browser on WASM SQLite |
 
 **Standards:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md) · [Multi-Phase Lifecycle Standard](docs/standards/governance/multi-phase-lifecycle-standard.md)
 
