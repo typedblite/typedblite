@@ -58,9 +58,32 @@ export async function workspace(files: Record<string, string>) {
     return document as LangiumDocument<TypeQLiteFile>;
   };
 
+  /**
+   * The position just inside the `occurrence`th match of `needle` in a document, so that a request
+   * lands on that word rather than on the boundary before it.
+   */
+  const positionOf = (name: string, needle: string, occurrence = 0) => {
+    const document = documentOf(name);
+    const text = document.textDocument.getText();
+    let offset = -1;
+    for (let i = 0; i <= occurrence; i += 1) {
+      offset = text.indexOf(needle, offset + 1);
+      if (offset < 0) throw new Error(`'${needle}' occurs fewer than ${occurrence + 1} times in ${name}.`);
+    }
+    return document.textDocument.positionAt(offset + 1);
+  };
+
+  /** The text document identifier and a position, as every LSP request carries them. */
+  const at = (name: string, needle: string, occurrence = 0) => ({
+    textDocument: { uri: uriOf(name).toString() },
+    position: positionOf(name, needle, occurrence),
+  });
+
   return {
     services,
     documentOf,
+    positionOf,
+    at,
     diagnostics: (name: string): Diagnostic[] => documentOf(name).diagnostics ?? [],
     messages: (name: string): string[] =>
       (documentOf(name).diagnostics ?? []).map((d) =>

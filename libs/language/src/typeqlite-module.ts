@@ -6,6 +6,7 @@ import {
   type LangiumServices,
   type LangiumSharedServices,
   type PartialLangiumServices,
+  type PartialLangiumSharedServices,
 } from 'langium/lsp';
 import {
   TypeQLiteGeneratedModule,
@@ -20,6 +21,11 @@ import { TypeQLiteScopeProvider } from './typeqlite-scope.js';
 import { TypeQLiteScopeComputation } from './typeqlite-scope-computation.js';
 import { TypeQLiteFormatter } from './typeqlite-formatter.js';
 import { TypeQLiteSemanticTokenProvider } from './typeqlite-semantic-tokens.js';
+import {
+  TypeQLiteDocumentSymbolProvider,
+  TypeQLiteHoverProvider,
+  TypeQLiteNodeKindProvider,
+} from './typeqlite-navigation.js';
 
 /** Language-specific services — the seam ADR-002 Decision 7's middle layer lives in. */
 export interface TypeQLiteAddedServices {
@@ -40,6 +46,8 @@ export const TypeQLiteModule: Module<
   lsp: {
     Formatter: () => new TypeQLiteFormatter(),
     SemanticTokenProvider: (services) => new TypeQLiteSemanticTokenProvider(services),
+    DocumentSymbolProvider: (services) => new TypeQLiteDocumentSymbolProvider(services),
+    HoverProvider: (services) => new TypeQLiteHoverProvider(services),
   },
   references: {
     ScopeProvider: (services) => new TypeQLiteScopeProvider(services),
@@ -56,6 +64,13 @@ export const TypeQLiteModule: Module<
   },
 };
 
+/** Services shared across languages: here, only what kind of symbol each definition is. */
+export const TypeQLiteSharedModule: Module<LangiumSharedServices, PartialLangiumSharedServices> = {
+  lsp: {
+    NodeKindProvider: () => new TypeQLiteNodeKindProvider(),
+  },
+};
+
 export function createTypeQLiteServices(context: DefaultSharedModuleContext): {
   shared: LangiumSharedServices;
   TypeQLite: TypeQLiteServices;
@@ -63,6 +78,7 @@ export function createTypeQLiteServices(context: DefaultSharedModuleContext): {
   const shared = inject(
     createDefaultSharedModule(context),
     TypeQLiteGeneratedSharedModule,
+    TypeQLiteSharedModule,
   );
   const TypeQLite = inject(
     createDefaultModule({ shared }),
