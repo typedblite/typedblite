@@ -27,6 +27,7 @@ import {
   TypeQLiteNodeKindProvider,
 } from './typeqlite-navigation.js';
 import { TypeQLiteLabels } from './typeqlite-labels.js';
+import { TypeQLiteCompletionProvider } from './typeqlite-completion.js';
 import {
   TypeQLiteDefinitionProvider,
   TypeQLiteDocumentBuilder,
@@ -61,6 +62,7 @@ export const TypeQLiteModule: Module<
     HoverProvider: (services) => new TypeQLiteHoverProvider(services),
     DefinitionProvider: (services) => new TypeQLiteDefinitionProvider(services),
     ReferencesProvider: (services) => new TypeQLiteReferencesProvider(services),
+    CompletionProvider: (services) => new TypeQLiteCompletionProvider(services),
   },
   labels: {
     Labels: (services) => new TypeQLiteLabels(services),

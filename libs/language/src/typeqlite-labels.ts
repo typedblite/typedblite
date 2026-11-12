@@ -17,6 +17,7 @@ import {
   isAnonRelationPattern,
   isCapabilityOwns,
   isCapabilitySub,
+  isFetchAttribute,
   isHasProperty,
   isIsaProperty,
   isKindLabelPattern,
@@ -128,6 +129,19 @@ export class TypeQLiteLabels {
       .filter((role) => role.name === site.name);
   }
 
+  /**
+   * Every definition a label of this kind could name: what completion offers (ADR-008 D5). A role
+   * whose relation is known offers that relation's roles, inherited ones included.
+   */
+  candidates(kind: LabelKind, relation?: string): AstNode[] {
+    if (kind !== 'role') return this.definitionsOf(undefined, TARGETS[kind]);
+    const relations =
+      relation !== undefined
+        ? this.relationChain(relation)
+        : this.definitionsOf(undefined, [RelationDef.$type]).filter(isRelationDef);
+    return relations.flatMap((each) => this.rolesOf(each));
+  }
+
   /** Every label site in the workspace that names this definition. */
   usesOf(target: AstNode): LabelSite[] {
     const name = (target as { name?: string }).name;
@@ -175,6 +189,39 @@ export class TypeQLiteLabels {
   }
 }
 
+/**
+ * The same label positions, by grammar rule and property: what completion sees while a statement is
+ * still being typed, before there is an AST node to ask. 🔴 Keep it in step with `sitesOf` below;
+ * `labels.spec.ts` checks that every entry still names a real rule and property.
+ */
+export const LABEL_POSITIONS: Readonly<Record<string, LabelKind>> = {
+  'IsaProperty.type': 'type',
+  'HasProperty.attribute': 'attribute',
+  'FetchAttribute.attribute': 'attribute',
+  'OwnsProperty.attribute': 'attribute',
+  'TypePattern.subject': 'type',
+  'KindLabelPattern.label': 'type',
+  'AnonRelationPattern.type': 'relation',
+  'TypeExtensionDef.type': 'type',
+  'TypeExtensionDef.superType': 'type',
+  'RoleName.relation': 'relation',
+  'RoleName.role': 'role',
+  'RolePlayer.role': 'role',
+  'RelatesProperty.role': 'role',
+  'SubProperty.type': 'type',
+  'LabelProperty.label': 'type',
+  'RelatesProperty.specialises': 'role',
+  'UndefineTarget.attribute': 'attribute',
+  'UndefineTarget.superType': 'type',
+  'UndefineTarget.role': 'role',
+  'Capability.attribute': 'attribute',
+  'Capability.superType': 'type',
+  'UndefineFrom.type': 'type',
+  'UndefineType.type': 'type',
+  'RedefineType.type': 'type',
+  'RedefineChange.superType': 'type',
+};
+
 /** The label sites one AST node holds. */
 function sitesOf(document: LangiumDocument, node: AstNode): LabelSite[] {
   const site = (
@@ -219,6 +266,7 @@ function sitesOf(document: LangiumDocument, node: AstNode): LabelSite[] {
 
   if (isIsaProperty(node)) return site('type', node.type, 'type');
   if (isHasProperty(node)) return site('attribute', node.attribute, 'attribute');
+  if (isFetchAttribute(node)) return site('attribute', node.attribute, 'attribute');
   if (isOwnsProperty(node)) return site('attribute', node.attribute, 'attribute');
   if (isTypePattern(node)) return site('subject', node.subject, 'type');
   if (isKindLabelPattern(node)) return site('label', node.label, node.kind as LabelKind);

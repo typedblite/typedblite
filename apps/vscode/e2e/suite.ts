@@ -150,8 +150,15 @@ const cases: Record<string, () => Promise<void>> = {
       at,
     );
     const files = (found ?? []).map((l) => l.uri.fsPath.split('/').pop()).sort();
-    // `labels.tql` holds `has nav-name`: a label, found since Phase 04 (ADR-008 D5).
-    assert.deepEqual(files, ['labels.tql', 'nav-people.typeqlite', 'nav-shared.typeqlite']);
+    // The declaration, the `owns` in another schema file, and `has nav-name` in a query (a label,
+    // found since Phase 04, ADR-008 D5). Other fixtures may use it too, so every hit must be a real use.
+    for (const expected of ['nav-shared.typeqlite', 'nav-people.typeqlite', 'labels.tql']) {
+      assert.ok(files.includes(expected), `references include ${expected}`);
+    }
+    for (const location of found ?? []) {
+      const text = (await vscode.workspace.openTextDocument(location.uri)).getText(location.range);
+      assert.equal(text, 'nav-name');
+    }
   },
 
   async 'the outline lists definitions, roles and re-opens'() {
@@ -230,6 +237,26 @@ const cases: Record<string, () => Promise<void>> = {
     assert.equal(codeOf(warning), 'typedblite.unknown-label');
     assert.equal(warning.severity, vscode.DiagnosticSeverity.Warning);
     assert.equal(document.getText(warning.range), 'nav-persn');
+  },
+
+  async 'completion offers the workspace’s definitions of the kind each position expects'() {
+    const document = await open('complete.tql');
+    await diagnosticsSettled(document.uri);
+    const offered = async (needle: string) => {
+      const list = await vscode.commands.executeCommand<vscode.CompletionList>(
+        'vscode.executeCompletionItemProvider',
+        document.uri,
+        document.positionAt(document.getText().indexOf(needle)),
+      );
+      return (list?.items ?? []).map((item) => (typeof item.label === 'string' ? item.label : item.label.label));
+    };
+    const afterIsa = await offered('nav-person');
+    assert.ok(afterIsa.includes('nav-person') && afterIsa.includes('nav-employment'), 'after isa: types');
+    const afterHas = await offered('nav-name');
+    assert.ok(afterHas.includes('nav-name'), 'after has: attributes');
+    assert.ok(!afterHas.includes('nav-person'), 'after has: not entities');
+    const asRole = await offered('nav-employee');
+    assert.ok(asRole.includes('nav-employee'), 'a role player: the relation’s roles');
   },
 
   // Last, because it deletes a file from the workspace.
