@@ -28,6 +28,11 @@
       "dependsOn": [
         "typecheck"
       ]
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^build"
+      ]
     }
   }
 }

@@ -1,0 +1,3 @@
+define
+attribute skill-id, value string;
+entity skill, owns skill-id, owns nope-id;

@@ -1,0 +1,33 @@
+// @ts-check
+import * as esbuild from 'esbuild';
+
+/**
+ * Two bundles: the extension host loads `out/extension.cjs`, which forks
+ * `out/language-server/main.cjs` over IPC. Upstream's shape: `packages/langium-vscode/esbuild.mjs`
+ * at `v4.3.0` (ADR-008 D8, row 4).
+ *
+ * They are CommonJS because that is what the extension host loads, and bundled so that the `.vsix`
+ * carries no `node_modules` (`vsce.dependencies: false`). `@typedblite/language` is ESM, and esbuild
+ * converts it.
+ *
+ * 🔴 The target follows VS Code's Node, not upstream's `ES2017`: `engines.vscode ^1.91.0` ships
+ * Node 20.
+ */
+const minify = process.argv.includes('--minify');
+
+await esbuild.build({
+  entryPoints: {
+    extension: 'src/extension.ts',
+    'language-server/main': 'src/language-server/main.ts',
+  },
+  outdir: 'out',
+  outExtension: { '.js': '.cjs' },
+  bundle: true,
+  format: 'cjs',
+  platform: 'node',
+  target: 'node20',
+  external: ['vscode'],
+  sourcemap: !minify,
+  minify,
+  logLevel: 'warning',
+});

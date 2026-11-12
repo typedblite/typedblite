@@ -51,7 +51,10 @@
         ],
         "cwd": "libs/language",
         "parallel": true
-      }
+      },
+      "dependsOn": [
+        "langium-generate"
+      ]
     }
   }
 }

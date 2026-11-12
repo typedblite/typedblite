@@ -14,7 +14,8 @@ typedblite/
 │   ├── content-revision/  @typedblite/content-revision — revision identifiers
 │   └── conformance/       typedblite-conformance  — TypeDB behaviour spec + report card
 ├── apps/
-│   └── cli/               typedblite-cli          — REPL and file runner
+│   ├── cli/               typedblite-cli          — REPL and file runner
+│   └── vscode/            typeqlite (extension)   — the TypeQLite editor: a Langium language server
 ├── test-fixtures/schemas/ — shared TypeQLite schema files used by multiple test suites
 ├── nx.json                — Nx task graph configuration
 ├── package.json           — workspace root (npm workspaces)
@@ -28,6 +29,7 @@ typedblite/
 cli → runtime → language
               → content-revision
 conformance → runtime
+vscode → language
 ```
 
 Build order is enforced by Nx. `runtime` must build before `cli` and `conformance`. `language` and `content-revision` must build before `runtime`.
@@ -60,6 +62,7 @@ Package names:
 - `@typedblite/content-revision`
 - `typedblite-conformance`
 - `typedblite-cli`
+- `typeqlite` (the VS Code extension, Nx project `typeqlite-vscode`)
 
 Coverage is enabled only on CI (`CI=true`). Test suites time out at 30 seconds per test.
 
@@ -140,6 +143,18 @@ nx run typedblite-conformance:cli -- --update-baseline
 - Test files for `libs/language` live in `libs/language/test/` with `.spec.ts` extension.
 - Test files for `libs/runtime` live in `libs/runtime/test/` with `.test.ts` extension.
 - Test files for `apps/cli` live in `apps/cli/test/` with `.test.mts` extension.
+- Test files for `apps/vscode` live in `apps/vscode/test/` (`.test.ts`, run by vitest against the built
+  bundle). Its e2e (`nx run typeqlite-vscode:e2e`) launches a real VS Code through
+  `@vscode/test-electron` and is off by default. Run it when changing anything an editor sees.
+
+## The editor
+
+`apps/vscode` is a client plus a language server that runs `createTypeQLiteServices` unchanged
+([ADR-008](docs/architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md)).
+🔴 **Nothing the editor knows may reach the runtime.** The interpreter runs every check registered in
+`ValidationRegistry` (through `validateSync`), so a check registered there is a runtime rule. An
+editor-only diagnostic belongs in a `DocumentValidator` subclass, which the runtime never runs. The
+file extensions it claims come from `langium-config.json`, and a test fails if the manifest differs.
 - Shared TypeQLite schema fixtures used by multiple suites live in `test-fixtures/schemas/`.
 - The runtime has an optional oracle test suite (`vitest.oracle.config.ts`) and a WASM test suite (`vitest.wasm.config.ts`), both off by default. Run them explicitly when changing the SQLite binding or the revision algorithm.
 

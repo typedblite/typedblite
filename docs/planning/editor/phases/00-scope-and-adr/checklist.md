@@ -31,8 +31,9 @@ architectural answers in an ADR, and leave Phase 01 nothing to decide. This phas
 - [x] The `vscode-languageserver` versions installed. `@typedblite/language` pins `~9.0.1`, and
       `langium@4.3.1` depends on `~10.0.1`, so two copies are installed
 - [x] What an e2e harness can run on this machine. `code-server` 4.135.0 is installed, and Playwright
-      browsers are cached. An Electron VS Code is missing `libatk-bridge-2.0` and `libsecret-1`, and
-      this repository has no CI
+      browsers are cached. An Electron VS Code was measured as missing `libatk-bridge-2.0` and
+      `libsecret-1`. ~~That was wrong~~: Phase 01 found the pattern could not match the library's real
+      name. This repository has no CI
 
 ## Decisions
 
