@@ -1,0 +1,11 @@
+{
+  "name": "typedblite-sync-demo",
+  "version": "0.0.1",
+  "license": "MPL-2.0",
+  "description": "Offline-first sync with TypeDBLite: browser, desktop and Android devices replicating through a TypeDBLite hub",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@typedblite/runtime": "0.0.1"
+  }
+}

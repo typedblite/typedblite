@@ -211,7 +211,7 @@ because every store holds the same tasks, which is what the original's driver ch
 | 01 | [The runtime in a browser: a browser-safe entry, synchronous SHA-256, `Object.groupBy`](phases/01-runtime-in-browser/summary.md) | Complete | [summary](phases/01-runtime-in-browser/summary.md) |
 | 02 | [The WASM binding, promoted: the export, the peer dependency, tests in Node and Chromium](phases/02-wasm-binding/summary.md) | Complete | [summary](phases/02-wasm-binding/summary.md) |
 | 03 | [Replication that fails honestly: 5xx and timeouts, and a warning on a reopened store](phases/03-honest-replication/summary.md) | Complete | [summary](phases/03-honest-replication/summary.md) |
-| 04 | The hub, the switchboard, the control page, and `smoke` | Not started | |
+| 04 | [The hub, the switchboard, the control page, and `smoke`](phases/04-hub-and-switchboard/summary.md) | Complete | [summary](phases/04-hub-and-switchboard/summary.md) |
 | 05 | The PWA client and its service worker | Not started | |
 | 06 | Electron and Android | Not started | |
 | 07 | The story: the Playwright driver, captions, Pause and Play, silent recording | Not started | |
@@ -267,6 +267,9 @@ Anything a phase defers is recorded here, not only in a commit message.
   `vscode-languageserver`, which pulls about a megabyte of protocol code into a browser bundle.
   Importing it from `vscode-languageserver-types` would avoid that, at the cost of a direct
   dependency. To be picked up when a browser user asks about bundle size.
+- **Refuse `has <attr> $v` where `$v` is a `given` value.** Phase 04. It matches nothing, and is
+  reported only as an `empty-match` fact. A refusal or a warning at plan time would have saved a
+  debugging round. This is engine and grammar work, decided caller-first.
 
 ## Key Documents
 
