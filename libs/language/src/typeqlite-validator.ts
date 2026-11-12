@@ -233,7 +233,9 @@ export class TypeQLiteValidator {
   }
 
   checkAnnotationsOnTrait(node: OwnsTrait | RelatesTrait | PlaysTrait, accept: ValidationAcceptor): void {
-    const subject: AnnotationSubject = isOwnsTrait(node) ? 'owns' : node.$type === 'RelatesTrait' ? 'relates' : 'plays';
+    // A list — `owns name[]`, `relates parent[]` — admits `@distinct` besides (define.feature L1728).
+    const list = (isOwnsTrait(node) || node.$type === 'RelatesTrait') && (node as OwnsTrait | RelatesTrait).ordered;
+    const subject: AnnotationSubject = isOwnsTrait(node) ? (list ? 'owns list' : 'owns') : node.$type === 'RelatesTrait' ? (list ? 'relates list' : 'relates') : 'plays';
     this.checkAnnotationList(node.annotations, subject, accept);
   }
 

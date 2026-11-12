@@ -1,5 +1,5 @@
 {
-  "define": 417,
+  "define": 441,
   "delete": 30,
   "disjunction": 9,
   "expression": 124,
@@ -13,9 +13,9 @@
   "optional": 10,
   "pipelines": 10,
   "put": 9,
-  "redefine": 155,
+  "redefine": 191,
   "reduce": 65,
-  "undefine": 133,
+  "undefine": 161,
   "update": 34,
   "variables": 12
 }

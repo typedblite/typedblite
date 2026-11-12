@@ -82,9 +82,9 @@ Rules:
 
 | Feature | Passing |
 |---|---|
-| define | 417 |
-| redefine | 155 |
-| undefine | 133 |
+| define | 441 |
+| redefine | 191 |
+| undefine | 161 |
 | expression | 124 |
 | reduce | 65 |
 | insert | 107 |

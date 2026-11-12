@@ -120,17 +120,17 @@ UndefineFrom:
 UndefineTarget:
       {infer UndefineAnnotation} category=AnnotationKeyword ('(' key=STRING ')')?
     | {infer UndefineSub} 'sub' superType=ID
-    | {infer UndefineOwns} 'owns' attribute=ID
+    | {infer UndefineOwns} 'owns' attribute=ID (ordered?='[' ']')?
     | {infer UndefinePlays} 'plays' role=RoleName
-    | {infer UndefineRelates} 'relates' role=ID
+    | {infer UndefineRelates} 'relates' role=ID (ordered?='[' ']')?
     | {infer UndefineValue} 'value' valueType=ValueType
     | {infer UndefineSpecialise} 'as' role=ID;
 
 // The capability an annotation or a specialisation is removed from: `… from person owns name`.
 Capability:
-      {infer CapabilityOwns} 'owns' attribute=ID
+      {infer CapabilityOwns} 'owns' attribute=ID (ordered?='[' ']')?
     | {infer CapabilityPlays} 'plays' role=RoleName
-    | {infer CapabilityRelates} 'relates' role=ID
+    | {infer CapabilityRelates} 'relates' role=ID (ordered?='[' ']')?
     | {infer CapabilitySub} 'sub' superType=ID
     | {infer CapabilityValue} 'value' valueType=ValueType;
 
@@ -182,12 +182,15 @@ Trait:
 // 🔴 These are real Langium cross-references, not strings. Langium then resolves them, and an
 // unresolved name becomes an error for free — along with go-to-definition and find-references in
 // any editor. A grammar that merely parses `owns nonexistent-attribute` is not checking anything.
+// `owns name[]` — an ORDERED ownership, a list (define.feature L338). A different definition from
+// `owns name`, not a variant of it: one type cannot have both.
 OwnsTrait:
-    'owns' attribute=[AttributeDef:ID] annotations+=Annotation*;
+    'owns' attribute=[AttributeDef:ID] (ordered?='[' ']')? annotations+=Annotation*;
 
 // `name`, not `role`, so the role is a *named element* other references can resolve to.
+// `relates parent[]` — an ordered role, as `owns name[]` is an ordered ownership.
 RelatesTrait:
-    'relates' name=ID annotations+=Annotation*;
+    'relates' name=ID (ordered?='[' ']')? annotations+=Annotation*;
 
 // `plays employment:employee @card(0..)` — the spec annotates plays as it does owns.
 PlaysTrait:

@@ -29,6 +29,7 @@ import {
 } from '@typedblite/language';
 import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf, type DiagnosticCodeValue } from './diagnostics.js';
+import { ownsSubject, relatesSubject } from './schema-subjects.js';
 
 /**
  * What `define` has applied, as the schema rules need to read it.
@@ -58,6 +59,8 @@ export interface SchemaFacts {
   readonly annotations: ReadonlyMap<string, ReadonlyMap<string, string>>;
   /** Which types play which roles, as `playsSubject(type, "relation:role")`. */
   readonly plays: ReadonlySet<string>;
+  /** The ordered capabilities, `owns name[]` and `relates parent[]`, as their subjects. */
+  readonly ordered: ReadonlySet<string>;
 }
 
 /** One key for `keyOwnerships`, the shape `SchemaModel.owns` already uses. */
@@ -139,7 +142,7 @@ export function checkSchemaRules(
       for (const trait of definition.traits) {
         if (isOwnsTrait(trait)) checkOwns(trait, name, proposed, data, refuse);
         if (isPlaysTrait(trait)) checkPlays(trait, name, proposed, refuse);
-        if (isRelatesTrait(trait)) checkRelates(trait, name, proposed, refuse);
+        if (isRelatesTrait(trait)) checkRelates(trait, name, proposed, refuse, applied);
       }
     }
   }
@@ -194,6 +197,7 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
     keyOwnerships: applied.keyOwnerships,
     annotations: applied.annotations,
     plays: applied.plays,
+    ordered: applied.ordered,
   };
 }
 
@@ -477,6 +481,10 @@ function checkOwns(trait: OwnsTrait, owner: string, proposed: SchemaFacts, data:
       rangeOf(trait),
     );
   }
+  // `owns name[]` and `owns name` are two definitions of one capability, and a type has one (L338).
+  if (proposed.owns.has(ownershipKey(owner, attribute))) {
+    checkOrderUnchanged(`${owner} owns ${attribute}`, proposed.ordered.has(ownsSubject(owner, attribute)), trait.ordered === true, trait, refuse);
+  }
   const valueType = valueTypeOf(attribute, proposed);
   for (const annotation of trait.annotations) {
     checkArgumentsFit(annotation, attribute, valueType, refuse);
@@ -592,7 +600,24 @@ function checkPlays(trait: PlaysTrait, player: string, proposed: SchemaFacts, re
  * parent;` when `parentship relates parent` is above it is refused with the message the scenario
  * matches on (L1003).
  */
-function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFacts, refuse: Refuse): void {
+/**
+ * A restated `owns`/`relates` keeps its ordering: TypeDB's *"different 'person owns name' is already
+ * defined"* (define.feature L338, L599) names the one APPLIED. Changing it is `redefine`'s.
+ */
+function checkOrderUnchanged(capability: string, appliedOrdered: boolean, statedOrdered: boolean, trait: OwnsTrait | RelatesTrait, refuse: Refuse): void {
+  if (appliedOrdered === statedOrdered) return;
+  refuse(
+    DiagnosticCode.alreadyDefined,
+    `'${capability}${statedOrdered ? '[]' : ''}' cannot be defined: a different '${capability}${appliedOrdered ? '[]' : ''}' ` +
+      `is already defined, and \`define\` does not change an ordering. Try redefine instead.`,
+    rangeOf(trait),
+  );
+}
+
+function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFacts, refuse: Refuse, applied: SchemaFacts): void {
+  if (applied.roles.get(relation)?.has(trait.name) === true) {
+    checkOrderUnchanged(`${relation} relates ${trait.name}`, applied.ordered.has(relatesSubject(relation, trait.name)), trait.ordered === true, trait, refuse);
+  }
   const kind = kindOf(relation, proposed) ?? 'entity';
   if (kind !== 'relation') {
     refuse(

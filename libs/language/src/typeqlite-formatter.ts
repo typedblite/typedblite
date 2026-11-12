@@ -180,6 +180,8 @@ export class TypeQLiteFormatter extends AbstractFormatter {
     const f = this.getNodeFormatter(node);
     const named = isOwnsTrait(node) ? 'attribute' : 'name';
     f.property(named as never).prepend(Formatting.oneSpace());
+    // `owns name[]` — the list marker sits on the name.
+    if (node.ordered) f.keywords('[', ']').prepend(Formatting.noSpace());
     node.annotations.forEach((annotation) =>
       f.node(annotation).prepend(Formatting.oneSpace()),
     );

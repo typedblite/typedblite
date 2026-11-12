@@ -161,9 +161,24 @@ function redefineType(node: RedefineType, context: MutationContext): void {
         rangeOf(node),
       );
     }
+    // `redefine person owns name[];` over `owns name` — the ordering is the change, and it is the ONLY
+    // change one redefine makes: an annotation beside it is refused (redefine.feature L295).
+    const ordered = (isOwnsTrait(trait) || isRelatesTrait(trait)) && trait.ordered === true;
+    const wasOrdered = context.schema.ordered.has(subject);
+    if ((isOwnsTrait(trait) || isRelatesTrait(trait)) && ordered !== wasOrdered) {
+      if (trait.annotations.length > 0) {
+        refuse(DiagnosticCode.mixedPattern, `A redefine makes one change: '${capability}' changes its ordering here, so its annotations cannot change with it.`, rangeOf(node));
+      }
+      // `@distinct` belongs to a list; an unordered capability cannot keep one (define.feature L1608).
+      if (!ordered && context.schema.annotations.get(subject)?.has('distinct')) {
+        refuse(DiagnosticCode.annotationNotAdmitted, `'${capability}' carries \`@distinct\`, which only a list admits; undefine it before redefining the ordering.`, rangeOf(node));
+      }
+      if (ordered) context.db.prepare('INSERT OR IGNORE INTO schema_ordered(subject) VALUES (?)').run(subject);
+      else context.db.prepare('DELETE FROM schema_ordered WHERE subject = ?').run(subject);
+      return;
+    }
     if (trait.annotations.length === 0) {
-      // `redefine person owns name;` — the only thing that could change is the list ordering,
-      // which this grammar does not have; nothing else was said.
+      // `redefine person owns name;` over `owns name` — nothing else was said.
       refuse(DiagnosticCode.nothingRedefined, `Nothing was redefined: '${capability}' is stated as it is.`, rangeOf(node));
     }
     return redefineAnnotations(subject, `'${capability}'`, trait.annotations, node, context);
@@ -567,6 +582,14 @@ function renameInSubjects(db: SqliteDatabase, name: string, newLabel: string): v
     const renamed = parts.join(SEP);
     if (renamed !== subject) update.run(renamed, subject);
   }
+  // The ordered capabilities are keyed by the same subjects, renamed by the same rule.
+  const ordered = db.prepare('SELECT subject FROM schema_ordered').all() as Array<{ subject: string }>;
+  const move = db.prepare('UPDATE schema_ordered SET subject = ? WHERE subject = ?');
+  for (const { subject } of ordered) {
+    const parts = subject.split(SEP).map((part, index, all) => (index === 0 && part === name) || (index === 2 && all[1] === 'owns' && part === name) ? newLabel : part);
+    const renamed = parts.join(SEP);
+    if (renamed !== subject) move.run(renamed, subject);
+  }
 }
 
 // ── undefine ───────────────────────────────────────────────────────────────
@@ -633,6 +656,7 @@ function undefineType(name: string, node: { $cstNode?: unknown }, context: Mutat
       `DELETE FROM schema_annotation WHERE subject = ? OR subject LIKE ?${ESCAPE} OR subject LIKE ?${ESCAPE} OR subject LIKE ?${ESCAPE}`,
       name, `${like(name)}${SEP}%`, `%${SEP}owns${SEP}${like(name)}`, `%${SEP}plays${SEP}${like(name)}:%`,
     );
+    run(`DELETE FROM schema_ordered WHERE subject LIKE ?${ESCAPE} OR subject LIKE ?${ESCAPE}`, `${like(name)}${SEP}%`, `%${SEP}owns${SEP}${like(name)}`);
     if (kind === 'attribute') {
       for (const prefix of ['key', 'unique']) db.exec(`DROP INDEX IF EXISTS ${prefix}_${ident(name)}`);
     }
@@ -689,12 +713,14 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
   if (isUndefineOwns(target)) {
     const attribute = target.attribute;
     ownCapabilityOrRefuse(type, `owns ${attribute}`, ownsRow(type, attribute, schema), ancestorsOf(type, schema).some((a) => ownsRow(a, attribute, schema)), at, refuse);
+    sameOrderOrRefuse(`${type} owns ${attribute}`, ownsSubject(type, attribute), target.ordered === true, schema, at, refuse);
     const held = ownersHolding(db, type, attribute);
     if (held > 0) refuse(DiagnosticCode.hasInstances, `${held} instance(s) of '${type}' own '${attribute}'; the ownership cannot be undefined (L1412).`, at);
     {
       db.prepare('DELETE FROM schema_owns WHERE type = ? AND attribute = ?').run(type, attribute);
       db.prepare('DELETE FROM schema_key_owns WHERE type = ? AND attribute = ?').run(type, attribute);
       db.prepare('DELETE FROM schema_annotation WHERE subject = ?').run(ownsSubject(type, attribute));
+      db.prepare('DELETE FROM schema_ordered WHERE subject = ?').run(ownsSubject(type, attribute));
       dropIndexIfUnowned(db, attribute);
     }
     return;
@@ -719,10 +745,12 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
     const own = schema.roles.get(type)?.has(role) === true;
     const inherited = ancestorsOf(type, schema).some((a) => schema.roles.get(a)?.has(role));
     ownCapabilityOrRefuse(type, `relates ${role}`, own, inherited, at, refuse);
+    sameOrderOrRefuse(`${type} relates ${role}`, relatesSubject(type, role), target.ordered === true, schema, at, refuse);
     const played = rolePlayed(db, type, role);
     if (played > 0) refuse(DiagnosticCode.hasInstances, `'${role}' is played in ${played} existing relation(s) of '${type}'; the role cannot be undefined (L1086).`, at);
     {
       db.prepare('DELETE FROM schema_relates WHERE relation = ? AND role = ?').run(type, role);
+      db.prepare('DELETE FROM schema_ordered WHERE subject = ?').run(relatesSubject(type, role));
       // "undefining a role type automatically detaches any possible roleplayers" (L1059).
       db.prepare('DELETE FROM schema_plays WHERE role = ?').run(roleRef(type, role));
       db.prepare(`DELETE FROM schema_annotation WHERE subject = ? OR subject LIKE ?${ESCAPE}`).run(relatesSubject(type, role), `%${SEP}plays${SEP}${like(roleRef(type, role))}`);
@@ -759,6 +787,7 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
       where = `'${type}'`;
     } else if (isCapabilityOwns(capability)) {
       ownCapabilityOrRefuse(type, `owns ${capability.attribute}`, ownsRow(type, capability.attribute, schema), ancestorsOf(type, schema).some((a) => ownsRow(a, capability.attribute, schema)), at, refuse);
+      sameOrderOrRefuse(`${type} owns ${capability.attribute}`, ownsSubject(type, capability.attribute), capability.ordered === true, schema, at, refuse);
       subject = ownsSubject(type, capability.attribute);
       where = `'${type} owns ${capability.attribute}'`;
     } else if (isCapabilityPlays(capability)) {
@@ -768,6 +797,7 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
       where = `'${type} plays ${role}'`;
     } else if (isCapabilityRelates(capability)) {
       ownCapabilityOrRefuse(type, `relates ${capability.role}`, schema.roles.get(type)?.has(capability.role) === true, ancestorsOf(type, schema).some((a) => schema.roles.get(a)?.has(capability.role)), at, refuse);
+      sameOrderOrRefuse(`${type} relates ${capability.role}`, relatesSubject(type, capability.role), capability.ordered === true, schema, at, refuse);
       subject = relatesSubject(type, capability.role);
       where = `'${type} relates ${capability.role}'`;
     } else if (isCapabilitySub(capability)) {
@@ -805,6 +835,21 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
       }
     }
   }
+}
+
+/**
+ * An undefine names the capability as it is defined, ordering included: `undefine owns name[]` over
+ * `owns name` is TypeDB's *"there is no defined 'person owns name[]', while 'person owns name' is"*
+ * (undefine.feature L258).
+ */
+function sameOrderOrRefuse(capability: string, subject: string, stated: boolean, schema: SchemaFacts, at: ReturnType<typeof rangeOf>, refuse: Refuse): void {
+  const applied = schema.ordered.has(subject);
+  if (applied === stated) return;
+  refuse(
+    DiagnosticCode.notDefined,
+    `there is no defined '${capability}${stated ? '[]' : ''}', while '${capability}${applied ? '[]' : ''}' is; undefine it as it is defined.`,
+    at,
+  );
 }
 
 /** A capability is undefined from the type that declares it — never through a subtype (L1444, L1294, L1163). */

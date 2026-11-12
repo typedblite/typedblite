@@ -142,6 +142,13 @@ CREATE TABLE IF NOT EXISTS schema_plays (
   PRIMARY KEY (type, role)
 );
 
+-- Which owns and relates are ORDERED, lists: owns name[], relates parent[] (define.feature L338). Keyed
+-- by the capability's subject (schema-subjects.ts), so a rename, an undefine and a redefine each
+-- find it where they find the capability's annotations. Additive, like the tables above.
+CREATE TABLE IF NOT EXISTS schema_ordered (
+  subject TEXT PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS role_player (
   rel    INTEGER NOT NULL REFERENCES thing(iid) ON DELETE CASCADE,
   role   TEXT NOT NULL,
@@ -175,6 +182,8 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
   const keyOwns: Array<[string, string]> = [];
   const annotations: Array<[string, string, string]> = [];
   const plays: Array<[string, string]> = [];
+  /** `owns name[]`, `relates parent[]` — their subjects. */
+  const ordered: string[] = [];
   const record = (subject: string, list: readonly Annotation[]): void => {
     for (const annotation of list) annotations.push([subject, recordCategory(annotation), recordText(annotation)]);
   };
@@ -209,6 +218,7 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
         record(valueSubject(name), definition.valueAnnotations);
         for (const trait of definition.traits) {
           record(traitSubject(name, trait).subject, trait.annotations);
+          if ((isOwnsTrait(trait) || isRelatesTrait(trait)) && trait.ordered === true) ordered.push(traitSubject(name, trait).subject);
           if (isPlaysTrait(trait)) {
             plays.push([name, roleRef(trait.role.relation.$refText, trait.role.role.$refText)]);
           }
@@ -297,6 +307,10 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
 
   for (const [type, role] of plays) {
     statements.push(`INSERT OR IGNORE INTO schema_plays(type, role) VALUES (${q(type)}, ${q(role)});`);
+  }
+
+  for (const subject of ordered) {
+    statements.push(`INSERT OR IGNORE INTO schema_ordered(subject) VALUES (${q(subject)});`);
   }
 
   for (const key of keys) {

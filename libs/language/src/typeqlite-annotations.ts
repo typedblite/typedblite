@@ -27,8 +27,8 @@ import {
  * schema, refuses `@independent` on a re-opened entity.
  *
  * `@cascade` is TypeDB's own *"temporarily turned off"* — kept on relation types, where it
- * belonged, and nowhere else. `@distinct` belongs to lists (`owns name[]`), which this grammar
- * does not have yet; until it does, no subject admits it.
+ * belonged, and nowhere else. `@distinct` belongs to lists — `owns name[]`, `relates parent[]` —
+ * and to nothing else; a list admits everything its unordered form does, and that (L1728, L1495).
  */
 export type AnnotationSubject =
   | 'entity type'
@@ -38,7 +38,9 @@ export type AnnotationSubject =
   | 'sub'
   | 'value type'
   | 'owns'
+  | 'owns list'
   | 'relates'
+  | 'relates list'
   | 'plays';
 
 export type AnnotationCategory =
@@ -65,7 +67,9 @@ export const ADMITTED: Readonly<Record<AnnotationSubject, ReadonlySet<Annotation
   sub: new Set(METADATA),
   'value type': new Set(['regex', 'range', 'values']),
   owns: new Set(['card', 'unique', 'key', 'regex', 'range', 'values', ...METADATA]),
+  'owns list': new Set(['distinct', 'card', 'unique', 'key', 'regex', 'range', 'values', ...METADATA]),
   relates: new Set(['abstract', 'card', ...METADATA]),
+  'relates list': new Set(['abstract', 'distinct', 'card', ...METADATA]),
   plays: new Set(['card', ...METADATA]),
 };
 

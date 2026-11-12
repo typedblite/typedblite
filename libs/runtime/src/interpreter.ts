@@ -306,6 +306,8 @@ interface SchemaModel extends SchemaFacts {
   readonly annotations: Map<string, Map<string, string>>;
   /** Which types play which roles, from `schema_plays`, as `playsSubject`-shaped `type\u0000plays\u0000rel:role`. */
   readonly plays: Set<string>;
+  /** The ordered capabilities — `owns name[]`, `relates parent[]` — by subject, from `schema_ordered`. */
+  readonly ordered: Set<string>;
 }
 
 /**
@@ -560,6 +562,7 @@ export class TypeDBLiteInterpreter {
     keyOwnerships: new Set(),
     annotations: new Map(),
     plays: new Set(),
+    ordered: new Set(),
   };
 
   /**
@@ -654,7 +657,12 @@ export class TypeDBLiteInterpreter {
   private ensureRolePlayerIndex(): void {
     try {
       const table = this.db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'role_player'").get();
-      if (table !== undefined) this.db.exec('CREATE INDEX IF NOT EXISTS role_player_by_player ON role_player(player, role, rel)');
+      if (table !== undefined) {
+        this.db.exec('CREATE INDEX IF NOT EXISTS role_player_by_player ON role_player(player, role, rel)');
+        // A store defined before lists existed has no `schema_ordered`; `undefine` and `redefine`
+        // write to it whether or not a list was ever declared. Additive and empty: no list was.
+        this.db.exec('CREATE TABLE IF NOT EXISTS schema_ordered (subject TEXT PRIMARY KEY)');
+      }
     } catch {
       /* slower, not wrong */
     }
@@ -951,6 +959,18 @@ export class TypeDBLiteInterpreter {
     } catch {
       // Before `schema_plays` — the same degradation.
     }
+    this.loadOrdered();
+  }
+
+  /** `schema_ordered` into the model — none before the table existed, which is none declared. */
+  private loadOrdered(): void {
+    this.schema.ordered.clear();
+    try {
+      const rows = this.db.prepare('SELECT subject FROM schema_ordered').all() as Array<{ subject: string }>;
+      for (const row of rows) this.schema.ordered.add(String(row.subject));
+    } catch {
+      // Before `schema_ordered`: no list was ever declared.
+    }
   }
 
   private rememberAnnotation(subject: string, category: string, text: string): void {
@@ -982,7 +1002,7 @@ export class TypeDBLiteInterpreter {
    * read a schema that is not the one applied.
    */
   private reloadSchema(): void {
-    for (const set of [this.schema.types, this.schema.relations, this.schema.attributes, this.schema.owns, this.schema.abstracts, this.schema.keyOwnerships, this.schema.plays]) set.clear();
+    for (const set of [this.schema.types, this.schema.relations, this.schema.attributes, this.schema.owns, this.schema.abstracts, this.schema.keyOwnerships, this.schema.plays, this.schema.ordered]) set.clear();
     for (const map of [this.schema.parents, this.schema.valueTypes, this.schema.roles, this.schema.annotations]) map.clear();
     this.loadSchema();
   }
@@ -1051,6 +1071,7 @@ export class TypeDBLiteInterpreter {
     });
     const { ddl, keys } = generateSchema(file);
     this.applySchemaDdl(ddl, file);
+    this.loadOrdered();
     // Identity is the @key attribute's value (ADR-003 D3, canonical.ts). `loadSchema` restores only
     // types and attributes, so without persisting these a reopened database could not tell which
     // attribute names an entity, and every entity would fall back to a node-local id.
