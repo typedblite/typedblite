@@ -1,6 +1,6 @@
 ---
 kind: adr
-status: proposed
+status: accepted
 date: 2026-11-12
 decision-owners: [TypeDBLite maintainers]
 extends: [adr-005]
@@ -8,13 +8,17 @@ extends: [adr-005]
 
 # ADR-007: A scenario TypeDB itself fails is a deviation, and the oracle decides which
 
-- **Status:** Proposed. It needs the founder's acceptance. Until then, the twelve deviations it owns are
-  a proposal shown on the report card, not a decision.
+- **Status:** Accepted by the founder (Dave Jackson) on 2026-11-12, with the oracle run and the twelve
+  deviations it owns on PR #6.
 - **Date:** 2026-11-12
 - **Decision owners:** Founder; TypeDBLite maintainers
 - **Extends:** [ADR-005](adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md).
   ADR-005 makes the vendored spec the standard and names a live-server oracle as later work. This ADR is
   that oracle's first use.
+
+> ✅ **Accepted 2026-11-12 by the founder.** It was proposed with its evidence: a full oracle run against
+> `typedb/typedb:3.10.4`, and each of the twelve scenarios re-run there before acceptance.
+> `update` L959 is not decided here (see below).
 
 ---
 

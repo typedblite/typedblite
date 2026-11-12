@@ -161,7 +161,7 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 | [ADR-004](docs/architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md) | TypeDBLite Execution Diagnostics as a Returned Report |
 | [ADR-005](docs/architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md) | TypeDB's Behaviour Specification is TypeDBLite's Conformance Oracle |
 | [ADR-006](docs/architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md) | An Attribute Is Stored Once per Type and Value |
-| [ADR-007](docs/architecture/adr-007-a-scenario-typedb-itself-fails-is-a-deviation.md) | A Scenario TypeDB Itself Fails Is a Deviation (Proposed) |
+| [ADR-007](docs/architecture/adr-007-a-scenario-typedb-itself-fails-is-a-deviation.md) | A Scenario TypeDB Itself Fails Is a Deviation |
 
 **Standard:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md)
 

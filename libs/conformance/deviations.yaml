@@ -2,7 +2,7 @@
 # Each needs an owner that resolves: an ADR number, or a defect record id. No owner: it is a fail.
 # An entry whose scenario starts passing is reported by the run; remove it in the same commit.
 #
-# Every entry below is owned by ADR-007 (Proposed): a scenario TypeDB 3.10.4 itself fails, measured by
+# Every entry below is owned by ADR-007 (accepted 2026-11-12): a scenario TypeDB 3.10.4 itself fails, measured by
 # the differential oracle (`src/oracle.ts`) against a live `typedb/typedb:3.10.4` on 2026-11-12. Each
 # fails here at, or after, the step TypeDB fails at, and for the same cause. Re-verify on a pin move.
 
