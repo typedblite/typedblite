@@ -2911,6 +2911,7 @@ export class TypeDBLiteInterpreter {
     // would accuse `$p has principal-type "user";` of naming an unowned attribute purely because
     // its type had not been seen yet.
     for (const constraint of constraints) this.checkOwns(constraint, statement);
+    if (statement === 'match') for (const constraint of constraints) this.checkRelationRoles(constraint, constraints);
     return constraints;
   }
 
@@ -2995,6 +2996,50 @@ export class TypeDBLiteInterpreter {
       const bound: ValueBinding = { kind: 'attribute', attributeType: type, valueType: this.valueTypeOfAttribute(type) ?? 'string', value: String(row.value) };
       return { ...combination, [instance.variable]: bound };
     });
+  }
+
+  /**
+   * A relation pattern that can never match is refused, as TypeDB's type inference refuses it
+   * (match.feature L1433–L1484): a role no relation declares; a relation type that is no relation;
+   * a role the named relation type relates nowhere in its hierarchy — `isa marriage` reaches a
+   * `hetero-marriage`'s husband, `isa civil-marriage` does not; a player whose type plays no role
+   * of the relation. Only what is WRITTEN is judged; a type variable constrains nothing here.
+   */
+  private checkRelationRoles(constraint: ThingConstraint, all: readonly ThingConstraint[]): void {
+    if (constraint.roles.length === 0 || this.schema.relations.size === 0) return;
+    const incompatible = (detail: string): never =>
+      this.refuse(DiagnosticCode.unknownRole, `Type-inference was unable to find compatible types for the pair of variables: ${detail}`, constraint.range);
+    const declared = (role: string): boolean => [...this.schema.roles.values()].some((roles) => roles.has(role));
+    const relationTypes = constraint.isas.flatMap((isa) => (isa.type === undefined ? [] : [isa.type]));
+    for (const type of relationTypes) {
+      if (!this.typeFamily(type, 'inherited').some((t) => this.schema.relations.has(t))) {
+        incompatible(`'${type}' is not a relation type, so it has no roles to link.`);
+      }
+    }
+    // The roles a relation type can link: those it or an ancestor declares, and — since `isa T`
+    // answers T's subtypes — those its subtypes declare.
+    const related = (type: string): Set<string> => new Set(this.typeFamily(type, 'both').flatMap((t) => [...(this.schema.roles.get(t) ?? [])]));
+    for (const role of constraint.roles) {
+      if (role.role === undefined) continue;
+      if (!declared(role.role)) {
+        this.refuse(DiagnosticCode.unknownRole, `Role label not found '${role.role}': no relation type relates it.`, role.range ?? constraint.range);
+      }
+      for (const type of relationTypes) {
+        if (!related(type).has(role.role)) incompatible(`'${type}' relates no role '${role.role}', nor does any type above or below it.`);
+      }
+    }
+    // A player with a written type that can play no role of the relation — `$x isa company;
+    // friendship ($x);` (L1473). Both directions of each hierarchy count, as `isa` does.
+    if (relationTypes.length === 0 || this.schema.plays.size === 0) return;
+    const roles = new Set(relationTypes.flatMap((type) => this.typeFamily(type, 'both').flatMap((t) => [...(this.schema.roles.get(t) ?? [])].map((r) => roleRef(t, r)))));
+    for (const role of constraint.roles) {
+      const playerTypes = all.find((c) => c.variable === role.player)?.isas.flatMap((isa) => (isa.type === undefined ? [] : [isa.type])) ?? [];
+      for (const playerType of playerTypes) {
+        if (!this.schema.types.has(playerType)) continue;
+        const plays = this.typeFamily(playerType, 'both').some((t) => [...roles].some((r) => (role.role === undefined || r.split(':')[1] === role.role) && this.schema.plays.has(playsSubject(t, r))));
+        if (!plays) incompatible(`'${playerType}' plays no role of '${relationTypes.join("', '")}'${role.role === undefined ? '' : ` as '${role.role}'`}.`);
+      }
+    }
   }
 
   /**
