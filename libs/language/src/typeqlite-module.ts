@@ -17,6 +17,7 @@ import {
 } from './typeqlite-validator.js';
 import { SyncValidationRegistry } from './typeqlite-validate-sync.js';
 import { TypeQLiteScopeProvider } from './typeqlite-scope.js';
+import { TypeQLiteScopeComputation } from './typeqlite-scope-computation.js';
 import { TypeQLiteFormatter } from './typeqlite-formatter.js';
 import { TypeQLiteSemanticTokenProvider } from './typeqlite-semantic-tokens.js';
 
@@ -42,6 +43,9 @@ export const TypeQLiteModule: Module<
   },
   references: {
     ScopeProvider: (services) => new TypeQLiteScopeProvider(services),
+    // Editor-only, like everything under `references` (ADR-008 D2): the runtime never builds a
+    // document, so it never computes scopes.
+    ScopeComputation: (services) => new TypeQLiteScopeComputation(services),
   },
   validation: {
     TypeQLiteValidator: () => new TypeQLiteValidator(),

@@ -27,6 +27,16 @@ async function diagnosticsOf(uri: vscode.Uri, timeout = 20_000): Promise<vscode.
   }
 }
 
+/** Diagnostics settle on a count: every build may republish, so the first set seen is not the answer. */
+async function settledOn(uri: vscode.Uri, count: number, timeout = 20_000): Promise<vscode.Diagnostic[]> {
+  const started = Date.now();
+  for (;;) {
+    const found = vscode.languages.getDiagnostics(uri);
+    if (found.length === count || Date.now() - started > timeout) return found;
+    await new Promise((done) => setTimeout(done, 100));
+  }
+}
+
 const codeOf = (diagnostic: vscode.Diagnostic) =>
   typeof diagnostic.code === 'object' ? diagnostic.code.value : diagnostic.code;
 
@@ -99,6 +109,24 @@ const cases: Record<string, () => Promise<void>> = {
     // `entity skill, owns skill-id, owns nope-id;`: skill-id at 19, nope-id at 34.
     assert.equal(on(19)?.type, 'property');
     assert.equal(on(34), undefined);
+  },
+
+  // Last, because it deletes a file from the workspace.
+  async 'a schema split across files resolves, and deleting the defining file unresolves it'() {
+    // `split-attributes.typeqlite` is never opened: the server found it by indexing the workspace.
+    const document = await open('split-people.typeqlite');
+    const before = await settledOn(document.uri, 1);
+    assert.deepEqual(
+      before.map((d) => d.message),
+      ["Could not resolve reference to AttributeDef named 'missing-attr'."],
+      '`employee-name` resolved into the other file (ADR-008 D3)',
+    );
+    await vscode.workspace.fs.delete(uriOf('split-attributes.typeqlite'));
+    const after = await settledOn(document.uri, 2);
+    assert.deepEqual(after.map((d) => d.message).sort(), [
+      "Could not resolve reference to AttributeDef named 'employee-name'.",
+      "Could not resolve reference to AttributeDef named 'missing-attr'.",
+    ]);
   },
 };
 

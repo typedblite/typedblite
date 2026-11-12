@@ -1,0 +1,2 @@
+define
+entity employee, owns employee-name, owns missing-attr;

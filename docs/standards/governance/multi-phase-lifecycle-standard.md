@@ -80,6 +80,9 @@ A phase closes when:
       handoff.
 - [ ] Build, typecheck and test are green for what the phase touched, and the conformance run has not
       regressed ([ADR-005](../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
+      🔴 **From a clean tree**, when the phase changed a dependency or a library's public types:
+      delete every `out/` and `*.tsbuildinfo` first. `tsc -b` is incremental, and a gate run on stale
+      declarations is green without having checked anything.
 - [ ] Anything deferred is in the feature document's **Deferred** section, not only in a commit
       message.
 - [ ] The phase branch is merged into the feature branch and deleted.

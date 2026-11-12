@@ -3,6 +3,7 @@ export * from './typeqlite-validator.js';
 export * from './typeqlite-validate-sync.js';
 export * from './typeqlite-validation-codes.js';
 export * from './typeqlite-scope.js';
+export * from './typeqlite-scope-computation.js';
 export * from './generated/ast.js';
 export * from './generated/grammar.js';
 export * from './generated/module.js';

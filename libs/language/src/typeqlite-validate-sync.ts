@@ -12,6 +12,15 @@ import type { Diagnostic } from 'vscode-languageserver';
 import type { TypeQLiteServices } from './typeqlite-module.js';
 
 /**
+ * A diagnostic whose message is plain text.
+ *
+ * 🔴 LSP 3.18 (`vscode-languageserver` 10) widened `Diagnostic.message` to `string | MarkupContent`.
+ * Every TypeQLite check reports a string, and the runtime's execution reports (ADR-004) carry
+ * strings, so this API keeps saying so instead of passing the widening on to every caller.
+ */
+export type SyncDiagnostic = Omit<Diagnostic, 'message'> & { message: string };
+
+/**
  * A registry whose wrapper keeps a synchronous check synchronous.
  *
  * 🔴 **Langium wraps EVERY registered check in an `async` function**, in
@@ -68,9 +77,9 @@ export class SyncValidationRegistry extends ValidationRegistry {
 export function validateSync(
   services: TypeQLiteServices,
   root: AstNode,
-): readonly Diagnostic[] {
+): readonly SyncDiagnostic[] {
   const registry = services.validation.ValidationRegistry;
-  const diagnostics: Diagnostic[] = [];
+  const diagnostics: SyncDiagnostic[] = [];
 
   const accept: ValidationAcceptor = (severity, message, info): void => {
     diagnostics.push({
