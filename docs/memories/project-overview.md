@@ -46,3 +46,5 @@ The repo is completely self-contained and self-referential:
 | ADR-004 | Execution diagnostics are returned reports, not emitted events |
 | ADR-005 | TypeDB's behaviour spec is TypeDBLite's conformance oracle |
 | ADR-006 | An attribute is stored once per type and value |
+| ADR-007 | A scenario TypeDB itself fails is a deviation, and the oracle decides which |
+| ADR-008 | The TypeQLite editor is a Langium language server in this repository; nothing it knows reaches the runtime |
