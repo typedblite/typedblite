@@ -25,11 +25,14 @@ flowchart LR
 ```mermaid
 flowchart LR
   cli --> runtime
+  sync-demo --> runtime
   conformance --> runtime
   runtime --> language
   runtime --> content-revision
   vscode --> language
 ```
+
+`apps/sync-demo` (the offline-first sync demo) depends on `@typedblite/runtime` only, through its public entry points — never `src/` (its feature doc's invariant 3).
 
 Build order is enforced by Nx. `runtime` must build before `cli` and `conformance`. `language` and `content-revision` must build before `runtime`.
 
@@ -62,6 +65,7 @@ Nx project names (not the npm package names):
 - `typedblite-conformance` — also has `report`
 - `typedblite` — the CLI, `typedblite-cli`
 - `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
+- `sync-demo` — `typedblite-sync-demo`, the offline-first sync demo; also has `smoke`, `test-browser`, `serve`, `demo` and `android-setup`/`android-apk`/`android-emulator`
 
 Coverage is enabled only on CI (`CI=true`). Test suites time out at 30 seconds per test.
 
@@ -90,7 +94,9 @@ This regenerates `src/generated/ast.ts`, `src/generated/grammar.ts`, and `src/ge
 
 ### SQLite binding contract
 
-The interpreter works through a `SqliteDatabase` interface (`libs/runtime/src/sqlite-database.ts`), not against `node:sqlite` directly. Only `node-sqlite.ts` imports `node:sqlite`. When adding a new SQLite operation, add it to the interface and implement it in `node-sqlite.ts`.
+The interpreter works through a `SqliteDatabase` interface (`libs/runtime/src/sqlite-database.ts`), not against `node:sqlite` directly. Only `node-sqlite.ts` imports `node:sqlite`. When adding a new SQLite operation, add it to the interface and implement it in `node-sqlite.ts` **and** `wasm.ts`, then run `test-wasm` and `test-browser`.
+
+**The runtime runs in browsers too** (ADR-009). `src/index.browser.ts` is the `browser` export condition: everything except `node-sqlite.ts` and `change-stream.ts` (the hub, `node:http`); `src/index.ts` re-exports it and adds those two. The interpreter's default opener is the conditional import `#default-opener` (package.json `imports`): `node:sqlite` under `node`, a refusal elsewhere. 🔴 Nothing reachable from `index.browser.ts` may import a `node:` module — `test/browser-entry.test.ts` bundles it for the browser and fails if it does. `content-revision` hashes with its own synchronous SHA-256 (`sha256.ts`), pinned to the `node:crypto` digest by `sha256.spec.ts`.
 
 Key constraints:
 - **Synchronous**. The interpreter runs ~250 SQLite calls inside transactions. No async binding satisfies the interface.
@@ -110,7 +116,7 @@ Every write appends to a change log. Revisions are `generation-digest` strings (
 
 The hub exposes Server-Sent Events for spokes to subscribe to. The `ChangeStream` interface (`change-stream.ts`) is the hub's side. `ChangeStreamClient` (`change-stream-client.ts`) is the spoke's side.
 
-**Do not change the revision algorithm** in `content-revision/src/lib/revision.ts` casually. 🔴 The CouchDB parity oracle that once proved these semantics was removed (2026-09); `test-oracle` now only names an FTS parity test, and its config does not currently start (it imports `vitest.shared` from outside the repo). Nothing re-checks CouchDB parity, so a change here needs its own tests and an ADR-003 amendment.
+**Do not change the revision algorithm** in `content-revision/src/lib/revision.ts` casually. 🔴 The CouchDB parity oracle that once proved these semantics was removed (2026-09); `test-oracle` now only runs an FTS parity test against an external index. Nothing re-checks CouchDB parity, so a change here needs its own tests and an ADR-003 amendment. The hash itself is pinned to the pre-ADR-009 `node:crypto` digest by `sha256.spec.ts`.
 
 ---
 
@@ -163,7 +169,7 @@ must stay so (ADR-008 D5). The editor resolves them through `TypeQLiteLabels`, w
 (`sitesOf`, and `LABEL_POSITIONS` for completion) must change whenever the grammar gains a position
 that names a type. `nx run typeqlite-vscode:package` builds `apps/vscode/dist/typeqlite-0.0.1.vsix`.
 - Shared TypeQLite schema fixtures used by multiple suites live in `test-fixtures/schemas/`.
-- The runtime's optional `vitest.oracle.config.ts` and `vitest.wasm.config.ts` **do not currently start**: both import `vitest.shared` from a path outside this repository. Do not rely on them ([Testing](docs/development/testing.md#suites-that-do-not-run-at-the-moment)).
+- `typedblite-runtime:test-wasm` runs the whole runtime suite on WASM SQLite, and `typedblite-runtime:test-browser` runs the engine in a real Chromium on OPFS (ADR-009). Run both after touching the binding interface, `src/wasm.ts` or `content-revision`. `test-oracle` needs an external search index and is not routine ([Testing](docs/development/testing.md#the-engine-on-wasm-sqlite)).
 
 ---
 

@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-import { swcDecoratorMetadata, testDefaults, workspaceAliases } from '../../../../vitest.shared';
+import { swcDecoratorMetadata, testDefaults, workspaceAliases } from '../../vitest.shared';
 
 /**
  * `fts-parity.test.ts`, run **on demand** rather than on every commit — it needs a live

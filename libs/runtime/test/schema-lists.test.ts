@@ -84,7 +84,8 @@ describe('undefine names the capability as it is defined', () => {
 });
 
 describe('the ordering is recorded with the schema', () => {
-  it('survives reopening a file-backed store, and a rename of the owner', () => {
+  // A real file, inspected through a second `DatabaseSync`: a binding limit under WASM (vitest.wasm.config.ts).
+  it.skipIf(process.env['TYPEDBLITE_SQLITE'] === 'wasm')('survives reopening a file-backed store, and a rename of the owner', () => {
     const directory = mkdtempSync(join(tmpdir(), 'typedblite-lists-'));
     try {
       const path = join(directory, 'store.db');

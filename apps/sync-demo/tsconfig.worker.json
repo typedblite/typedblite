@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
+    "customConditions": ["browser"],
+    "lib": ["ES2022", "WebWorker"], "strict": true, "skipLibCheck": true, "noEmit": true,
+    "types": []
+  },
+  "include": ["src/client/worker.ts", "src/client/sw.ts", "src/client/polyfills.ts", "src/client/protocol.ts"]
+}

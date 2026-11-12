@@ -359,5 +359,8 @@ A binding must meet these requirements:
 | `exec()` runs several statements in one string | Schema DDL is applied that way |
 | **FTS5 compiled in** | Full-text search is always on. Opening a database without FTS5 fails with a message that says so |
 
-A WASM build of SQLite running synchronously inside a Web Worker meets these requirements. That is
-how TypeDBLite can run in a browser.
+**In a browser, use the supported WASM binding** rather than writing your own:
+`@typedblite/runtime/wasm` runs the engine on the official SQLite WASM build, with OPFS persistence.
+See the runtime README's [In the browser](../../libs/runtime/README.md#in-the-browser) section, and
+[ADR-009](../architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md). Outside Node,
+`new TypeDBLiteInterpreter()` with no `openDatabase` refuses, and names the opener to pass.

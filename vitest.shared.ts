@@ -11,10 +11,16 @@ export const workspaceAliases = (): ReadonlyArray<{ find: string; replacement: s
   const raw = readFileSync(resolve(ROOT, 'tsconfig.base.json'), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   const paths: Record<string, readonly string[]> =
     JSON.parse(raw).compilerOptions?.paths ?? {};
-  return Object.entries(paths).map(([find, targets]) => ({
-    find,
-    replacement: resolve(ROOT, targets[0] as string),
-  }));
+  return [
+    ...Object.entries(paths).map(([find, targets]) => ({
+      find,
+      replacement: resolve(ROOT, targets[0] as string),
+    })),
+    // 🔴 The runtime's `#default-opener` (ADR-009 D4) resolves through its package.json `imports` to
+    // `out/`, which a test run must not depend on: point it at the Node source, as `node` selects.
+    // `vitest.wasm.config.ts` replaces this alias to run the suite on WASM SQLite.
+    { find: '#default-opener', replacement: resolve(ROOT, 'libs/runtime/src/default-opener.node.ts') },
+  ];
 };
 
 export const swcDecoratorMetadata = (): Plugin => ({

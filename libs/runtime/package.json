@@ -1,6 +1,6 @@
 {
   "name": "@typedblite/runtime",
-  "description": "SQLite generator, interpreter and TypeDBLiteDatabase adapter for TypeQL",
+  "description": "The TypeDBLite engine: TypeQLite on SQLite, with a change log, replication and full-text search",
   "version": "0.0.1",
   "license": "MPL-2.0",
   "type": "module",
@@ -8,7 +8,15 @@
   "exports": {
     ".": {
       "types": "./out/index.d.ts",
+      "browser": {
+        "types": "./out/index.browser.d.ts",
+        "default": "./out/index.browser.js"
+      },
       "default": "./out/index.js"
+    },
+    "./wasm": {
+      "types": "./out/wasm.d.ts",
+      "default": "./out/wasm.js"
     }
   },
   "dependencies": {
@@ -16,5 +24,24 @@
     "@typedblite/language": "0.0.1",
     "langium": "~4.3.1",
     "vscode-languageserver": "~10.0.1"
+  },
+  "imports": {
+    "#default-opener": {
+      "types": "./out/default-opener.d.ts",
+      "node": "./out/default-opener.node.js",
+      "default": "./out/default-opener.js"
+    }
+  },
+  "devDependencies": {
+    "@sqlite.org/sqlite-wasm": "3.54.1-build1",
+    "playwright-core": "1.62.1"
+  },
+  "peerDependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.50.0"
+  },
+  "peerDependenciesMeta": {
+    "@sqlite.org/sqlite-wasm": {
+      "optional": true
+    }
   }
 }

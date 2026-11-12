@@ -1,4 +1,4 @@
-import { openNodeSqlite } from './node-sqlite.js';
+import { defaultOpener } from '#default-opener';
 import type { SqliteDatabase, SqliteOpener } from './sqlite-database.js';
 import { AstUtils, EmptyFileSystem, type AstNode as LangiumNode } from 'langium';
 import {
@@ -638,7 +638,7 @@ export class TypeDBLiteInterpreter {
   private readonly planJoins: boolean;
 
   constructor(location = ':memory:', busyTimeoutMs = 5000, options: TypeDBLiteOptions = {}) {
-    const raw = (options.openDatabase ?? openNodeSqlite)(location);
+    const raw = (options.openDatabase ?? defaultOpener)(location);
     // `process` does not exist in a browser or a WebView; there the environment switches are off.
     const processEnv = typeof process === 'undefined' ? {} : process.env;
     const env = processEnv['TYPEDBLITE_TRACE'];

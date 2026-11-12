@@ -11,7 +11,8 @@ it.
 - [The conformance report card](#the-conformance-report-card)
 - [The TypeDB oracle](#the-typedb-oracle)
 - [The editor's end-to-end suite](#the-editors-end-to-end-suite)
-- [Suites that do not run at the moment](#suites-that-do-not-run-at-the-moment)
+- [The engine on WASM SQLite](#the-engine-on-wasm-sqlite)
+- [The full-text parity oracle](#the-full-text-parity-oracle)
 - [Writing tests](#writing-tests)
 
 ## Running the tests
@@ -25,7 +26,7 @@ npm exec nx -- run typedblite-runtime:test -- interpreter   # files matching a n
 ```
 
 The Nx project names are `typeqlite-language`, `content-revision`, `typedblite-runtime`,
-`typedblite-conformance`, `typedblite` (the CLI) and `typeqlite-vscode`.
+`typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode` and `sync-demo`.
 
 Every suite runs on [Vitest](https://vitest.dev), with a 30-second timeout per test. Set `CI=true`
 to collect coverage into `coverage/<project>/`.
@@ -40,6 +41,7 @@ to collect coverage into `coverage/<project>/`.
 | `typedblite-conformance` | `libs/conformance/test/*.test.ts` | The [report card](#the-conformance-report-card) has not regressed, plus the harness itself |
 | `typedblite` | `apps/cli/test/*.test.mts` | The CLI. `repl.test.mts` spawns the real binary and pipes input into it |
 | `typeqlite-vscode` | `apps/vscode/test/*.test.ts` | The manifest matches the language library, and the bundled language server answers over stdio |
+| `sync-demo` | `apps/sync-demo/test/smoke.test.ts` | The sync demo's story with headless devices, a real hub process and the real switchboard: convergence after every network event. `test-browser` adds the PWA in Chromium, the Electron app, and the whole story headless |
 
 ## The clean-tree gate
 
@@ -116,16 +118,28 @@ profile, and runs the cases in `apps/vscode/e2e/suite.ts` inside the real editor
 display: use `xvfb-run` on a headless machine. Run it whenever you change something an editor sees.
 That includes any change to the language library's providers.
 
-## Suites that do not run at the moment
+## The engine on WASM SQLite
 
-Two optional configurations in `libs/runtime` are **currently broken**. Each imports
-`vitest.shared` from a path outside the repository, so it fails at startup. They are listed here so
-that nobody relies on them:
+[ADR-009](../architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md) makes WASM SQLite
+a supported binding. Two targets prove it:
 
-| Config | Was meant to test | Note |
-| ------ | ----------------- | ---- |
-| `vitest.oracle.config.ts` (`test-oracle` target) | Full-text parity with an external search index | The CouchDB revision-tree parity oracle that once lived here was removed in 2026-09. **Nothing now compares the change log's conflict semantics with CouchDB's.** Treat changes to `change-log.ts` and `content-revision` with corresponding care, and cover them with runtime tests |
-| `vitest.wasm.config.ts` | The runtime suite against a WASM SQLite binding | A spike |
+| Target | What it proves |
+| ------ | -------------- |
+| `typedblite-runtime:test-wasm` | The whole runtime suite on `@typedblite/runtime/wasm`, in Node. The interpreter's `#default-opener` is aliased to the WASM opener, and no test is edited. Tests that need a real file on a real disk are excluded **by name, with the reason**, in `vitest.wasm.config.ts`: a second connection inspecting the file, another process on the same file, and WAL |
+| `typedblite-runtime:test-browser` | The engine in a real Chromium, on OPFS. A store survives closing the whole browser, a duplicate key is refused with `[CNT9]`, and 🔴 **every revision the browser computes equals the one Node computes** for the same writes. Needs Playwright's Chromium (`npx playwright-core install chromium`) |
+
+Run both after any change to the binding interface, `wasm.ts`, or `content-revision`.
+
+## The full-text parity oracle
+
+`typedblite-runtime:test-oracle` compares full-text search with an external search index, the one
+the `downstream-store` project used. It needs that index running, so it is not part of the routine run.
+
+🔴 **Nothing compares the change log's conflict semantics with CouchDB's any more.** A CouchDB
+revision-tree parity suite once lived in that configuration, and was removed in 2026-09. Treat
+changes to `change-log.ts` and `content-revision` with corresponding care, and cover them with
+runtime tests. The revision *hash* is pinned: `sha256.spec.ts` proves it identical to the
+`node:crypto` digest every existing store was written with.
 
 ## Writing tests
 

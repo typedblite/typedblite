@@ -41,6 +41,28 @@
         "command": "vitest run --config vitest.oracle.config.ts",
         "cwd": "libs/runtime"
       }
+    },
+    "test-wasm": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "^build"
+      ],
+      "parallelism": false,
+      "options": {
+        "command": "vitest run --config vitest.wasm.config.ts",
+        "cwd": "libs/runtime"
+      }
+    },
+    "test-browser": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "parallelism": false,
+      "options": {
+        "command": "vitest run --config vitest.browser.config.ts",
+        "cwd": "libs/runtime"
+      }
     }
   }
 }

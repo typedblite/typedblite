@@ -21,6 +21,7 @@ flowchart LR
   cli["apps/cli<br/>typedblite-cli"] --> runtime
   conformance["libs/conformance<br/>typedblite-conformance"] --> runtime
   vscode["apps/vscode<br/>typeqlite extension"] --> language
+  demo["apps/sync-demo<br/>typedblite-sync-demo"] --> runtime
   runtime["libs/runtime<br/>@typedblite/runtime"] --> language["libs/language<br/>@typedblite/language"]
   runtime --> revision["libs/content-revision<br/>@typedblite/content-revision"]
 ```
@@ -33,6 +34,7 @@ flowchart LR
 | `typedblite-conformance` | `typedblite-conformance` | Runs TypeDB's behaviour specification against the runtime |
 | `typedblite-cli` | `typedblite` | The `typedblite` REPL and file runner |
 | `typeqlite` | `typeqlite-vscode` | The VS Code extension: a Langium language server over the language library |
+| `typedblite-sync-demo` | `sync-demo` | The offline-first sync demo: browser, desktop and Android devices and a TypeDBLite hub. Uses only the runtime's public API |
 
 The split follows [ADR-002](../architecture/adr-002-typeql-engine-as-a-port.md), Decision 4. A
 parser belongs in every layer that needs to parse, so the language library must not drag a database
@@ -185,7 +187,7 @@ followed by a lost publish would be a change that never replicates and that noth
   built. 🔴 The suite that proved it has since been removed, so **nothing now re-checks that
   parity**. A change to the change log or the revision algorithm needs its own tests, and an
   amendment to ADR-003 if the semantics move
-  ([Testing](testing.md#suites-that-do-not-run-at-the-moment)).
+  ([Testing](testing.md#the-full-text-parity-oracle)).
 
 ## Conformance is the oracle
 

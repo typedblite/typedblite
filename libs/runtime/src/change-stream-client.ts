@@ -91,8 +91,9 @@ export class ChangeStreamClient {
   }
 
   /** Push revisions to the hub. The other half of duplex — SSE has no back-channel. */
-  public async push(records: readonly ChangeRecord[]): Promise<number> {
+  public async push(records: readonly ChangeRecord[], signal?: AbortSignal): Promise<number> {
     const response = await fetch(`${this.url}/changes`, {
+      signal,
       method: 'POST',
       headers: {
         ...(await this.requestHeaders()),

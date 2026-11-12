@@ -1,0 +1,10 @@
+{
+  "name": "typedblite-sync-demo-mobile",
+  "private": true,
+  "description": "The Capacitor root of the sync demo's Android device. Its packages are installed by the workspace (apps/sync-demo).",
+  "dependencies": {
+    "@capacitor/android": "7.6.10",
+    "@capacitor/cli": "7.6.10",
+    "@capacitor/core": "7.6.10"
+  }
+}

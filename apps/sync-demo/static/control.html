@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hub · TypeDBLite sync demo</title>
+<style>
+  :root { --bg: #f6f7f9; --card: #fff; --ink: #1d2433; --muted: #667085; --line: #e3e6ec; --ok: #12805c; --bad: #c4320a; --accent: #3b5bdb; --amber: #b54708; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #11151c; --card: #1a202b; --ink: #e8ebf1; --muted: #98a2b3; --line: #2a3242; --ok: #3ccb8f; --bad: #ff8a65; --accent: #7c95ff; --amber: #fdb022; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  header { padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--card); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 17px; margin: 0; flex: 1; }
+  main { padding: 16px 18px; display: grid; gap: 14px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: 0; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+  .up .dot { background: var(--ok); } .down .dot { background: var(--bad); }
+  .name { flex: 1; } .muted { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 5px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  .done { text-decoration: line-through; color: var(--muted); }
+  #caption { display: none; background: var(--accent); color: #fff; border-radius: 10px; padding: 12px 14px; font-size: 16px; }
+  #caption.on { display: block; }
+  #paused { display: none; background: var(--amber); color: #fff; border-radius: 10px; padding: 8px 14px; font-weight: 600; }
+  #paused.on { display: block; }
+  #play { display: none; } #play.on { display: inline-block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TypeDBLite hub</h1>
+  <button id="play" title="Space">⏸ Pause</button>
+  <span id="hub-state" class="muted">…</span>
+  <button id="hub-toggle">Stop hub</button>
+</header>
+<main>
+  <div id="paused">⏸ Paused — the devices keep working and syncing. Press ▶ Play (or Space) to continue.</div>
+  <div id="caption"></div>
+  <section>
+    <h2>Device links</h2>
+    <div id="links"></div>
+  </section>
+  <section>
+    <h2>Tasks on the hub</h2>
+    <div id="tasks" class="muted">…</div>
+  </section>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const LABELS = { pwa: 'Browser', electron: 'Desktop', android: 'Phone' };
+  const named = (device) => LABELS[device] ? `${LABELS[device]} (${device})` : device;
+  const post = (path) => fetch(path, { method: 'POST' }).then(refresh);
+  let running = false;
+  $('hub-toggle').onclick = () => post(`/api/hub/${running ? 'stop' : 'start'}`);
+  $('play').onclick = () => post('/api/story/toggle');
+  document.addEventListener('keydown', (event) => {
+    if (event.code === 'Space' && $('play').classList.contains('on')) { event.preventDefault(); post('/api/story/toggle'); }
+  });
+
+  function render(state) {
+    running = state.hub.running;
+    const story = state.story ?? {};
+    $('play').classList.toggle('on', !!story.active);
+    $('play').textContent = story.paused ? '▶ Play' : '⏸ Pause';
+    $('paused').classList.toggle('on', !!story.active && !!story.paused);
+    $('caption').classList.toggle('on', !!story.caption);
+    $('caption').textContent = story.step ? `${story.step} — ${story.caption ?? ''}` : (story.caption ?? '');
+    $('hub-state').textContent = running ? 'running' : 'stopped';
+    $('hub-toggle').textContent = running ? 'Stop hub' : 'Start hub';
+    $('links').replaceChildren(...Object.entries(state.links).map(([device, up]) => {
+      const row = document.createElement('div');
+      row.className = `row ${up ? 'up' : 'down'}`;
+      row.innerHTML = '<span class="dot"></span><span class="name"></span><button></button>';
+      row.querySelector('.name').textContent = named(device);
+      const button = row.querySelector('button');
+      button.textContent = up ? 'Cut link' : 'Restore link';
+      button.onclick = () => post(`/api/link/${device}/${up ? 'down' : 'up'}`);
+      return row;
+    }));
+    const tasks = state.hub.tasks;
+    if (!tasks) { $('tasks').textContent = 'The hub is down.'; return; }
+    if (tasks.length === 0) { $('tasks').textContent = 'No tasks yet.'; return; }
+    $('tasks').replaceChildren(...tasks.map((task) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = '<span class="name"></span><span class="muted"></span>';
+      row.querySelector('.name').textContent = task.title;
+      row.querySelector('.name').classList.toggle('done', task.done);
+      row.querySelector('.muted').textContent = `from ${LABELS[task.origin] ?? task.origin}`;
+      return row;
+    }));
+  }
+  function refresh() { return fetch('/api/state').then((r) => r.json()).then(render).catch(() => undefined); }
+  refresh();
+  setInterval(refresh, 1000);
+</script>
+</body>
+</html>

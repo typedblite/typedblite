@@ -1,0 +1,9 @@
+{
+  "appId": "dev.typedblite.syncdemo",
+  "appName": "TypeDBLite Tasks",
+  "webDir": "www",
+  "server": {
+    "url": "http://localhost:4300/?device=android",
+    "cleartext": true
+  }
+}
