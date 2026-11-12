@@ -189,8 +189,10 @@ OwnsTrait:
 
 // `name`, not `role`, so the role is a *named element* other references can resolve to.
 // `relates parent[]` — an ordered role, as `owns name[]` is an ordered ownership.
+// `relates father as parent` — a role SPECIALISING an inherited one: `fathership:father` is a sub-role
+// of `parentship:parent` (define.feature L635).
 RelatesTrait:
-    'relates' name=ID (ordered?='[' ']')? annotations+=Annotation*;
+    'relates' name=ID (ordered?='[' ']')? ('as' specialises=ID)? annotations+=Annotation*;
 
 // `plays employment:employee @card(0..)` — the spec annotates plays as it does owns.
 PlaysTrait:
@@ -600,8 +602,9 @@ IsaProperty:
 LabelProperty:
     'label' label=ScopedLabel;
 
+// `$x sub parenthood:parent` — a role type, under the roles that specialise it (define.feature L635).
 SubProperty:
-    (direct?='sub!' | 'sub') (type=ID | typeVariable=VAR);
+    (direct?='sub!' | 'sub') (type=ScopedLabel | typeVariable=VAR);
 
 OwnsProperty:
     'owns' (attribute=ID | attributeVariable=VAR);
@@ -609,8 +612,10 @@ OwnsProperty:
 PlaysProperty:
     'plays' (role=RoleName | roleVariable=VAR);
 
+// `$x relates $_ as child` — a role that is, or specialises, one named `child`; `as parentship:child`
+// names the one role (match.feature L3546). `as` is to roles what `sub` is to types.
 RelatesProperty:
-    'relates' (role=ID | roleVariable=VAR);
+    'relates' (role=ID | roleVariable=VAR) ('as' (specialises=ScopedLabel | specialisesVariable=VAR))?;
 
 // The value is a literal when constraining, a variable when binding for output.
 // `has $a` — any attribute, of whatever type (163 uses in the behaviour spec).

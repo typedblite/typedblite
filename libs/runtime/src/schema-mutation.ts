@@ -33,7 +33,7 @@ import {
   type UndefineFrom,
 } from '@typedblite/language';
 import { DiagnosticCode, rangeOf } from './diagnostics.js';
-import { checkArgumentsFit, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
+import { checkArgumentsFit, checkSpecialisation, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import {
   SEP,
   ownsKey,
@@ -160,6 +160,21 @@ function redefineType(node: RedefineType, context: MutationContext): void {
         `'${capability}' is not defined, so there is nothing to redefine. Try define instead.`,
         rangeOf(node),
       );
+    }
+    // `redefine part-time-employment relates part-time-role as empty-abstract-role;` — the specialisation
+    // is the change (redefine.feature L630), checked as `define` checks one, against the schema without
+    // the one it replaces.
+    if (isRelatesTrait(trait) && trait.specialises !== undefined) {
+      const key = roleRef(name, trait.name);
+      const before = context.schema.specialises.get(key)?.split(':')[1];
+      if (before === trait.specialises) {
+        refuse(DiagnosticCode.alreadyDefined, `'${capability} as ${trait.specialises}' is already defined; a redefine changes something. Nothing was redefined.`, rangeOf(node));
+      }
+      const without = new Map(context.schema.specialises);
+      without.delete(key);
+      checkSpecialisation(trait, trait.specialises, name, { ...context.schema, specialises: without }, refuse);
+      context.db.prepare('INSERT OR REPLACE INTO schema_specialises(relation, role, specialises) VALUES (?, ?, ?)').run(name, trait.name, trait.specialises);
+      return;
     }
     // `redefine person owns name[];` over `owns name` — the ordering is the change, and it is the ONLY
     // change one redefine makes: an annotation beside it is refused (redefine.feature L295).
@@ -657,6 +672,7 @@ function undefineType(name: string, node: { $cstNode?: unknown }, context: Mutat
       name, `${like(name)}${SEP}%`, `%${SEP}owns${SEP}${like(name)}`, `%${SEP}plays${SEP}${like(name)}:%`,
     );
     run(`DELETE FROM schema_ordered WHERE subject LIKE ?${ESCAPE} OR subject LIKE ?${ESCAPE}`, `${like(name)}${SEP}%`, `%${SEP}owns${SEP}${like(name)}`);
+    run('DELETE FROM schema_specialises WHERE relation = ?', name);
     if (kind === 'attribute') {
       for (const prefix of ['key', 'unique']) db.exec(`DROP INDEX IF EXISTS ${prefix}_${ident(name)}`);
     }
@@ -712,7 +728,7 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
 
   if (isUndefineOwns(target)) {
     const attribute = target.attribute;
-    ownCapabilityOrRefuse(type, `owns ${attribute}`, ownsRow(type, attribute, schema), ancestorsOf(type, schema).some((a) => ownsRow(a, attribute, schema)), at, refuse);
+    ownCapabilityOrRefuse(type, `owns ${attribute}`, ownsRow(type, attribute, schema), ancestorsOf(type, schema).find((a) => ownsRow(a, attribute, schema)), at, refuse);
     sameOrderOrRefuse(`${type} owns ${attribute}`, ownsSubject(type, attribute), target.ordered === true, schema, at, refuse);
     const held = ownersHolding(db, type, attribute);
     if (held > 0) refuse(DiagnosticCode.hasInstances, `${held} instance(s) of '${type}' own '${attribute}'; the ownership cannot be undefined (L1412).`, at);
@@ -729,7 +745,7 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
   if (isUndefinePlays(target)) {
     const role = roleRef(target.role.relation, target.role.role);
     const own = schema.plays.has(playsSubject(type, role));
-    const inherited = ancestorsOf(type, schema).some((a) => schema.plays.has(playsSubject(a, role)));
+    const inherited = ancestorsOf(type, schema).find((a) => schema.plays.has(playsSubject(a, role)));
     ownCapabilityOrRefuse(type, `plays ${role}`, own, inherited, at, refuse);
     const playing = playersOf(db, type, target.role.relation, target.role.role);
     if (playing > 0) refuse(DiagnosticCode.hasInstances, `${playing} instance(s) of '${type}' play '${role}'; the plays cannot be undefined (L1276).`, at);
@@ -743,7 +759,7 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
   if (isUndefineRelates(target)) {
     const role = target.role;
     const own = schema.roles.get(type)?.has(role) === true;
-    const inherited = ancestorsOf(type, schema).some((a) => schema.roles.get(a)?.has(role));
+    const inherited = ancestorsOf(type, schema).find((a) => schema.roles.get(a)?.has(role));
     ownCapabilityOrRefuse(type, `relates ${role}`, own, inherited, at, refuse);
     sameOrderOrRefuse(`${type} relates ${role}`, relatesSubject(type, role), target.ordered === true, schema, at, refuse);
     const played = rolePlayed(db, type, role);
@@ -751,6 +767,7 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
     {
       db.prepare('DELETE FROM schema_relates WHERE relation = ? AND role = ?').run(type, role);
       db.prepare('DELETE FROM schema_ordered WHERE subject = ?').run(relatesSubject(type, role));
+      db.prepare('DELETE FROM schema_specialises WHERE relation = ? AND role = ?').run(type, role);
       // "undefining a role type automatically detaches any possible roleplayers" (L1059).
       db.prepare('DELETE FROM schema_plays WHERE role = ?').run(roleRef(type, role));
       db.prepare(`DELETE FROM schema_annotation WHERE subject = ? OR subject LIKE ?${ESCAPE}`).run(relatesSubject(type, role), `%${SEP}plays${SEP}${like(roleRef(type, role))}`);
@@ -759,11 +776,18 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
   }
 
   if (isUndefineSpecialise(target)) {
-    refuse(
-      DiagnosticCode.notImplemented,
-      `TypeDBLite does not implement role specialisation (\`relates … as …\`), so there is none to undefine.`,
-      at,
-    );
+    // `undefine as employee from part-time-employment relates part-time-employee;` (L631).
+    const capability = node.capability;
+    if (capability === undefined || !isCapabilityRelates(capability)) {
+      return refuse(DiagnosticCode.notDefined, `\`as ${target.role}\` is undefined from a relates: \`undefine as ${target.role} from ${type} relates <role>;\`.`, at);
+    }
+    const role = capability.role;
+    const named = `${type} relates ${role} as ${target.role}`;
+    const current = schema.specialises.get(roleRef(type, role))?.split(':')[1];
+    if (current === undefined) refuse(DiagnosticCode.notDefined, `there is no defined '${named}' to undefine.`, at);
+    if (current !== target.role) refuse(DiagnosticCode.notDefined, `there is no defined '${named}', while '${type} relates ${role} as ${current}' is.`, at);
+    db.prepare('DELETE FROM schema_specialises WHERE relation = ? AND role = ?').run(type, role);
+    return;
   }
 
   if (isUndefineAnnotation(target)) {
@@ -786,17 +810,17 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
       subject = typeSubject(type);
       where = `'${type}'`;
     } else if (isCapabilityOwns(capability)) {
-      ownCapabilityOrRefuse(type, `owns ${capability.attribute}`, ownsRow(type, capability.attribute, schema), ancestorsOf(type, schema).some((a) => ownsRow(a, capability.attribute, schema)), at, refuse);
+      ownCapabilityOrRefuse(type, `owns ${capability.attribute}`, ownsRow(type, capability.attribute, schema), ancestorsOf(type, schema).find((a) => ownsRow(a, capability.attribute, schema)), at, refuse, 'annotation');
       sameOrderOrRefuse(`${type} owns ${capability.attribute}`, ownsSubject(type, capability.attribute), capability.ordered === true, schema, at, refuse);
       subject = ownsSubject(type, capability.attribute);
       where = `'${type} owns ${capability.attribute}'`;
     } else if (isCapabilityPlays(capability)) {
       const role = roleRef(capability.role.relation, capability.role.role);
-      ownCapabilityOrRefuse(type, `plays ${role}`, schema.plays.has(playsSubject(type, role)), ancestorsOf(type, schema).some((a) => schema.plays.has(playsSubject(a, role))), at, refuse);
+      ownCapabilityOrRefuse(type, `plays ${role}`, schema.plays.has(playsSubject(type, role)), ancestorsOf(type, schema).find((a) => schema.plays.has(playsSubject(a, role))), at, refuse, 'annotation');
       subject = playsSubject(type, role);
       where = `'${type} plays ${role}'`;
     } else if (isCapabilityRelates(capability)) {
-      ownCapabilityOrRefuse(type, `relates ${capability.role}`, schema.roles.get(type)?.has(capability.role) === true, ancestorsOf(type, schema).some((a) => schema.roles.get(a)?.has(capability.role)), at, refuse);
+      ownCapabilityOrRefuse(type, `relates ${capability.role}`, schema.roles.get(type)?.has(capability.role) === true, ancestorsOf(type, schema).find((a) => schema.roles.get(a)?.has(capability.role)), at, refuse, 'annotation');
       sameOrderOrRefuse(`${type} relates ${capability.role}`, relatesSubject(type, capability.role), capability.ordered === true, schema, at, refuse);
       subject = relatesSubject(type, capability.role);
       where = `'${type} relates ${capability.role}'`;
@@ -853,10 +877,28 @@ function sameOrderOrRefuse(capability: string, subject: string, stated: boolean,
 }
 
 /** A capability is undefined from the type that declares it — never through a subtype (L1444, L1294, L1163). */
-function ownCapabilityOrRefuse(type: string, capability: string, own: boolean, inherited: boolean, at: ReturnType<typeof rangeOf>, refuse: Refuse): void {
+/**
+ * TypeDB words each inherited case its own way, and the scenarios match on the words: a capability
+ * is *"Cannot unset 'owns email' constraint for 'user' inherited from 'person'"* (L1452, L1302) —
+ * but an inherited role is simply *"there is no defined"* one (L1163) — and an annotation on an
+ * inherited capability is *"'user' does not own attribute type 'email'"*, *"does not play the role"*,
+ * *"The relation type … does not relate role …"* (L1466, L1316, L1185).
+ */
+function ownCapabilityOrRefuse(type: string, capability: string, own: boolean, inheritedFrom: string | undefined, at: ReturnType<typeof rangeOf>, refuse: Refuse, form: 'capability' | 'annotation' = 'capability'): void {
   if (own) return;
-  if (inherited) {
-    refuse(DiagnosticCode.inheritedCapability, `'${type} ${capability}' is inherited; undefining an inherited capability is not allowed. Undefine it from the type that declares it.`, at);
+  if (inheritedFrom !== undefined) {
+    const [verb, target] = [capability.slice(0, capability.indexOf(' ')), capability.slice(capability.indexOf(' ') + 1)];
+    const message =
+      form === 'annotation'
+        ? verb === 'owns'
+          ? `'${type}' does not own attribute type '${target}' itself: it inherits '${capability}' from '${inheritedFrom}', where its annotations are undefined.`
+          : verb === 'plays'
+            ? `'${type}' does not play the role '${target}' itself: it inherits it from '${inheritedFrom}', where its annotations are undefined.`
+            : `The relation type '${type}' does not relate role '${target}' itself: it inherits it from '${inheritedFrom}', where its annotations are undefined.`
+        : verb === 'relates'
+          ? `there is no defined '${type} ${capability}': '${type}' inherits the role from '${inheritedFrom}', and an inherited role is undefined there.`
+          : `Cannot unset '${capability}' constraint for '${type}' inherited from '${inheritedFrom}'. Undefine it from the type that declares it.`;
+    refuse(DiagnosticCode.inheritedCapability, message, at);
   }
   // TypeDB's phrasing, which the scenarios match on (L218, L247, L589).
   refuse(DiagnosticCode.notDefined, `there is no defined '${type} ${capability}' to undefine.`, at);

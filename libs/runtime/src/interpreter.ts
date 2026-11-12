@@ -308,6 +308,8 @@ interface SchemaModel extends SchemaFacts {
   readonly plays: Set<string>;
   /** The ordered capabilities — `owns name[]`, `relates parent[]` — by subject, from `schema_ordered`. */
   readonly ordered: Set<string>;
+  /** `relates father as parent` — `relation:role` to the specialised `relation:role`, from `schema_specialises`. */
+  readonly specialises: Map<string, string>;
 }
 
 /**
@@ -563,6 +565,7 @@ export class TypeDBLiteInterpreter {
     annotations: new Map(),
     plays: new Set(),
     ordered: new Set(),
+    specialises: new Map(),
   };
 
   /**
@@ -662,6 +665,7 @@ export class TypeDBLiteInterpreter {
         // A store defined before lists existed has no `schema_ordered`; `undefine` and `redefine`
         // write to it whether or not a list was ever declared. Additive and empty: no list was.
         this.db.exec('CREATE TABLE IF NOT EXISTS schema_ordered (subject TEXT PRIMARY KEY)');
+        this.db.exec('CREATE TABLE IF NOT EXISTS schema_specialises (relation TEXT NOT NULL, role TEXT NOT NULL, specialises TEXT NOT NULL, PRIMARY KEY (relation, role))');
       }
     } catch {
       /* slower, not wrong */
@@ -962,14 +966,29 @@ export class TypeDBLiteInterpreter {
     this.loadOrdered();
   }
 
-  /** `schema_ordered` into the model — none before the table existed, which is none declared. */
+  /**
+   * `schema_ordered` and `schema_specialises` into the model — none before the tables existed, which
+   * is none declared. A specialised role is resolved to the relation above that declares it, so the
+   * model holds role TYPES (`parentship:parent`), not names.
+   */
   private loadOrdered(): void {
     this.schema.ordered.clear();
+    this.schema.specialises.clear();
     try {
       const rows = this.db.prepare('SELECT subject FROM schema_ordered').all() as Array<{ subject: string }>;
       for (const row of rows) this.schema.ordered.add(String(row.subject));
     } catch {
       // Before `schema_ordered`: no list was ever declared.
+    }
+    try {
+      const rows = this.db.prepare('SELECT relation, role, specialises FROM schema_specialises').all() as Array<{ relation: string; role: string; specialises: string }>;
+      for (const row of rows) {
+        const relation = String(row.relation);
+        const declaring = this.typeFamily(relation, 'inherited').slice(1).find((t) => this.schema.roles.get(t)?.has(String(row.specialises)));
+        if (declaring !== undefined) this.schema.specialises.set(roleRef(relation, String(row.role)), roleRef(declaring, String(row.specialises)));
+      }
+    } catch {
+      // Before `schema_specialises`: no role was ever specialised.
     }
   }
 
@@ -1003,7 +1022,7 @@ export class TypeDBLiteInterpreter {
    */
   private reloadSchema(): void {
     for (const set of [this.schema.types, this.schema.relations, this.schema.attributes, this.schema.owns, this.schema.abstracts, this.schema.keyOwnerships, this.schema.plays, this.schema.ordered]) set.clear();
-    for (const map of [this.schema.parents, this.schema.valueTypes, this.schema.roles, this.schema.annotations]) map.clear();
+    for (const map of [this.schema.parents, this.schema.valueTypes, this.schema.roles, this.schema.annotations, this.schema.specialises]) map.clear();
     this.loadSchema();
   }
 
@@ -1071,7 +1090,6 @@ export class TypeDBLiteInterpreter {
     });
     const { ddl, keys } = generateSchema(file);
     this.applySchemaDdl(ddl, file);
-    this.loadOrdered();
     // Identity is the @key attribute's value (ADR-003 D3, canonical.ts). `loadSchema` restores only
     // types and attributes, so without persisting these a reopened database could not tell which
     // attribute names an entity, and every entity would fall back to a node-local id.
@@ -1145,6 +1163,8 @@ export class TypeDBLiteInterpreter {
     // a `define` that changed nothing is today indistinguishable from one that did. That is the
     // fact worth reporting, not the success.
     const applied = declared - alreadyPresent;
+    // After the in-memory roles and parents above: a specialisation resolves through them.
+    this.loadOrdered();
     this.diagnostics.fact(
       DiagnosticCode.schemaApplied,
       `\`define\` applied ${applied} new definition(s); ${alreadyPresent} already present.`,
@@ -2329,12 +2349,25 @@ export class TypeDBLiteInterpreter {
    */
   private projectRows(rows: Array<Record<string, Binding>>, scope: StreamScope): Array<Record<string, TypeDBLiteValue>> {
     const projected: Array<Record<string, TypeDBLiteValue>> = [];
+    // 🔴 A row that differed from another only in a `$_` is the same ANSWER once `$_` is dropped:
+    // `match $_ relates $x as member;` answers each role once, however many relations relate it
+    // (define.feature L943, match.feature L3546). Only then — rows the query's own variables tell
+    // apart are never merged.
+    let droppedAnonymous = false;
+    const seen = new Set<string>();
     for (const row of rows) {
       const cells: Record<string, TypeDBLiteValue> = {};
       for (const [variable, binding] of Object.entries(row)) {
+        if (isAnonymous(variable) && binding !== undefined) droppedAnonymous = true;
         if (!scope.available.has(variable) || variable.startsWith('__') || isAnonymous(variable) || binding === undefined) continue;
         // `select $x` — the caller reads `row.x`, without the `$`.
         cells[variable.slice(1)] = this.cellOf(binding);
+      }
+      if (droppedAnonymous) {
+        // `type` beside the rendering: an attribute `name "W"` and a string value "W" render alike.
+        const key = Object.keys(cells).sort().map((k) => `${k}=${cells[k].isAttribute() ? 'a' : cells[k].isValue() ? 'v' : 't'}:${cells[k].type}:${String(cells[k])}`).join(String.fromCharCode(30));
+        if (seen.has(key)) continue;
+        seen.add(key);
       }
       projected.push(cells);
     }
@@ -3630,11 +3663,7 @@ export class TypeDBLiteInterpreter {
       const params: Array<string | number> = [];
       const joins: string[] = [];
       // A roleless slot (`($p)`) joins on any role (optional.feature L46).
-      const roleOf = (alias: string, role: string | undefined): string => {
-        if (role === undefined) return '';
-        params.push(role);
-        return ` AND ${alias}.role = ?`;
-      };
+      const roleOf = (alias: string, role: string | undefined): string => (role === undefined ? '' : this.roleFilter(alias, role, params));
       mine.forEach((role, index) => {
         joins.push(
           index === 0
@@ -3656,6 +3685,27 @@ export class TypeDBLiteInterpreter {
       return { sql: `SELECT rv0.player FROM thing t ${joins.join(' ')}${where}`, params };
     }
     return undefined;
+  }
+
+  /**
+   * A role in `links (…)` matches the role and every role that specialises it, at any depth:
+   * `(spouse: $x)` finds a `husband` of a `hetero-marriage` (match.feature L1484). `role_player`
+   * holds role NAMES, so the family is a set of names; the relation's own `isa` keeps it honest.
+   */
+  private roleFilter(alias: string, role: string, params: Array<string | number>): string {
+    const family = new Set([role]);
+    for (const [child] of this.schema.specialises) {
+      let current: string | undefined = child;
+      while (current !== undefined) {
+        if (current.split(':')[1] === role) {
+          family.add(child.split(':')[1]);
+          break;
+        }
+        current = this.schema.specialises.get(current);
+      }
+    }
+    params.push(...family);
+    return family.size === 1 ? ` AND ${alias}.role = ?` : ` AND ${alias}.role IN (${[...family].map(() => '?').join(', ')})`;
   }
 
   /**
@@ -3687,10 +3737,7 @@ export class TypeDBLiteInterpreter {
         const boundPlayer = typeof player === 'number' ? player : undefined;
         // A roleless slot (`($p, $c)`) joins on any role (optional.feature L46).
         let join = `JOIN role_player rp${index} ON rp${index}.rel = t.iid`;
-        if (role.role !== undefined) {
-          join += ` AND rp${index}.role = ?`;
-          params.push(role.role);
-        }
+        if (role.role !== undefined) join += this.roleFilter(`rp${index}`, role.role, params);
 
         // 🔴 One variable in two roles must be the SAME thing in both.
         //

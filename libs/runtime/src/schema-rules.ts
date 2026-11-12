@@ -61,6 +61,11 @@ export interface SchemaFacts {
   readonly plays: ReadonlySet<string>;
   /** The ordered capabilities, `owns name[]` and `relates parent[]`, as their subjects. */
   readonly ordered: ReadonlySet<string>;
+  /**
+   * Role specialisation, `relates father as parent`: each specialising role as `relation:role`, to
+   * the role it specialises as its DECLARING relation's `relation:role` — the role types' parents.
+   */
+  readonly specialises: ReadonlyMap<string, string>;
 }
 
 /** One key for `keyOwnerships`, the shape `SchemaModel.owns` already uses. */
@@ -159,6 +164,7 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
   const parents = new Map(applied.parents);
   const valueTypes = new Map(applied.valueTypes);
   const roles = new Map([...applied.roles].map(([relation, set]) => [relation, new Set(set)]));
+  const specialising: Array<[string, string, string]> = [];
   const declareRole = (relation: string, role: string): void => {
     const set = roles.get(relation) ?? new Set<string>();
     set.add(role);
@@ -185,9 +191,18 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
       if (!isAttributeDef(definition)) {
         for (const trait of definition.traits) {
           if (isRelatesTrait(trait)) declareRole(name, trait.name);
+          if (isRelatesTrait(trait) && trait.specialises !== undefined) specialising.push([name, trait.name, trait.specialises]);
         }
       }
     }
+  }
+  // Resolved once every parent and role of the statement is known: `relation b sub a, relates x as y;
+  // relation a relates y;` is one statement, in either order.
+  const specialises = new Map(applied.specialises);
+  const resolving = { ...applied, parents } as SchemaFacts;
+  for (const [relation, role, parent] of specialising) {
+    const declaring = ancestorsOf(relation, resolving).find((t) => roles.get(t)?.has(parent));
+    if (declaring !== undefined) specialises.set(`${relation}:${role}`, `${declaring}:${parent}`);
   }
   // `keyOwnerships` is the APPLIED set on purpose: the rule that reads it asks whether this
   // statement adds a key, which the statement's own annotations cannot answer.
@@ -198,6 +213,7 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
     annotations: applied.annotations,
     plays: applied.plays,
     ordered: applied.ordered,
+    specialises,
   };
 }
 
@@ -617,7 +633,20 @@ function checkOrderUnchanged(capability: string, appliedOrdered: boolean, stated
 function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFacts, refuse: Refuse, applied: SchemaFacts): void {
   if (applied.roles.get(relation)?.has(trait.name) === true) {
     checkOrderUnchanged(`${relation} relates ${trait.name}`, applied.ordered.has(relatesSubject(relation, trait.name)), trait.ordered === true, trait, refuse);
+    // A restatement keeps its specialisation (define.feature L619) — changing it is `redefine`'s.
+    // Adding one to a role defined without one is a definition, not a change (redefine.feature L630).
+    const before = applied.specialises.get(`${relation}:${trait.name}`);
+    const stated = trait.specialises;
+    if (before !== undefined && stated !== undefined && before.split(':')[1] !== stated) {
+      refuse(
+        DiagnosticCode.alreadyDefined,
+        `'${relation} relates ${trait.name}${stated === undefined ? '' : ` as ${stated}`}' cannot be defined: a different ` +
+          `'${relation} relates ${trait.name}${before === undefined ? '' : ` as ${before.split(':')[1]}`}' is already defined. Try redefine instead.`,
+        rangeOf(trait),
+      );
+    }
   }
+  if (trait.specialises !== undefined) checkSpecialisation(trait, trait.specialises, relation, proposed, refuse);
   const kind = kindOf(relation, proposed) ?? 'entity';
   if (kind !== 'relation') {
     refuse(
@@ -638,6 +667,35 @@ function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFac
       `or use the inherited role.`,
     rangeOf(trait),
   );
+}
+
+/**
+ * `relates father as parent`: `parent` must be a role the relation INHERITS — declared above it
+ * (define.feature L685) — and inherited without specialisation: once `parentship` specialises
+ * `family-relation:member`, a relation below it cannot specialise `member` again (L985). Several
+ * roles of ONE relation may specialise the same role (L943).
+ */
+export function checkSpecialisation(trait: RelatesTrait, parent: string, relation: string, proposed: SchemaFacts, refuse: Refuse): void {
+  const above = ancestorsOf(relation, proposed);
+  const declaring = above.find((type) => proposed.roles.get(type)?.has(parent));
+  if (declaring === undefined) {
+    refuse(
+      DiagnosticCode.unknownRole,
+      `'${relation} relates ${trait.name} as ${parent}': no supertype of '${relation}' relates '${parent}', so there is no role to specialise.`,
+      rangeOf(trait),
+    );
+    return;
+  }
+  const between = above.slice(0, above.indexOf(declaring));
+  const specialisedBy = between.find((type) => [...proposed.specialises].some(([child, of]) => child.startsWith(`${type}:`) && of === `${declaring}:${parent}`));
+  if (specialisedBy !== undefined) {
+    refuse(
+      DiagnosticCode.roleRedeclared,
+      `'${relation} relates ${trait.name} as ${parent}': '${declaring}:${parent}' must be inherited without specialization, ` +
+        `and '${specialisedBy}' already specialises it.`,
+      rangeOf(trait),
+    );
+  }
 }
 
 const article = (word: string): string => (/^[aeiou]/.test(word) ? 'an' : 'a');

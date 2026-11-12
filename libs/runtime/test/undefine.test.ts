@@ -123,10 +123,10 @@ describe('undefine', () => {
       assert.equal(refusal(() => engine.execute('insert $p isa person, has email "b@x", has name "B";')).code, DiagnosticCode.unownedAttribute);
     });
 
-    it('refuses an inherited ownership — "not allowed" — L1351, L1444', () => {
+    it('refuses an inherited ownership, in TypeDB\'s words — L1351, L1444', () => {
       const r = refusal(() => engine.define('undefine owns name from child;'));
       assert.equal(r.code, DiagnosticCode.inheritedCapability);
-      assert.match(r.message, /not allowed/);
+      assert.match(r.message, /Cannot unset 'owns name' constraint for 'child' inherited from 'person'/);
     });
 
     it('refuses a capability that is not defined, in TypeDB\'s words — L246, L217, L588', () => {
@@ -227,7 +227,7 @@ describe('undefine', () => {
     });
   });
 
-  it('role specialisation is not this engine\'s — refused by name', () => {
-    assert.equal(refusal(() => engine.define('undefine as employee from employment relates employer;')).code, DiagnosticCode.notImplemented);
+  it('undefines a role specialisation only as it is defined — L631', () => {
+    assert.match(refusal(() => engine.define('undefine as employee from employment relates employer;')).message, /there is no defined 'employment relates employer as employee'/);
   });
 });

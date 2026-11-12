@@ -82,13 +82,13 @@ Rules:
 
 | Feature | Passing |
 |---|---|
-| define | 441 |
-| redefine | 191 |
-| undefine | 161 |
+| define | 460 |
+| redefine | 194 |
+| undefine | 170 |
 | expression | 124 |
 | reduce | 65 |
 | insert | 107 |
-| match | 85 |
+| match | 95 |
 | delete | 30 |
 | fetch | 65 |
 | pipelines | 10 |

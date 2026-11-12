@@ -182,6 +182,8 @@ export class TypeQLiteFormatter extends AbstractFormatter {
     f.property(named as never).prepend(Formatting.oneSpace());
     // `owns name[]` — the list marker sits on the name.
     if (node.ordered) f.keywords('[', ']').prepend(Formatting.noSpace());
+    // `relates father as parent`.
+    if (!isOwnsTrait(node) && node.specialises !== undefined) f.keyword('as').surround(Formatting.oneSpace());
     node.annotations.forEach((annotation) =>
       f.node(annotation).prepend(Formatting.oneSpace()),
     );

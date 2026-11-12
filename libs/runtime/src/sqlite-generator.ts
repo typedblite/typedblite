@@ -149,6 +149,15 @@ CREATE TABLE IF NOT EXISTS schema_ordered (
   subject TEXT PRIMARY KEY
 );
 
+-- relates father as parent: the role a relation's own role SPECIALISES, by name; the relation above it
+-- that declares that name is resolved on load (define.feature L635). Additive, like the tables above.
+CREATE TABLE IF NOT EXISTS schema_specialises (
+  relation    TEXT NOT NULL,
+  role        TEXT NOT NULL,
+  specialises TEXT NOT NULL,
+  PRIMARY KEY (relation, role)
+);
+
 CREATE TABLE IF NOT EXISTS role_player (
   rel    INTEGER NOT NULL REFERENCES thing(iid) ON DELETE CASCADE,
   role   TEXT NOT NULL,
@@ -184,6 +193,8 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
   const plays: Array<[string, string]> = [];
   /** `owns name[]`, `relates parent[]` — their subjects. */
   const ordered: string[] = [];
+  /** `relates father as parent` — [relation, role, the role it specialises]. */
+  const specialises: Array<[string, string, string]> = [];
   const record = (subject: string, list: readonly Annotation[]): void => {
     for (const annotation of list) annotations.push([subject, recordCategory(annotation), recordText(annotation)]);
   };
@@ -219,6 +230,7 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
         for (const trait of definition.traits) {
           record(traitSubject(name, trait).subject, trait.annotations);
           if ((isOwnsTrait(trait) || isRelatesTrait(trait)) && trait.ordered === true) ordered.push(traitSubject(name, trait).subject);
+          if (isRelatesTrait(trait) && trait.specialises !== undefined) specialises.push([name, trait.name, trait.specialises]);
           if (isPlaysTrait(trait)) {
             plays.push([name, roleRef(trait.role.relation.$refText, trait.role.role.$refText)]);
           }
@@ -311,6 +323,10 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
 
   for (const subject of ordered) {
     statements.push(`INSERT OR IGNORE INTO schema_ordered(subject) VALUES (${q(subject)});`);
+  }
+
+  for (const [relation, role, parent] of specialises) {
+    statements.push(`INSERT OR IGNORE INTO schema_specialises(relation, role, specialises) VALUES (${q(relation)}, ${q(role)}, ${q(parent)});`);
   }
 
   for (const key of keys) {
