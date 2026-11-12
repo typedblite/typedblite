@@ -44,6 +44,11 @@ const DOCUMENTS = {
     'attribute   skill-id ,  value string ;',
     '',
   ].join('\n'),
+  // A schema split across two files (ADR-008 D3). `missing-attr` is defined nowhere, so exactly one
+  // diagnostic proves `employee-name` resolved into the other file.
+  'file:///workspace/split-attributes.typeqlite': 'define attribute employee-name, value string;\n',
+  'file:///workspace/split-people.typeqlite':
+    'define entity employee, owns employee-name, owns missing-attr;\n',
   'file:///workspace/resolution.typeqlite': [
     'define',
     'attribute skill-id, value string;',
@@ -87,6 +92,15 @@ beforeAll(async () => {
   await allPublished();
 });
 
+/** Diagnostics settle: each opened document rebuilds the workspace, and may republish. */
+async function settled(uri: string, expected: number, timeout = 10_000): Promise<Diagnostic[]> {
+  const started = Date.now();
+  while ((published.get(uri)?.length ?? -1) !== expected && Date.now() - started < timeout) {
+    await new Promise((done) => setTimeout(done, 20));
+  }
+  return published.get(uri) ?? [];
+}
+
 afterAll(() => {
   connection?.dispose();
   server?.kill();
@@ -108,6 +122,13 @@ describe('the bundled language server', () => {
 
   it('publishes nothing for a valid document', () => {
     expect(published.get('file:///workspace/messy.typeqlite')).toEqual([]);
+  });
+
+  it('resolves a reference into another open document', async () => {
+    const diagnostics = await settled('file:///workspace/split-people.typeqlite', 1);
+    expect(diagnostics.map((d) => d.message)).toEqual([
+      "Could not resolve reference to AttributeDef named 'missing-attr'.",
+    ]);
   });
 
   it('formats a document', async () => {

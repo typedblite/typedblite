@@ -166,7 +166,7 @@ the end (invariant 1).
 | - | ----- | ------ | ------- |
 | 00 | [Scope, the upstream diff, and the ADR](phases/00-scope-and-adr/summary.md) | Complete | [summary](phases/00-scope-and-adr/summary.md) |
 | 01 | [Extension shell: client, server, bundle, e2e harness, and existing services in the editor](phases/01-extension-shell/summary.md) | Complete | [summary](phases/01-extension-shell/summary.md) |
-| 02 | Workspace schema: cross-file resolution of schema references | ⬜ Not started | — |
+| 02 | [Workspace schema: cross-file resolution of schema references](phases/02-workspace-schema/summary.md) | Complete | [summary](phases/02-workspace-schema/summary.md) |
 | 03 | Navigation: definition, references, outline, hover, folding | ⬜ Not started | — |
 | 04 | Query-side labels: pipeline type labels resolve against the schema | ⬜ Not started | — |
 | 05 | Completion | ⬜ Not started | — |

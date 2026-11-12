@@ -195,6 +195,7 @@ file extensions it claims come from `langium-config.json`, and a test fails if t
 | Changing revision semantics without running the parity oracle | CouchDB parity is not covered by the routine test suite |
 | Editing the grammar without regenerating locally | Tools run from source (`tsx`, vitest aliases) read `src/generated/`, which only `langium-generate` refreshes |
 | Adding a construct to the grammar with no caller | Grammar scope is measured, not guessed — find the caller first |
+| Trusting a gate after a dependency bump without a clean build | `build` is `tsc -b`, which is incremental: a library whose sources did not change is not re-emitted, so its dependants are judged against stale declarations, even with `--skip-nx-cache`. Delete `out/` and `*.tsbuildinfo` first (the `vscode-languageserver` 10 bump hid a type error for a whole phase this way) |
 
 ---
 

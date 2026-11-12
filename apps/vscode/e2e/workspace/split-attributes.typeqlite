@@ -1,0 +1,2 @@
+define
+attribute employee-name, value string;
