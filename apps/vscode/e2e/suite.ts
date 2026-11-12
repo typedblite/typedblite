@@ -37,6 +37,22 @@ async function settledOn(uri: vscode.Uri, count: number, timeout = 20_000): Prom
   }
 }
 
+/** A document is built once the server has published for it, even an empty set. */
+async function diagnosticsSettled(uri: vscode.Uri, quiet = 500): Promise<void> {
+  // An empty publication is indistinguishable from none, so wait for the server to go quiet.
+  let last = JSON.stringify(vscode.languages.getDiagnostics(uri));
+  let stableSince = Date.now();
+  const started = Date.now();
+  while (Date.now() - stableSince < quiet && Date.now() - started < 10_000) {
+    await new Promise((done) => setTimeout(done, 100));
+    const now = JSON.stringify(vscode.languages.getDiagnostics(uri));
+    if (now !== last) {
+      last = now;
+      stableSince = Date.now();
+    }
+  }
+}
+
 const codeOf = (diagnostic: vscode.Diagnostic) =>
   typeof diagnostic.code === 'object' ? diagnostic.code.value : diagnostic.code;
 
@@ -109,6 +125,80 @@ const cases: Record<string, () => Promise<void>> = {
     // `entity skill, owns skill-id, owns nope-id;`: skill-id at 19, nope-id at 34.
     assert.equal(on(19)?.type, 'property');
     assert.equal(on(34), undefined);
+  },
+
+  async 'go to definition crosses files'() {
+    const document = await open('nav-people.typeqlite');
+    await diagnosticsSettled(document.uri);
+    const at = document.positionAt(document.getText().indexOf('nav-name') + 1);
+    const found = await vscode.commands.executeCommand<(vscode.Location | vscode.LocationLink)[]>(
+      'vscode.executeDefinitionProvider',
+      document.uri,
+      at,
+    );
+    const target = found?.[0];
+    const uri = target && ('targetUri' in target ? target.targetUri : target.uri);
+    assert.equal(uri?.fsPath, uriOf('nav-shared.typeqlite').fsPath);
+  },
+
+  async 'find references crosses files'() {
+    const document = await open('nav-shared.typeqlite');
+    const at = document.positionAt(document.getText().indexOf('nav-name') + 1);
+    const found = await vscode.commands.executeCommand<vscode.Location[]>(
+      'vscode.executeReferenceProvider',
+      document.uri,
+      at,
+    );
+    const files = (found ?? []).map((l) => l.uri.fsPath.split('/').pop()).sort();
+    assert.deepEqual(files, ['nav-people.typeqlite', 'nav-shared.typeqlite']);
+  },
+
+  async 'the outline lists definitions, roles and re-opens'() {
+    const shared = await open('nav-shared.typeqlite');
+    const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+      'vscode.executeDocumentSymbolProvider',
+      shared.uri,
+    );
+    assert.deepEqual(
+      symbols?.map((s) => [s.name, s.kind]),
+      [
+        ['nav-name', vscode.SymbolKind.Property],
+        ['nav-employment', vscode.SymbolKind.Interface],
+      ],
+    );
+    assert.deepEqual(symbols?.[1]?.children.map((c) => c.name), ['nav-employee']);
+    const reopens = await open('nav-reopens.typeqlite');
+    const reopened = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+      'vscode.executeDocumentSymbolProvider',
+      reopens.uri,
+    );
+    assert.deepEqual(reopened?.map((s) => s.name), ['nav-employment']);
+  },
+
+  async 'hover shows the definition and its documentation'() {
+    const document = await open('nav-people.typeqlite');
+    const at = document.positionAt(document.getText().indexOf('nav-person') + 1);
+    const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+      'vscode.executeHoverProvider',
+      document.uri,
+      at,
+    );
+    const text = (hovers ?? [])
+      .flatMap((h) => h.contents)
+      .map((c) => (typeof c === 'string' ? c : c.value))
+      .join('\n');
+    assert.match(text, /entity nav-person/);
+    assert.match(text, /Someone the organisation knows about\./);
+    assert.match(text, /A human being/);
+  },
+
+  async 'a multi-line definition folds'() {
+    const document = await open('nav-people.typeqlite');
+    const ranges = await vscode.commands.executeCommand<vscode.FoldingRange[]>(
+      'vscode.executeFoldingRangeProvider',
+      document.uri,
+    );
+    assert.ok((ranges ?? []).some((r) => r.start === 2), 'the entity on line 3 folds');
   },
 
   // Last, because it deletes a file from the workspace.

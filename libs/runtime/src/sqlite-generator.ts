@@ -1,4 +1,5 @@
 import {
+  docCommentOf,
   isAbstractAnnotation,
   isAttributeDef,
   isEntityDef,
@@ -191,25 +192,6 @@ CREATE TABLE IF NOT EXISTS role_player (
 -- check): the primary key starts with rel, so without this each lookup scans the whole table. An existing
 -- store gets it when it is next opened (the interpreter ensures it). Not a rule; a lookup path.
 CREATE INDEX IF NOT EXISTS role_player_by_player ON role_player(player, role, rel);`;
-
-/**
- * `#! This represents a person` on the line(s) directly above a definition — TypeDB's doc comment,
- * read from the source text because comments are hidden from the AST. `undefined` when there is none.
- */
-function docCommentOf(definition: { $cstNode?: { offset: number; root: { fullText: string } } }): string | undefined {
-  const node = definition.$cstNode;
-  if (node === undefined) return undefined;
-  const lines = node.root.fullText.slice(0, node.offset).split(/\r?\n/);
-  // The definition's own line, up to where it starts, holds nothing but indentation.
-  lines.pop();
-  const comment: string[] = [];
-  for (let i = lines.length - 1; i >= 0; i -= 1) {
-    const line = /^\s*#!\s?(.*)$/.exec(lines[i]);
-    if (line === null) break;
-    comment.unshift(line[1].trimEnd());
-  }
-  return comment.length === 0 ? undefined : comment.join('\n');
-}
 
 export interface SchemaSql {
   readonly ddl: string;
