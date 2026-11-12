@@ -7,18 +7,30 @@ import type {
   SqliteRow,
   SqliteRunResult,
   SqliteStatement,
-} from '../src/sqlite-database.js';
+} from './sqlite-database.js';
 
 /**
- * SPIKE — a `SqliteDatabase` over the official SQLite WASM build (`@sqlite.org/sqlite-wasm`).
+ * `@typedblite/runtime/wasm` — TypeDBLite on the official SQLite WASM build (`@sqlite.org/sqlite-wasm`)
+ * ([ADR-009](../../../docs/architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md) D1).
  *
- * It lives outside `src/` on purpose: nothing here ships in the runtime package until the spike
- * says it should. It satisfies the SYNCHRONOUS interface in `src/sqlite-database.ts`, which holds
- * wherever the WASM module is initialised before the interpreter is constructed — Node here, and
- * a Web Worker in a browser or a Capacitor WebView.
+ * It satisfies the SYNCHRONOUS interface in `sqlite-database.ts`, which holds wherever the WASM module
+ * is initialised before an interpreter is constructed: a Web Worker in a browser, Electron or a
+ * Capacitor WebView, and Node for tests. Initialisation is the one asynchronous step and cannot hide
+ * in a synchronous opener, so callers `await initWasmSqlite()` once, first:
  *
- * Initialisation is the one asynchronous step and cannot be hidden in a synchronous opener, so
- * callers `await initWasmSqlite()` once, first.
+ * ```ts
+ * import { TypeDBLiteInterpreter } from '@typedblite/runtime';
+ * import { initWasmSqlite, openWasmSqlite } from '@typedblite/runtime/wasm';
+ *
+ * await initWasmSqlite({ sahPool: { name: 'my-app' } }); // OPFS, in a dedicated Worker
+ * const db = new TypeDBLiteInterpreter('/tasks.db', undefined, { openDatabase: openWasmSqlite });
+ * ```
+ *
+ * 🔴 **OPFS through the SAH pool allows one connection per file.** Two tabs on one store need one
+ * owner (a single worker, or a Web Lock); this binding does not coordinate them.
+ *
+ * Proven in a spike first (494 of 515 runtime tests on WASM, the rest being the binding's honest
+ * limits) and now tested by `vitest.wasm.config.ts` and `test-browser/`.
  */
 type Sqlite3 = Awaited<ReturnType<typeof sqlite3InitModule>>;
 type Oo1Db = InstanceType<Sqlite3['oo1']['DB']>;
@@ -233,8 +245,8 @@ export const openWasmSqlite: SqliteOpener = (
     return new WasmDatabase(sqlite3, new sqlite3.oo1.DB(location, 'c'));
   const filename = `file:${location}?vfs=memdb`;
   // `memdb` frees a database when its LAST connection closes, which a real file does not do. A
-  // keeper connection per path, never closed, stands in for the file staying on disk — a spike
-  // measure that leaks one connection per distinct path for the life of the process.
+  // keeper connection per path, never closed, stands in for the file staying on disk. It holds one
+  // connection per distinct path for the life of the process: without OPFS, that is what a path is.
   if (!keepers.has(location))
     keepers.set(location, new sqlite3.oo1.DB(filename, 'c'));
   return new WasmDatabase(sqlite3, new sqlite3.oo1.DB(filename, 'c'));

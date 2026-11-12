@@ -110,7 +110,7 @@ run stays at 1742 of 1756** (ADR-005), at every phase close.
 `node:crypto`, every revision computed in a browser must equal the one computed on Node, or stores
 on different platforms stop converging (ADR-003 D3). That is proven by a differential test over many
 states, not argued. The CouchDB parity oracle no longer exists, so nothing else would notice
-([Testing](../../development/testing.md#suites-that-do-not-run-at-the-moment)).
+([Testing](../../development/testing.md#the-full-text-parity-oracle)).
 
 **3. The demo uses only public API.** It imports nothing from `src/`, `spike/` or a relative path
 into a library. Anything it needs that is not exported is a change to the library, made in a library
@@ -209,7 +209,7 @@ because every store holds the same tasks, which is what the original's driver ch
 | - | ----- | ------ | ------- |
 | 00 | [Scope, the survey of the original, ADR-009, versions and licences](phases/00-scope-and-adr/summary.md) | Complete | [summary](phases/00-scope-and-adr/summary.md) |
 | 01 | [The runtime in a browser: a browser-safe entry, synchronous SHA-256, `Object.groupBy`](phases/01-runtime-in-browser/summary.md) | Complete | [summary](phases/01-runtime-in-browser/summary.md) |
-| 02 | The WASM binding, promoted: the export, the peer dependency, tests in Node and Chromium | Not started | |
+| 02 | [The WASM binding, promoted: the export, the peer dependency, tests in Node and Chromium](phases/02-wasm-binding/summary.md) | Complete | [summary](phases/02-wasm-binding/summary.md) |
 | 03 | Replication that fails honestly: 5xx and timeouts, and a warning on a reopened store | Not started | |
 | 04 | The hub, the switchboard, the control page, and `smoke` | Not started | |
 | 05 | The PWA client and its service worker | Not started | |

@@ -185,7 +185,7 @@ followed by a lost publish would be a change that never replicates and that noth
   built. 🔴 The suite that proved it has since been removed, so **nothing now re-checks that
   parity**. A change to the change log or the revision algorithm needs its own tests, and an
   amendment to ADR-003 if the semantics move
-  ([Testing](testing.md#suites-that-do-not-run-at-the-moment)).
+  ([Testing](testing.md#the-full-text-parity-oracle)).
 
 ## Conformance is the oracle
 
