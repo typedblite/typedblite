@@ -5,7 +5,13 @@ import {
   DefaultNodeKindProvider,
   type LangiumServices,
 } from 'langium/lsp';
-import { CompletionItemKind, SymbolKind, type DocumentSymbol } from 'vscode-languageserver';
+import {
+  CompletionItemKind,
+  SymbolKind,
+  type DocumentSymbol,
+  type Hover,
+  type HoverParams,
+} from 'vscode-languageserver';
 import {
   isAttributeDef,
   isDocAnnotation,
@@ -20,6 +26,7 @@ import {
   type RelationDef,
 } from './generated/ast.js';
 import { docCommentOf } from './typeqlite-doc-comments.js';
+import type { TypeQLiteLabels } from './typeqlite-labels.js';
 
 /**
  * Navigation for TypeQLite: what kind of thing each definition is, the outline, and hover.
@@ -105,6 +112,27 @@ export class TypeQLiteHoverProvider extends AstNodeHoverProvider {
   constructor(services: LangiumServices) {
     super(services);
     this.services = services;
+  }
+
+  /**
+   * A label that is a plain `ID` (`isa person`) is not a reference Langium can follow, so when Langium
+   * finds nothing the hover is for whatever the label resolves to (ADR-008 D5).
+   */
+  override async getHoverContent(
+    document: LangiumDocument,
+    params: HoverParams,
+  ): Promise<Hover | undefined> {
+    const found = await super.getHoverContent(document, params);
+    if (found) return found;
+    const labels = (this.services as { labels?: { Labels: TypeQLiteLabels } }).labels?.Labels;
+    const site = labels?.siteAt(document, document.textDocument.offsetAt(params.position));
+    if (!labels || !site) return undefined;
+    const contents = labels
+      .resolve(site)
+      .map((target) => this.getAstNodeHoverContent(target))
+      .filter((content): content is string => content !== undefined);
+    if (contents.length === 0) return undefined;
+    return { contents: { kind: 'markdown', value: contents.join('\n\n---\n\n') }, range: site.range };
   }
 
   protected override getAstNodeHoverContent(node: AstNode): string | undefined {

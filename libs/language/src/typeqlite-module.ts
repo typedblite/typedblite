@@ -26,11 +26,22 @@ import {
   TypeQLiteHoverProvider,
   TypeQLiteNodeKindProvider,
 } from './typeqlite-navigation.js';
+import { TypeQLiteLabels } from './typeqlite-labels.js';
+import {
+  TypeQLiteDefinitionProvider,
+  TypeQLiteDocumentBuilder,
+  TypeQLiteDocumentValidator,
+  TypeQLiteReferencesProvider,
+} from './typeqlite-label-providers.js';
 
 /** Language-specific services — the seam ADR-002 Decision 7's middle layer lives in. */
 export interface TypeQLiteAddedServices {
   validation: {
     TypeQLiteValidator: TypeQLiteValidator;
+  };
+  /** Labels that are plain `ID`s, resolved against the workspace (ADR-008 D5). Editor-only. */
+  labels: {
+    Labels: TypeQLiteLabels;
   };
 }
 
@@ -48,6 +59,11 @@ export const TypeQLiteModule: Module<
     SemanticTokenProvider: (services) => new TypeQLiteSemanticTokenProvider(services),
     DocumentSymbolProvider: (services) => new TypeQLiteDocumentSymbolProvider(services),
     HoverProvider: (services) => new TypeQLiteHoverProvider(services),
+    DefinitionProvider: (services) => new TypeQLiteDefinitionProvider(services),
+    ReferencesProvider: (services) => new TypeQLiteReferencesProvider(services),
+  },
+  labels: {
+    Labels: (services) => new TypeQLiteLabels(services),
   },
   references: {
     ScopeProvider: (services) => new TypeQLiteScopeProvider(services),
@@ -61,6 +77,9 @@ export const TypeQLiteModule: Module<
     // an `async` function, which makes `getChecks()` promise-returning however the rule was written
     // — see `SyncValidationRegistry`. The language server is unaffected: it awaits either way.
     ValidationRegistry: (services) => new SyncValidationRegistry(services),
+    // 🔴 Editor-only (ADR-008 D2): `validateSync` never calls the DocumentValidator, so the
+    // unknown-label warning it adds cannot reach the runtime.
+    DocumentValidator: (services) => new TypeQLiteDocumentValidator(services),
   },
 };
 
@@ -68,6 +87,9 @@ export const TypeQLiteModule: Module<
 export const TypeQLiteSharedModule: Module<LangiumSharedServices, PartialLangiumSharedServices> = {
   lsp: {
     NodeKindProvider: () => new TypeQLiteNodeKindProvider(),
+  },
+  workspace: {
+    DocumentBuilder: (services) => new TypeQLiteDocumentBuilder(services),
   },
 };
 

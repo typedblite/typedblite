@@ -150,7 +150,8 @@ const cases: Record<string, () => Promise<void>> = {
       at,
     );
     const files = (found ?? []).map((l) => l.uri.fsPath.split('/').pop()).sort();
-    assert.deepEqual(files, ['nav-people.typeqlite', 'nav-shared.typeqlite']);
+    // `labels.tql` holds `has nav-name`: a label, found since Phase 04 (ADR-008 D5).
+    assert.deepEqual(files, ['labels.tql', 'nav-people.typeqlite', 'nav-shared.typeqlite']);
   },
 
   async 'the outline lists definitions, roles and re-opens'() {
@@ -199,6 +200,36 @@ const cases: Record<string, () => Promise<void>> = {
       document.uri,
     );
     assert.ok((ranges ?? []).some((r) => r.start === 2), 'the entity on line 3 folds');
+  },
+
+  async 'a query label goes to its definition in the schema file'() {
+    const document = await open('labels.tql');
+    const at = document.positionAt(document.getText().indexOf('nav-person') + 1);
+    const found = await vscode.commands.executeCommand<(vscode.Location | vscode.LocationLink)[]>(
+      'vscode.executeDefinitionProvider',
+      document.uri,
+      at,
+    );
+    const target = found?.[0];
+    const uri = target && ('targetUri' in target ? target.targetUri : target.uri);
+    assert.equal(uri?.fsPath, uriOf('nav-people.typeqlite').fsPath);
+    const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
+      'vscode.executeHoverProvider',
+      document.uri,
+      at,
+    );
+    const text = (hovers ?? []).flatMap((h) => h.contents).map((c) => (typeof c === 'string' ? c : c.value)).join('\n');
+    assert.match(text, /entity nav-person/);
+  },
+
+  async 'an unknown query label is a warning, not an error (ADR-008 D6)'() {
+    const document = await open('labels.tql');
+    const [warning, ...rest] = await settledOn(document.uri, 1);
+    assert.deepEqual(rest, []);
+    assert.ok(warning);
+    assert.equal(codeOf(warning), 'typedblite.unknown-label');
+    assert.equal(warning.severity, vscode.DiagnosticSeverity.Warning);
+    assert.equal(document.getText(warning.range), 'nav-persn');
   },
 
   // Last, because it deletes a file from the workspace.

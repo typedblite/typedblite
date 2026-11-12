@@ -79,11 +79,26 @@ export async function workspace(files: Record<string, string>) {
     position: positionOf(name, needle, occurrence),
   });
 
+  /** The semantic tokens of a document, decoded to their text and type. */
+  const tokens = async (name: string) => {
+    const { SemanticTokensDecoder } = await import('langium/lsp');
+    const provider = services.TypeQLite.lsp.SemanticTokenProvider!;
+    const document = documentOf(name);
+    const encoded = await provider.semanticHighlight(document, {
+      textDocument: { uri: document.uri.toString() },
+    });
+    return SemanticTokensDecoder.decode(encoded, provider.tokenTypes, document).map((token) => ({
+      text: token.text,
+      type: token.tokenType as string,
+    }));
+  };
+
   return {
     services,
     documentOf,
     positionOf,
     at,
+    tokens,
     diagnostics: (name: string): Diagnostic[] => documentOf(name).diagnostics ?? [],
     messages: (name: string): string[] =>
       (documentOf(name).diagnostics ?? []).map((d) =>
