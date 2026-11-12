@@ -250,7 +250,7 @@ describe('redefine', () => {
     });
 
     it('a subtype that restates its value type keeps its values out of the count — round 4', () => {
-      engine.define('define attribute code value string; attribute sub-code sub code, value string; person owns sub-code;');
+      engine.define('define attribute code @abstract, value string; attribute sub-code sub code, value string; person owns sub-code;');
       engine.execute('insert $p isa person, has email "p@x", has sub-code "abc";');
       engine.define('undefine value string from code;'); // sub-code keeps string; nothing is left untyped
       engine.define('define attribute code value string;');

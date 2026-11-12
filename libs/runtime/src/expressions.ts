@@ -215,7 +215,7 @@ function arithmetic(operator: string, left: Numeric, right: Numeric, refuse: Ref
   if (operator === '^') return checkedDouble(toDouble(left) ** toDouble(right), refuse, at);
   if (operator === '/') {
     const divisor = toDouble(right);
-    if (divisor === 0) return refuse(DiagnosticCode.valueOutOfRange, 'Division by zero.', at);
+    if (divisor === 0) return refuse(DiagnosticCode.valueOutOfRange, 'Division failed: division by zero.', at);
     return checkedDouble(toDouble(left) / divisor, refuse, at);
   }
   if (left.kind === 'double' || right.kind === 'double') {

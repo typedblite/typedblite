@@ -3669,6 +3669,10 @@ export class TypeDBLiteInterpreter {
         if (used !== undefined) this.refuse(DiagnosticCode.unboundValue, `A write stage uses the optional variable '${used.slice(1)}' outside a 'try' block.`, rangeOf(deletion));
       }
       for (const deletion of openDeletions(write.deletions, this.refuse)) {
+        // `delete has $_ of $_` deletes nothing anyone named (delete.feature L2791).
+        if ([deletion.target, deletion.owner].some((v) => v !== undefined && isAnonymous(v))) {
+          this.refuse(DiagnosticCode.mixedPattern, 'A delete names what it deletes: an anonymous variable `$_` cannot be deleted, or deleted from.', rangeOf(deletion));
+        }
         // `delete links (friend: $x) of $r` — a relation the match bound, and things playing in it.
         if (deletion.links) {
           if (kindOf(deletion.owner as string) !== 'thing') {
@@ -3755,7 +3759,7 @@ export class TypeDBLiteInterpreter {
       const read = constraint?.instance?.valueVariable;
       if (read !== undefined && constraint?.instance !== undefined) {
         if (!matchBinds.has(read)) {
-          this.refuse(DiagnosticCode.unboundValue, `The variable '${read.slice(1)}' must be bound to a value before it's used in a write.`, constraint.instance.range);
+          this.refuse(DiagnosticCode.unboundValue, unboundInWrite(read), constraint.instance.range);
         }
         const from = typeOfVariable(read);
         if (from !== undefined) this.checkValueFits(read, from, constraint.instance.type, constraint.instance.range);
@@ -3766,7 +3770,7 @@ export class TypeDBLiteInterpreter {
         const variable = property.valueVariable ?? (property.comparator === '==' && property.compared !== undefined && isVariableExpression(property.compared) ? property.compared.variable : undefined);
         if (variable === undefined) continue;
         if (!matchBinds.has(variable)) {
-          this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used in a write.`, rangeOf(property));
+          this.refuse(DiagnosticCode.unboundValue, unboundInWrite(variable), rangeOf(property));
         }
         const from = typeOfVariable(variable);
         if (from !== undefined && property.attribute !== undefined) this.checkValueFits(variable, from, property.attribute, rangeOf(property));
@@ -4328,7 +4332,7 @@ export class TypeDBLiteInterpreter {
         if (variable === '$_' || bound.has(variable)) continue;
         const first = owner.get(variable);
         if (first !== undefined && first !== group) {
-          this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used: two nested blocks here use it, and nothing around them binds it.`, rangeOf(block.node));
+          this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used. Two nested blocks here use it, and nothing around them binds it.`, rangeOf(block.node));
         }
         owner.set(variable, group);
       }
@@ -4765,7 +4769,7 @@ export class TypeDBLiteInterpreter {
   private valueFor(variable: string, attribute: string, values: ReadonlyMap<string, ValueBinding>, at: Range | undefined): string {
     const bound = values.get(variable);
     if (bound === undefined) {
-      return this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' must be bound to a value before it's used in a write.`, at);
+      return this.refuse(DiagnosticCode.unboundValue, unboundInWrite(variable), at);
     }
     this.checkValueFits(variable, bound.valueType, attribute, at);
     // Stored as the attribute's type spells it — `canonicalValue` — so an integer `10` on a
@@ -4904,7 +4908,7 @@ export class TypeDBLiteInterpreter {
     const relationType = this.typeOfThing(relation);
     const declaring = this.typeFamily(relationType, 'inherited').find((t) => this.schema.roles.get(t)?.has(role));
     if (declaring === undefined) {
-      const message = `'${relationType}' has no role '${role}'.`;
+      const message = `Role label not found '${role}': '${relationType}' has no such role.`;
       throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.unknownRole, message, at));
     }
     // A schema that declares no `plays` at all predates the plays record; nothing to check against.
@@ -4925,9 +4929,10 @@ export class TypeDBLiteInterpreter {
     for (const role of roles) {
       const player = bindings.get(role.player)?.[0];
       if (player === undefined) {
-        const message =
-          `Refusing a dangling relation: '${role.player}' is not bound, so ${role.role === undefined ? 'it' : `role '${role.role}'`} ` +
-          'has nothing to relate.';
+        const message = isAnonymous(role.player)
+          ? 'An anonymous variable is not available to a write: `$_` binds no player for a relation to link. Name it.'
+          : `Refusing a dangling relation: '${role.player}' is not bound, so ${role.role === undefined ? 'it' : `role '${role.role}'`} ` +
+            'has nothing to relate.';
         throw attachDiagnostic(
           new Error(message),
           this.diagnostics.error(
@@ -5116,6 +5121,12 @@ function resolveEveryMatch(
 
 /** What an anonymous `$_` becomes — `$_#N`, which no query can write, so it collides with nothing. */
 const isAnonymous = (variable: string): boolean => variable.startsWith('$_#');
+
+/** A write reading what nothing binds — an anonymous `$_` never binds a value (insert.feature L2733). */
+const unboundInWrite = (variable: string): string =>
+  isAnonymous(variable)
+    ? 'An anonymous variable is not available to a write: `$_` binds nothing a write could read. Name it.'
+    : `The variable '${variable.slice(1)}' must be bound to a value before it's used in a write.`;
 
 /**
  * 🔴 Each `$_` is its OWN variable — "something", never "the same something as the last `$_`".

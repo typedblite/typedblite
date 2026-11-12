@@ -164,6 +164,9 @@ describe('undefine', () => {
       engine.execute('insert $p isa person, has email "a@x", has name "A";');
       assert.equal(refusal(() => engine.define('undefine value string from name;')).code, DiagnosticCode.hasInstances);
       engine.execute('match $p isa person, has name $n; delete $n of $p;');
+      // A concrete attribute type keeps a value type — `@abstract` first (L886).
+      assert.match(refusal(() => engine.define('undefine value string from name;')).message, /should be abstract/);
+      engine.define('define name @abstract;');
       engine.define('undefine value string from name;');
     });
   });

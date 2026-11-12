@@ -299,7 +299,7 @@ function checkSupertypeUnchanged(definition: TypeDefinition, name: string, facts
   if (declared === undefined || before === undefined || declared === before) return;
   refuse(
     DiagnosticCode.supertypeChanged,
-    `'${name}' already has supertype '${before}' and cannot be switched to '${declared}' through ` +
+    `A different '${name} sub ${before}' is already defined: '${name}' cannot be switched to '${declared}' through ` +
       `define. Use redefine to change a supertype.`,
     rangeOf(definition),
   );

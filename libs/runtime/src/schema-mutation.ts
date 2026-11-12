@@ -705,12 +705,21 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
 
   if (isUndefineValue(target)) {
     const own = schema.valueTypes.get(type);
-    if (kind !== 'attribute' || own === undefined || own !== target.valueType) {
-      refuse(DiagnosticCode.notDefined, `'${type} value ${target.valueType}' is no defined value type to undefine.`, at);
+    // TypeDB's words (undefine.feature L845, L886): none at all, or a different one.
+    if (kind !== 'attribute' || own === undefined) {
+      refuse(DiagnosticCode.notDefined, `there is no defined '${type} value ${target.valueType}' to undefine.`, at);
+    }
+    if (own !== target.valueType) {
+      refuse(DiagnosticCode.notDefined, `there is no defined '${type} value ${target.valueType}', while the defined 'value' is '${own}'.`, at);
     }
     // Values of the attribute and of every subtype inheriting its value type (review, round 3).
     if (attributeValuesInheriting(db, type, schema) > 0) {
       refuse(DiagnosticCode.hasInstances, `'${type}' or a subtype has stored values; its value type cannot be undefined over them.`, at);
+    }
+    // A concrete attribute type keeps a value type, its own or inherited (undefine.feature L886).
+    const inherited = ancestorsOf(type, schema).some((a) => schema.valueTypes.has(a));
+    if (!inherited && !schema.annotations.get(typeSubject(type))?.has('abstract')) {
+      refuse(DiagnosticCode.notDefined, `'${type}' should be abstract to have no value type: make it @abstract first, or keep its value type.`, at);
     }
     {
       db.prepare('DELETE FROM schema_value_type WHERE attribute = ?').run(type);

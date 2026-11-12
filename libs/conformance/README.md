@@ -82,18 +82,18 @@ Rules:
 
 | Feature | Passing |
 |---|---|
-| define | 464 |
+| define | 467 |
 | redefine | 194 |
-| undefine | 171 |
-| expression | 128 |
+| undefine | 174 |
+| expression | 129 |
 | reduce | 65 |
 | insert | 122 |
-| match | 106 |
-| delete | 39 |
+| match | 107 |
+| delete | 40 |
 | fetch | 65 |
-| pipelines | 11 |
+| pipelines | 12 |
 | modifiers | 34 |
-| update | 53 |
+| update | 54 |
 | variables | 12 |
 | disjunction | 9 |
 | given | 18 |

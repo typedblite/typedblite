@@ -601,7 +601,7 @@ function checkSelect(select: SelectStage, bound: ReadonlySet<string>, ever: Read
       });
       return;
     }
-    accept('error', `\`select\` names '${variable}', which the \`match\` never bound.${inventory}`, {
+    accept('error', `The variable '${variable.slice(1)}' was not available in the stage: \`select\` names '${variable}', which the \`match\` never bound.${inventory}`, {
       node: select,
       code: TypeQLiteValidationCode.unprojectableVariable,
     });

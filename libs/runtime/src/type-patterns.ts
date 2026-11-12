@@ -228,12 +228,12 @@ export function solveTypes(
     }
     for (const plays of constraint.plays) {
       if (plays.role !== undefined && !labels.includes(plays.role)) {
-        refuse(DiagnosticCode.unknownRole, `Unknown role '${plays.role}': no relation declares it.`, constraint.range);
+        refuse(DiagnosticCode.unknownRole, `Role label not found '${plays.role}': no relation declares it.`, constraint.range);
       }
     }
     for (const relates of constraint.relates) {
       if (relates.role !== undefined && ![...facts.roles.values()].some((roles) => roles.has(relates.role as string))) {
-        refuse(DiagnosticCode.unknownRole, `Unknown role '${relates.role}': no relation declares it.`, constraint.range);
+        refuse(DiagnosticCode.unknownRole, `Role label not found '${relates.role}': no relation declares it.`, constraint.range);
       }
     }
   }
