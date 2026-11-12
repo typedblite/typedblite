@@ -28,6 +28,7 @@ import {
 } from './typeqlite-navigation.js';
 import { TypeQLiteLabels } from './typeqlite-labels.js';
 import { TypeQLiteCompletionProvider } from './typeqlite-completion.js';
+import { TypeQLiteCodeActionProvider, TypeQLiteRenameProvider } from './typeqlite-edits.js';
 import {
   TypeQLiteDefinitionProvider,
   TypeQLiteDocumentBuilder,
@@ -63,6 +64,8 @@ export const TypeQLiteModule: Module<
     DefinitionProvider: (services) => new TypeQLiteDefinitionProvider(services),
     ReferencesProvider: (services) => new TypeQLiteReferencesProvider(services),
     CompletionProvider: (services) => new TypeQLiteCompletionProvider(services),
+    RenameProvider: (services) => new TypeQLiteRenameProvider(services),
+    CodeActionProvider: (services) => new TypeQLiteCodeActionProvider(services),
   },
   labels: {
     Labels: (services) => new TypeQLiteLabels(services),

@@ -259,6 +259,38 @@ const cases: Record<string, () => Promise<void>> = {
     assert.ok(asRole.includes('nav-employee'), 'a role player: the relation’s roles');
   },
 
+  async 'a quick fix offers the nearest defined label for an unknown one'() {
+    const document = await open('labels.tql');
+    const [warning] = await settledOn(document.uri, 1);
+    assert.ok(warning);
+    const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+      'vscode.executeCodeActionProvider',
+      document.uri,
+      warning.range,
+    );
+    assert.ok(
+      (actions ?? []).some((action) => action.title === "Change to 'nav-person'"),
+      `offered: ${(actions ?? []).map((action) => action.title).join(', ')}`,
+    );
+  },
+
+  async 'rename from a schema renames the query labels too'() {
+    const schema = await open('rename-schema.typeqlite');
+    await diagnosticsSettled(schema.uri);
+    const edit = await vscode.commands.executeCommand<vscode.WorkspaceEdit>(
+      'vscode.executeDocumentRenameProvider',
+      schema.uri,
+      schema.positionAt(schema.getText().indexOf('ren-thing') + 1),
+      'ren-object',
+    );
+    assert.ok(edit, 'a workspace edit');
+    const files = edit.entries().map(([uri]) => uri.fsPath.split('/').pop()).sort();
+    assert.deepEqual(files, ['rename-query.tql', 'rename-schema.typeqlite']);
+    assert.ok(await vscode.workspace.applyEdit(edit));
+    const query = await vscode.workspace.openTextDocument(uriOf('rename-query.tql'));
+    assert.equal(query.getText(), 'match\n$x isa ren-object;\n');
+  },
+
   // Last, because it deletes a file from the workspace.
   async 'a schema split across files resolves, and deleting the defining file unresolves it'() {
     // `split-attributes.typeqlite` is never opened: the server found it by indexing the workspace.
