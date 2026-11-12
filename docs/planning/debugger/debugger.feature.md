@@ -23,7 +23,9 @@ depends-on: [editor]
 > ([Out of scope](../editor/editor.feature.md#out-of-scope)). A debugger does run queries, but it
 > needs no results grid and no live store browser. If that database IDE is taken on alongside this
 > feature, both share the question of where the runtime executes, and that is the point to write
-> an initiative over both.
+> an initiative over both. That database IDE is now proposed as the
+> [Graph Explorer](../graph-explorer/graph-explorer.feature.md), which sets out the work the two
+> features share.
 
 ## Process
 
