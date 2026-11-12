@@ -325,8 +325,10 @@ FunctionOutputType:
 FunctionBody:
     stages+=LeadStage stages+=Stage* returnStage=ReturnStage;
 
+// `update` may lead too — and is refused for what it names unbound, as TypeDB refuses it, rather than
+// failing to parse (update.feature L1097, L2046).
 LeadStage:
-    GivenStage | MatchStage | InsertStage | PutStage | DeleteStage;
+    GivenStage | MatchStage | InsertStage | PutStage | DeleteStage | UpdateStage;
 
 // `given $n: string, $p: person, $y: integer?;` — the rows the caller passes in, each variable typed
 // and `?` when it may be absent (given.feature). Only ever the first stage.

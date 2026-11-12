@@ -2231,7 +2231,13 @@ export class TypeDBLiteInterpreter {
   private checkUpdateStage(stage: UpdateStage, before: StreamScope): void {
     const illegal = (at: Range | undefined): never => this.refuse(DiagnosticCode.mixedPattern, 'Illegal statement provided for an update stage: it changes the `has` and `links` of things an earlier stage bound.', at);
     const unavailable = (variable: string, at: Range | undefined): never =>
-      this.refuse(DiagnosticCode.unboundValue, `The variable '${variable.slice(1)}' referenced in the update stage is unavailable: no earlier stage binds it.`, at);
+      this.refuse(
+        DiagnosticCode.unboundValue,
+        isAnonymous(variable)
+          ? 'An anonymous variable cannot be updated: `$_` names nothing an earlier stage bound (update.feature L2585).'
+          : `The variable '${variable.slice(1)}' referenced in the update stage is unavailable: no earlier stage binds it.`,
+        at,
+      );
     const scope = this.fetchScope(before);
     this.checkOptionalUse(stage.patterns, before);
     for (const pattern of writtenPatterns(stage.patterns, this.refuse)) {
