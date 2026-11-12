@@ -20,6 +20,12 @@ export type SyncErrorClass = 'transient' | 'terminal';
 export interface ReplicationOptions {
   readonly direction: SyncDirection;
   readonly from?: SyncCursor;
+  /**
+   * `replicateOnce` only: fail if the hub has not answered, pull and push together, within this many
+   * milliseconds. Without it, a hub that accepts the connection and then says nothing (a paused
+   * container, a dropped route) hangs the sync for as long as the socket lives.
+   */
+  readonly timeoutMs?: number;
 }
 
 export interface ReplicationEvents {
@@ -62,14 +68,35 @@ export class TypeDBLiteReplicator {
     let applied = 0;
     const cursor: { pull?: number; push?: number } = {};
     const touched = new Set<string>();
+    const signal = options.timeoutMs === undefined ? undefined : AbortSignal.timeout(options.timeoutMs);
+    try {
+      await this.replicateOnceWithin(options, from, cursor, touched, signal, (count) => {
+        applied += count;
+      });
+    } catch (error) {
+      if (signal?.aborted) throw new Error(`no answer from the hub within ${options.timeoutMs} ms`, { cause: error });
+      throw error;
+    }
+    let conflicts = 0;
+    for (const id of touched) conflicts += this.log.conflictsOf(id).length;
+    return { cursor, applied, conflicts };
+  }
 
+  private async replicateOnceWithin(
+    options: ReplicationOptions,
+    from: SyncCursor,
+    cursor: { pull?: number; push?: number },
+    touched: Set<string>,
+    signal: AbortSignal | undefined,
+    count: (applied: number) => void,
+  ): Promise<void> {
     if (options.direction === 'pull' || options.direction === 'duplex') {
       // A one-shot pull is a `?since=` read of the stream, not a subscription — the same endpoint,
       // read to its first caught-up marker.
-      const records = await this.fetchSince(from.pull ?? 0);
+      const records = await this.fetchSince(from.pull ?? 0, signal);
       for (const record of records) {
         if (this.applyRecord(record)) {
-          applied += 1;
+          count(1);
           touched.add(record.entityId);
         }
       }
@@ -80,15 +107,16 @@ export class TypeDBLiteReplicator {
 
     if (options.direction === 'push' || options.direction === 'duplex') {
       cursor.push = from.push ?? 0;
-      cursor.push = await this.pushFrom(from.push ?? 0, (count, at) => {
-        applied += count;
-        cursor.push = at;
-      });
+      cursor.push = await this.pushFrom(
+        from.push ?? 0,
+        (applied, at) => {
+          count(applied);
+          cursor.push = at;
+        },
+        () => false,
+        signal,
+      );
     }
-
-    let conflicts = 0;
-    for (const id of touched) conflicts += this.log.conflictsOf(id).length;
-    return { cursor, applied, conflicts };
   }
 
   /**
@@ -205,6 +233,7 @@ export class TypeDBLiteReplicator {
     from: number,
     onBatch: (applied: number, cursor: number) => void,
     stopped: () => boolean = () => false,
+    signal?: AbortSignal,
   ): Promise<number> {
     let cursor = from;
     for (;;) {
@@ -223,7 +252,7 @@ export class TypeDBLiteReplicator {
       // reached.
       const outgoing = batch.filter((record) => isReplicable(record.entityId));
       const applied =
-        outgoing.length > 0 ? await this.client.push(outgoing) : 0;
+        outgoing.length > 0 ? await this.client.push(outgoing, signal) : 0;
       cursor = batch[batch.length - 1].seq;
       // 🔴 Reported per batch, not only on a clean drain.
       //
@@ -246,24 +275,30 @@ export class TypeDBLiteReplicator {
   }
 
   /** Read the stream once, up to its caught-up marker, rather than holding it open. */
-  private async fetchSince(since: number): Promise<ChangeRecord[]> {
+  private async fetchSince(since: number, signal?: AbortSignal): Promise<ChangeRecord[]> {
     const response = await fetch(`${this.client.url}/changes?since=${since}`, {
       headers: {
         ...(await this.client.requestHeaders()),
         accept: 'text/event-stream',
       },
+      signal,
     });
     // 🔴 A refusal is an error, not "nothing to pull". Returning an empty list on 401 made a spoke
     // with an expired token look perfectly in sync while receiving nothing.
     if (response.status === 401 || response.status === 403) {
       throw new Error(`pull refused: ${response.status}`);
     }
-    if (!response.ok || !response.body) return [];
+    // 🔴 So is every other non-OK answer (ADR-009 D7). This returned an empty list for a 502 or a 503,
+    // so a spoke whose hub was down reported itself in sync while receiving nothing — found by the
+    // downstream-app offline demo, whose "the hub goes down" step depended on seeing it.
+    if (!response.ok) throw new Error(`pull failed: the hub answered ${response.status}`);
+    if (!response.body) throw new Error('pull failed: the hub answered with no stream');
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     const records: ChangeRecord[] = [];
     let buffer = '';
+    let caughtUp = false;
 
     try {
       for (;;) {
@@ -272,7 +307,6 @@ export class TypeDBLiteReplicator {
         buffer += decoder.decode(value, { stream: true });
         const parts = buffer.split('\n\n');
         buffer = parts.pop() ?? '';
-        let caughtUp = false;
         for (const part of parts) {
           if (part.startsWith(':')) {
             caughtUp = true;
@@ -287,6 +321,9 @@ export class TypeDBLiteReplicator {
     } finally {
       await reader.cancel().catch(() => undefined);
     }
+    // A stream that ends before the hub says it is caught up was cut off: what arrived is real (and
+    // `applyRemote` is idempotent, so the next sync re-reading it is harmless), but "in sync" is not.
+    if (!caughtUp) throw new Error('pull failed: the stream ended before the hub reported it was caught up');
     return records;
   }
 }
