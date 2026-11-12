@@ -7,7 +7,8 @@ change log that replication and full-text search are built on.
 npm install @typedblite/runtime
 ```
 
-Requires Node.js 22.12 or later (`node:sqlite`), or a synchronous SQLite binding of your own.
+Requires Node.js 22.12 or later (`node:sqlite`). In a browser, it runs on WASM SQLite: see
+[In the browser](#in-the-browser).
 
 ## Quick usage
 
@@ -45,7 +46,8 @@ rows[0]?.n.asString(); // 'Alice'
 | `serveChangeStream`, `createChangeStreamHandler` | The hub: an SSE stream of changes, and a POST endpoint for spokes |
 | `TypeDBLiteReplicator`, `ChangeStreamClient` | The spoke: one-shot or continuous replication with a hub over HTTP |
 | `FullTextIndex` | Reached as `db.changeLog.fullText`: FTS5 search over every recorded thing |
-| `SqliteDatabase`, `SqliteOpener`, `openNodeSqlite` | The binding interface, and its `node:sqlite` implementation |
+| `SqliteDatabase`, `SqliteOpener`, `openNodeSqlite` | The binding interface, and its `node:sqlite` implementation (Node only) |
+| `initWasmSqlite`, `openWasmSqlite`, `wipeOpfsPool`, `poolInfo` | From `@typedblite/runtime/wasm`: the binding on WASM SQLite, with OPFS persistence |
 
 ## Storage
 
@@ -55,6 +57,41 @@ The storage model mirrors TypeDB's, not a table per type. Every store has the sa
 `@unique` are partial `UNIQUE` indexes, and role players have foreign keys to `thing`. A duplicate
 key or a dangling role player is therefore refused by SQLite itself.
 [Architecture](../../docs/development/architecture.md#the-storage-model) has the details.
+
+## In the browser
+
+TypeDBLite runs in a browser, Electron or a Capacitor WebView on the official SQLite WASM build
+([ADR-009](../../docs/architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md)):
+
+```bash
+npm install @typedblite/runtime @sqlite.org/sqlite-wasm
+```
+
+```ts
+// In a dedicated Web Worker:
+import { TypeDBLiteInterpreter } from '@typedblite/runtime';
+import { initWasmSqlite, openWasmSqlite } from '@typedblite/runtime/wasm';
+
+await initWasmSqlite({
+  moduleOptions: { locateFile: (file) => `/${file}` }, // where you serve sqlite3.wasm
+  sahPool: { name: 'my-app' },                         // persist in OPFS
+});
+const db = new TypeDBLiteInterpreter('/tasks.db', undefined, { openDatabase: openWasmSqlite });
+db.define(schema); // on every open: it restores the store's key ownerships
+```
+
+- **A bundler picks the browser entry** through the `browser` export condition. It has everything
+  except the `node:sqlite` binding and the SSE hub. Replicating to a hub with `TypeDBLiteReplicator`
+  works from the browser.
+- **Persistence is OPFS through SQLite's SAH-pool VFS.** That works in a dedicated Worker, and needs
+  neither `SharedArrayBuffer` nor COOP/COEP headers. Without `sahPool`, a path is held in memory for
+  the life of the page.
+- **One connection per store.** The SAH pool allows one connection to a file at a time. Give a store
+  one owner: a single worker, or one elected tab.
+- **Browser floor: Chromium 117, Firefox 119, Safari 17.4.** The parser calls `Object.groupBy`. For
+  an older engine, such as Android 14's built-in WebView (Chromium 113), add a polyfill before
+  importing the runtime.
+- **Serve `sqlite3.wasm`** from `@sqlite.org/sqlite-wasm/dist/`, and point `locateFile` at it.
 
 ## SQLite binding
 
@@ -71,6 +108,11 @@ npm exec nx -- run typedblite-runtime:build
 npm exec nx -- run typedblite-runtime:test
 ```
 
-Tests live in `test/*.test.ts`. See [Testing](../../docs/development/testing.md), including the
-note on the two optional configurations (`vitest.oracle.config.ts` and `vitest.wasm.config.ts`) that
-do not currently run.
+Tests live in `test/*.test.ts`. Two more targets run the engine on WASM SQLite:
+
+```bash
+npm exec nx -- run typedblite-runtime:test-wasm     # the whole suite on WASM SQLite, in Node
+npm exec nx -- run typedblite-runtime:test-browser  # in a real Chromium, on OPFS (needs Playwright's Chromium)
+```
+
+See [Testing](../../docs/development/testing.md).
