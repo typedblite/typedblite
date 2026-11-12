@@ -68,10 +68,11 @@ the web app always serves the latest release.
 | **Export** | Copy or download as JSON or CSV; save the graph as PNG | JSON and CSV first. PNG later |
 | Agent mode, user manager | Natural language to TypeQL using OpenAI; server user accounts | **Out of scope** |
 
-**This is modelled on Studio, not a copy of it.** It does not reuse Studio's name, code, assets or
-theme. Under MPL-2.0, any file copied from Studio would have to stay MPL-licensed, so Phase 00
-records that nothing is copied. The shape conventions are TypeDB's visual vocabulary, not Studio
-artwork.
+**This is modelled on Studio, not a copy of it.** It does not reuse Studio's name, assets or theme:
+those are TypeDB's product identity. Licensing does not block reuse: TypeDBLite is MPL-2.0, the
+same as Studio, so a Studio source file *could* be brought in. It would keep its MPL header, just as
+the vendored behaviour specification does. Phase 00 records any file that is. The shape conventions
+are TypeDB's visual vocabulary, not Studio artwork.
 
 ## What already exists — verified on disk 2026-11-12
 

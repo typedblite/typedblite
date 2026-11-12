@@ -174,3 +174,10 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 **Standard:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md)
 
 References in source code link to `docs/architecture/adr-NNN-*.md` using relative paths — they resolve to this repo's `docs/` tree.
+
+## License
+
+[Mozilla Public License 2.0](LICENSE), the licence TypeDB, TypeQL and TypeDB's behaviour
+specification are published under. The specification files vendored in
+[`libs/conformance/spec/`](libs/conformance/spec/) are TypeDB's, under the same licence, with their
+headers intact.

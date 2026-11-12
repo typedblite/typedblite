@@ -68,3 +68,8 @@ code --install-extension apps/vscode/dist/typeqlite-0.0.1.vsix
   `xvfb-run`.
 
 The architecture is ADR-008 in this repository: `docs/architecture/`.
+
+## License
+
+[Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/). The packaged extension includes the
+licence text.
