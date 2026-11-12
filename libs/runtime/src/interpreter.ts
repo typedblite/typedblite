@@ -663,6 +663,9 @@ export class TypeDBLiteInterpreter {
       const table = this.db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'role_player'").get();
       if (table !== undefined) {
         this.db.exec('CREATE INDEX IF NOT EXISTS role_player_by_player ON role_player(player, role, rel)');
+        // Repeated role players: a store from before them holds each edge once, which is a count of one.
+        const columns = (this.db.prepare("SELECT name FROM pragma_table_info('role_player')").all() as Array<{ name: string }>).map((c) => String(c.name));
+        if (!columns.includes('count')) this.db.exec('ALTER TABLE role_player ADD COLUMN count INTEGER NOT NULL DEFAULT 1');
         // A store defined before lists existed has no `schema_ordered`; `undefine` and `redefine`
         // write to it whether or not a list was ever declared. Additive and empty: no list was.
         this.db.exec('CREATE TABLE IF NOT EXISTS schema_ordered (subject TEXT PRIMARY KEY)');
@@ -3864,11 +3867,10 @@ export class TypeDBLiteInterpreter {
         // source must not be treated as one statement asking for two.
         const key = role.statement + ' ' + role.role;
         for (const [earlierIndex, earlierPlayer] of sameRoleSlots.get(key) ?? []) {
-          // `(friend: $x, friend: $x)` asks for $x as a friend TWICE — two edges, not one read twice
-          // (match.feature L1314). The primary key holds one edge per (rel, role, player), so no
-          // relation answers it here.
+          // `(friend: $x, friend: $x)` asks for $x as a friend TWICE: one edge counted twice or more
+          // answers it (match.feature L1185); one edge played once does not (L1314).
           if (earlierPlayer === role.player) {
-            join += ` AND rp${index}.rowid <> rp${earlierIndex}.rowid`;
+            join += ` AND (rp${index}.rowid <> rp${earlierIndex}.rowid OR rp${index}.count >= 2)`;
             continue;
           }
           join += ` AND rp${index}.player <> rp${earlierIndex}.player`;
@@ -4828,15 +4830,9 @@ export class TypeDBLiteInterpreter {
       // one path that did NOT create it is now refused above rather than left to skip the log.
       this.touched.add(relation);
       const name = role.role === undefined ? this.inferRole(relation, player, role.player, role.range) : this.checkPlays(relation, player, role.role, role.player, role.range);
-      try {
-        this.db.prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?)').run(relation, name, player);
-      } catch (error) {
-        // 🔴 Only the duplicate edge is named as one — a foreign-key or busy failure is not a
-        // duplicate, and is rethrown as SQLite raised it (add-role-player.test.ts).
-        if (!/UNIQUE constraint failed: role_player/.test(String(error))) throw error;
-        const message = `'${role.player}' already plays '${name}' in this relation; a player holds a role in one relation once.`;
-        throw attachDiagnostic(new Error(message), this.diagnostics.error(DiagnosticCode.constraintViolated, message, role.range));
-      }
+      // A player may hold one role more than once — `(friend: $x, friend: $x)` — and each is counted
+      // (insert.feature L938). A foreign-key or busy failure is rethrown as SQLite raised it.
+      this.db.prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?) ON CONFLICT(rel, role, player) DO UPDATE SET count = count + 1').run(relation, name, player);
       this.written.roles += 1;
     }
   }
@@ -4861,8 +4857,11 @@ export class TypeDBLiteInterpreter {
           for (const entry of deletion.players?.entries ?? []) {
             const player = combination[entry.player];
             if (typeof player !== 'number') continue;
-            if (entry.role === undefined) this.db.prepare('DELETE FROM role_player WHERE rel = ? AND player = ?').run(relation, player);
-            else this.db.prepare('DELETE FROM role_player WHERE rel = ? AND player = ? AND role = ?').run(relation, player, entry.role);
+            // One occurrence per slot: `links (friend: $x)` of a twice-played friend leaves one
+            // (delete.feature L626); `links (friend: $x, friend: $x)` removes both (L453).
+            if (entry.role === undefined) this.db.prepare('UPDATE role_player SET count = count - 1 WHERE rel = ? AND player = ?').run(relation, player);
+            else this.db.prepare('UPDATE role_player SET count = count - 1 WHERE rel = ? AND player = ? AND role = ?').run(relation, player, entry.role);
+            this.db.prepare('DELETE FROM role_player WHERE rel = ? AND count <= 0').run(relation);
           }
           this.touched.add(relation);
           if (this.db.prepare('SELECT 1 FROM role_player WHERE rel = ?').get(relation) === undefined) this.deleteThing(relation);

@@ -158,10 +158,13 @@ CREATE TABLE IF NOT EXISTS schema_specialises (
   PRIMARY KEY (relation, role)
 );
 
+-- count: how many times the player plays the role in this relation — TypeDB's repeated role players,
+-- (friend: $x, friend: $x), a multiset (match.feature L1185, delete.feature L453).
 CREATE TABLE IF NOT EXISTS role_player (
   rel    INTEGER NOT NULL REFERENCES thing(iid) ON DELETE CASCADE,
   role   TEXT NOT NULL,
   player INTEGER NOT NULL REFERENCES thing(iid),
+  count  INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY (rel, role, player)
 );
 

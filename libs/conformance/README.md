@@ -87,9 +87,9 @@ Rules:
 | undefine | 171 |
 | expression | 124 |
 | reduce | 65 |
-| insert | 121 |
-| match | 95 |
-| delete | 33 |
+| insert | 122 |
+| match | 97 |
+| delete | 39 |
 | fetch | 65 |
 | pipelines | 11 |
 | modifiers | 34 |
@@ -100,7 +100,7 @@ Rules:
 | metadata | 107 |
 | negation | 15 |
 | optional | 10 |
-| put | 10 |
+| put | 11 |
 
 ## Tests
 

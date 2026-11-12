@@ -178,12 +178,13 @@ export class ChangeLog {
     // identity cannot be resolved is skipped rather than encoded as a local rowid, which would make
     // the digest node-dependent and every replicated revision differ.
     const rolePlayers = this.db
-      .prepare('SELECT role, player FROM role_player WHERE rel = ?')
-      .all(iid) as Array<{ role: string; player: number }>;
+      .prepare('SELECT role, player, count FROM role_player WHERE rel = ?')
+      .all(iid) as Array<{ role: string; player: number; count: number }>;
     const keys = this.keyTypes();
     const roles = rolePlayers.flatMap((row) => {
       const player = this.identityOf(row.player, keys);
-      return player ? [{ role: row.role, player }] : [];
+      // Once per occurrence: a player twice a friend is two entries, as TypeDB counts it.
+      return player ? Array.from({ length: Math.max(1, Number(row.count ?? 1)) }, () => ({ role: row.role, player })) : [];
     });
 
     const state: EntityState = { type: thing.type, attributes, roles };
@@ -457,8 +458,9 @@ export class ChangeLog {
 
     this.db.prepare('DELETE FROM role_player WHERE rel = ?').run(iid);
     this.db.prepare('DELETE FROM pending_role WHERE rel_id = ?').run(id);
+    // A repeated player is one edge with a count — the document lists it once per occurrence.
     const insertRole = this.db.prepare(
-      'INSERT OR IGNORE INTO role_player(rel, role, player) VALUES (?, ?, ?)',
+      'INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?) ON CONFLICT(rel, role, player) DO UPDATE SET count = count + 1',
     );
     const defer = this.db.prepare(
       'INSERT OR IGNORE INTO pending_role(rel_id, role, player_id) VALUES (?, ?, ?)',
