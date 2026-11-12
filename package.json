@@ -33,6 +33,7 @@
   "allowScripts": {
     "@swc/core@1.15.47": true,
     "nx@23.3.0": true,
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "electron@42.11.18": true
   }
 }

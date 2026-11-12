@@ -42,6 +42,12 @@ phase: 00-scope-and-adr
 - [x] **Versions:** the ones proven on this machine, which are all older than two weeks: Electron 38.2.0,
       Capacitor 7.4.3, playwright-core 1.62.1, sqlite-wasm 3.54.1-build1. A move to Electron 45 or
       Capacitor 8 is a separate change, with its own run on the emulator
+      ⚠️ **Corrected in Phase 06.** `npm audit` showed critical and high advisories on these:
+      Capacitor Android below 7.6.9 can load remote content at the app origin, its CLI pulls in a
+      vulnerable `tar`, and Electron 38 has dozens of advisories fixed only from 39 to 42.11.16. The
+      demo now pins **Capacitor 7.6.10** and **Electron 42.11.18**, the patched releases in the
+      lowest majors, each more than two weeks old. "Proven on this machine" was the wrong criterion
+      on its own
 - [x] **Android in the default run:** on when `adb devices` lists a device, otherwise skipped with a
       message. `--no-android` forces it off
 

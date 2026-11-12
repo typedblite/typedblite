@@ -35,7 +35,8 @@
         "commands": [
           "tsc -p tsconfig.app.json --noEmit",
           "tsc -p tsconfig.client.json",
-          "tsc -p tsconfig.worker.json"
+          "tsc -p tsconfig.worker.json",
+          "tsc -p tsconfig.electron.json"
         ],
         "cwd": "apps/sync-demo",
         "parallel": false
@@ -78,6 +79,30 @@
       ],
       "options": {
         "command": "vitest run --config vitest.browser.config.ts",
+        "cwd": "apps/sync-demo"
+      }
+    },
+    "android-setup": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bash mobile/setup.sh",
+        "cwd": "apps/sync-demo"
+      }
+    },
+    "android-apk": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bash mobile/build-apk.sh",
+        "cwd": "apps/sync-demo"
+      },
+      "outputs": [
+        "{projectRoot}/mobile/android/app/build/outputs"
+      ]
+    },
+    "android-emulator": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bash mobile/start-emulator.sh",
         "cwd": "apps/sync-demo"
       }
     }
