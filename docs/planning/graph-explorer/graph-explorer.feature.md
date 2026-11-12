@@ -100,7 +100,10 @@ Both features need the same thing, and neither should build it alone:
   in the extension host (which depends on `node:sqlite` being in Electron's Node, not yet
   verified), in a separate Node process, or in a worker running WASM SQLite.
 - **One statement classifier** for define, read and write, moved out of the CLI and shared.
-- **One rule for writes:** nothing is written unless the user chose a write transaction or commit.
+- **Not shared: the rule for writes.** The debugger avoids the question by always running in
+  `:memory:` ([its invariant 4](../debugger/debugger.feature.md#-the-invariants-every-phase-is-bound-by)).
+  The explorer opens real stores, so it keeps its own rule (invariant 3 below). If copying a store
+  into memory is built for the debugger, the explorer could reuse it for a "scratch copy" mode.
 
 If both features are scheduled, these become the first feature of an initiative. If only this one
 is scheduled, they are its Phase 01.
