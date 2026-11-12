@@ -1,0 +1,6 @@
+out
+syntaxes
+e2e/out
+.vscode-test
+*.vsix
+dist

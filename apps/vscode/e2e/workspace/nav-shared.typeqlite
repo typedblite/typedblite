@@ -1,0 +1,3 @@
+define
+attribute nav-name, value string;
+relation nav-employment, relates nav-employee;

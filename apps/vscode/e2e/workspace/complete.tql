@@ -1,0 +1,3 @@
+match
+$p isa nav-person, has nav-name $n;
+$e isa nav-employment (nav-employee: $p);

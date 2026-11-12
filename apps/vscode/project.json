@@ -1,0 +1,90 @@
+{
+  "name": "typeqlite-vscode",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/vscode/src",
+  "projectType": "application",
+  "tags": [
+    "scope:tooling",
+    "type:app"
+  ],
+  "targets": {
+    "sync-grammar": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "typeqlite-language:langium-generate"
+      ],
+      "options": {
+        "command": "mkdir -p syntaxes && cp ../../libs/language/syntaxes/typeqlite.tmLanguage.json syntaxes/",
+        "cwd": "apps/vscode"
+      },
+      "outputs": [
+        "{projectRoot}/syntaxes"
+      ]
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "sync-grammar",
+        "^build"
+      ],
+      "options": {
+        "command": "node esbuild.mjs",
+        "cwd": "apps/vscode"
+      },
+      "outputs": [
+        "{projectRoot}/out"
+      ]
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "command": "tsc -p tsconfig.json --noEmit",
+        "cwd": "apps/vscode"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "typecheck",
+        "build"
+      ],
+      "outputs": [
+        "{workspaceRoot}/coverage/{projectRoot}"
+      ],
+      "options": {
+        "command": "vitest run",
+        "cwd": "apps/vscode"
+      }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "package"
+      ],
+      "options": {
+        "command": "node esbuild.e2e.mjs && node e2e/out/run.cjs dist/typeqlite-0.0.1.vsix",
+        "cwd": "apps/vscode"
+      }
+    },
+    "package": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "sync-grammar",
+        "^build"
+      ],
+      "options": {
+        "commands": [
+          "node esbuild.mjs --minify",
+          "mkdir -p dist",
+          "vsce package --no-dependencies --skip-license --out dist/typeqlite-0.0.1.vsix"
+        ],
+        "parallel": false,
+        "cwd": "apps/vscode"
+      },
+      "outputs": [
+        "{projectRoot}/dist"
+      ]
+    }
+  }
+}
