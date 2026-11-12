@@ -169,7 +169,7 @@ the end (invariant 1).
 | 02 | [Workspace schema: cross-file resolution of schema references](phases/02-workspace-schema/summary.md) | Complete | [summary](phases/02-workspace-schema/summary.md) |
 | 03 | [Navigation: definition, references, outline, hover, folding](phases/03-navigation/summary.md) | Complete | [summary](phases/03-navigation/summary.md) |
 | 04 | [Query-side labels: pipeline type labels resolve against the schema](phases/04-query-labels/summary.md) | Complete | [summary](phases/04-query-labels/summary.md) |
-| 05 | Completion | ⬜ Not started | — |
+| 05 | [Completion](phases/05-completion/summary.md) | Complete | [summary](phases/05-completion/summary.md) |
 | 06 | Code actions and rename | ⬜ Not started | — |
 | 07 | Packaging: the `.vsix` target, install path, and docs | ⬜ Not started | — |
 
