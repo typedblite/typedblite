@@ -1,6 +1,6 @@
 {
   "name": "@typedblite/runtime",
-  "description": "SQLite generator, interpreter and TypeDBLiteDatabase adapter for TypeQL",
+  "description": "The TypeDBLite engine: TypeQLite on SQLite, with a change log, replication and full-text search",
   "version": "0.0.1",
   "license": "MPL-2.0",
   "type": "module",
@@ -8,6 +8,10 @@
   "exports": {
     ".": {
       "types": "./out/index.d.ts",
+      "browser": {
+        "types": "./out/index.browser.d.ts",
+        "default": "./out/index.browser.js"
+      },
       "default": "./out/index.js"
     }
   },
@@ -16,5 +20,12 @@
     "@typedblite/language": "0.0.1",
     "langium": "~4.3.1",
     "vscode-languageserver": "~10.0.1"
+  },
+  "imports": {
+    "#default-opener": {
+      "types": "./out/default-opener.d.ts",
+      "node": "./out/default-opener.node.js",
+      "default": "./out/default-opener.js"
+    }
   }
 }
