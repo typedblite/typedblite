@@ -145,7 +145,7 @@ describe('an attribute constraint is checked against ownership', () => {
     // through SQLite directly: the engine's own read of `edge-id` on a node is the refusal.
     const store = new DatabaseSync(path);
     const rows = store
-      .prepare("SELECT COUNT(*) AS n FROM attr WHERE type = 'edge-id'")
+      .prepare("SELECT COUNT(*) AS n FROM has WHERE type = 'edge-id'")
       .get() as { n: number };
     store.close();
 

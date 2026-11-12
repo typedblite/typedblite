@@ -9,8 +9,9 @@ import { DatabaseSync } from 'node:sqlite';
  * ⚠️ Defect records live in `.mvp/defects/defects.db`, which is machine-local and gitignored. Where
  * the store is present a `d-` owner must be a record in it; where it is absent — CI — a `d-` owner
  * is accepted on its format alone, and the report says so. That is the third outcome named rather
- * than hidden. The store is a TypeDBLite file, read here through its `attr` table read-only rather
- * than by spawning the defects CLI from a test.
+ * than hidden. The store is a TypeDBLite file, read here through its tables read-only rather than
+ * by spawning the defects CLI from a test: `attribute` since ADR-006, `attr` in a store an older
+ * engine wrote and no newer one has opened (a read-only reader cannot migrate it).
  */
 export interface OwnerCheck {
   readonly resolves: (owner: string) => boolean;
@@ -19,7 +20,7 @@ export interface OwnerCheck {
 
 /**
  * The record ids in the store, or `undefined` when the file is there and could not be read —
- * zero bytes from an interrupted first run, a database `define` never reached (no `attr` table),
+ * zero bytes from an interrupted first run, a database `define` never reached (no tables at all),
  * or a store busy under a `defect.*` write. ⚠️ The catch is that wide on purpose: every one of
  * those is the same third outcome as an absent store, not a crash before any scenario runs. The
  * run degrades to "accepted on format alone", and the caveat says the store was present.
@@ -32,7 +33,9 @@ const defectIds = (storePath: string): ReadonlySet<string> | undefined => {
     return undefined;
   }
   try {
-    const rows = db.prepare("SELECT value FROM attr WHERE type = 'defect-id'").all() as { value: string }[];
+    const current = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'attribute'").get() !== undefined;
+    const table = current ? 'attribute' : 'attr';
+    const rows = db.prepare(`SELECT value FROM ${table} WHERE type = 'defect-id'`).all() as { value: string }[];
     return new Set(rows.map((r) => String(r.value)));
   } catch {
     return undefined;

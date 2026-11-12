@@ -22,6 +22,7 @@ import {
   typeSubject,
   valueSubject,
 } from './schema-subjects.js';
+import { ATTRIBUTE_DDL } from './attribute-store.js';
 
 /**
  * TypeQLite → SQLite.
@@ -31,7 +32,8 @@ import {
  * the two guarantees fall out of SQLite's own constraint machinery instead of being re-checked
  * in application code:
  *
- * - **`@key`** becomes a partial `UNIQUE INDEX` on the attribute type.
+ * - **`@key`** becomes a partial `UNIQUE INDEX` on `has(attribute)` for the attribute type: an
+ *   attribute instance is owned at most once (ADR-006).
  * - **"a dangling dependency is unrepresentable"** becomes a `FOREIGN KEY` from every role
  *   player back to `thing`. This is the guarantee the GraphQLite spike (2026-08-29) failed —
  *   it accepted an edge to a non-existent node and silently wrote it between two unrelated ones.
@@ -53,13 +55,8 @@ CREATE TABLE IF NOT EXISTS type_parent (
   parent TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS attr (
-  owner INTEGER NOT NULL REFERENCES thing(iid) ON DELETE CASCADE,
-  type  TEXT NOT NULL,
-  value TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS attr_owner ON attr(owner);
-CREATE INDEX IF NOT EXISTS attr_lookup ON attr(type, value);
+-- Attribute instances, once per type and value, and the ownerships of them (ADR-006).
+${ATTRIBUTE_DDL}
 
 -- The applied schema's own vocabulary, so a FILE-BACKED database can be reopened and still know
 -- what it defines. Without this the type list lives only in the process that ran define, and a
@@ -306,7 +303,7 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
     // Partial index: uniqueness applies within the attribute type, which is what @key means for
     // these schemas — `skill-id` unique across skills, `step-id` globally, as its comment states.
     statements.push(
-      `CREATE UNIQUE INDEX IF NOT EXISTS key_${ident(key)} ON attr(value) WHERE type = ${q(key)};`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS key_${ident(key)} ON has(attribute) WHERE type = ${q(key)};`,
     );
   }
 
@@ -318,7 +315,7 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
   for (const attribute of uniques) {
     if (keys.includes(attribute)) continue;
     statements.push(
-      `CREATE UNIQUE INDEX IF NOT EXISTS unique_${ident(attribute)} ON attr(value) WHERE type = ${q(attribute)};`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS unique_${ident(attribute)} ON has(attribute) WHERE type = ${q(attribute)};`,
     );
   }
 

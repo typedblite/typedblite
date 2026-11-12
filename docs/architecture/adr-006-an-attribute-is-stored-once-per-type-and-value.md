@@ -109,8 +109,8 @@ CREATE TABLE has (
   type      TEXT    NOT NULL,   -- the attribute's type, copied
   PRIMARY KEY (owner, attribute)
 );
-CREATE INDEX has_owner_type ON has(owner, type);
-CREATE INDEX has_attribute  ON has(attribute);
+CREATE INDEX has_owner     ON has(owner);
+CREATE INDEX has_attribute ON has(attribute);
 ```
 
 `has` replaces `attr`. The primary key makes ownership a set: inserting `has name "John"` twice is
@@ -122,8 +122,13 @@ The copied `type` column serves two purposes:
   `CREATE UNIQUE INDEX … ON has(attribute) WHERE type = '<attr>'`: an attribute instance owned at
   most once across all owners, which is what `ON attr(value) WHERE type = …` enforces today.
   Scoping by owner type stays a separate decision.
-- **"What does this owner have of type T"** stays a single-table index lookup, as it is on `attr`
-  today.
+- **"Does this owner have a T"** reads `has` alone, with no join.
+
+The index is on `owner` alone, not `(owner, type)`, because an owner's attributes are read in the
+order they were written, and only an index on `owner` alone gives rowid order without a sort. The
+first implementation indexed `(owner, type)` and paid for the sort on every query (see
+Measurements). A lookup by value starts from the value instead: `attribute(type, value)` finds the
+one instance, and `has(attribute)` finds its owners.
 
 ### 3. 🔴 Attributes are not rows in `thing`
 
@@ -158,8 +163,10 @@ The insert still answers the concept, because the sweep runs after the statement
 built.
 
 `delete $a` on an attribute removes it and, through the foreign key, every ownership of it. It is
-refused when any of those ownerships is a `@key` (`delete.feature` L2755), because that would leave
-the owner without its key.
+refused when any of those ownerships is a `@key`. TypeDB accepts the delete and then fails the
+commit, because the owner is left without its key (`delete.feature` L2755). TypeDBLite validates
+nothing at commit, so it refuses at the `delete`, the one point that still keeps every owner keyed.
+That scenario fails either way until commit-time validation exists.
 
 ### 5. The change log does not change
 
@@ -205,8 +212,7 @@ Every attribute in an existing store has an owner, so the migration sweeps nothi
 ### Negative / Constraints
 
 - **Every read of an owned value is a two-table join** (`has` then `attribute`) where it was one.
-  Both sides are indexed. The conformance run time and the runtime's performance tests are the
-  check, and a measurable slowdown blocks acceptance.
+  Both sides are indexed, and the measurements below show no slowdown.
 - **About 26 SQL sites change:** `interpreter.ts` (23 references), `change-log.ts`,
   `schema-mutation.ts` (renaming an attribute type now updates `attribute.type` and `has.type`),
   the generated DDL, one runtime test, and `libs/conformance/src/owners.ts`, which reads `attr`
@@ -257,6 +263,37 @@ attribute key. It did not trace three paths:
 The engine's canonical text folds `Z`, `+00:00` and `-00:00` into one spelling. If TypeDB reads
 `Z` as `UTC`, then `Z` and `+00:00` are two attributes there, and the canonical text must keep
 them apart. The conformance card is the check for all three.
+
+## Measurements (2026-11-11, implementation on `feat/attribute-instances`)
+
+**Migration on real stores.** 18 TypeDBLite stores from the downstream-app workspace were copied
+through SQLite's backup API, with the originals opened read-only. Each copy was queried by the old
+engine and by the new engine after migrating it. Per thing type, the queries listed every ownership
+(`match $x isa! T, has $a;`) and looked up one string value per owned attribute type. **Every
+answer was identical on all 18 stores**: about 225,000 ownerships and 232 lookups. Migration took
+0.6 s on the largest store (275,594 ownerships).
+
+One query failed with "Maximum call stack size exceeded" on both engines alike: `scm/ladder`'s
+`workflow-history-entry`, at 194,244 ownerships. That is an existing limit on very large answers,
+not part of this change.
+
+**Performance.** The old engine's build was compared with this one's, both compiled, on the four
+largest stores, taking the median of five alternating runs:
+
+| Store | Listing ownerships | Lookups by value |
+| --- | --- | --- |
+| `scm/ladder` | −7% | −82% |
+| `observability` | −2% | −41% |
+| `document-store` | −7% | −77% |
+| `skills/graph` | −11% | −51% |
+
+The first implementation was slower: +8% to +10% on listings and +14% to +57% on lookups. It
+indexed `has(owner, type)`, which forced a sort per owner, and it found owners of a value by probing
+every candidate thing. Decision 2's index and value-first lookups replaced both.
+
+**Conformance.** 1,306 → 1,439 of 1,756, with no scenario lost. The storage swap alone left the card
+unchanged at 1,306. The new behaviour added 133: attribute inserts, matches, deletes, `isa $t` over
+attributes, and values matched across numeric kinds.
 
 ## References
 

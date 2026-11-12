@@ -105,7 +105,9 @@ describe('a refusal never depends on the data', () => {
     ['match $p isa person, has ref R, has name $a; let $v = 1; delete $a of $v;', DiagnosticCode.mixedPattern, 'write'],
     ['match $p isa $t, has ref R, has name $a; delete $a of $t;', DiagnosticCode.mixedPattern, 'write'],
     ['match $p isa person, has ref R, has name $a; delete $a of $zz;', DiagnosticCode.mixedPattern, 'write'],
-    ['match $p isa person, has ref R, has name $a; delete $a;', DiagnosticCode.mixedPattern, 'write'],
+    // An attribute the match bound is deleted, with its ownerships (ADR-006, delete.feature L1019) —
+    // accepted whatever the data, as `delete $v` of a `let` value is refused whatever the data.
+    ['match $p isa person, has ref R, has name $a; delete $a;', 'no refusal', 'write'],
   ];
 
   for (const [template, expected, kind, populatedRef = '1'] of CASES) {
