@@ -52,11 +52,28 @@ checklist is the contract for the phase actually being worked.
 
 ## Branches
 
+```mermaid
+gitGraph
+  commit id: "main"
+  branch "feat/feature"
+  checkout "feat/feature"
+  commit id: "feature document"
+  branch "phase/feature/00-scope"
+  checkout "phase/feature/00-scope"
+  commit id: "phase 00"
+  checkout "feat/feature"
+  merge "phase/feature/00-scope"
+  branch "phase/feature/01-slug"
+  checkout "phase/feature/01-slug"
+  commit id: "phase 01"
+  checkout "feat/feature"
+  merge "phase/feature/01-slug"
+  checkout main
+  merge "feat/feature" id: "feature complete"
 ```
-main
-└── feat/<feature>
-    └── phase/<feature>/<NN>-<slug>
-```
+
+Branch names follow `feat/<feature>` and `phase/<feature>/<NN>-<slug>`. The diagram writes
+`feature` for `<feature>`.
 
 The feature branch is cut from `main`. Each phase branch is cut from the feature branch and merges
 back into it. **It never merges into `main` directly**, which would put half a feature on the branch

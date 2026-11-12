@@ -1,0 +1,225 @@
+# Replication and search
+
+Every TypeDBLite store keeps a **change log** of what it wrote. Two stores can exchange their change
+logs and converge, either once on demand or continuously over HTTP. The same log keeps a
+**full-text index** current. This guide covers both.
+
+The design is [ADR-003](../architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md). The
+model is CouchDB's (revision trees, deterministic revisions, and conflicts kept rather than
+discarded), and it was checked against a real CouchDB 3.4.3 when it was built. The wire protocol is
+TypeDBLite's own, so TypeDBLite does not replicate with CouchDB itself.
+
+- [What gets replicated](#what-gets-replicated)
+- [The change log](#the-change-log)
+- [Revisions and conflicts](#revisions-and-conflicts)
+- [Replicating once](#replicating-once)
+- [Hub and spoke over HTTP](#hub-and-spoke-over-http)
+- [Compaction](#compaction)
+- [Full-text search](#full-text-search)
+
+## What gets replicated
+
+**A thing replicates when its type has a `@key`.** Its identity across stores is `type/key-value`,
+such as `person/Alice`. That is what lets two stores agree they are describing the same person.
+
+The internal `iid` is never used, because two stores both call their first thing `1`. A thing whose
+type has no key is logged under a `local:` identity, such as `local:employment/4`, and **is not
+replicated**. Replication refuses to guess that two keyless things are the same one.
+
+So, for a type you want replicated, declare a key:
+
+```typeql
+define
+  entity note, owns note-id @key, owns body;
+  attribute note-id, value string;
+  attribute body, value string;
+```
+
+What a revision carries is the thing's whole state: its type, its attributes, and the roles it
+plays. A relation that names a player the receiving store has not seen yet is held back, and is
+drawn once that player arrives.
+
+## The change log
+
+Every write appends to the log **in the same SQLite transaction as the data**. A crash can never
+leave a write that the log does not know about. A write that bypasses your application, from the
+CLI or a migration script for example, is logged too.
+
+```ts
+import { TypeDBLiteInterpreter } from '@typedblite/runtime';
+
+const db = new TypeDBLiteInterpreter('./notes.db');
+db.execute(`insert $n isa note, has note-id "n1", has body "first draft";`);
+
+for (const record of db.changeLog.since(0, 100)) {
+  record.seq;       // 1: the cursor, strictly increasing and never reused
+  record.entityId;  // 'note/n1'
+  record.rev;       // '1-…': generation and digest
+  record.parentRev; // null for a first revision
+  record.deleted;   // true for a tombstone
+  record.state;     // { type, attributes, roles }, absent for a tombstone
+}
+```
+
+`since(cursor, limit)` returns the records after `cursor`, in commit order. Keep the last `seq` you
+processed, and you can resume from exactly that point.
+
+## Revisions and conflicts
+
+A revision looks like `2-9f86d081884c7d659a2feaa0c55ad015`: a generation number, then a digest of
+the state, the parent revision and the deleted flag
+([`@typedblite/content-revision`](../../libs/content-revision/README.md)).
+
+**The digest comes from the content, not from chance.** The same edit made independently on two
+stores produces the same revision, so they converge with no conflict.
+
+**Different edits to the same thing are a conflict, and both are kept.** Every store picks the same
+winner without talking to the others:
+1. a live revision beats a tombstone;
+2. then the highest generation wins;
+3. then the greatest digest wins.
+
+The winner is what queries see. The losing revisions stay, and you can list them:
+
+```ts
+db.changeLog.winnerOf('note/n1');    // the winning leaf
+db.changeLog.conflictsOf('note/n1'); // the losing leaves, for your application to resolve
+db.changeLog.leavesOf('note/n1');    // every leaf
+```
+
+Nothing is discarded silently: which losing revision matters, if any, is your application's
+decision.
+
+## Replicating once
+
+`replicateOnce` exchanges records between two change logs in one direction or both:
+
+```ts
+import { TypeDBLiteInterpreter, replicateOnce } from '@typedblite/runtime';
+
+const a = new TypeDBLiteInterpreter('./a.db');
+const b = new TypeDBLiteInterpreter('./b.db');
+
+const outcome = replicateOnce(a.changeLog, b.changeLog, { direction: 'duplex' });
+// { cursor: { pull: 1, push: 2 }, applied: 2, conflicts: 0 }
+```
+
+| Option | Meaning |
+| ------ | ------- |
+| `direction` | `'push'` (local to remote), `'pull'` (remote to local), or `'duplex'` (both) |
+| `from` | The cursor returned last time, `{ pull, push }`, to resume instead of starting over |
+| `limit` | Records per batch. Default 500 |
+
+Both stores need the same schema. Replication moves data, not schema.
+
+`replicateOnce` accepts anything that implements `ReplicationEndpoint` (`since`, `applyRemote` and
+`conflictsOf`). A `ChangeLog` is one.
+
+## Hub and spoke over HTTP
+
+For stores in different processes or on different machines, one store is the **hub** and the others
+are **spokes**. The hub streams its changes to each spoke over Server-Sent Events, and each spoke
+POSTs its own changes to the hub.
+
+**The hub:**
+
+```ts
+import { TypeDBLiteInterpreter, serveChangeStream } from '@typedblite/runtime';
+
+const hub = new TypeDBLiteInterpreter('./hub.db');
+const served = serveChangeStream(hub.changeLog, { pollMs: 250, port: 4001 });
+await served.port; // 4001
+// GET  /changes          an SSE stream of changes, resumable with Last-Event-ID or ?since=
+// POST /changes          a spoke's changes
+await served.close();
+```
+
+`serveChangeStream` listens on `127.0.0.1` only. To serve the stream to other machines, put it
+behind your own server, with your own authentication. `createChangeStreamHandler(log, options)`
+gives you a plain `(request, response)` handler to mount:
+
+```ts
+import { createServer } from 'node:http';
+import { createChangeStreamHandler } from '@typedblite/runtime';
+
+const changes = createChangeStreamHandler(hub.changeLog, { path: '/changes' });
+createServer((request, response) => {
+  if (!isAuthorised(request)) return void response.writeHead(401).end();
+  changes.handle(request, response);
+}).listen(4001);
+```
+
+**A spoke:**
+
+```ts
+import { TypeDBLiteInterpreter, TypeDBLiteReplicator } from '@typedblite/runtime';
+
+const spoke = new TypeDBLiteInterpreter('./spoke.db');
+const replicator = new TypeDBLiteReplicator(
+  spoke.changeLog,
+  'https://hub.example.com',
+  100,                                           // push interval, in milliseconds
+  async () => ({ authorization: `Bearer ${token}` }), // headers for each request
+);
+
+// Catch up once…
+await replicator.replicateOnce({ direction: 'duplex' });
+
+// …or keep replicating until cancelled.
+const session = replicator.replicateContinuously(
+  { direction: 'duplex' },
+  {
+    onChange: (applied) => console.log(`applied ${applied} change(s)`),
+    onPaused: () => console.log('caught up'),
+    onFailed: (error, classification) => console.error(classification, error),
+  },
+);
+session.status; // 'syncing' | 'ready' | 'idle' | 'failed'
+await session.cancel();
+```
+
+A continuous session reconnects after a network failure, and resumes from the last change it
+applied. Catching up does not end it: it reports `onPaused` and keeps listening. `onFailed`
+classifies an error as `'transient'`, such as a network failure that a retry may cure, or
+`'terminal'`: a received change this store could not apply, which would fail the same way again.
+
+## Compaction
+
+Revision history grows with every edit. Compaction drops the states of revisions that are no longer
+leaves:
+
+```ts
+const report = db.changeLog.compact({ keepAncestors: 0 });
+// { entities, revisionsBefore, revisionsAfter, removed, bytesReclaimed }
+db.changeLog.vacuum(); // return the freed pages to the file system
+```
+
+`keepAncestors` keeps that many non-leaf revisions behind each leaf. Compaction never removes a
+leaf, so conflicts survive it.
+
+## Full-text search
+
+Every thing the change log records, keyed or not, is indexed for full-text search with SQLite's
+FTS5. The index is updated in the same transaction as the write, whether the write was local or
+replicated:
+
+```ts
+db.changeLog.fullText.search('text:draft', 20);
+// [{ entityId: 'note/n1', rank: -0.000001 }]
+```
+
+The index has four columns you can search:
+
+| Column | Holds |
+| ------ | ----- |
+| `doctype` | The thing's type |
+| `status` | The value of an attribute named `status`, if it has one |
+| `tags` | Every attribute named `tag` or ending in `-tag`, joined by spaces |
+| `text` | Every attribute value |
+
+The query string is [FTS5 query syntax](https://www.sqlite.org/fts5.html#full_text_query_syntax), so
+`text:replication AND doctype:note` and `"exact phrase"` work. Results come back best match first;
+`rank` is BM25, where lower is better.
+
+Full-text search is not part of TypeQLite. TypeQL has no full-text construct, and TypeDBLite does
+not add one ([ADR-002](../architecture/adr-002-typeql-engine-as-a-port.md), Decision 6).

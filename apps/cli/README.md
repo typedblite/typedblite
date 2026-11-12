@@ -5,7 +5,7 @@ Interactive REPL, file runner, and one-shot executor for TypeDBLite.
 ## Installation
 
 ```bash
-npm run build   # or: nx run typedblite-cli:build
+npm run build   # or: npm exec nx -- run typedblite:build
 ```
 
 The compiled binary is at `apps/cli/out/main.js`.
@@ -76,6 +76,20 @@ Statements are run in order. The first error stops execution and exits with code
 node apps/cli/out/main.js --exec 'match $p isa person, has name $n; select $n;' --database ./my.db
 ```
 
+## Known limitations
+
+The CLI finds where a statement ends by looking at `;` and the keyword the statement starts with.
+It does not parse the statement. Two consequences:
+
+- **A standalone `insert` ends at its first `;`.** `insert $a isa person, …; $c isa company, …;`
+  runs as two statements, and the second fails to parse. Write one `insert` per thing, or start the
+  statement with `match` (`match …; insert …;` is kept whole).
+- **In the REPL, a `define` block runs when its first line ends in `;`.** Type a `define` on one
+  line, or put the schema in a file and load it with `--file`, which reads ahead and keeps a
+  multi-line `define` together.
+
+The engine has neither limitation. Statements passed to it through the runtime API are parsed whole.
+
 ## Output format
 
 | Outcome | Output |
@@ -98,7 +112,7 @@ This works because the REPL is driven by the `line` event on readline rather tha
 ## Tests
 
 ```bash
-nx run typedblite-cli:test
+npm exec nx -- run typedblite:test
 ```
 
 Test files live in `test/` with `.test.mts` extension. The REPL tests (`test/repl.test.mts`) spawn the actual binary and pipe input into it; they test the real process boundary rather than the module in isolation.

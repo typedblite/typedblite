@@ -23,7 +23,7 @@ Example: `2-9f86d081884c7d659a2feaa0c55ad015`
 
 The digest is **derived from content**, not randomised. The same edit applied to the same parent on two independent nodes produces the same revision string. Independent identical edits converge instead of manufacturing a conflict.
 
-This is CouchDB's revision model (Decision 3 of ADR-003). Parity with CouchDB 3.4.3 was proven empirically and is guarded by the parity oracle (`nx run typedblite-runtime:test-oracle`).
+This is CouchDB's revision model (Decision 3 of ADR-003). Parity with CouchDB 3.4.3 was proven empirically when it was built. 🔴 The differential suite that proved it was removed in 2026-09, so **nothing now re-checks that parity automatically**.
 
 ## Usage
 
@@ -55,14 +55,14 @@ digestOf(rev2);     // => '<32 hex chars>'
 
 ## Invariants
 
-- **Do not change the revision algorithm** without running the parity oracle. The oracle is not part of the routine test suite (it requires a live CouchDB instance) and will not catch a regression automatically on CI.
+- **Do not change the revision algorithm casually.** Revisions written by one version must match those computed by another, or stores stop converging. The CouchDB parity oracle no longer exists, so a change here needs its own evidence: tests in this package and in the runtime's change-log suites, and an ADR-003 amendment if the semantics change.
 - **The separator between state, parent, and deleted flag is `\0`** — it cannot appear in a revision string, so injection is structurally impossible.
 - **`parent` absent → generation 1.** There is no generation 0.
 
 ## Tests
 
 ```bash
-nx run @typedblite/content-revision:test
+npm exec nx -- run content-revision:test
 ```
 
 Test files live in `src/lib/revision.spec.ts`.

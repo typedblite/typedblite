@@ -13,34 +13,44 @@ Langium grammar, generated AST, and language services for **TypeQLite** — the 
 - **Scope provider** (`typeqlite-scope.ts`) — resolves cross-references; role names are scoped to their relation, so two relations may each `relate member`.
 - **Formatter** (`typeqlite-formatter.ts`) — canonical formatting for `.typeqlite` files.
 - **Semantic tokens** (`typeqlite-semantic-tokens.ts`) — token classifications for editor syntax highlighting.
+- **Editor services** — a workspace-wide schema (`typeqlite-scope-computation.ts`), query-label resolution (`typeqlite-labels.ts`), outline and hover (`typeqlite-navigation.ts`), completion, rename and quick fixes. The [VS Code extension](../../apps/vscode/README.md) runs them in a language server. 🔴 The runtime uses only the parser and `validateSync`, so a check registered in `ValidationRegistry` is a runtime rule too ([ADR-008](../../docs/architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md) D2).
 - **TextMate grammar** (`syntaxes/typeqlite.tmLanguage.json`) — for editors that use TextMate grammars rather than a language server.
 
 ## Installation
 
-This package is part of the TypeDBLite monorepo. It is consumed as a workspace dependency by `@typedblite/runtime`.
-
 ```bash
-npm install
-npm run build   # or: nx run @typedblite/language:build
+npm install @typedblite/language
 ```
+
+Inside this repository it is a workspace dependency of `@typedblite/runtime` and of the VS Code
+extension. Build it with `npm exec nx -- run typeqlite-language:build`.
 
 ## Usage
 
+Parse, then validate. This is exactly what the runtime does with every statement:
+
 ```ts
-import { createTypeQLiteServices, validateSync } from '@typedblite/language';
 import { EmptyFileSystem } from 'langium';
+import { createTypeQLiteServices, validateSync, isEntityDef, type TypeQLiteFile } from '@typedblite/language';
 
-const services = createTypeQLiteServices(EmptyFileSystem);
+const { TypeQLite } = createTypeQLiteServices(EmptyFileSystem);
 
-// Parse and validate in one step
-const { ast, diagnostics } = validateSync(services, `
+const result = TypeQLite.parser.LangiumParser.parse<TypeQLiteFile>(`
   define
     entity person, owns name @key;
     attribute name, value string;
 `);
+const syntaxErrors = [...result.lexerErrors, ...result.parserErrors]; // []
+const diagnostics = validateSync(TypeQLite, result.value);            // [] — every validator rule, synchronously
+const entities = result.value.clauses
+  .flatMap((clause) => ('definitions' in clause ? clause.definitions : []))
+  .filter(isEntityDef);                                               // [person]
 ```
 
-The returned `ast` is a fully linked `TypeQLiteFile` — cross-references are resolved and type guards like `isEntityDef`, `isOwnsTrait`, `isKeyAnnotation` work against every node.
+`result.value` is the AST: typed node interfaces with `is*` type guards for every production. It is
+**not linked**: the parser path never builds a `LangiumDocument`, so cross-references are not
+resolved. Linking, scoping and the workspace index are for language-server use, where
+`createTypeQLiteServices` is given a real file system and Langium's document builder.
 
 ## File extensions
 
@@ -53,15 +63,17 @@ Language ID: `typeqlite`
 
 ## Regenerating the AST
 
-The generated files in `src/generated/` are outputs of `langium generate` and must be committed alongside any grammar change.
+`src/generated/` is build output and is **not committed**. The `build`, `test` and `typecheck`
+targets regenerate it first. After editing the grammar, regenerate it yourself so that tools running
+from source see the change:
 
 ```bash
-cd libs/language
-npm run langium:generate
-# Commits: src/typeqlite.langium  +  src/generated/{ast,grammar,module}.ts
+npm exec nx -- run typeqlite-language:langium-generate
 ```
 
-Do not edit `src/generated/` by hand — changes are overwritten on the next generation.
+Commit the grammar (`src/typeqlite.langium`, `src/terminals.langium`), never the generated files.
+[Adding a TypeQLite construct](../../docs/development/adding-a-construct.md) walks through the
+whole path.
 
 ## Synchronous validation
 
@@ -76,7 +88,7 @@ TypeQLite 3.x implements the subset required by real production schemas and by T
 ## Tests
 
 ```bash
-nx run @typedblite/language:test
+npm exec nx -- run typeqlite-language:test
 ```
 
 Test files live in `test/` with `.spec.ts` extension. The spec-backgrounds suite (`test/spec-backgrounds.spec.ts`) uses the vendored TypeDB behaviour specification as acceptance tests for the grammar.

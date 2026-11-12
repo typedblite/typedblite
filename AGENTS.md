@@ -1,35 +1,34 @@
 # AGENTS.md — Working in TypeDBLite
 
-This file is for AI agents and automated tools working in this repository. It describes the layout, the invariants, and the conventions that must be respected when making changes.
+This file is for AI agents and automated tools working in this repository. It describes the layout, the invariants, and the conventions that must be respected when making changes. Human contributors: start with [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/README.md), which say the same things at greater length.
 
 ---
 
 ## Repository layout
 
-```
-typedblite/
-├── libs/
-│   ├── language/          @typedblite/language   — grammar, AST, language services
-│   ├── runtime/           @typedblite/runtime     — interpreter, SQLite generator, change log
-│   ├── content-revision/  @typedblite/content-revision — revision identifiers
-│   └── conformance/       typedblite-conformance  — TypeDB behaviour spec + report card
-├── apps/
-│   ├── cli/               typedblite-cli          — REPL and file runner
-│   └── vscode/            typeqlite (extension)   — the TypeQLite editor: a Langium language server
-├── test-fixtures/schemas/ — shared TypeQLite schema files used by multiple test suites
-├── nx.json                — Nx task graph configuration
-├── package.json           — workspace root (npm workspaces)
-├── tsconfig.base.json     — shared TypeScript path aliases
-└── vitest.shared.ts       — shared Vitest configuration helpers
+```mermaid
+flowchart LR
+  root["typedblite/"] --> libs["libs/"]
+  root --> apps["apps/"]
+  root --> fixtures["test-fixtures/schemas/<br/>shared TypeQLite schemas used by several suites"]
+  root --> config["nx.json · package.json · tsconfig.base.json · vitest.shared.ts<br/>Nx task graph · npm workspaces root · path aliases · shared Vitest config"]
+  libs --> language["language/<br/><b>@typedblite/language</b><br/>grammar, AST, language services"]
+  libs --> runtime["runtime/<br/><b>@typedblite/runtime</b><br/>interpreter, storage, change log"]
+  libs --> revision["content-revision/<br/><b>@typedblite/content-revision</b><br/>revision identifiers"]
+  libs --> conformance["conformance/<br/><b>typedblite-conformance</b><br/>TypeDB behaviour spec and report card"]
+  apps --> cli["cli/<br/><b>typedblite-cli</b><br/>REPL and file runner"]
+  apps --> vscode["vscode/<br/><b>typeqlite</b> extension<br/>the TypeQLite editor: a Langium language server"]
 ```
 
 ## Dependency graph
 
-```
-cli → runtime → language
-              → content-revision
-conformance → runtime
-vscode → language
+```mermaid
+flowchart LR
+  cli --> runtime
+  conformance --> runtime
+  runtime --> language
+  runtime --> content-revision
+  vscode --> language
 ```
 
 Build order is enforced by Nx. `runtime` must build before `cli` and `conformance`. `language` and `content-revision` must build before `runtime`.
@@ -50,19 +49,19 @@ npm run test
 # Type-check everything
 npm run typecheck
 
-# Single package — replace <target> with the package name from package.json
-nx run <target>:build
-nx run <target>:test
-nx run <target>:typecheck
+# Single project — replace <project> with the Nx project name
+npm exec nx -- run <project>:build
+npm exec nx -- run <project>:test
+npm exec nx -- run <project>:typecheck
 ```
 
-Package names:
-- `@typedblite/language`
-- `@typedblite/runtime`
-- `@typedblite/content-revision`
-- `typedblite-conformance`
-- `typedblite-cli`
-- `typeqlite` (the VS Code extension, Nx project `typeqlite-vscode`)
+Nx project names (not the npm package names):
+- `typeqlite-language` — `@typedblite/language`
+- `typedblite-runtime` — `@typedblite/runtime` (no `typecheck` target; `build` type-checks)
+- `content-revision` — `@typedblite/content-revision`
+- `typedblite-conformance` — also has `report`
+- `typedblite` — the CLI, `typedblite-cli`
+- `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
 
 Coverage is enabled only on CI (`CI=true`). Test suites time out at 30 seconds per test.
 
@@ -103,7 +102,7 @@ Key constraints:
 
 The SQLite schema is generated from a TypeQLite `define` statement by `sqlite-generator.ts`. The interpreter in `interpreter.ts` translates TypeQLite queries to SQLite.
 
-TypeQLite entities become rows in a table named after the entity type. Attributes become columns. Relations become junction tables. `@key` generates a `UNIQUE` index.
+There is **no table per type**: the storage model mirrors TypeDB's. Every store has the same fixed tables — `thing` (one row per entity or relation), `attribute` (one row per type and value, ADR-006), `has` (ownership), `role_player`, `type_parent`, and `schema_*` tables. `@key`/`@unique` are a partial `UNIQUE` index on `has`; role players have foreign keys to `thing` (`PRAGMA foreign_keys = ON` on every connection). New storage is added additively (`CREATE TABLE IF NOT EXISTS`), never by changing an existing table's shape.
 
 ### Change log and replication
 
@@ -111,7 +110,7 @@ Every write appends to a change log. Revisions are `generation-digest` strings (
 
 The hub exposes Server-Sent Events for spokes to subscribe to. The `ChangeStream` interface (`change-stream.ts`) is the hub's side. `ChangeStreamClient` (`change-stream-client.ts`) is the spoke's side.
 
-**Do not change the revision algorithm** in `content-revision/src/lib/revision.ts` without running the parity oracle (`nx run typedblite-runtime:test-oracle`). That oracle proves the semantics against real CouchDB 3.4.3.
+**Do not change the revision algorithm** in `content-revision/src/lib/revision.ts` casually. 🔴 The CouchDB parity oracle that once proved these semantics was removed (2026-09); `test-oracle` now only names an FTS parity test, and its config does not currently start (it imports `vitest.shared` from outside the repo). Nothing re-checks CouchDB parity, so a change here needs its own tests and an ADR-003 amendment.
 
 ---
 
@@ -131,9 +130,9 @@ Intentional failures are declared in `deviations.yaml`:
 `baseline.json` records the last-known pass/fail count per feature file. The test fails if a scenario regresses below the baseline. Update the baseline when scenarios improve:
 
 ```bash
-nx run typedblite-conformance:test
-# If the run reports `unraised`, update baseline.json manually or via the CLI tool
-nx run typedblite-conformance:cli -- --update-baseline
+npm exec nx -- run typedblite-conformance:test     # fails on a regression AND on an unraised improvement
+npm exec nx -- run typedblite-conformance:report   # the full card and a failure digest
+# Raise the numbers in baseline.json by hand, in the same commit as the improvement
 ```
 
 ---
@@ -164,7 +163,7 @@ must stay so (ADR-008 D5). The editor resolves them through `TypeQLiteLabels`, w
 (`sitesOf`, and `LABEL_POSITIONS` for completion) must change whenever the grammar gains a position
 that names a type. `nx run typeqlite-vscode:package` builds `apps/vscode/dist/typeqlite-0.0.1.vsix`.
 - Shared TypeQLite schema fixtures used by multiple suites live in `test-fixtures/schemas/`.
-- The runtime has an optional oracle test suite (`vitest.oracle.config.ts`) and a WASM test suite (`vitest.wasm.config.ts`), both off by default. Run them explicitly when changing the SQLite binding or the revision algorithm.
+- The runtime's optional `vitest.oracle.config.ts` and `vitest.wasm.config.ts` **do not currently start**: both import `vitest.shared` from a path outside this repository. Do not rely on them ([Testing](docs/development/testing.md#suites-that-do-not-run-at-the-moment)).
 
 ---
 
@@ -200,7 +199,7 @@ that names a type. `nx run typeqlite-vscode:package` builds `apps/vscode/dist/ty
 | Using `async` in the interpreter's inner loop | The `SqliteDatabase` interface is synchronous by design |
 | Hardcoding `:memory:` in a test | Use the fixture helpers; they create an isolated session per test |
 | Declaring a deviation before the scenario's Background passes | The deviation isn't the real reason for failure yet |
-| Changing revision semantics without running the parity oracle | CouchDB parity is not covered by the routine test suite |
+| Changing revision semantics without new tests | CouchDB parity is no longer checked by any suite; stores written by different versions must still converge |
 | Editing the grammar without regenerating locally | Tools run from source (`tsx`, vitest aliases) read `src/generated/`, which only `langium-generate` refreshes |
 | Adding a construct to the grammar with no caller | Grammar scope is measured, not guessed — find the caller first |
 | Trusting a gate after a dependency bump without a clean build | `build` is `tsc -b`, which is incremental: a library whose sources did not change is not re-emitted, so its dependants are judged against stale declarations, even with `--skip-nx-cache`. Delete `out/` and `*.tsbuildinfo` first (the `vscode-languageserver` 10 bump hid a type error for a whole phase this way) |

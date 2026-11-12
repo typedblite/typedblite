@@ -30,10 +30,10 @@ The pinned commit is in `spec/PIN`. Do not update the vendored files without als
 
 ```bash
 # Run all scenarios and check for regressions against baseline.json
-nx run typedblite-conformance:test
+npm exec nx -- run typedblite-conformance:test
 
 # Print the full report card to stdout (exits 1 on regression, 0 otherwise)
-nx run typedblite-conformance:report
+npm exec nx -- run typedblite-conformance:report
 ```
 
 ### The differential oracle (ADR-007)
@@ -117,7 +117,7 @@ Rules:
 ## Tests
 
 ```bash
-nx run typedblite-conformance:test
+npm exec nx -- run typedblite-conformance:test
 ```
 
 The test suite (`test/conformance.test.ts`) calls `runConformance()` and asserts no regressions. Additional unit tests cover the harness, spec loading, and owner validation.
