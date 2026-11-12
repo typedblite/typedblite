@@ -41,6 +41,8 @@ Definition:
 // `entity person owns ref` alike (verified on the live server 2026-09-11); this grammar required
 // the comma, and every Background in the behaviour spec is written without it —
 // `d-20260911-the-typeql-grammar-requires-a-comma`. Between traits the comma stays required.
+// The same holds before `sub`: `relation person, sub base @doc("…")` (metadata.feature L228), as
+// `AttributeDef` already admitted.
 //
 // 🔴 **An annotation belongs to the thing it follows, and the AST says which.** `entity player
 // @abstract sub person` annotates the *type*; `entity player sub person @abstract` annotates the
@@ -51,14 +53,14 @@ Definition:
 // `define.feature` L392 says `; fails`, not `parsing fails`.
 EntityDef:
     'entity' name=ID annotations+=Annotation*
-    ('sub' superType=[EntityDef:ID] subAnnotations+=Annotation*)?
+    (','? 'sub' superType=[EntityDef:ID] subAnnotations+=Annotation*)?
     (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
     (','? traits+=Trait (',' traits+=Trait)*)? ';';
 
 // `relation membership, relates member, relates org, owns membership-key @key;`
 RelationDef:
     'relation' name=ID annotations+=Annotation*
-    ('sub' superType=[RelationDef:ID] subAnnotations+=Annotation*)?
+    (','? 'sub' superType=[RelationDef:ID] subAnnotations+=Annotation*)?
     (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
     (','? traits+=Trait (',' traits+=Trait)*)? ';';
 
@@ -67,10 +69,13 @@ RelationDef:
 // `attribute email value string @regex("^.*@.*$");`      <- annotation on the VALUE TYPE
 // `attribute empty-sub-data @abstract, sub empty-data;`  <- annotation before `sub`
 // `attribute person-name sub name;`                      <- attribute subtyping, no value type
+// `sub` and `value` in either order: `attribute name value string, sub valueless-name;` (match.feature L4214).
 AttributeDef:
     'attribute' name=ID annotations+=Annotation*
-    (','? 'sub' superType=[AttributeDef:ID] subAnnotations+=Annotation*)?
-    (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)? ';';
+    (
+          (','? 'sub' superType=[AttributeDef:ID] subAnnotations+=Annotation*) (','? 'value' valueType=ValueType valueAnnotations+=Annotation*)?
+        | (','? 'value' valueType=ValueType valueAnnotations+=Annotation*) (','? 'sub' superType=[AttributeDef:ID] subAnnotations+=Annotation*)?
+    )? ';';
 
 // `principal plays membership:member;` — a re-open of an already-defined type, with no kind
 // keyword. The spec re-opens with a whole trait list: `person plays employment:employee, owns
@@ -211,8 +216,9 @@ UniqueAnnotation:
     {infer UniqueAnnotation} '@unique';
 
 // `@card(0..)` — downstream-store's multi-valued attributes. An absent upper bound is unbounded.
+// `@card(2)` is exactly two (update.feature L727).
 CardAnnotation:
-    '@card' '(' min=INT '..' (max=INT)? ')';
+    '@card' '(' min=INT (range?='..' (max=INT)?)? ')';
 
 // `attribute age @independent, value integer;` — an attribute instance may exist with no owner.
 IndependentAnnotation:
@@ -261,16 +267,85 @@ ValueType returns string:
 // A pipeline is a sequence of stages, which is how TypeQLite 3.x composes read and write:
 // `match ...; insert ...;` and `match ...; select $a, $b;` are both pipelines.
 
-// 🔴 Stage ORDER is part of the grammar, not a validator rule. An earlier version wrote this as
-// `stages+=Stage+`, which parses but is ambiguous across query boundaries: a file of consecutive
-// queries collapsed into ONE pipeline, because nothing told the parser where a pipeline ends.
-// Encoding the real order — match, then a write, then a projection — makes each query terminate.
+// 🔴 A pipeline is an ordered list of STAGES, as TypeQL 3's is: `match …; match …;` chains, and
+// `match …; sort $x; limit 1; insert …;` streams the match's answers through each stage in turn
+// (pipelines.feature, modifiers.feature). It opens with a stage that can start a stream and may end
+// with `fetch` or `return`, which answer documents or a function's result and nothing after them.
+//
+// ⚠️ This replaced a FIXED order — `match (write)? (select)? (reduce)?` — which had been chosen to
+// stop a file of consecutive queries collapsing into one pipeline. On TypeDB that IS one pipeline:
+// a query is one pipeline, and a second `match` is a second stage reading the first's answers. A
+// caller with several independent queries runs them one at a time (the CLI splits its input).
+//
+// `end;` closes a pipeline explicitly — TypeQL's terminator, which is how one document holds several
+// queries (`examples/real-queries.typeqlite`).
 Pipeline:
-      match=MatchStage (write=WriteStage)? (select=SelectStage)? (reduce=ReduceStage)?
-    | write=WriteStage;
+    (functions+=FunctionDefinition)* stages+=LeadStage stages+=Stage* (fetch=FetchStage | returnStage=ReturnStage)? (end?='end' ';')?;
 
-WriteStage:
-    InsertStage | PutStage | DeleteStage;
+// ── query-local functions ───────────────────────────────────────────────────
+//
+// `with fun get_names($p: person) -> { name }: match $p has name $n; return { $n };` — a function the
+// query that follows may call (fetch.feature L1687). `-> { T, … }` answers a stream of tuples,
+// `-> T, …` one tuple (or none); a `?` marks a value that may be absent. The body is a pipeline that
+// ends in `return`. 🔴 `define fun …` — a function the SCHEMA stores — is not this, and does not parse.
+FunctionDefinition:
+    'with' 'fun' name=ID '(' (parameters+=FunctionParameter (',' parameters+=FunctionParameter)*)? ')' '->' output=FunctionOutput ':' body=FunctionBody;
+
+FunctionParameter:
+    variable=VAR ':' type=ValueType (optional?='?')?;
+
+FunctionOutput:
+      stream?='{' types+=FunctionOutputType (',' types+=FunctionOutputType)* '}'
+    | types+=FunctionOutputType (',' types+=FunctionOutputType)*;
+
+FunctionOutputType:
+    type=ValueType (optional?='?')?;
+
+FunctionBody:
+    stages+=LeadStage stages+=Stage* returnStage=ReturnStage;
+
+LeadStage:
+    GivenStage | MatchStage | InsertStage | PutStage | DeleteStage;
+
+// `given $n: string, $p: person, $y: integer?;` — the rows the caller passes in, each variable typed
+// and `?` when it may be absent (given.feature). Only ever the first stage.
+GivenStage:
+    'given' declarations+=GivenDeclaration (',' declarations+=GivenDeclaration)* ';';
+
+GivenDeclaration:
+    variable=VAR ':' type=ValueType (optional?='?')?;
+
+Stage:
+    MatchStage | InsertStage | PutStage | DeleteStage | UpdateStage | SelectStage | ReduceStage | SortStage
+    | OffsetStage | LimitStage | DistinctStage | RequireStage;
+
+type WriteStage = InsertStage | PutStage | DeleteStage | UpdateStage;
+
+// `update $p has name "Bob"; $f links (friend: $x);` — replace what a bound thing owns or what a
+// bound relation's role holds (update.feature). Parsed as patterns; the engine admits only `has`
+// and `links` on variables an earlier stage bound, and says why for anything else.
+UpdateStage:
+    'update' patterns+=Pattern+;
+
+// `sort $age desc, $name;` — ascending unless it says otherwise; stable, so ties keep stream order.
+SortStage:
+    'sort' keys+=SortKey (',' keys+=SortKey)* ';';
+
+SortKey:
+    variable=VAR (order=('asc' | 'desc'))?;
+
+OffsetStage:
+    'offset' count=INT ';';
+
+LimitStage:
+    'limit' count=INT ';';
+
+DistinctStage:
+    {infer DistinctStage} 'distinct' ';';
+
+// `require $x, $y;` — keep only the answers where each is bound (after a `try`).
+RequireStage:
+    'require' variables+=VAR (',' variables+=VAR)* ';';
 
 MatchStage:
     'match' patterns+=Pattern+;
@@ -306,17 +381,121 @@ ReduceStage:
 Reduction:
     variable=VAR (optional?='?')? '=' reducer=ID ('(' (argument=VAR)? ')')?;
 
+// `delete $x;` (the thing), `delete has $n of $p;` (an ownership the match bound), `delete links
+// (friend: $x) of $r;` (a role player), and the older `delete $n of $p;`. 🔴 Not `delete has name
+// "Alex" of $x;` — TypeDB fails that at PARSE (delete.feature L1100): a delete names what the match
+// bound, never a value.
 Deletion:
-    target=VAR ('of' owner=VAR)? ';';
+    (
+          // `delete try { $f; };` — run only when what it names is bound (delete.feature L2929). A
+          // `try` inside it is a PARSE failure (L2995), so the block holds plain deletions only.
+          optional?='try' '{' block+=PlainDeletion+ '}'
+        | has?='has' (attribute=ID)? target=VAR 'of' owner=VAR
+        | links?='links' players=RolePlayers 'of' owner=VAR
+        | target=VAR ('of' owner=VAR)?
+    ) ';';
+
+PlainDeletion infers Deletion:
+    (
+          has?='has' (attribute=ID)? target=VAR 'of' owner=VAR
+        | links?='links' players=RolePlayers 'of' owner=VAR
+        | target=VAR ('of' owner=VAR)?
+    ) ';';
+
+// `return { $a, $b };` `return first $a;` `return count($x), sum($y);` `return check;` — TypeQL's
+// function return, which a `fetch` sub-query also ends with (fetch.feature L882). Parsed in
+// TypeQL's own shapes so that the shapes it refuses — an aggregate mixed with a variable,
+// `return $age, count($name);` (L2260) — fail to parse for THAT reason, and not because `return`
+// was unknown. Evaluating one is the functions phase's; the engine refuses it by name.
+ReturnStage:
+    'return' (
+          '{' streamed+=VAR (',' streamed+=VAR)* '}'
+        | selector=('first' | 'last') selected+=VAR (',' selected+=VAR)*
+        | check?='check'
+        | reductions+=ReturnReduction (',' reductions+=ReturnReduction)*
+    ) ';';
+
+ReturnReduction:
+    reducer=ID ('(' (argument=VAR)? ')')?;
+
+// ── fetch ───────────────────────────────────────────────────────────────────
+//
+// `fetch { "name": $n, "ages": [ $p.age ], "all": { $p.* }, "sub": [ match …; fetch { … }; ] };` —
+// a JSON document per answer (fetch.feature). The shapes are TypeDB's, and so are the parse
+// failures the spec names: `fetch;` (no object), `"all attributes": $p.*` (a spread is an object's
+// entry, never a value), and a sub-query written outside `[ … ]`.
+FetchStage:
+    'fetch' body=FetchObject ';'?;
+
+// A trailing comma is admitted — `fetch { "person name": $n, };` (fetch.feature L989).
+FetchObject:
+    {infer FetchObject} '{' (entries+=FetchEntry (',' entries+=FetchEntry)* ','?)? '}';
+
+FetchEntry:
+    FetchKeyValue | FetchAllAttributes;
+
+FetchKeyValue:
+    key=STRING ':' value=FetchValue;
+
+// `$p.*` — every attribute the thing owns, keyed by its type.
+FetchAllAttributes:
+    variable=VAR '.' '*';
+
+FetchValue:
+    FetchObject | FetchList | FetchSingle | FetchAttribute | FetchExpression;
+
+// `( match …; return count($n); )` — a sub-query answering ONE value, where `[ … ]` collects a list
+// (fetch.feature L2174).
+// 🔴 A `return` sub-query only: `( match …; fetch { … }; )` is a PARSE failure (fetch.feature L989).
+FetchSingle:
+    '(' subquery=FunctionBody ')';
+
+// `$p.age` — scalar: `null`, or the one value; refused when the attribute can be owned more than once.
+FetchAttribute:
+    variable=VAR '.' attribute=ID;
+
+// `[ $p.name ]`, `[ get_names($p) ]`, `[ match …; fetch { … }; ]` — a list.
+FetchList:
+    '[' (subquery=Pipeline | attribute=FetchAttribute | expression=Expression) ']';
+
+// `$n`, `100`, `$k - 100`, `get_doc($t)` — a value.
+FetchExpression:
+    expression=Expression;
 
 Pattern:
-    ThingPattern | AnonRelationPattern | TypePattern | KindPattern | LetPattern | ComparisonPattern;
+    ThingPattern | AnonRelationPattern | TypePattern | KindPattern | LetPattern | ComparisonPattern
+    | NegationPattern | DisjunctionPattern | OptionalPattern | IsPattern;
+
+// ── nested patterns (negation.feature, disjunction.feature, optional.feature) ────────────────
+//
+// Each block is a conjunction of its own, evaluated against the answer the patterns around it bound:
+// `not { … }` keeps the answer only if the block matches nothing, `{ … } or { … }` answers each
+// branch's extensions, `try { … }` extends the answer if the block matches and keeps it unextended
+// if it does not.
+NegationPattern:
+    'not' '{' patterns+=Pattern+ '}' ';';
+
+DisjunctionPattern:
+    branches+=PatternBlock ('or' branches+=PatternBlock)+ ';';
+
+PatternBlock:
+    '{' patterns+=Pattern+ '}';
+
+OptionalPattern:
+    'try' '{' patterns+=Pattern+ '}' ';';
+
+// `$x is $y;` — the same concept.
+IsPattern:
+    left=VAR 'is' right=VAR ';';
 
 // ── values (Phase 06) ───────────────────────────────────────────────────────
 
 // `let $v = $a * 2;` — a value variable, assigned once.
+// `let $key, $value in get_all_meta(person);` — one row per tuple the expression answers
+// (metadata.feature). `variable` stays the first name so every single-variable reader is unchanged;
+// `others` are the rest of the tuple, and `iterate` marks the `in` form.
 LetPattern:
-    'let' variable=VAR '=' expression=Expression ';';
+    'let' variable=VAR (',' others+=VAR)* (iterate?='in' | '=') expression=Expression ';';
 
 // `$a > 10;` `$v == $a;` — a predicate over bound values, filtering the match.
 ComparisonPattern:
@@ -347,13 +526,29 @@ PowerExpression infers Expression:
 AtomExpression infers Expression:
       {infer LiteralExpression} literal=ExpressionLiteral
     | {infer VariableExpression} variable=VAR
-    | {infer FunctionExpression} function=FunctionName '(' (arguments+=Expression (',' arguments+=Expression)*)? ')'
+    | {infer FunctionExpression} function=FunctionName '(' (arguments+=FunctionArgument (',' arguments+=FunctionArgument)*)? ')'
     | '(' Expression ')';
+
+// `person`, `marriage:spouse` — a type named as a function's argument, as the schema functions take
+// it: `get_doc(person)`, `get_relates_doc(person, person:newrole)` (metadata.feature).
+//
+// 🔴 **An argument, never an atom.** As an atom, `let $a = P524287Y;` — a duration literal this
+// grammar does not have — parsed as a label, the engine refused it as "a type, not a value", and
+// `typeql read query; fails` passed for that reason (expression.feature L825, found by this
+// phase's audit of its own new passes). TypeDB parses a bare label nowhere else in an expression.
+FunctionArgument infers Expression:
+    {infer LabelExpression} label=ScopedLabel | Expression;
+
+// The label itself — also what `$r label marriage:spouse` names.
+ScopedLabel returns string:
+    ID (':' ID)?;
 
 // `floor`, `std::math::floor`, `std::string::len` — the built-ins, with or without their
 // namespace; `string` is a value-type keyword, so a segment is a `ValueType`, which admits it.
+// `label` is a keyword (`$t label person`), and also the schema function `label($t)`
+// (expression.feature L1334) — admitted here by name.
 FunctionName returns string:
-    ValueType ('::' ValueType)*;
+    (ValueType | 'label') ('::' ValueType)*;
 
 // `$s isa skill, has skill-id "x", has skill-name $n;`
 // `$r isa step-dependency (dependent: $d, prerequisite: $p);`
@@ -374,8 +569,12 @@ KindPattern:
     kind=Kind variable=VAR (properties+=Property (',' properties+=Property)*)? ';';
 
 // `(owner: $s, step: $st) isa skill-composition;` — an unbound relation, never referred to again.
+// `(employee: $x);` — with no `isa`, a relation of any type (negation.feature L608).
+// `employment (employee: $p, employer: $e);` — the type before the players (fetch.feature L882).
+// Either form may own attributes: `(friend: $x) isa friendship, has ref 0;` (delete.feature L221).
 AnonRelationPattern:
-    players=RolePlayers 'isa' type=ID ';';
+      players=RolePlayers ('isa' type=ID)? (',' properties+=HasProperty)* ';'
+    | type=ID players=RolePlayers (',' properties+=HasProperty)* ';';
 
 Property:
     IsaProperty | HasProperty | LinksProperty | LabelProperty | SubProperty | OwnsProperty
@@ -389,8 +588,10 @@ IsaProperty:
 //
 // Each names a type or a type variable; a ThingPattern carrying one is a TYPE pattern, and the
 // interpreter refuses a head that mixes `has`/`links` with these.
+// `$t label person`, `$r label marriage:spouse` — a role type is labelled through its relation
+// (metadata.feature L73), as the solver's universe already names it.
 LabelProperty:
-    'label' label=ID;
+    'label' label=ScopedLabel;
 
 SubProperty:
     (direct?='sub!' | 'sub') (type=ID | typeVariable=VAR);
@@ -405,8 +606,13 @@ RelatesProperty:
     'relates' (role=ID | roleVariable=VAR);
 
 // The value is a literal when constraining, a variable when binding for output.
+// `has $a` — any attribute, of whatever type (163 uses in the behaviour spec).
+// `has age > 5`, `has name == $n` — a comparison on the owned value (a write takes `==` as the value).
 HasProperty:
-    'has' attribute=ID (value=Literal | valueVariable=VAR)?;
+    'has' (
+          attribute=ID (comparator=Comparator compared=Expression | value=Literal | valueVariable=VAR)?
+        | valueVariable=VAR
+    );
 
 LinksProperty:
     'links' players=RolePlayers;
@@ -414,8 +620,10 @@ LinksProperty:
 RolePlayers:
     '(' entries+=RolePlayer (',' entries+=RolePlayer)* ')';
 
+// `employee: $p`, or `$p` alone — the role left for the schema to decide (optional.feature L46).
+// `($r: $x)` — the role as a type variable, bound to the role type it plays (negation.feature L365).
 RolePlayer:
-    role=ID ':' player=VAR;
+    ((role=ID | roleVariable=VAR) ':')? player=VAR;
 
 // 🔴 `DatetimeLiteral`, then `DateLiteral`, then `DoubleLiteral`, then `IntLiteral`, mirroring the
 // terminal order in `terminals.langium` — all begin with digits, and the alternation is resolved by
@@ -435,13 +643,17 @@ RolePlayer:
 // that `10-1` is a subtraction; a `has age -5` or `@range(-5..5)` takes its `-` as the literal's
 // `negative` flag, and `literalText` applies it.
 Literal:
-    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | BooleanLiteral
+    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | DurationLiteral | BooleanLiteral
     | SignedDecimalLiteral | SignedDoubleLiteral | SignedIntLiteral;
 
 // An expression's literal carries no sign — `-1` there is a `NegationExpression` over `1`.
 ExpressionLiteral infers Literal:
-    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | BooleanLiteral
+    StringLiteral | DatetimeTzLiteral | DatetimeLiteral | DateLiteral | DurationLiteral | BooleanLiteral
     | DecimalLiteral | DoubleLiteral | IntLiteral;
+
+// `P1Y2M3DT4H5M6.789S` — a duration, stored as TypeDB holds one: months, days and exact time.
+DurationLiteral:
+    value=DURATION;
 
 SignedDecimalLiteral infers DecimalLiteral:
     (negative?='-')? value=DECIMAL;

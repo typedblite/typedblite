@@ -10,7 +10,7 @@ import type { Pipeline, ReduceStage, TypeQLiteFile } from '@typedblite/language'
 const parseReduce = (text: string): ReduceStage => {
   const { TypeQLite } = createTypeQLiteServices(EmptyFileSystem);
   const file = TypeQLite.parser.LangiumParser.parse<TypeQLiteFile>(text).value;
-  const stage = (file.clauses[0] as Pipeline).reduce;
+  const stage = (file.clauses[0] as Pipeline).stages.find((s): s is ReduceStage => s.$type === 'ReduceStage');
   if (!stage) throw new Error('no reduce stage');
   return stage;
 };

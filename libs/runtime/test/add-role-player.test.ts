@@ -4,7 +4,7 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 import { DiagnosticCode, diagnosticOf } from '../src/diagnostics.js';
 
 /**
- * 🔴 Adding a role player to an existing relation must either work or say it did not.
+ * 🔴 Adding a role player to an existing relation must either work or say it did not — it works.
  *
  * `insert $l links (source: $b);` against a matched relation parses, runs, reports
  * `Wrote 0 thing(s), 0 attribute(s), 0 role player(s).` and exits successfully — the store is
@@ -47,65 +47,54 @@ const sourcesOf = (edge: string): string[] =>
     .sort();
 
 describe('adding a role player to an existing relation', () => {
-  // 🔴 Refused, and deliberately not implemented.
-  //
-  // It was inert before 2026-09-10 — the statement reported
-  // `Wrote 0 thing(s), 0 attribute(s), 0 role player(s).` at exit 0 with the store unchanged. It
-  // was then briefly ENABLED, and that was worse: nothing on this path knows the bound owner is a
-  // relation, so `insert $a links (source: $b);` with `$a` matched as an entity wrote a
-  // `role_player` row keyed on the entity and reported success. A corruption where there had only
-  // been a no-op.
-  //
-  // Implementing it needs a relation check, `checkKnown` on the role name, and an error path that
-  // does not report a foreign-key or busy failure as a duplicate edge. Until then it refuses —
-  // the same trade `select` takes on a variable it cannot project.
-  it('refuses rather than reporting success having written nothing', () => {
-    let thrown: unknown;
-    try {
-      engine.execute(
-        'match $l isa link, has edge-id "e"; $b isa node, has node-id "b";' +
-          ' insert $l links (source: $b);',
-      );
-    } catch (error) {
-      thrown = error;
-    }
-    assert.ok(thrown instanceof Error, 'a write that cannot happen must say so');
-    assert.match((thrown as Error).message, /not supported/);
-    assert.match((thrown as Error).message, /Name every player in one/);
-    assert.equal(
-      diagnosticOf(thrown)?.code,
-      DiagnosticCode.unsupportedIncrementalRole,
+  // ✅ Implemented in the fetch-and-writes phase of the conformance work, on the three conditions
+  // this file set for it: the owner is checked to be a RELATION, the role to be one it has (and one
+  // the player plays), and a duplicate edge is the only failure reported as one. It was refused
+  // until then — inert before 2026-09-10, and a corruption when briefly enabled without the checks.
+  it('adds the player, and says so', () => {
+    const report = engine.execute(
+      'match $l isa link, has edge-id "e"; $b isa node, has node-id "b";' + ' insert $l links (source: $b);',
     );
-    // 🔴 And the store is untouched — a refusal that half-wrote would be worse than either.
+    assert.deepEqual(sourcesOf('e'), ['a', 'b']);
+    assert.ok(report.diagnostics.some((d) => /1 role player/.test(d.message)));
+  });
+
+  // 🔴 The case that made the first enabling a corruption rather than a feature.
+  it('refuses it against an entity, where it once wrote a bogus edge', () => {
+    assert.throws(
+      () => engine.execute('match $a isa node, has node-id "a"; $b isa node, has node-id "b";' + ' insert $a links (source: $b);'),
+      /not a relation/,
+    );
     assert.deepEqual(sourcesOf('e'), ['a']);
   });
 
-  // 🔴 The case that made enabling it a corruption rather than a feature.
-  it('refuses it against an entity too, where it used to write a bogus edge', () => {
+  it('refuses a role the relation does not have', () => {
+    const thrown = (() => {
+      try {
+        engine.execute('match $l isa link, has edge-id "e"; $b isa node, has node-id "b"; insert $l links (nope: $b);');
+      } catch (error) {
+        return error;
+      }
+      return undefined;
+    })();
+    assert.equal(diagnosticOf(thrown)?.code, DiagnosticCode.unknownRole);
+    assert.deepEqual(sourcesOf('e'), ['a']);
+  });
+
+  // 🔴 The refusal must fire for an UNBOUND relation variable too — a refusal reachable only on the
+  // half of the inputs that were already the safer half is not a refusal.
+  it('refuses when the relation variable was never bound', () => {
+    assert.throws(() => engine.execute('match $x isa node, has node-id "b"; insert $nope links (source: $x);'), /dangling/);
+  });
+
+  it('a duplicate edge is reported as one, and nothing else is', () => {
     assert.throws(
-      () =>
-        engine.execute(
-          'match $a isa node, has node-id "a"; $b isa node, has node-id "b";' +
-            ' insert $a links (source: $b);',
-        ),
-      /not supported/,
+      () => engine.execute('match $l isa link, has edge-id "e"; $a isa node, has node-id "a"; insert $l links (source: $a);'),
+      /already plays 'source'/,
     );
   });
 
-  // 🔴 The refusal must fire for an UNBOUND relation variable too. `if (owner === undefined)
-  // return;` ran first, so the half of the inputs that never named a real relation still reported
-  // success having written nothing — a refusal reachable only on the safer half is not a refusal.
-  it('refuses even when the relation variable was never bound', () => {
-    assert.throws(
-      () =>
-        engine.execute(
-          'match $x isa node, has node-id "b"; insert $nope links (source: $x);',
-        ),
-      /not supported/,
-    );
-  });
-
-  it('the one-statement form already works, and must keep working', () => {
+  it('the one-statement form still works', () => {
     engine.execute(
       'match $a isa node, has node-id "a"; $b isa node, has node-id "b";' +
         ' $c isa node, has node-id "c";' +

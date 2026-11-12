@@ -1,4 +1,4 @@
-import { DiagnosticCode, TypeDBLiteInterpreter, type TypeDBLiteValue } from '@typedblite/runtime';
+import { DiagnosticCode, TypeDBLiteInterpreter, type GivenRows, type JsonValue, type TypeDBLiteValue } from '@typedblite/runtime';
 
 export type TransactionKind = 'schema' | 'write' | 'read';
 
@@ -10,6 +10,10 @@ export interface Answers {
   readonly query: string;
   /** The driver's `getHas` — how `key:ref:1` is resolved against a thing cell, by iid. */
   readonly has: (iid: number, attribute: string) => ReadonlyArray<TypeDBLiteValue>;
+  /** A `fetch` query's answers — one document each — and then `rows` is empty. */
+  readonly documents?: ReadonlyArray<JsonValue>;
+  /** The value type an attribute type holds — how an `attr:` identifier's literal is read. */
+  readonly valueTypeOf?: (attribute: string) => string | undefined;
 }
 
 /** A step's failure, distinguished from an engine failure so the report can say which it was. */
@@ -42,6 +46,8 @@ export class World {
   private readonly databases = new Map<string, TypeDBLiteInterpreter>();
   private transaction: { database: string; kind: TransactionKind; open: boolean } | undefined;
   public answers: Answers | undefined;
+  /** What `set query given rows` set, for the next `… with given rows` step. */
+  public givenRows: GivenRows | undefined;
   public timeZone: string | undefined;
 
   /**
@@ -111,14 +117,15 @@ export class World {
    * 🔴 A write that evaluated nothing is a failure, not a success. `execute()` skips a pipeline
    * with no write stage, and reports a fact for each one it ran — no fact, nothing ran.
    */
-  writeQuery(text: string): void {
-    const report = this.engineFor('write').execute(text);
+  writeQuery(text: string, given?: GivenRows): { rows: ReadonlyArray<AnswerRow>; documents?: ReadonlyArray<JsonValue> } {
+    const report = this.engineFor('write').execute(text, given);
     // `emptyMatch` is a write that RAN, zero times — `match` bound nothing — which is a success on
     // TypeDB too. Only a pipeline that was skipped altogether reports neither fact.
     const ran = report.diagnostics.some(
       (d) => d.code === DiagnosticCode.wrote || d.code === DiagnosticCode.emptyMatch,
     );
     if (!ran) throw new EvaluatedNothing('TypeDBLite evaluated nothing: no write stage was executed');
+    return { rows: report.rows, documents: report.documents };
   }
 
   /**
@@ -130,11 +137,21 @@ export class World {
    * refused the same way.
    */
   readQuery(text: string): ReadonlyArray<AnswerRow> {
-    const { rows, diagnostics } = this.engineFor('read').query(text);
+    return this.readAnswers(text).rows;
+  }
+
+  /** A read's rows, and its documents when it ends in `fetch` — under the same evaluated-nothing guard. */
+  readAnswers(text: string, given?: GivenRows): { rows: ReadonlyArray<AnswerRow>; documents?: ReadonlyArray<JsonValue> } {
+    const { rows, diagnostics, documents } = this.engineFor('read').query(text, given);
     if (!diagnostics.some((d) => d.code === DiagnosticCode.projected)) {
       throw new EvaluatedNothing('TypeDBLite evaluated nothing: no pipeline reported a projection');
     }
-    return rows;
+    return { rows, documents };
+  }
+
+  /** An attribute type's value type, from the engine the open transaction reads. */
+  attributeValueType(attribute: string): string | undefined {
+    return this.engineFor('read').attributeValueType(attribute);
   }
 
   /** A thing's attributes of one type, from the engine the open transaction reads. */

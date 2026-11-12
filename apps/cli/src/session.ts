@@ -120,14 +120,16 @@ export function splitStatements(source: string): string[] {
     // A `define` block holds many definitions, each `;`-terminated, so it ends only where a
     // pipeline begins — or at the end of the input.
     if (/^define\b/i.test(body)) {
-      if (!/^\s*(match|insert|put|delete)\b/i.test(rest)) continue;
+      if (!/^\s*(match|insert|put|delete|update)\b/i.test(rest)) continue;
     } else if (/^match\b/i.test(body)) {
       // A `match` is `;`-separated patterns followed by a write and/or a projection, so its
       // internal semicolons are NOT terminators. The pipeline ends once its LAST stage has been
       // consumed — the stage order the grammar encodes: `match (write)? (select)? (reduce)?`. A
       // `select` followed by a `reduce` is not the end (Phase 06 review, round 4).
-      if (!/\b(insert|put|delete|select|reduce)\b/i.test(body)) continue;
-      if (/\bselect\b/i.test(body) && !/\breduce\b/i.test(body) && /^\s*reduce\b/i.test(rest)) continue;
+      if (!/\b(insert|put|delete|update|select|reduce|sort|offset|limit|distinct|require|fetch)\b/i.test(body)) continue;
+      // A stage that only reshapes the stream — and a `fetch`, which ends it — continues the
+      // pipeline it follows: `match …; select $x; sort $x; limit 1;` is one query.
+      if (/^\s*(select|reduce|sort|offset|limit|distinct|require|fetch)\b/i.test(rest)) continue;
     }
 
     statements.push(body);

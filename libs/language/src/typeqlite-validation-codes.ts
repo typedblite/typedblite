@@ -34,6 +34,8 @@ export const TypeQLiteValidationCode = {
   unprojectableVariable: 'typedblite.unprojectable-variable',
   /** `$v > $h` with `$v` bound by nothing — a value read before anything assigns it (Phase 06). */
   unboundValue: 'typedblite.unbound-value',
+  /** `select $_`, `sort $_`, `reduce … groupby $_` — a stage that names a variable needs a named one. */
+  anonymousVariable: 'typedblite.anonymous-variable',
 } as const;
 
 export type TypeQLiteValidationCodeValue =

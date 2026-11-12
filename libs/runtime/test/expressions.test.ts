@@ -223,10 +223,11 @@ describe('value expressions', () => {
     engine.define('define attribute born value date; person owns born;');
     engine.execute('insert $y isa person, has ref 9, has born 2000-01-01;');
     assert.deepEqual(values(engine, 'match $p isa person, has born $b; let $v = $b; select $v;'), [{ v: 'date:2000-01-01' }]);
-    // Every temporal comparison is refused by name, equality included (round 11).
-    assert.equal(refusal(() => engine.query('match $p isa person, has born $b; $b < 2001-01-01;')).code, DiagnosticCode.notImplemented);
-    assert.equal(refusal(() => engine.query('match $p isa person, has born $b; let $v = $b; $v == $b;')).code, DiagnosticCode.notImplemented);
-    assert.equal(refusal(() => engine.query('match $p isa person, has born $b; let $v = $b + 1;')).code, DiagnosticCode.notImplemented);
+    // Dates compare by instant now (modifiers.feature L458) — refused by name until they could.
+    assert.deepEqual(values(engine, 'match $p isa person, has born $b; $b < 2001-01-01; select $b;'), [{ b: 'born:2000-01-01' }]);
+    assert.equal(values(engine, 'match $p isa person, has born $b; let $v = $b; $v == $b; select $v;').length, 1);
+    // A date and an integer have no `+` — a duration does (expression.feature L492).
+    assert.equal(refusal(() => engine.query('match $p isa person, has born $b; let $v = $b + 1;')).code, DiagnosticCode.valueTypeConflict);
     engine.execute('match $p isa person, has ref 0; let $v = 10; insert $p has weight $v;');
     assert.deepEqual(values(engine, 'match $p isa person, has ref 0, has weight 10.0; select $p;'), [{ p: 'thing:person' }]);
     assert.equal(refusal(() => engine.execute('match $p isa person, has ref 0; insert $p has age 1; reduce $c = count;')).code, DiagnosticCode.notImplemented);
@@ -242,7 +243,12 @@ describe('value expressions', () => {
     engine.define('define attribute born value date; person owns born;');
     engine.execute('insert $z isa person, has ref 11, has born 2020-01-01;');
     assert.deepEqual(values(engine, 'match $p isa person, has born $d; let $v = 2020-01-01; select $v;'), [{ v: 'date:2020-01-01' }]);
-    assert.equal(refusal(() => engine.query('match $p isa person, has born $d; $d == 2020-01-01;')).code, DiagnosticCode.notImplemented);
+    assert.equal(values(engine, 'match $p isa person, has born $d; $d == 2020-01-01; select $d;').length, 1);
+    // 🔴 One instant, two spellings — the reason temporal equality was refused (round 11) — are equal.
+    engine.define('define attribute seen value datetime; person owns seen;');
+    engine.execute('insert $w isa person, has ref 12, has seen 2020-01-01T00:00:00;');
+    assert.equal(values(engine, 'match $p isa person, has seen $s; $s == 2020-01-01T00:00:00.000; select $s;').length, 1);
+    assert.equal(values(engine, 'match $p isa person, has seen $s; $s == 2020-01-01; select $s;').length, 1);
     assert.equal(refusal(() => engine.query('match $p isa person; $q isa person, has name $p;')).code, DiagnosticCode.mixedPattern);
   });
 
@@ -342,8 +348,12 @@ describe('value expressions', () => {
     assert.equal(diagnostics.filter((d) => d.severity === 1).length, 0);
   });
 
-  it('what this engine does not have is refused by name: metadata functions, a second stage — metadata L833, variables L38', () => {
+  it('what this engine does not have is refused by name: schema functions — metadata L833', () => {
     assert.equal(refusal(() => engine.query('match let $d = get_fun_doc("nothing");')).code, DiagnosticCode.notImplemented);
-    assert.equal(refusal(() => engine.query('match let $x = 1; select $x; match let $y = $x + 2;')).code, DiagnosticCode.notImplemented);
+  });
+
+  it('a second `match` is a later stage, and reads what the first selected — variables L26, L38', () => {
+    // Refused by name until stages chained (Phase 06 audit); now they do.
+    assert.deepEqual(values(engine, 'match let $x = 1; select $x; match let $y = $x + 2;'), [{ x: 'integer:1', y: 'integer:3' }]);
   });
 });

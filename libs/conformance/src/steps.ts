@@ -1,7 +1,8 @@
-import { DiagnosticCode, diagnosticOf } from '@typedblite/runtime';
+import { DiagnosticCode, diagnosticOf, TypeDBLiteValue, type GivenRows } from '@typedblite/runtime';
 import { orderedIdentify, rowKey, singleRowVariable, uniquelyIdentify } from './identify.js';
 import type { SpecStep } from './spec.js';
 import { EvaluatedNothing, HarnessError, World, type TransactionKind } from './world.js';
+import type { JsonValue } from '@typedblite/runtime';
 
 /**
  * The specification's step vocabulary, bound to TypeDBLite — what a driver's step definitions do.
@@ -15,8 +16,8 @@ import { EvaluatedNothing, HarnessError, World, type TransactionKind } from './w
  * - `… fails with a message containing: "X"` requires the thrown message to contain X. TypeDB's
  *   messages are TypeDB's; ours differ, and those scenarios fail until the message is matched. That
  *   is a real gap in drop-in terms — a caller matching on the message would break.
- * - `get answers of typeql write query` — TypeDB answers the inserted rows. TypeDBLite's `execute`
- *   answers nothing, and no answer set is invented for it: the step itself fails.
+ * - `get answers of typeql write query` — TypeDB answers the written stream's rows, and so does
+ *   `execute` (the write-answers phase); before that, no answer set was invented and the step failed.
  *
  * A step with no definition is not "pending": it fails its scenario and is reported by text, so
  * the first run's undefined list is the next phase's checklist.
@@ -188,18 +189,41 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
     pattern: /^get answers of typeql read query$/,
     run: (world, _m, step) => {
       const query = docString(step);
-      world.answers = { rows: world.readQuery(query), query, has: (iid, attribute) => world.attributesOf(iid, attribute) };
+      const { rows, documents } = world.readAnswers(query);
+      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute), valueTypeOf: (attribute) => world.attributeValueType(attribute) };
     },
   },
   {
-    // TypeDB answers the written rows. TypeDBLite answers nothing from a write, and the harness
-    // does not invent an answer set for it — `update.feature` asserts `answer size is: 0` after a
-    // write, which an invented empty set would satisfy. The write runs, then the step fails.
+    // A write answers its stream as a read does — the rows its last stage left, or a document each
+    // when it ends in `fetch`. The write must still have run: `writeQuery` refuses one that did not.
     pattern: /^get answers of typeql write query$/,
     run: (world, _m, step) => {
-      world.writeQuery(docString(step));
-      world.answers = undefined;
-      throw new HarnessError('TypeDBLite answers nothing from a write; the answer set cannot be evaluated');
+      const query = docString(step);
+      const { rows, documents } = world.writeQuery(query);
+      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute), valueTypeOf: (attribute) => world.attributeValueType(attribute) };
+    },
+  },
+
+  // ── given rows (given.feature) ──────────────────────────────────────────────────────────────
+  {
+    pattern: /^set query given rows$/,
+    run: (world, _m, step) => void (world.givenRows = givenRows(table(step))),
+  },
+  {
+    pattern: /^get answers of typeql (read|write) query with given rows$/,
+    run: (world, m, step) => {
+      const query = docString(step);
+      const given = givenOf(world);
+      const { rows, documents } = m[1] === 'read' ? world.readAnswers(query, given) : world.writeQuery(query, given);
+      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute), valueTypeOf: (attribute) => world.attributeValueType(attribute) };
+    },
+  },
+  {
+    pattern: /^typeql (read|write) query with given rows; fails with a message containing: "(.*)"$/,
+    run: (world, m, step) => {
+      const query = docString(step);
+      const given = givenOf(world);
+      expectFailure(() => void (m[1] === 'read' ? world.readAnswers(query, given) : world.writeQuery(query, given)), 'containing', m[2]);
     },
   },
 
@@ -207,7 +231,9 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
   {
     pattern: /^answer size is: (\d+)$/,
     run: (world, m) => {
-      const rows = answersOf(world).rows.length;
+      // A `fetch` answers documents, one per answer; anything else answers rows.
+      const answers = answersOf(world);
+      const rows = answers.documents?.length ?? answers.rows.length;
       if (rows !== Number(m[1])) throw new Error(`expected ${m[1]} answer(s), got ${rows}`);
     },
   },
@@ -242,17 +268,77 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
     },
   },
   {
-    // `fetch` answers documents. TypeDBLite has no fetch; a read that reached here answered rows
-    // or nothing, and neither is a document.
+    // `fetch` answers documents, compared with TypeDB's own equality — `jsonEqual`.
     pattern: /^answer (contains|does not contain) document:$/,
-    run: (world, m) => {
-      answersOf(world);
-      if (m[1] === 'contains') throw new Error('TypeDBLite answers rows, not documents');
-      // "does not contain" is vacuously true of no documents — and that would be a false pass.
-      throw new Error('TypeDBLite answers rows, not documents; the assertion cannot be evaluated');
+    run: (world, m, step) => {
+      const { documents } = answersOf(world);
+      // 🔴 "does not contain" is vacuously true of a read that answered rows — a false pass. A
+      // document assertion needs documents.
+      if (documents === undefined) throw new HarnessError('the query answered rows, not documents; a document assertion cannot be evaluated');
+      const expected = JSON.parse(docString(step)) as JsonValue;
+      const found = documents.some((document) => jsonEqual(document, expected));
+      if (m[1] === 'contains' && !found) {
+        throw new Error(`no answer is the document ${JSON.stringify(expected)}; answered: ${JSON.stringify(documents)}`);
+      }
+      if (m[1] === 'does not contain' && found) throw new Error(`an answer is the document ${JSON.stringify(expected)}`);
     },
   },
 ];
+
+/**
+ * TypeDB's own document equality — `jsons_equal_up_to_reorder` in `typedb/typedb`
+ * `tests/behaviour/steps/util.rs`, read 2026-11-11 rather than guessed (ADR-005 D2):
+ *
+ * - a number is an f64, equal within an ABSOLUTE `1e-10` (`equals_approximate`) — so `$k - 100`
+ *   answering `23.456789099999995` is the spec's `23.4567891`, as it is on TypeDB's own f64;
+ * - a list is a multiset: same length, each item matched to an unused item, greedily as TypeDB does;
+ * - an object's keys are unordered;
+ * - strings, booleans and null are exact.
+ */
+const jsonEqual = (a: JsonValue, b: JsonValue): boolean => {
+  if (typeof a === 'number' && typeof b === 'number') return Math.abs(a - b) < 1e-10;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return a === b;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    const used = new Set<number>();
+    return a.every((item) => {
+      const index = b.findIndex((candidate, i) => !used.has(i) && jsonEqual(item, candidate));
+      if (index < 0) return false;
+      used.add(index);
+      return true;
+    });
+  }
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => key in b && jsonEqual(a[key], b[key]));
+};
+
+const givenOf = (world: World): GivenRows => {
+  if (world.givenRows === undefined) throw new HarnessError('no given rows — run `set query given rows` first');
+  return world.givenRows;
+};
+
+/**
+ * A given-rows table: the header names each variable (`n: string` — the type is the query's to
+ * declare), a cell is `value:<type>:<text>` or `none` (absent). 🔴 A cell naming a TypeDB iid
+ * (`iid:entity:0:1`) is TypeDB's own storage numbering; nothing here can resolve one, and inventing
+ * a mapping would be guessing — the step fails instead.
+ */
+const givenRows = (rows: ReadonlyArray<ReadonlyArray<string>>): GivenRows => {
+  const [header, ...body] = rows;
+  const names = header.map((column) => column.split(':')[0].trim());
+  return body.map((row) =>
+    Object.fromEntries(
+      row.map((cell, index) => {
+        const text = cell.trim();
+        if (text === 'none') return [names[index], null];
+        const value = /^value:([\w-]+):(.*)$/.exec(text);
+        if (value === null) throw new HarnessError(`a given cell '${text}' names no value this harness can pass — a TypeDB iid cannot be resolved here`);
+        const [, type, raw] = value;
+        return [names[index], TypeDBLiteValue.value(type, type === 'decimal' ? raw.replace(/dec$/, '') : raw)];
+      }),
+    ),
+  );
+};
 
 const answersOf = (world: World) => {
   if (world.answers === undefined) throw new HarnessError('no answers — run `get answers of …` first');

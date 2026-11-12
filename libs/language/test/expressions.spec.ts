@@ -4,6 +4,7 @@ import { TypeQLiteValidationCode } from '../src/typeqlite-validation-codes.js';
 import {
   isBinaryExpression,
   isLetPattern,
+  isMatchStage,
   isNegationExpression,
   type LetPattern,
   type Pipeline,
@@ -21,7 +22,8 @@ const parses = (text: string): boolean => {
 
 const firstLet = (text: string): LetPattern => {
   const pipeline = parse(text).value.clauses[0] as Pipeline;
-  const pattern = pipeline.match!.patterns.find(isLetPattern);
+  const match = pipeline.stages.find(isMatchStage);
+  const pattern = match?.patterns.find(isLetPattern);
   if (!pattern) throw new Error('no let');
   return pattern;
 };

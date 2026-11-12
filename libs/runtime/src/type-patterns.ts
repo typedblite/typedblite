@@ -105,10 +105,9 @@ export function typeConstraintsOf(patterns: readonly Pattern[], refuse: Refuse):
         if (constraint.fixed !== undefined && constraint.fixed !== property.label) constraint.impossible = true;
         constraint.fixed = property.label;
       } else if (isSubProperty(property)) {
-        if (property.typeVariable !== undefined && !isTypePattern(pattern) && !property.type) {
-          // `$x sub $y` — two type variables in one relation; not this phase.
-          refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate `$x sub $y` with two type variables yet.', rangeOf(property));
-        }
+        // `$x sub $y` binds both: `$x` takes every label, `$y` that label and each above it (or its
+        // parent, for `sub!`) — reflexive, as TypeDB's `sub` is (match.feature L210, L5229). A later
+        // constraint on `$y` filters what this bound.
         // A repeated `sub` NARROWS — `$x sub writer; $x sub person;` is writer's family (review, round 1).
         constraint.subs.push({ type: property.type, variable: property.typeVariable, direct: property.direct === true });
       } else if (isOwnsProperty(property)) constraint.owns.push({ attribute: property.attribute, variable: property.attributeVariable });

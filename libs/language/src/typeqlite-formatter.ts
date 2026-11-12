@@ -204,7 +204,7 @@ export class TypeQLiteFormatter extends AbstractFormatter {
   /** Each stage begins a line; the stage itself decides how its patterns sit. */
   private formatPipeline(node: Pipeline): void {
     const f = this.getNodeFormatter(node);
-    const stages = [node.match, node.write, node.select].filter(
+    const stages = [...node.stages, node.fetch, node.returnStage].filter(
       (stage): stage is NonNullable<typeof stage> => stage !== undefined,
     );
     stages.forEach((stage, index) => {

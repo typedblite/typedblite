@@ -4,11 +4,14 @@ import {
   isDateLiteral,
   isDatetimeLiteral,
   isDatetimeTzLiteral,
+  isDurationLiteral,
   isComparisonPattern,
   isDecimalLiteral,
   isDoubleLiteral,
   isFunctionExpression,
+  isPipeline,
   isIntLiteral,
+  isLabelExpression,
   isLetPattern,
   isLiteralExpression,
   isNegationExpression,
@@ -16,12 +19,16 @@ import {
   isVariableExpression,
   type ComparisonPattern,
   type Expression,
+  type FunctionDefinition,
   type LetPattern,
   type Pattern,
 } from '@typedblite/language';
+import type { AstNode } from 'langium';
 import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf } from './diagnostics.js';
-import type { Refuse } from './schema-rules.js';
+import { callSchemaFunction, checkSchemaCall, isSchemaFunction, schemaFunctionWidth, type ArgumentShape, type SchemaArgument } from './schema-functions.js';
+import type { Refuse, SchemaFacts } from './schema-rules.js';
+import { canonicalTemporal, temporalArithmetic, temporalResultType, type TemporalValue } from './temporal.js';
 
 /**
  * Value expressions — Phase 06 of the conformance feature.
@@ -39,6 +46,7 @@ import type { Refuse } from './schema-rules.js';
 export type ValueType = 'integer' | 'double' | 'decimal' | 'string' | 'boolean' | 'date' | 'datetime' | 'datetime-tz' | 'duration';
 
 const NUMERIC_TYPES = new Set(['integer', 'long', 'double', 'decimal']);
+const VALUE_TYPE_NAMES = new Set(['integer', 'long', 'double', 'decimal', 'string', 'boolean', 'date', 'datetime', 'datetime-tz', 'duration']);
 /** Carried as text: a string, a boolean, and the temporal types this phase does not compute with. */
 const TEMPORAL_TYPES = new Set(['date', 'datetime', 'datetime-tz', 'duration']);
 const isNumericType = (valueType: string): boolean => NUMERIC_TYPES.has(valueType);
@@ -270,13 +278,6 @@ const BUILTINS: Readonly<Record<string, { namespace: string; arity: number }>> =
 function builtin(name: string, args: readonly Evaluated[], refuse: Refuse, at: Range | undefined): Evaluated {
   const separator = name.lastIndexOf('::');
   const bare = separator < 0 ? name : name.slice(separator + 2);
-  // `get_owns_doc(…)`, `get_fun_meta(…)` — TypeDB's metadata built-ins, which this engine does not
-  // have. Refused by NAME, not as "unknown": `get_fun_doc("no-such")` fails on TypeDB because the
-  // function does not exist, and an "unknown function" here would pass that scenario for the wrong
-  // reason (metadata.feature L833, Phase 06 audit).
-  if (/^get_\w+_(doc|meta)$/.test(bare)) {
-    return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate the metadata function '${name}' yet.`, at);
-  }
   // Own keys only: `constructor(1)` is not a built-in (review, round 11).
   const known = Object.prototype.hasOwnProperty.call(BUILTINS, bare) ? BUILTINS[bare] : undefined;
   if (known === undefined || (name.includes('::') && name !== `${known.namespace}::${bare}`)) {
@@ -374,6 +375,115 @@ function compareNumeric(a: Numeric, b: Numeric): number {
 
 export type Environment = (variable: string) => ValueBinding | undefined;
 
+/**
+ * What a schema function reads beyond values: the applied schema, and the label a type variable
+ * is bound to in this combination (`$ty label person; let $d = get_doc($ty);`).
+ */
+export interface SchemaContext {
+  readonly facts: SchemaFacts;
+  readonly typeOf: (variable: string) => string | undefined;
+  /** A variable's binding in this combination — a user function takes things as arguments. */
+  readonly bindingOf?: (variable: string) => ConceptBinding | undefined;
+  /** Run a query-local function on these arguments: every tuple it answers. */
+  readonly call?: (definition: FunctionDefinition, args: ReadonlyArray<ConceptBinding | undefined>, at: Range | undefined) => ReadonlyArray<ReadonlyArray<ValueBinding | undefined>>;
+}
+
+/** A thing by iid, a type by label, or a value — what a variable binds; `Binding` in `type-patterns.ts`. */
+export type ConceptBinding = number | string | ValueBinding;
+
+/**
+ * The query-local function a call names — `with fun get_names(…)` on a pipeline that encloses the
+ * call, or on the pipeline whose function body the call sits in — found from the AST alone.
+ */
+export function userFunctionOf(expression: Expression): FunctionDefinition | undefined {
+  if (!isFunctionExpression(expression)) return undefined;
+  const name = expression.function;
+  for (let node: AstNode | undefined = expression.$container; node !== undefined; node = node.$container) {
+    if (isPipeline(node)) {
+      const found = node.functions.find((f) => f.name === name);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+}
+
+/** What a function or a `return` answers: a stream or one tuple, of how many values, by reduction or not. */
+export interface ReturnShape {
+  readonly stream: boolean;
+  readonly reduce: boolean;
+  readonly width: number;
+}
+
+export const shapeOfFunction = (definition: FunctionDefinition): ReturnShape => ({
+  stream: definition.output.stream === true,
+  reduce: definition.body.returnStage.reductions.length > 0,
+  width: definition.output.types.length,
+});
+
+const bareName = (name: string): string => {
+  const separator = name.lastIndexOf('::');
+  return separator < 0 ? name : name.slice(separator + 2);
+};
+
+/** `get_doc(…)`, `label(…)` — a call `schema-functions.ts` answers, not `builtin`. */
+/** A call that takes concepts and answers tuples: a schema function, or a query-local one. */
+const isSchemaCall = (expression: Expression): boolean =>
+  isFunctionExpression(expression) && (isSchemaFunction(bareName(expression.function)) || userFunctionOf(expression) !== undefined);
+
+/**
+ * The variables a schema call takes as its own arguments — which may be TYPE variables, and so are
+ * exempt from the "a type is not an operand" refusal that applies everywhere else.
+ */
+function typeArgumentsOf(expression: Expression): string[] {
+  if (isSchemaCall(expression) && isFunctionExpression(expression)) {
+    return expression.arguments.flatMap((argument) => (isVariableExpression(argument) ? [argument.variable] : []));
+  }
+  if (isBinaryExpression(expression)) return [...typeArgumentsOf(expression.left), ...typeArgumentsOf(expression.right)];
+  if (isNegationExpression(expression)) return typeArgumentsOf(expression.operand);
+  if (isFunctionExpression(expression)) return expression.arguments.flatMap(typeArgumentsOf);
+  return [];
+}
+
+/** The variables passed straight to a query-local function — a thing among them is an argument, not an operand. */
+function userArgumentsOf(expression: Expression): string[] {
+  if (isFunctionExpression(expression)) {
+    const own = userFunctionOf(expression) === undefined ? [] : expression.arguments.flatMap((a) => (isVariableExpression(a) ? [a.variable] : []));
+    return [...own, ...expression.arguments.flatMap(userArgumentsOf)];
+  }
+  if (isBinaryExpression(expression)) return [...userArgumentsOf(expression.left), ...userArgumentsOf(expression.right)];
+  if (isNegationExpression(expression)) return userArgumentsOf(expression.operand);
+  return [];
+}
+
+/** Every tuple a schema call answers, its arguments resolved in this combination. */
+function schemaTuples(expression: Expression, env: Environment, refuse: Refuse, schema: SchemaContext | undefined): ReadonlyArray<ReadonlyArray<ValueBinding | undefined>> {
+  const at = rangeOf(expression);
+  if (!isFunctionExpression(expression)) return refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate this expression yet.', at);
+  if (schema === undefined) {
+    return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate '${expression.function}' here.`, at);
+  }
+  const definition = userFunctionOf(expression);
+  if (definition !== undefined) {
+    if (schema.call === undefined) return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate '${expression.function}' here.`, at);
+    // A variable passes what it binds — a thing, a type or a value; anything else is computed.
+    const args = expression.arguments.map((argument): ConceptBinding | undefined => {
+      if (isVariableExpression(argument)) return schema.bindingOf?.(argument.variable) ?? env(argument.variable);
+      const value = evaluate(argument, env, refuse, schema);
+      return { kind: 'value', valueType: value.valueType, value: value.text };
+    });
+    return schema.call(definition, args, at);
+  }
+  const args = expression.arguments.map((argument): SchemaArgument => {
+    if (isLabelExpression(argument)) return { kind: 'type', label: argument.label };
+    if (isVariableExpression(argument)) {
+      const label = schema.typeOf(argument.variable);
+      if (label !== undefined) return { kind: 'type', label };
+    }
+    return { kind: 'value', value: evaluate(argument, env, refuse, schema) };
+  });
+  return callSchemaFunction(expression.function, args, schema.facts, refuse, at).map((tuple) => tuple.map((v): ValueBinding => ({ kind: 'value', valueType: v.valueType, value: v.text })));
+}
+
 /** The variables an expression reads. */
 export function variablesOf(expression: Expression): string[] {
   if (isVariableExpression(expression)) return [expression.variable];
@@ -384,14 +494,14 @@ export function variablesOf(expression: Expression): string[] {
 }
 
 /** Evaluate an expression to a value; every variable it reads must be bound in `env`. */
-export function evaluate(expression: Expression, env: Environment, refuse: Refuse): Value {
-  const numeric = evaluateNumeric(expression, env, refuse);
+export function evaluate(expression: Expression, env: Environment, refuse: Refuse, schema?: SchemaContext): Value {
+  const numeric = evaluateNumeric(expression, env, refuse, schema);
   return numeric.kind === 'text' ? numeric.value : toValue(numeric);
 }
 
 type Evaluated = Numeric | { kind: 'text'; value: Value };
 
-function evaluateNumeric(expression: Expression, env: Environment, refuse: Refuse): Evaluated {
+function evaluateNumeric(expression: Expression, env: Environment, refuse: Refuse, schema?: SchemaContext): Evaluated {
   const at = rangeOf(expression);
   if (isLiteralExpression(expression)) {
     const literal = expression.literal;
@@ -404,9 +514,13 @@ function evaluateNumeric(expression: Expression, env: Environment, refuse: Refus
     if (isBooleanLiteral(literal)) return { kind: 'text', value: { valueType: 'boolean', text: literal.value } };
     // A temporal literal is carried as text, as a temporal attribute is: `$d == 2020-01-01`
     // compares as written (review, round 9); its arithmetic is refused by name where it is used.
-    if (isDateLiteral(literal)) return { kind: 'text', value: { valueType: 'date', text: literal.value } };
-    if (isDatetimeLiteral(literal)) return { kind: 'text', value: { valueType: 'datetime', text: literal.value } };
-    if (isDatetimeTzLiteral(literal)) return { kind: 'text', value: { valueType: 'datetime-tz', text: literal.value } };
+    // A temporal literal is checked as it is read — an out-of-range date, a zoned time in a gap or an
+    // overlap, a duration over the limit are refused here (expression.feature L692–L837) — and
+    // carried in its one spelling.
+    if (isDateLiteral(literal)) return { kind: 'text', value: { valueType: 'date', text: canonicalTemporal('date', literal.value, refuse, at) } };
+    if (isDatetimeLiteral(literal)) return { kind: 'text', value: { valueType: 'datetime', text: canonicalTemporal('datetime', literal.value, refuse, at) } };
+    if (isDatetimeTzLiteral(literal)) return { kind: 'text', value: { valueType: 'datetime-tz', text: canonicalTemporal('datetime-tz', literal.value, refuse, at) } };
+    if (isDurationLiteral(literal)) return { kind: 'text', value: { valueType: 'duration', text: canonicalTemporal('duration', literal.value, refuse, at) } };
     return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate a ${(literal as { $type: string }).$type} in an expression yet.`, at);
   }
   if (isVariableExpression(expression)) {
@@ -436,36 +550,57 @@ function evaluateNumeric(expression: Expression, env: Environment, refuse: Refus
     if (isLiteralExpression(operand) && isDecimalLiteral(operand.literal)) {
       return parseDecimal(`-${operand.literal.value}`, refuse, at);
     }
-    const value = numericOrRefuse(evaluateNumeric(operand, env, refuse), refuse, at);
+    const value = numericOrRefuse(evaluateNumeric(operand, env, refuse, schema), refuse, at);
     return arithmetic('-', { kind: 'integer', value: ZERO }, value, refuse, at);
   }
   if (isBinaryExpression(expression)) {
-    const left = evaluateNumeric(expression.left, env, refuse);
-    const right = evaluateNumeric(expression.right, env, refuse);
+    const left = evaluateNumeric(expression.left, env, refuse, schema);
+    const right = evaluateNumeric(expression.right, env, refuse, schema);
     if (left.kind === 'text' && right.kind === 'text' && expression.operator === '+' && left.value.valueType === 'string' && right.value.valueType === 'string') {
       return { kind: 'text', value: { valueType: 'string', text: left.value.text + right.value.text } };
     }
-    for (const side of [left, right]) {
-      if (side.kind === 'text' && TEMPORAL_TYPES.has(side.value.valueType)) {
-        return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${side.value.valueType} arithmetic yet.`, at);
-      }
+    // Dates, datetimes and durations add and subtract by TypeDB's table — `temporal.ts`.
+    if (left.kind === 'text' && right.kind === 'text' && TEMPORAL_TYPES.has(left.value.valueType) && TEMPORAL_TYPES.has(right.value.valueType)) {
+      const result = temporalArithmetic(expression.operator, left.value as TemporalValue, right.value as TemporalValue, refuse, at);
+      return { kind: 'text', value: result };
     }
     return arithmetic(expression.operator, numericOrRefuse(left, refuse, at), numericOrRefuse(right, refuse, at), refuse, at);
   }
+  if (isSchemaCall(expression)) {
+    // Inside an expression a schema call must be one value: `get_doc(person) + "!"`. A call that
+    // answers no row or a tuple has no single value to compute with.
+    const tuples = schemaTuples(expression, env, refuse, schema);
+    if (tuples.length !== 1 || tuples[0].length !== 1 || tuples[0][0] === undefined) {
+      return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate '${(expression as { function: string }).function}' inside an expression unless it answers exactly one value.`, at);
+    }
+    const [only] = tuples[0] as ValueBinding[];
+    return isNumericType(only.valueType) ? toNumeric(only.valueType, only.value, refuse, at) : { kind: 'text', value: { valueType: only.valueType as ValueType, text: only.value } };
+  }
   if (isFunctionExpression(expression)) {
-    return builtin(expression.function, expression.arguments.map((argument) => evaluateNumeric(argument, env, refuse)), refuse, at);
+    return builtin(expression.function, expression.arguments.map((argument) => evaluateNumeric(argument, env, refuse, schema)), refuse, at);
+  }
+  if (isLabelExpression(expression)) {
+    return refuse(DiagnosticCode.valueTypeConflict, `'${expression.label}' is a type, not a value, and cannot be an operand.`, at);
   }
   return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate this expression yet.`, at);
 }
 
 const numericOrRefuse = (evaluated: Evaluated, refuse: Refuse, at: Range | undefined): Numeric =>
   evaluated.kind === 'text'
-    ? TEMPORAL_TYPES.has(evaluated.value.valueType)
-      ? refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${evaluated.value.valueType} arithmetic yet.`, at)
-      : refuse(DiagnosticCode.valueTypeConflict, `A ${evaluated.value.valueType} is not a number and cannot be an operand here.`, at)
+    ? refuse(DiagnosticCode.valueTypeConflict, `A ${evaluated.value.valueType} is not a number and cannot be an operand here.`, at)
     : evaluated;
 
 /** `$a > 10`, `$v == $a` — over numbers by value, over strings and booleans by text. */
+/** Dates and datetimes, which order by instant — `temporalKey`. Zoned datetimes and durations do not yet. */
+const ORDERED_TEMPORAL = new Set(['date', 'datetime']);
+
+/** A date or datetime as one comparable text: a date is its midnight, seconds to the nanosecond. */
+export function temporalKey(text: string): string {
+  const [date, time = '00:00:00'] = text.split('T');
+  const [whole, fraction = ''] = time.split('.');
+  return `${date}T${whole}.${fraction.padEnd(9, '0')}`;
+}
+
 /** Strings order by Unicode code point, not UTF-16 code unit: `"𝔸"` (U+1D538) is above `"ﬀ"` (U+FB00) (review, round 14). */
 export function compareStrings(a: string, b: string): number {
   const x = Array.from(a);
@@ -482,10 +617,14 @@ export function compare(comparator: string, left: ValueBinding, right: Value, re
   let order: number;
   if (isNumericType(left.valueType) && isNumericType(right.valueType)) {
     order = compareNumeric(toNumeric(left.valueType, left.value, refuse, at), toNumeric(right.valueType, right.text, refuse, at));
+  } else if (ORDERED_TEMPORAL.has(left.valueType) && ORDERED_TEMPORAL.has(right.valueType)) {
+    // 🔴 By instant, not by text: `2020-01-01T00:00:00` and `…:00.000` are one instant and two
+    // texts (review, round 11), and a date is its midnight (modifiers.feature L458).
+    order = compareStrings(temporalKey(left.value), temporalKey(right.text));
   } else if (TEMPORAL_TYPES.has(left.valueType) || TEMPORAL_TYPES.has(right.valueType)) {
-    // A temporal comparison is refused by NAME, equality included: `2020-01-01T00:00:00` and
-    // `…:00.000` are one instant and two texts, and a text equality answering nothing is the
-    // silent shape ADR-002 D7 forbids (review, round 11). Temporal values are Phase 07's.
+    // A zoned datetime or a duration is refused by NAME, equality included — their comparison needs
+    // zone and calendar arithmetic, and a text equality answering nothing is the silent shape
+    // ADR-002 D7 forbids.
     return refuse(DiagnosticCode.notImplemented, `TypeDBLite does not compare ${TEMPORAL_TYPES.has(left.valueType) ? left.valueType : right.valueType} values yet.`, at);
   } else if (left.valueType === right.valueType && left.valueType === 'string') {
     order = compareStrings(left.value, right.text);
@@ -496,7 +635,11 @@ export function compare(comparator: string, left: ValueBinding, right: Value, re
     }
     order = left.value === right.text ? 0 : 1;
   } else {
-    return refuse(DiagnosticCode.valueTypeConflict, `Cannot compare a ${left.valueType} with a ${right.valueType}.`, at);
+    // 🔴 Reached only when the static check could not know the types — `has $r` may hold a string
+    // or an integer, row by row. A declared conflict is refused before any row (`checkComparison`);
+    // a value that merely turns out to be of another kind is not equal to it, and orders against it
+    // not at all: TypeDB answers `not { $r == 55; }` for the strings (negation.feature L436).
+    return comparator === '!=';
   }
   switch (comparator) {
     case '==': return order === 0;
@@ -525,18 +668,29 @@ export function inferValueType(expression: Expression, variableType: (variable: 
     if (isDateLiteral(literal)) return 'date';
     if (isDatetimeLiteral(literal)) return 'datetime';
     if (isDatetimeTzLiteral(literal)) return 'datetime-tz';
+    if (isDurationLiteral(literal)) return 'duration';
     return undefined;
   }
   if (isVariableExpression(expression)) return variableType(expression.variable);
   if (isNegationExpression(expression)) return inferValueType(expression.operand, variableType);
   if (isBinaryExpression(expression)) {
-    if (expression.operator === '/' || expression.operator === '^') return 'double';
     const left = inferValueType(expression.left, variableType);
     const right = inferValueType(expression.right, variableType);
+    if (left !== undefined && right !== undefined && (TEMPORAL_TYPES.has(left) || TEMPORAL_TYPES.has(right))) {
+      return temporalResultType(expression.operator, left, right);
+    }
+    if (expression.operator === '/' || expression.operator === '^') return 'double';
     if (left === 'string' || right === 'string') return 'string';
     if (left === 'double' || right === 'double') return 'double';
     if (left === 'decimal' || right === 'decimal') return 'decimal';
     return left === undefined || right === undefined ? undefined : 'integer';
+  }
+  if (isSchemaCall(expression)) {
+    // A query-local function's one output, when it names a value type; a schema function's string.
+    const definition = userFunctionOf(expression);
+    if (definition === undefined) return 'string';
+    const [only] = definition.output.types;
+    return definition.output.types.length === 1 && VALUE_TYPE_NAMES.has(only.type) ? only.type : undefined;
   }
   if (isFunctionExpression(expression)) {
     const separator = expression.function.lastIndexOf('::');
@@ -555,7 +709,7 @@ export function inferValueType(expression: Expression, variableType: (variable: 
  * match that binds nothing refuses `$a + "x"` as one with rows does (review, round 14). A type
  * the shape cannot infer is left to evaluation.
  */
-export function checkExpression(expression: Expression, variableType: (variable: string) => string | undefined, refuse: Refuse): void {
+export function checkExpression(expression: Expression, variableType: (variable: string) => string | undefined, refuse: Refuse, facts?: SchemaFacts): void {
   const at = rangeOf(expression);
   if (isLiteralExpression(expression)) {
     // A literal outside its range "fails to parse" (expression.feature L654–684) — a refusal
@@ -563,15 +717,35 @@ export function checkExpression(expression: Expression, variableType: (variable:
     evaluateNumeric(expression, () => undefined, refuse);
     return;
   }
+  if (isLabelExpression(expression)) {
+    refuse(DiagnosticCode.valueTypeConflict, `'${expression.label}' is a type, not a value, and cannot be an operand.`, at);
+    return;
+  }
+  if (isSchemaCall(expression) && isFunctionExpression(expression)) {
+    // A query-local function: its arity, and its arguments' own expressions.
+    const definition = userFunctionOf(expression);
+    if (definition !== undefined) {
+      if (expression.arguments.length !== definition.parameters.length) {
+        refuse(DiagnosticCode.functionArity, `Function '${definition.name}' expects '${definition.parameters.length}' arguments but received '${expression.arguments.length}'.`, at);
+      }
+      for (const argument of expression.arguments) if (!isVariableExpression(argument)) checkExpression(argument, variableType, refuse, facts);
+      return;
+    }
+    // Refused before any row, as every other expression is (QA, A3): `get_fun_…` by NAME, so
+    // metadata.feature L833 does not pass on an empty match for the wrong reason; the arity, the
+    // argument kinds, and an unknown label from their shapes. A variable's binding is per row.
+    const shapes = expression.arguments.map((argument): ArgumentShape => {
+      if (isLabelExpression(argument)) return { kind: 'label', label: argument.label };
+      if (isVariableExpression(argument)) return { kind: 'variable' };
+      checkExpression(argument, variableType, refuse, facts);
+      return { kind: 'value', valueType: inferValueType(argument, variableType) };
+    });
+    checkSchemaCall(expression.function, shapes, facts, refuse, at);
+    return;
+  }
   if (isFunctionExpression(expression)) {
     const separator = expression.function.lastIndexOf('::');
     const bare = separator < 0 ? expression.function : expression.function.slice(separator + 2);
-    if (/^get_\w+_(doc|meta)$/.test(bare)) {
-      // Refused by NAME before any row (QA, A3): metadata.feature L833 must not pass on an
-      // empty match for the wrong reason.
-      refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate the metadata function '${expression.function}' yet.`, at);
-      return;
-    }
     const known = Object.prototype.hasOwnProperty.call(BUILTINS, bare) ? BUILTINS[bare] : undefined;
     if (known === undefined || (expression.function.includes('::') && expression.function !== `${known.namespace}::${bare}`)) {
       refuse(DiagnosticCode.unknownFunction, `Unknown function '${expression.function}'.`, at);
@@ -580,13 +754,13 @@ export function checkExpression(expression: Expression, variableType: (variable:
     if (expression.arguments.length !== known.arity) {
       refuse(DiagnosticCode.functionArity, `Function '${bare}' expects '${known.arity}' arguments but received '${expression.arguments.length}'.`, at);
     }
-    for (const argument of expression.arguments) checkExpression(argument, variableType, refuse);
+    for (const argument of expression.arguments) checkExpression(argument, variableType, refuse, facts);
     // The argument kinds, as `builtin` checks them with a value (review, round 15).
     const kinds = expression.arguments.map((argument) => inferValueType(argument, variableType));
     const qualified = `${known.namespace}::${bare}`;
     const [first, second] = kinds;
     for (const kind of kinds) {
-      if (kind !== undefined && TEMPORAL_TYPES.has(kind)) refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${kind} arithmetic yet.`, at);
+      if (kind !== undefined && TEMPORAL_TYPES.has(kind)) refuse(DiagnosticCode.valueTypeConflict, `Built-in function '${qualified}' cannot be applied to arguments of type '${kind}'.`, at);
     }
     if (bare === 'len') {
       if (first !== undefined && first !== 'string') refuse(DiagnosticCode.valueTypeConflict, `Built-in function '${qualified}' cannot be applied to arguments of type '${first}'.`, at);
@@ -605,35 +779,38 @@ export function checkExpression(expression: Expression, variableType: (variable:
       evaluateNumeric(expression, () => undefined, refuse);
       return;
     }
-    checkExpression(expression.operand, variableType, refuse);
+    checkExpression(expression.operand, variableType, refuse, facts);
     const type = inferValueType(expression.operand, variableType);
-    if (type !== undefined && TEMPORAL_TYPES.has(type)) refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${type} arithmetic yet.`, at);
     if (type !== undefined && !isNumericType(type)) refuse(DiagnosticCode.valueTypeConflict, `A ${type} is not a number and cannot be negated.`, at);
     return;
   }
   if (isBinaryExpression(expression)) {
-    checkExpression(expression.left, variableType, refuse);
-    checkExpression(expression.right, variableType, refuse);
+    checkExpression(expression.left, variableType, refuse, facts);
+    checkExpression(expression.right, variableType, refuse, facts);
     const left = inferValueType(expression.left, variableType);
     const right = inferValueType(expression.right, variableType);
     if (left === undefined || right === undefined) return;
     if (expression.operator === '+' && left === 'string' && right === 'string') return;
-    for (const type of [left, right]) {
-      if (TEMPORAL_TYPES.has(type)) {
-        refuse(DiagnosticCode.notImplemented, `TypeDBLite does not evaluate ${type} arithmetic yet.`, at);
+    if (TEMPORAL_TYPES.has(left) || TEMPORAL_TYPES.has(right)) {
+      if (temporalResultType(expression.operator, left, right) === undefined) {
+        refuse(DiagnosticCode.valueTypeConflict, `There is no '${expression.operator}' for a ${left} and a ${right}.`, at);
       }
+      return;
+    }
+    for (const type of [left, right]) {
       if (!isNumericType(type)) refuse(DiagnosticCode.valueTypeConflict, `A ${type} is not a number and cannot be an operand here.`, at);
     }
   }
 }
 
 /** A comparison's two sides can be compared at all — checked from their inferred types (review, round 14). */
-export function checkComparison(comparison: ComparisonPattern, variableType: (variable: string) => string | undefined, refuse: Refuse): void {
-  checkExpression(comparison.right, variableType, refuse);
+export function checkComparison(comparison: ComparisonPattern, variableType: (variable: string) => string | undefined, refuse: Refuse, facts?: SchemaFacts): void {
+  checkExpression(comparison.right, variableType, refuse, facts);
   const left = variableType(comparison.left);
   const right = inferValueType(comparison.right, variableType);
   if (left === undefined || right === undefined) return;
   const at = rangeOf(comparison);
+  if (ORDERED_TEMPORAL.has(left) && ORDERED_TEMPORAL.has(right)) return;
   if (TEMPORAL_TYPES.has(left) || TEMPORAL_TYPES.has(right)) {
     refuse(DiagnosticCode.notImplemented, `TypeDBLite does not compare ${TEMPORAL_TYPES.has(left) ? left : right} values yet.`, at);
   }
@@ -679,6 +856,10 @@ export function orderValueStatements(
   refuse: Refuse,
   conceptOf: (variable: string) => 'thing' | 'type' | undefined = () => undefined,
   attributeType: (variable: string) => string | undefined = () => undefined,
+  /** The applied schema, so a schema call's label is checked before any row. */
+  facts?: SchemaFacts,
+  /** What earlier stages bound — a `let` may not reassign one (given.feature L153). */
+  previous: ReadonlySet<string> = new Set(),
 ): ValueStatements {
   const lets = patterns.filter(isLetPattern);
   const comparisons = patterns.filter(isComparisonPattern);
@@ -693,10 +874,17 @@ export function orderValueStatements(
     return inferValueType(expression, (v) => variableType(v, new Set([...seen, variable])));
   };
   // A thing or a type read as an operand is refused HERE, before any combination — a match with
-  // no answers refuses it too (review, round 11).
+  // no answers refuses it too (review, round 11). A schema call's own argument may be a type
+  // (`get_doc($ty)`), and is checked when it is called.
   for (const statement of [...lets, ...comparisons]) {
+    const expression = isLetPattern(statement) ? statement.expression : statement.right;
+    const typeArguments = new Set(typeArgumentsOf(expression));
     const reads = isLetPattern(statement) ? variablesOf(statement.expression) : [statement.left, ...variablesOf(statement.right)];
+    const userArguments = new Set(userArgumentsOf(expression));
     for (const variable of reads) {
+      if (typeArguments.has(variable) && conceptOf(variable) === 'type') continue;
+      // A query-local function takes things too: `get_names($p)` passes the person.
+      if (userArguments.has(variable)) continue;
       const concept = conceptOf(variable);
       if (concept !== undefined) {
         refuse(DiagnosticCode.valueTypeConflict, `The variable '${variable.slice(1)}' is a ${concept}, not a value, and cannot be an operand.`, rangeOf(statement));
@@ -704,20 +892,40 @@ export function orderValueStatements(
     }
   }
   for (const statement of lets) {
-    if (assigned.has(statement.variable)) {
-      refuse(
-        DiagnosticCode.valueAssignedTwice,
-        `Variable '${statement.variable.slice(1)}' cannot be assigned to multiple times in the same branch.`,
-        rangeOf(statement),
-      );
+    checkLetShape(statement, refuse);
+    // `let $x = ident($x)` passes `$x` to the function that would assign it — read before it is bound
+    // (variables.feature L284), where an operand reading itself is a cycle (expression.feature L195).
+    const ownArgument = userArgumentsOf(statement.expression).find((variable) => letVariables(statement).includes(variable));
+    if (ownArgument !== undefined) {
+      refuse(DiagnosticCode.unboundValue, `The variable '${ownArgument.slice(1)}' must be bound to a value before it's used.`, rangeOf(statement));
     }
-    assigned.add(statement.variable);
-    if (bound.has(statement.variable)) {
-      refuse(
-        DiagnosticCode.mixedPattern,
-        `The variable '${statement.variable.slice(1)}' cannot be declared as both a 'Value' and as a 'Attribute'.`,
-        rangeOf(statement),
-      );
+    const joins = attributeOutputs(statement);
+    for (const [index, variable] of letVariables(statement).entries()) {
+      // A function answering ATTRIBUTES binds attribute variables: one bound already is joined on
+      // (disjunction.feature L172), not reassigned.
+      if (joins[index] && bound.has(variable)) continue;
+      if (assigned.has(variable)) {
+        refuse(
+          DiagnosticCode.valueAssignedTwice,
+          `Variable '${variable.slice(1)}' cannot be assigned to multiple times in the same branch.`,
+          rangeOf(statement),
+        );
+      }
+      assigned.add(variable);
+      if (previous.has(variable)) {
+        refuse(
+          DiagnosticCode.valueAssignedTwice,
+          `The variable '${variable.slice(1)}' may not be assigned to, as it was already bound in a previous stage.`,
+          rangeOf(statement),
+        );
+      }
+      if (bound.has(variable)) {
+        refuse(
+          DiagnosticCode.mixedPattern,
+          `The variable '${variable.slice(1)}' cannot be declared as both a 'Value' and as a 'Attribute'.`,
+          rangeOf(statement),
+        );
+      }
     }
   }
   const reads = (statement: LetPattern | ComparisonPattern): string[] =>
@@ -733,8 +941,8 @@ export function orderValueStatements(
       }
     }
   }
-  for (const statement of lets) checkExpression(statement.expression, variableType, refuse);
-  for (const comparison of comparisons) checkComparison(comparison, variableType, refuse);
+  for (const statement of lets) checkExpression(statement.expression, variableType, refuse, facts);
+  for (const comparison of comparisons) checkComparison(comparison, variableType, refuse, facts);
   // Dependency order: a `let` is ready when everything it reads is a concept variable or an
   // already-ordered `let`. Nothing ready while some remain is a cycle.
   const ordered: LetPattern[] = [];
@@ -751,24 +959,67 @@ export function orderValueStatements(
     }
     const [statement] = pending.splice(index, 1);
     ordered.push(statement);
-    ready.add(statement.variable);
+    for (const variable of letVariables(statement)) ready.add(variable);
   }
   return { lets: ordered, comparisons };
 }
 
+/** For each variable a `let` binds, whether it receives an ATTRIBUTE — a query-local function's output named by an attribute type. */
+function attributeOutputs(statement: LetPattern): boolean[] {
+  const definition = userFunctionOf(statement.expression);
+  return letVariables(statement).map((_, i) => {
+    const type = definition?.output.types[i]?.type;
+    return type !== undefined && !VALUE_TYPE_NAMES.has(type);
+  });
+}
+
+/** Every variable a `let` binds — one for `let $v = …`, the whole tuple for `let $k, $v in …`. */
+export const letVariables = (statement: LetPattern): string[] => [statement.variable, ...statement.others];
+
+/**
+ * A `let` binds as many variables as its expression answers values: `let $doc = get_doc(…)` one,
+ * `let $k, $v in get_all_meta(…)` two. 🔴 `in` iterates — over a schema call's tuples here; over a
+ * list it is not implemented, and refused by name rather than read as `=`.
+ */
+function checkLetShape(statement: LetPattern, refuse: Refuse): void {
+  const at = rangeOf(statement);
+  const width = letVariables(statement).length;
+  const call = isSchemaCall(statement.expression) && isFunctionExpression(statement.expression) ? statement.expression : undefined;
+  if (statement.iterate && call === undefined) {
+    refuse(DiagnosticCode.notImplemented, 'TypeDBLite does not evaluate `let … in` over anything but a function yet.', at);
+  }
+  if (!statement.iterate && width > 1) {
+    refuse(DiagnosticCode.mixedPattern, '`let $a, $b = …` assigns one value; a tuple is bound with `let $a, $b in …`.', at);
+  }
+  if (call === undefined) return;
+  const definition = userFunctionOf(call);
+  const shape = definition === undefined ? undefined : shapeOfFunction(definition);
+  // A stream is iterated: `let $x = f()` of a `-> { T }` function has no one value to assign.
+  if (shape?.stream && !statement.iterate) {
+    refuse(DiagnosticCode.valueTypeConflict, `'${call.function}' returns a stream; bind its answers with \`let ${letVariables(statement).join(', ')} in ${call.function}(…)\`.`, at);
+  }
+  const answers = shape === undefined ? schemaFunctionWidth(bareName(call.function)) : shape.width;
+  if (answers !== width) {
+    refuse(DiagnosticCode.valueTypeConflict, `'${call.function}' answers ${answers} value(s) per row, and ${width} variable(s) are bound to it.`, at);
+  }
+}
+
 /**
  * Apply the value statements to one combination: each `let` (already in dependency order) binds
- * its variable; each comparison filters. Returns `false` when a comparison does not hold. A
- * concept variable read as a value must carry one — a thing or a type is refused.
+ * its variables; each comparison filters. Answers every extension that survives — none when a
+ * comparison does not hold or a schema call answers nothing, several when one answers several
+ * tuples (`let $k, $v in get_all_meta(person)`). A concept variable read as a value must carry
+ * one — a thing or a type is refused, except as a schema call's own argument.
  */
 export function applyValueStatements(
   statements: ValueStatements,
-  bindings: Map<string, ValueBinding>,
+  bindings: ReadonlyMap<string, ValueBinding>,
   concept: (variable: string) => 'thing' | 'type' | undefined,
   refuse: Refuse,
-): boolean {
-  const env: Environment = (variable) => {
-    const bound = bindings.get(variable);
+  schema?: SchemaContext,
+): Array<Map<string, ValueBinding>> {
+  const envOf = (values: ReadonlyMap<string, ValueBinding>): Environment => (variable) => {
+    const bound = values.get(variable);
     if (bound === undefined) {
       const kind = concept(variable);
       if (kind !== undefined) {
@@ -781,23 +1032,52 @@ export function applyValueStatements(
     }
     return bound;
   };
+  const bind = (values: Map<string, ValueBinding>, variables: readonly string[], tuple: ReadonlyArray<Value>): Map<string, ValueBinding> => {
+    const next = new Map(values);
+    variables.forEach((variable, i) => next.set(variable, { kind: 'value', valueType: tuple[i].valueType, value: tuple[i].text }));
+    return next;
+  };
+  let rows: Array<Map<string, ValueBinding>> = [new Map(bindings)];
   for (const statement of statements.lets) {
-    const value = evaluate(statement.expression, env, refuse);
-    bindings.set(statement.variable, { kind: 'value', valueType: value.valueType, value: value.text });
+    rows = rows.flatMap((values) => {
+      const env = envOf(values);
+      if (isSchemaCall(statement.expression)) {
+        return schemaTuples(statement.expression, env, refuse, schema).flatMap((tuple) => {
+          const next = new Map(values);
+          for (const [i, variable] of letVariables(statement).entries()) {
+            const answered = tuple[i];
+            if (answered === undefined) continue;
+            const already = values.get(variable);
+            // Bound already (an attribute the match joined on): the answer must BE it, or the row goes.
+            if (already !== undefined) {
+              const same = already.kind === answered.kind && already.value === answered.value && (already.kind === 'attribute' ? already.attributeType === (answered as typeof already).attributeType : already.valueType === answered.valueType);
+              if (!same) return [];
+              continue;
+            }
+            next.set(variable, answered);
+          }
+          return [next];
+        });
+      }
+      return [bind(values, [statement.variable], [evaluate(statement.expression, env, refuse, schema)])];
+    });
   }
-  for (const comparison of statements.comparisons) {
-    const left = env(comparison.left);
-    if (left === undefined) {
-      return refuse(
-        DiagnosticCode.unboundValue,
-        `The variable '${comparison.left.slice(1)}' must be bound to a value before it's used.`,
-        rangeOf(comparison),
-      );
+  return rows.filter((values) => {
+    const env = envOf(values);
+    for (const comparison of statements.comparisons) {
+      const left = env(comparison.left);
+      if (left === undefined) {
+        return refuse(
+          DiagnosticCode.unboundValue,
+          `The variable '${comparison.left.slice(1)}' must be bound to a value before it's used.`,
+          rangeOf(comparison),
+        );
+      }
+      const right = evaluate(comparison.right, env, refuse, schema);
+      if (!compare(comparison.comparator, left, right, refuse, rangeOf(comparison))) return false;
     }
-    const right = evaluate(comparison.right, env, refuse);
-    if (!compare(comparison.comparator, left, right, refuse, rangeOf(comparison))) return false;
-  }
-  return true;
+    return true;
+  });
 }
 
 export { arithmetic as operate, compareNumeric as compareValues, toNumeric as numericOf, toValue as valueOf };

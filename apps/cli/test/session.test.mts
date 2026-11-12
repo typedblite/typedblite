@@ -27,6 +27,14 @@ describe('splitting TypeQLite into statements', () => {
     );
   });
 
+  it('modifier stages and a fetch continue the pipeline they follow', () => {
+    assert.deepEqual(splitStatements('match $p isa person, has age $a; select $a; sort $a desc; offset 1; limit 2;\nmatch $q isa person; select $q;'), [
+      'match $p isa person, has age $a; select $a; sort $a desc; offset 1; limit 2;',
+      'match $q isa person; select $q;',
+    ]);
+    assert.equal(splitStatements('match $p isa person; sort $p; fetch { "p": $p.name };').length, 1);
+  });
+
   it('a reduce ends a pipeline, after a select or on its own — Phase 06 review, round 4', () => {
     assert.deepEqual(splitStatements('match $p isa person, has age $a; select $a; reduce $s = sum($a);\nmatch $q isa person; select $q;'), [
       'match $p isa person, has age $a; select $a; reduce $s = sum($a);',

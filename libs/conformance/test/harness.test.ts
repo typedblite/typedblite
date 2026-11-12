@@ -84,6 +84,13 @@ describe('the row model cannot flatter an identification', () => {
   it('attr: reads the type from the cell itself, not from the query', () => {
     assert.equal(identifierMatches(parseIdentifier('attr:name:Alice'), row, 'n', has), true);
     assert.equal(identifierMatches(parseIdentifier('attr:email:Alice'), row, 'n', has), false);
+    // By value when the attribute's value type is known, as a driver parses the literal (given.feature L100).
+    const decimal = { d: TypeDBLiteValue.attribute('price', '1.5') };
+    const typed = () => 'decimal';
+    assert.equal(identifierMatches(parseIdentifier('attr:price:1.50dec'), decimal, 'd', has, typed), true);
+    assert.equal(identifierMatches(parseIdentifier('attr:price:1.51dec'), decimal, 'd', has, typed), false);
+    const zoned = { z: TypeDBLiteValue.attribute('at', '2024-09-20T16:40:05.000000001+01:00') };
+    assert.equal(identifierMatches(parseIdentifier('attr:at:2024-09-20T16:40:05.000000001+0100'), zoned, 'z', has, () => 'datetime-tz'), true);
     assert.equal(identifierMatches(parseIdentifier('attr:name:Bob'), row, 'n', has), false);
     // 🔴 The subtype case the old query-text reading could not close: a `first-name` answered for
     // `has name $n` is a `first-name` cell, and `attr:name:` does not match it.
@@ -323,19 +330,21 @@ describe('a scenario cannot pass without reaching its assertion', () => {
     assert.match(result.failure?.reason ?? '', /evaluated nothing/);
   });
 
-  it('answers of a write are not fabricated — TypeDBLite answers nothing from a write, and says so', () => {
-    const [result] = runFeature(
-      feature(scenario('x', [
-        ...open('schema'),
-        step('typeql schema query', { docString: SCHEMA }),
-        step('get answers of typeql write query', { docString: 'insert $p isa person, has ref 1;' }),
-        step('answer size is: 0'),
-      ])),
-      noDeclarations,
-    );
-    assert.equal(result.outcome, 'fail');
-    assert.equal(result.failure?.step.text, 'get answers of typeql write query');
-    assert.match(result.failure?.reason ?? '', /answers nothing from a write/);
+  it('answers of a write are the engine\'s — the row it wrote, never an invented empty set', () => {
+    const run = (size: number) =>
+      runFeature(
+        feature(scenario('x', [
+          ...open('schema'),
+          step('typeql schema query', { docString: SCHEMA }),
+          step('get answers of typeql write query', { docString: 'insert $p isa person, has ref 1;' }),
+          step(`answer size is: ${size}`),
+        ])),
+        noDeclarations,
+      )[0];
+    assert.equal(run(1).outcome, 'pass');
+    // 🔴 The shape this test used to guard: `update.feature` asserts `answer size is: 0` after a
+    // write, which an invented empty set would satisfy. The insert answered one row.
+    assert.equal(run(0).outcome, 'fail');
   });
 
   it('"evaluated nothing" does not satisfy a "fails" step either — the hollow pass must not move over', () => {
@@ -401,6 +410,12 @@ describe('a scenario cannot pass without reaching its assertion', () => {
       'verify answer set is equivalent for query',
       'answer contains document:',
       'set time-zone: Europe/London',
+      // The five `given rows` forms — given.feature.
+      'set query given rows',
+      'get answers of typeql read query with given rows',
+      'get answers of typeql write query with given rows',
+      'typeql read query with given rows; fails with a message containing: "x"',
+      'typeql write query with given rows; fails with a message containing: "x"',
     ]) {
       assert.doesNotThrow(() => findStep(text), text);
     }
@@ -408,16 +423,48 @@ describe('a scenario cannot pass without reaching its assertion', () => {
       'typeql delete',
       'each answer satisfies',
       'get answers of templated typeql read query',
-      // The five `given rows` forms — `given.feature`, 64 uses. Unbound until Phase 03+ decides
-      // what a given stage means here; hidden today only because every Background fails first.
-      'set query given rows',
-      'get answers of typeql read query with given rows',
-      'get answers of typeql write query with given rows',
-      'typeql read query with given rows; fails with a message containing: "x"',
-      'typeql write query with given rows; fails with a message containing: "x"',
     ]) {
       assert.throws(() => findStep(text), UndefinedStep, text);
     }
+  });
+});
+
+describe('documents are compared as TypeDB compares them', () => {
+  // `typedb/typedb` tests/behaviour/steps/util.rs, `jsons_equal_up_to_reorder` — read 2026-11-11.
+  const FETCH = `define
+attribute ref, value integer;
+attribute nick, value string;
+attribute karma, value double;
+entity person, owns ref @key, owns nick @card(0..), owns karma;`;
+  const outcome = (fetch: string, assertion: string, expected: string) =>
+    runFeature(
+      feature(scenario('x', [
+        ...open('schema'),
+        step('typeql schema query', { docString: FETCH }),
+        step('typeql write query', { docString: 'insert $p isa person, has ref 1, has nick "a", has nick "b", has karma 123.4567891;' }),
+        step('get answers of typeql read query', { docString: fetch }),
+        step(assertion, { docString: expected }),
+      ])),
+      noDeclarations,
+    )[0];
+
+  it('a number is within 1e-10, absolutely — f64 arithmetic is not the written decimal', () => {
+    const fetch = 'match $p isa person, has karma $k; fetch { "k": $k - 100 };';
+    assert.equal(outcome(fetch, 'answer contains document:', '{ "k": 23.4567891 }').outcome, 'pass');
+    assert.equal(outcome(fetch, 'answer contains document:', '{ "k": 23.4567892 }').outcome, 'fail');
+  });
+
+  it('a list is a multiset; an object’s keys are unordered', () => {
+    const fetch = 'match $p isa person; fetch { "r": $p.ref, "n": [ $p.nick ] };';
+    assert.equal(outcome(fetch, 'answer contains document:', '{ "n": [ "b", "a" ], "r": 1 }').outcome, 'pass');
+    assert.equal(outcome(fetch, 'answer contains document:', '{ "n": [ "a", "a" ], "r": 1 }').outcome, 'fail');
+    assert.equal(outcome(fetch, 'answer does not contain document:', '{ "n": [ "a" ], "r": 1 }').outcome, 'pass');
+  });
+
+  it('a document assertion is never satisfied by rows — "does not contain" would be vacuous', () => {
+    const result = outcome('match $p isa person;', 'answer does not contain document:', '{ "r": 1 }');
+    assert.equal(result.outcome, 'fail');
+    assert.match(result.failure?.reason ?? '', /rows, not documents/);
   });
 });
 
