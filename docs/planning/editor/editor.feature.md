@@ -139,7 +139,8 @@ installed into VS Code 1.146.0, 16 of 16 passing.
   have to run inside the editor's own Node. It is the natural next feature, and it would depend on
   this one's extension shell. If it is taken on, **that** is when an initiative earns its place.
 - **A debugger.** The interpreter executes eagerly against SQLite. Nothing in it suspends and
-  resumes.
+  resumes. Now proposed as its own feature, [TypeQLite Debugger](../debugger/debugger.feature.md),
+  which works around this without making the interpreter suspend.
 - **New grammar constructs.** See invariant 4.
 - **Marketplace publishing.** This involves a publisher id, the extension's display name next to
   TypeDB's own TypeQL extension, and licence review. The `.vsix` is the deliverable here.
