@@ -1,6 +1,6 @@
 ---
 kind: feature
-status: in-progress
+status: complete
 decided-by: [adr-008]
 title: TypeQLite Editor
 feature: editor
@@ -9,7 +9,7 @@ branch: feat/editor
 
 # TypeQLite Editor — Feature Doc
 
-> **Status:** 🔨 In progress · **Written:** 2026-11-12 · **Branch:** `feat/editor`, from `main` ·
+> **Status:** ✅ Complete, 2026-11-12 · **Written:** 2026-11-12 · **Branch:** `feat/editor`, from `main` ·
 > **Governed by:** [ADR-008](../../architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md)
 >
 > Request, 2026-11-12: *a Langium-powered TypeQLite editor in a VS Code extension.*
@@ -103,29 +103,33 @@ for *how* an existing construct resolves. It is not a caller for any new constru
 
 ## Definition of done
 
-- [ ] The built extension, installed into a real editor, shows a validator diagnostic, formats a
-      document, and returns semantic tokens. This is asserted by the e2e harness, not inferred from
-      unit specs.
-- [ ] A `sub`, an `owns` and a `plays` that name a type in another workspace file resolve. Deleting
-      that file turns each into an unresolved-reference diagnostic.
-- [ ] Definition, references, outline, hover and folding each have a language-service spec over a
-      multi-document workspace, **and** an e2e assertion.
-- [ ] A query label resolves to its schema definition across files. Semantic tokens tell a resolved
+Each item, with where it is proven. "e2e" means `nx run typeqlite-vscode:e2e`: the packaged `.vsix`,
+installed into VS Code 1.146.0, 16 of 16 passing.
+
+- [x] The built extension, installed into a real editor, shows a validator diagnostic, formats a
+      document, and returns semantic tokens. *e2e (Phase 01).*
+- [x] A `sub`, an `owns` and a `plays` that name a type in another workspace file resolve. Deleting
+      that file turns each into an unresolved-reference diagnostic. *`workspace-scope.spec.ts`; e2e
+      deletes a file on disk (Phase 02).*
+- [x] Definition, references, outline, hover and folding each have a language-service spec over a
+      multi-document workspace, **and** an e2e assertion. *`navigation.spec.ts`; e2e (Phase 03).*
+- [x] A query label resolves to its schema definition across files. Semantic tokens tell a resolved
       label from an unresolved one, asserted through `vscode.provideDocumentSemanticTokens` in the
-      extension host. That proves the resolved path ran: the TextMate grammar cannot know the
-      difference.
-- [ ] In a workspace that defines types, an unknown pipeline label is a warning. In a workspace that
-      defines none, it reports nothing (ADR-008 D6).
-- [ ] Completion offers, after `owns`, the workspace's attribute types; after `relation:`, only
-      that relation's roles; and the grammar's keywords where a keyword fits.
-- [ ] Each quick fix has a spec showing the fixed document re-validates clean. A rename across
-      files leaves every file parsing and resolving.
-- [ ] 🔴 The conformance run is unchanged, at **1742 of 1756** with `baseline.json` untouched, and
-      the runtime and CLI suites are green.
-- [ ] `nx run typeqlite-vscode:package` produces a `.vsix`, and the e2e installs *that* artifact
-      rather than a source tree.
-- [ ] `AGENTS.md`'s layout and dependency graph, and the project overview memory, name the new app.
-- [ ] Build, typecheck and test are green for everything touched.
+      extension host. *`labels.spec.ts`; e2e (Phases 04 and 07).*
+- [x] In a workspace that defines types, an unknown pipeline label is a warning. In a workspace that
+      defines none, it reports nothing (ADR-008 D6). *`labels.spec.ts`; the warning in e2e (Phase 04).*
+- [x] Completion offers, after `owns`, the workspace's attribute types; after `relation:`, only
+      that relation's roles; and the grammar's keywords where a keyword fits. *`completion.spec.ts`;
+      e2e (Phase 05).*
+- [x] Each quick fix has a spec showing the fixed document re-validates clean. A rename across
+      files leaves every file parsing and resolving. *`edits.spec.ts`; e2e (Phase 06).*
+- [x] 🔴 The conformance run is unchanged, at **1742 of 1756** with `baseline.json` untouched, and
+      the runtime and CLI suites are green. *Every phase, from a clean tree since Phase 02.*
+- [x] `nx run typeqlite-vscode:package` produces a `.vsix`, and the e2e installs *that* artifact
+      rather than a source tree. *Phase 07.*
+- [x] `AGENTS.md`'s layout and dependency graph, and the project overview memory, name the new app.
+      *Phases 01 and 07.*
+- [x] Build, typecheck and test are green for everything touched. *1278 tests, from a clean tree.*
 
 ## Out of scope
 
@@ -171,7 +175,7 @@ the end (invariant 1).
 | 04 | [Query-side labels: pipeline type labels resolve against the schema](phases/04-query-labels/summary.md) | Complete | [summary](phases/04-query-labels/summary.md) |
 | 05 | [Completion](phases/05-completion/summary.md) | Complete | [summary](phases/05-completion/summary.md) |
 | 06 | [Code actions and rename](phases/06-code-actions-rename/summary.md) | Complete | [summary](phases/06-code-actions-rename/summary.md) |
-| 07 | Packaging: the `.vsix` target, install path, and docs | ⬜ Not started | — |
+| 07 | [Packaging: the `.vsix` target, install path, and docs](phases/07-packaging/summary.md) | Complete | [summary](phases/07-packaging/summary.md) |
 
 Phase 00 kept the numbering. The phases after it are still a forward plan, and each checklist is written when its phase starts.
 

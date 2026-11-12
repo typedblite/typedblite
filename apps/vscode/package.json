@@ -5,6 +5,11 @@
   "version": "0.0.1",
   "publisher": "typedblite",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dave-jackson-dev/typedblite.git",
+    "directory": "apps/vscode"
+  },
   "type": "module",
   "engines": {
     "vscode": "^1.91.0"

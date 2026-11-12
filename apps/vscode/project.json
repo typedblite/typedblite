@@ -60,12 +60,31 @@
     "e2e": {
       "executor": "nx:run-commands",
       "dependsOn": [
-        "build"
+        "package"
       ],
       "options": {
-        "command": "node esbuild.e2e.mjs && node e2e/out/run.cjs",
+        "command": "node esbuild.e2e.mjs && node e2e/out/run.cjs dist/typeqlite-0.0.1.vsix",
         "cwd": "apps/vscode"
       }
+    },
+    "package": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "sync-grammar",
+        "^build"
+      ],
+      "options": {
+        "commands": [
+          "node esbuild.mjs --minify",
+          "mkdir -p dist",
+          "vsce package --no-dependencies --skip-license --out dist/typeqlite-0.0.1.vsix"
+        ],
+        "parallel": false,
+        "cwd": "apps/vscode"
+      },
+      "outputs": [
+        "{projectRoot}/dist"
+      ]
     }
   }
 }

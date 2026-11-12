@@ -15,6 +15,7 @@ TypeDB's native server is a standalone Rust binary. TypeDBLite brings the same p
 | [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
 | [`typedblite-conformance`](libs/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
 | [`typedblite-cli`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
+| [`typeqlite` (VS Code extension)](apps/vscode/) | The TypeQLite editor: diagnostics, cross-file navigation, hover, completion, rename, quick fixes, formatting and semantic highlighting, from a Langium language server that runs the language library unchanged (ADR-008). |
 
 ## Quick start
 
@@ -37,6 +38,13 @@ Start the interactive REPL:
 
 ```bash
 node apps/cli/out/main.js --repl
+```
+
+Package and install the editor:
+
+```bash
+npm exec nx -- run typeqlite-vscode:package
+code --install-extension apps/vscode/dist/typeqlite-0.0.1.vsix
 ```
 
 Run a `.typeqlite` file against a file-backed database:
