@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3b5bdb">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<title>Tasks</title>
+<style>
+  :root { --bg: #f6f7f9; --card: #fff; --ink: #1d2433; --muted: #667085; --line: #e3e6ec; --accent: #3b5bdb; --on: #12805c; --off: #c4320a; --wait: #b54708; --flash: #fff4c2; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #11151c; --card: #1a202b; --ink: #e8ebf1; --muted: #98a2b3; --line: #2a3242; --accent: #7c95ff; --on: #3ccb8f; --off: #ff8a65; --wait: #fdb022; --flash: #4a3f12; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 16px 12px; }
+  h1 { margin: 0; font-size: 20px; display: flex; align-items: baseline; gap: 8px; }
+  h1 small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  #status { display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; font-size: 14px; font-weight: 600; }
+  #status::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  #status[data-tone="on"] { color: var(--on); } #status[data-tone="off"] { color: var(--off); } #status[data-tone="wait"] { color: var(--wait); }
+  #pending { font-size: 14px; color: var(--wait); font-weight: 600; min-height: 1em; margin-top: 2px; }
+  main { padding: 12px 16px 32px; max-width: 640px; margin: 0 auto; }
+  form { display: flex; gap: 8px; margin-bottom: 12px; }
+  #title { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--ink); }
+  form button { font: inherit; font-weight: 600; padding: 10px 16px; border: 0; border-radius: 9px; background: var(--accent); color: #fff; }
+  ul { list-style: none; margin: 0; padding: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  li { border-top: 1px solid var(--line); transition: background 1.2s; }
+  li:first-child { border-top: 0; }
+  li.flash { background: var(--flash); transition: none; }
+  li label { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+  li input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+  .title { flex: 1; overflow-wrap: anywhere; }
+  li.done .title { text-decoration: line-through; color: var(--muted); }
+  .origin { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; }
+  #empty { color: var(--muted); text-align: center; padding: 18px; }
+  #error { color: var(--off); font-size: 14px; margin-top: 10px; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tasks <small id="device"></small></h1>
+  <div id="status" data-tone="wait">Starting…</div>
+  <div id="pending"></div>
+</header>
+<main>
+  <form id="add"><input id="title" placeholder="Add a task" autocomplete="off" aria-label="New task"><button>Add</button></form>
+  <ul id="tasks"></ul>
+  <p id="empty">No tasks yet.</p>
+  <p id="error" hidden></p>
+  <footer>TypeDBLite on WASM SQLite · stored on this device · synced through a TypeDBLite hub</footer>
+</main>
+<script type="module" src="/main.js"></script>
+</body>
+</html>

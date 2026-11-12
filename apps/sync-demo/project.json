@@ -3,29 +3,49 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/sync-demo/src",
   "projectType": "application",
-  "tags": ["scope:demo", "type:app"],
+  "tags": [
+    "scope:demo",
+    "type:app"
+  ],
   "targets": {
     "build": {
       "executor": "nx:run-commands",
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "options": {
-        "commands": ["tsc -b tsconfig.app.json"],
+        "commands": [
+          "tsc -b tsconfig.app.json",
+          "node build-client.mjs"
+        ],
         "parallel": false,
         "cwd": "apps/sync-demo"
       },
-      "outputs": ["{projectRoot}/out", "{projectRoot}/.build"]
+      "outputs": [
+        "{projectRoot}/out",
+        "{projectRoot}/.build"
+      ]
     },
     "typecheck": {
       "executor": "nx:run-commands",
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "options": {
-        "commands": ["tsc -p tsconfig.app.json --noEmit"],
-        "cwd": "apps/sync-demo"
+        "commands": [
+          "tsc -p tsconfig.app.json --noEmit",
+          "tsc -p tsconfig.client.json",
+          "tsc -p tsconfig.worker.json"
+        ],
+        "cwd": "apps/sync-demo",
+        "parallel": false
       }
     },
     "test": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "command": "vitest run",
         "cwd": "apps/sync-demo"
@@ -33,7 +53,9 @@
     },
     "smoke": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "command": "vitest run test/smoke.test.ts",
         "cwd": "apps/sync-demo"
@@ -41,9 +63,21 @@
     },
     "serve": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "command": "node out/server/main.js",
+        "cwd": "apps/sync-demo"
+      }
+    },
+    "test-browser": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "command": "vitest run --config vitest.browser.config.ts",
         "cwd": "apps/sync-demo"
       }
     }

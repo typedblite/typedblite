@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
+    "customConditions": ["browser"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"], "strict": true, "skipLibCheck": true, "noEmit": true,
+    "types": []
+  },
+  "include": ["src/client/main.ts", "src/client/protocol.ts"]
+}
