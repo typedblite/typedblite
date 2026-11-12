@@ -80,7 +80,8 @@ export interface DataFacts {
   /** Direct instances of a thing type, or values of an attribute type. */
   readonly instancesOf: (type: string) => number;
   /** A value of the attribute type held by more than one owner, if any. */
-  readonly repeatedValueOf: (attribute: string) => string | undefined;
+  /** A value of `attribute` held more than once among `owner`'s instances and its subtypes'. */
+  readonly repeatedValueOf: (attribute: string, owner: string) => string | undefined;
   /** Instances of the owner type (subtypes included) that do not hold exactly one value of the attribute. */
   readonly ownersWithoutExactlyOne: (owner: string, attribute: string) => number;
 }
@@ -509,7 +510,7 @@ function checkOwns(trait: OwnsTrait, owner: string, proposed: SchemaFacts, data:
     // before the DDL, so the refusal names the attribute; the UNIQUE index failing to build is
     // the backstop, not the rule.
     if (isKeyAnnotation(annotation) || isUniqueAnnotation(annotation)) {
-      const repeated = data.repeatedValueOf(attribute);
+      const repeated = data.repeatedValueOf(attribute, owner);
       if (repeated !== undefined) {
         refuse(
           DiagnosticCode.dataDoesNotConform,

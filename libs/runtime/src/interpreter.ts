@@ -86,7 +86,7 @@ import {
   rangeOf,
   type ExecutionReport,
 } from './diagnostics.js';
-import { OWNED, attributeId, ensureAttribute, hasAttributeTables, migrateAttrTable, ownAttribute, ownersOfValue, sweepAttributes } from './attribute-store.js';
+import { OWNED, attributeId, ensureAttribute, ensureScopedUniqueness, hasAttributeTables, migrateAttrTable, ownAttribute, ownersOfValue, rescopeOwnerships, sweepAttributes } from './attribute-store.js';
 import { generateSchema } from './sqlite-generator.js';
 import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
@@ -648,6 +648,7 @@ export class TypeDBLiteInterpreter {
     // A store written before ADR-006 keeps its attributes in `attr`; move them, once, before anything
     // reads the store. A store `define` never reached has neither table and nothing to move.
     migrateAttrTable(this.db);
+    ensureScopedUniqueness(this.db);
     this.loadSchema();
     this.ensureRolePlayerIndex();
   }
@@ -1216,12 +1217,13 @@ export class TypeDBLiteInterpreter {
           return 0; // As above: no tables, no data.
         }
       },
-      repeatedValueOf: (attribute: string): string | undefined => {
+      repeatedValueOf: (attribute: string, owner: string): string | undefined => {
         try {
           const row = this.db
-            // One attribute instance owned more than once — what a `@key`/`@unique` index refuses.
-            .prepare(`SELECT v.value AS value FROM ${OWNED} WHERE h.type = ? GROUP BY h.attribute HAVING COUNT(*) > 1 LIMIT 1`)
-            .get(attribute) as { value: string } | undefined;
+            // One attribute instance owned more than once among the owner type and its subtypes —
+            // what the scoped `@key`/`@unique` index would refuse (ADR-006 amendment).
+            .prepare(`SELECT v.value AS value FROM ${OWNED} JOIN thing t ON t.iid = h.owner WHERE h.type = ? AND t.type IN ${SUBTYPES_OF} GROUP BY h.attribute HAVING COUNT(*) > 1 LIMIT 1`)
+            .get(attribute, owner) as { value: string } | undefined;
           return row === undefined ? undefined : JSON.stringify(String(row.value));
         } catch {
           return undefined; // As above: no tables, no data.
@@ -1268,6 +1270,9 @@ export class TypeDBLiteInterpreter {
         const insert = this.db.prepare('INSERT OR IGNORE INTO schema_relation(name) VALUES (?)');
         for (const name of this.schema.relations) insert.run(name);
       }
+      // Inside the DDL's transaction: a new `@key`/`@unique` the data repeats fails the scoped index
+      // here, and the whole define rolls back (ADR-006 amendment).
+      rescopeOwnerships(this.db);
       this.db.exec('COMMIT');
       this.persistKeyOwnerships = false;
       this.persistRelations = false;

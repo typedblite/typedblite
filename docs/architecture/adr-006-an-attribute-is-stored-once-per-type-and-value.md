@@ -300,6 +300,31 @@ every candidate thing. Decision 2's index and value-first lookups replaced both.
 unchanged at 1,306. The new behaviour added 133: attribute inserts, matches, deletes, `isa $t` over
 attributes, and values matched across numeric kinds.
 
+## Amendment — `@key` and `@unique` are scoped per owner type (2026-11-11)
+
+Decision 2 kept today's enforcement: one partial unique index per attribute type, so a value could
+be owned once across ALL owners. Scoping by owner type was left as a separate decision. This
+amendment takes it, because the spec is unambiguous (`insert.feature` L1662–L1729):
+
+- A `@key` or `@unique` holds among the instances of the type that declares it **and its
+  subtypes**. A `base` and a `derived` may not share `ref 0` (L1671), and nor may two siblings
+  (L1704).
+- Two owner types that each declare the ownership are separate: a person and a friendship may each
+  have `ref 0`. The global index refused that, and about 26 scenarios with it.
+
+**What changed.** `has` gains a `scope` column: for a key or unique ownership, the top-most type in
+the owner's ancestry that declares it (on the attribute or a supertype of it), and NULL otherwise.
+One partial unique index, `has_unique_in_scope ON has(attribute, scope) WHERE scope IS NOT NULL`,
+replaces every per-attribute `key_*`/`unique_*` index. A single SQL function computes the scope,
+used by local writes and by the change log's replication path, so the two cannot disagree. Every
+schema transaction rescopes the stored ownerships before it commits, so data that does not conform
+fails the index and the change rolls back. A store from earlier in ADR-006's implementation gets the
+column on open and loses the old indexes.
+
+**What did not change.** Identity (ADR-003 Decision 10) still reads `key_attribute`, and the change
+log's documents are untouched. The 18 real stores still answer identically after migration.
+Migration on the largest takes 0.8 s, up from 0.6 s, because it also scopes every ownership.
+
 ## References
 
 - `libs/conformance/spec/query/language/insert.feature`: L349, L364, L388, L1407, L1426, L1493

@@ -329,25 +329,9 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
     statements.push(`INSERT OR IGNORE INTO schema_specialises(relation, role, specialises) VALUES (${q(relation)}, ${q(role)}, ${q(parent)});`);
   }
 
-  for (const key of keys) {
-    // Partial index: uniqueness applies within the attribute type, which is what @key means for
-    // these schemas — `skill-id` unique across skills, `step-id` globally, as its comment states.
-    statements.push(
-      `CREATE UNIQUE INDEX IF NOT EXISTS key_${ident(key)} ON has(attribute) WHERE type = ${q(key)};`,
-    );
-  }
-
-  // `@unique` is the same index without the identity: the value is unique among owners, and
-  // nothing else is claimed. Enforced since Phase 03 of the conformance feature — it was parsed
-  // and reported as not enforced — and, like `@key`, refused at define when the existing rows
-  // repeat (`define.feature` L2949). ⚠️ Per attribute type, not per owner type, as the `@key`
-  // index above already simplifies: TypeDB's `@unique` is among owners of ONE type.
-  for (const attribute of uniques) {
-    if (keys.includes(attribute)) continue;
-    statements.push(
-      `CREATE UNIQUE INDEX IF NOT EXISTS unique_${ident(attribute)} ON has(attribute) WHERE type = ${q(attribute)};`,
-    );
-  }
+  // `@key` and `@unique` need no index of their own: `has_unique_in_scope` enforces every one, among
+  // the instances of the type that declares it (ADR-006 amendment). The interpreter rescopes the
+  // stored ownerships inside this same transaction, so data that does not conform refuses the define.
 
   return { ddl: statements.join('\n\n'), keys };
 }

@@ -1,4 +1,5 @@
 import type { SqliteDatabase } from './sqlite-database.js';
+import { hasAttributeTables, rescopeOwnerships } from './attribute-store.js';
 import {
   isCapabilityOwns,
   isCapabilityPlays,
@@ -248,10 +249,7 @@ function redefineAnnotations(
     for (const [category, text, annotation] of changes) {
       update.run(subject, category, text);
       if (capability === 'owns' && (isKeyAnnotation(annotation) || isUniqueAnnotation(annotation))) {
-        // A key or unique whose text changed is one that changed category — `@key` → `@unique` is
-        // two categories, so a single annotation cannot "change" within its category. Reached
-        // only if the record held a different spelling; rebuild the index to be safe.
-        rebuildUniqueIndex(db, attribute, isKeyAnnotation(annotation) ? 'key' : 'unique');
+        // The scoped index needs nothing here: `transaction` rescopes every ownership before COMMIT.
         if (isKeyAnnotation(annotation)) {
           db.prepare('INSERT OR IGNORE INTO schema_key_owns(type, attribute) VALUES (?, ?)').run(owner, attribute);
           db.prepare('INSERT OR IGNORE INTO key_attribute(type) VALUES (?)').run(attribute);
@@ -515,15 +513,8 @@ function renameType(name: string, kind: Kind, newLabel: string, node: RedefineTy
     // Role references carry the relation's label: `employment:employee`.
     run("UPDATE schema_plays SET role = ? || substr(role, instr(role, ':')) WHERE substr(role, 1, instr(role, ':') - 1) = ?", newLabel, name);
     renameInSubjects(db, name, newLabel);
-    if (kind === 'attribute') {
-      for (const prefix of ['key', 'unique']) {
-        const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?").get(`${prefix}_${ident(name)}`);
-        if (exists) {
-          db.exec(`DROP INDEX ${prefix}_${ident(name)}`);
-          db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ${prefix}_${ident(newLabel)} ON has(attribute) WHERE type = ${q(newLabel)}`);
-        }
-      }
-    }
+    // `has.scope` names an owner type; a rename of one moves the scope with it.
+    run('UPDATE has SET scope = ? WHERE scope = ?', newLabel, name);
   }
 }
 
@@ -989,10 +980,6 @@ function dropUniqueIfUnowned(db: SqliteDatabase, attribute: string): void {
   if (!unique) db.exec(`DROP INDEX IF EXISTS unique_${ident(attribute)}`);
 }
 
-function rebuildUniqueIndex(db: SqliteDatabase, attribute: string, prefix: 'key' | 'unique'): void {
-  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ${prefix}_${ident(attribute)} ON has(attribute) WHERE type = ${q(attribute)}`);
-}
-
 // ── plumbing ────────────────────────────────────────────────────────────────
 
 /** One transaction per statement, `IMMEDIATE` for the reason `applySchemaDdl` gives. */
@@ -1000,6 +987,9 @@ function transaction(db: SqliteDatabase, body: () => void): void {
   db.exec('BEGIN IMMEDIATE');
   try {
     body();
+    // A change to an ownership, a `@key`/`@unique`, a supertype or a label moves uniqueness scopes;
+    // data that no longer conforms fails `has_unique_in_scope` here, and the change rolls back.
+    if (hasAttributeTables(db)) rescopeOwnerships(db);
     db.exec('COMMIT');
   } catch (error) {
     db.exec('ROLLBACK');
