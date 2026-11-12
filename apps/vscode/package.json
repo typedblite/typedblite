@@ -3,6 +3,7 @@
   "displayName": "TypeQLite",
   "description": "TypeQLite language support from TypeDBLite: diagnostics, formatting and semantic highlighting",
   "version": "0.0.1",
+  "license": "MPL-2.0",
   "publisher": "typedblite",
   "private": true,
   "repository": {

@@ -1,6 +1,7 @@
 {
   "name": "typedblite-cli",
   "version": "0.0.1",
+  "license": "MPL-2.0",
   "type": "module",
   "private": true,
   "bin": {

@@ -77,7 +77,8 @@
         "commands": [
           "node esbuild.mjs --minify",
           "mkdir -p dist",
-          "vsce package --no-dependencies --skip-license --out dist/typeqlite-0.0.1.vsix"
+          "cp ../../LICENSE LICENSE",
+          "vsce package --no-dependencies --out dist/typeqlite-0.0.1.vsix"
         ],
         "parallel": false,
         "cwd": "apps/vscode"

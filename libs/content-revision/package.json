@@ -2,6 +2,7 @@
   "name": "@typedblite/content-revision",
   "description": "Canonical state encoding and ADR-003 D3 generation-digest revisions, shared by TypeDBLite's change log and a downstream feature's DocumentVersion",
   "version": "0.0.1",
+  "license": "MPL-2.0",
   "type": "module",
   "main": "./out/index.js",
   "exports": {

@@ -2,6 +2,7 @@
   "name": "@typedblite/language",
   "description": "TypeQLite grammar, AST, language services and SQLite generator",
   "version": "0.0.1",
+  "license": "MPL-2.0",
   "type": "module",
   "engines": {
     "node": ">=20.10.0",
