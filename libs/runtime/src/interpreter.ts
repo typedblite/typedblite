@@ -4763,8 +4763,10 @@ export class TypeDBLiteInterpreter {
       const written = this.writtenValue(binding, values);
       this.insertAttribute(iid, written.attribute, written.value, binding.range);
     }
-    this.insertRoles(iid, constraint.roles, bindings);
+    // Bound before its players are linked: a relation may play a role in itself —
+    // `$r isa comparison, links (compared: $r)` (match.feature L1259).
     bindings.set(constraint.variable, [iid]);
+    this.insertRoles(iid, constraint.roles, bindings);
   }
 
   /**
