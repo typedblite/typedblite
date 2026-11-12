@@ -76,7 +76,7 @@ cd libs/language
 npm run langium:generate
 ```
 
-This regenerates `src/generated/ast.ts`, `src/generated/grammar.ts`, and `src/generated/module.ts`. Commit the regenerated files alongside the grammar change.
+This regenerates `src/generated/ast.ts`, `src/generated/grammar.ts`, and `src/generated/module.ts`. `src/generated/` is gitignored: the `build`, `test` and `typecheck` targets regenerate it first (`langium-generate`), so commit the grammar, not the output.
 
 **Grammar scope discipline.** A construct is added to the grammar only when a real caller needs it. The rule is "find the caller first". The TypeDB behaviour spec (`libs/conformance/spec/`) is a first-class caller — if the spec's Background steps require a construct, add it.
 
@@ -178,7 +178,7 @@ nx run typedblite-conformance:cli -- --update-baseline
 | Hardcoding `:memory:` in a test | Use the fixture helpers; they create an isolated session per test |
 | Declaring a deviation before the scenario's Background passes | The deviation isn't the real reason for failure yet |
 | Changing revision semantics without running the parity oracle | CouchDB parity is not covered by the routine test suite |
-| Generating the AST without committing the result | Other packages import the generated files; a stale AST causes build failures |
+| Editing the grammar without regenerating locally | Tools run from source (`tsx`, vitest aliases) read `src/generated/`, which only `langium-generate` refreshes |
 | Adding a construct to the grammar with no caller | Grammar scope is measured, not guessed — find the caller first |
 
 ---

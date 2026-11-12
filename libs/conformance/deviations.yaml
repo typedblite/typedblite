@@ -2,8 +2,67 @@
 # Each needs an owner that resolves: an ADR number, or a defect record id. No owner: it is a fail.
 # An entry whose scenario starts passing is reported by the run; remove it in the same commit.
 #
-# ⚠️ As of the first report card (2026-09-11, 0 of 1756) no scenario reaches the step where a
-# deviation would show: every Background stops at `@card`. The select-refusal deviation ADR-005 D5
-# names is real, but declaring it against a scenario that fails three steps earlier would record a
-# reason that is not yet the reason. It is declared when it becomes the reason — Phase 02.
-[]
+# Every entry below is owned by ADR-007 (Proposed): a scenario TypeDB 3.10.4 itself fails, measured by
+# the differential oracle (`src/oracle.ts`) against a live `typedb/typedb:3.10.4` on 2026-11-12. Each
+# fails here at, or after, the step TypeDB fails at, and for the same cause. Re-verify on a pin move.
+
+- feature: insert
+  scenario: "when inserting a instance that has inferred concepts, those concepts are not automatically materialised"
+  line: 2219
+  reason: "TypeDB-2 `rule` syntax; TypeDB 3.10.4 fails to parse it at L2222 (no rules in TypeDB 3). @ignore upstream"
+  owner: adr-007
+- feature: insert
+  scenario: "when inserting a instance with an inferred attribute ownership, the ownership is not automatically persisted"
+  line: 2272
+  reason: "TypeDB-2 `rule` syntax; TypeDB 3.10.4 fails to parse it at L2275. @ignore upstream"
+  owner: adr-007
+- feature: insert
+  scenario: "when inserting instances connected to an inferred attribute, the inferred attribute gets materialised"
+  line: 2337
+  reason: "TypeDB-2 `rule` syntax; TypeDB 3.10.4 fails to parse it at L2343. @ignore upstream"
+  owner: adr-007
+- feature: insert
+  scenario: "when inserting instances connected to an inferred relation, the inferred relation gets materialised"
+  line: 2432
+  reason: "TypeDB-2 define-shaped `undefine employment owns ref`; TypeDB 3.10.4 fails to parse it at L2435. @ignore upstream"
+  owner: adr-007
+- feature: insert
+  scenario: "when inserting instances connected to a chain of inferred concepts, the whole chain is materialised"
+  line: 2515
+  reason: "the rules chain; TypeDB 3.10.4 refuses its data at commit (L2580, @card(0..1) violated). @ignore upstream"
+  owner: adr-007
+- feature: delete
+  scenario: "variable types can be used in deletes"
+  line: 221
+  reason: "TypeQL-2 syntax (`$n0 \"Alice\"`, `type person`); TypeDB 3.10.4 fails type inference at L233. @ignore upstream"
+  owner: adr-007
+- feature: match
+  scenario: "subtype hierarchy satisfies transitive sub assertions"
+  line: 210
+  reason: "templates an iid for a TYPE (L231); \"types cannot be specified by IID\" — TypeDB fails the same step. @ignore upstream"
+  owner: adr-007
+- feature: match
+  scenario: "Relations can be queried with pairings of relation and role types that are not directly related to each other"
+  line: 1484
+  reason: "L1516 expects a failed read to close its transaction; TypeDB 3.10.4 keeps every kind open (probed 2026-11-12). @ignore upstream"
+  owner: adr-007
+- feature: metadata
+  scenario: "doc comments on top-level items can be defined"
+  line: 189
+  reason: "TypeDB 3.10.4 fails to parse `get_doc` at L198 (\"TODO settle on the syntax\" upstream). @ignore upstream"
+  owner: adr-007
+- feature: negation
+  scenario: "negation can filter out an unwanted connection between two concepts from a chain of matched relations"
+  line: 303
+  reason: "L354 compares two queries naming different variables ($f3/$f2); TypeDB's own step is a no-op, the only reason its CI passes"
+  owner: adr-007
+- feature: put
+  scenario: "Putting an ownership when a subtype already owns the attribute does nothing."
+  line: 366
+  reason: "unterminated doc string in the spec — `Then answer size is: 1` is inside the query at L385; TypeDB 3.10.4 fails to parse it too"
+  owner: adr-007
+- feature: put
+  scenario: "Putting an ownership when a subtype is already owned does nothing."
+  line: 407
+  reason: "unterminated doc string in the spec — the next step's text is inside the query at L427; TypeDB 3.10.4 fails to parse it too"
+  owner: adr-007

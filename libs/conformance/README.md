@@ -36,6 +36,18 @@ nx run typedblite-conformance:test
 nx run typedblite-conformance:report
 ```
 
+### The differential oracle (ADR-007)
+
+```bash
+docker run -d --name typedb-oracle --restart always -p 8000:8000 typedb/typedb:3.10.4
+npx tsx --tsconfig ../../tsconfig.base.json src/oracle.ts [feature[:line,…] …]
+```
+
+Runs the same steps against a live TypeDB (`TYPEDB_URL`, default `http://localhost:8000`) and prints
+where it and TypeDBLite disagree. A scenario TypeDB itself fails is a deviation owned by ADR-007, not
+an engine gap. It needs a server, so it is never part of the routine suite. Given rows cannot be passed
+over HTTP, and TypeDB 3.10.4 panics on a few spec queries; `--restart always` lets the run continue.
+
 The test suite exits non-zero if any scenario is below its baseline. The report CLI also prints:
 - Improvements whose baseline has not been raised (`⬆ above baseline — raise it`)
 - Deviations that now pass and must be removed (`✅ deviation now passing`)
@@ -82,25 +94,25 @@ Rules:
 
 | Feature | Passing |
 |---|---|
-| define | 469 |
-| redefine | 196 |
-| undefine | 174 |
-| expression | 129 |
+| define | 475 |
+| redefine | 197 |
+| undefine | 176 |
+| expression | 130 |
 | reduce | 65 |
-| insert | 125 |
-| match | 111 |
-| delete | 40 |
-| fetch | 65 |
+| insert | 136 |
+| match | 130 |
+| delete | 49 |
+| fetch | 66 |
 | pipelines | 12 |
 | modifiers | 34 |
-| update | 59 |
+| update | 67 |
 | variables | 12 |
 | disjunction | 9 |
-| given | 18 |
+| given | 22 |
 | metadata | 122 |
 | negation | 15 |
 | optional | 10 |
-| put | 11 |
+| put | 15 |
 
 ## Tests
 

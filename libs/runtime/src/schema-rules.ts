@@ -153,7 +153,7 @@ export function checkSchemaRules(
         }
       }
       for (const trait of definition.traits) {
-        if (isOwnsTrait(trait)) checkOwns(trait, name, proposed, data, refuse);
+        if (isOwnsTrait(trait)) checkOwns(trait, name, proposed, data, refuse, applied);
         if (isPlaysTrait(trait)) checkPlays(trait, name, proposed, refuse);
         if (isRelatesTrait(trait)) checkRelates(trait, name, proposed, refuse, applied);
       }
@@ -506,7 +506,7 @@ function descendantsOf(type: string, facts: SchemaFacts): string[] {
  * holds (L1622's outline, 58 rows). An attribute with no value type anywhere admits none of
  * the three.
  */
-function checkOwns(trait: OwnsTrait, owner: string, proposed: SchemaFacts, data: DataFacts, refuse: Refuse): void {
+function checkOwns(trait: OwnsTrait, owner: string, proposed: SchemaFacts, data: DataFacts, refuse: Refuse, applied: SchemaFacts = proposed): void {
   const attribute = trait.attribute.$refText;
   const kind = kindOf(attribute, proposed);
   if (kind === undefined) {
@@ -554,7 +554,11 @@ function checkOwns(trait: OwnsTrait, owner: string, proposed: SchemaFacts, data:
     // `@key` on an already-keyed attribute would never be checked (review, round 1). Re-applying
     // a schema is how every repository opens, and `@key`'s cardinality is not enforced at insert,
     // so a restated `@key` over existing rows must never refuse itself.
-    if (isKeyAnnotation(annotation) && !proposed.keyOwnerships.has(ownershipKey(owner, attribute))) {
+    //
+    // ⚠️ And only on an ownership that ALREADY EXISTED — `@unique` becoming `@key` (L3066). A NEW
+    // `owns barcode @key` over products that hold none is accepted here and refused at COMMIT, as
+    // TypeDB does (L2727, "transaction commits; fails … @card"): the commit check covers it.
+    if (isKeyAnnotation(annotation) && applied.owns.has(ownershipKey(owner, attribute)) && !proposed.keyOwnerships.has(ownershipKey(owner, attribute))) {
       const missing = data.ownersWithoutExactlyOne(owner, attribute);
       if (missing === 0) continue;
       refuse(

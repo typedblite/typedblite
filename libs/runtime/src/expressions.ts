@@ -384,6 +384,8 @@ export interface SchemaContext {
   readonly typeOf: (variable: string) => string | undefined;
   /** A variable's binding in this combination — a user function takes things as arguments. */
   readonly bindingOf?: (variable: string) => ConceptBinding | undefined;
+  /** A thing's or an attribute's iid, as `iid($x)` answers it — `undefined` for anything else. */
+  readonly iidOf?: (variable: string) => string | undefined;
   /** Run a query-local function on these arguments: every tuple it answers. */
   readonly call?: (definition: FunctionDefinition, args: ReadonlyArray<ConceptBinding | undefined>, at: Range | undefined) => ReadonlyArray<ReadonlyArray<ValueBinding | undefined>>;
 }
@@ -457,7 +459,9 @@ function typeArgumentsOf(expression: Expression): string[] {
 /** The variables passed straight to a query-local function — a thing among them is an argument, not an operand. */
 function userArgumentsOf(expression: Expression): string[] {
   if (isFunctionExpression(expression)) {
-    const own = userFunctionOf(expression) === undefined ? [] : expression.arguments.flatMap((a) => (isVariableExpression(a) ? [a.variable] : []));
+    // `iid($x)` takes the concept itself, as a query-local function does.
+    const takesConcepts = userFunctionOf(expression) !== undefined || bareName(expression.function) === 'iid';
+    const own = !takesConcepts ? [] : expression.arguments.flatMap((a) => (isVariableExpression(a) ? [a.variable] : []));
     return [...own, ...expression.arguments.flatMap(userArgumentsOf)];
   }
   if (isBinaryExpression(expression)) return [...userArgumentsOf(expression.left), ...userArgumentsOf(expression.right)];
@@ -482,6 +486,12 @@ function schemaTuples(expression: Expression, env: Environment, refuse: Refuse, 
       return { kind: 'value', valueType: value.valueType, value: value.text };
     });
     return schema.call(definition, args, at);
+  }
+  if (bareName(expression.function) === 'iid') {
+    const [argument] = expression.arguments;
+    const iid = argument !== undefined && isVariableExpression(argument) ? schema.iidOf?.(argument.variable) : undefined;
+    if (iid === undefined) return refuse(DiagnosticCode.valueTypeConflict, `Function 'iid' expects a thing or an attribute.`, at);
+    return [[{ kind: 'value', valueType: 'string', value: iid }]];
   }
   const args = expression.arguments.map((argument): SchemaArgument => {
     if (isLabelExpression(argument)) return { kind: 'type', label: argument.label };

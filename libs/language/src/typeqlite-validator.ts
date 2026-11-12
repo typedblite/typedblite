@@ -346,6 +346,9 @@ export class TypeQLiteValidator {
     const seen = new Map<string, string>();
     for (const definition of labelled(node)) {
       const previous = seen.get(definition.name);
+      // The same label as the same kind is the one type stated again — additive, and a no-op where it
+      // repeats (define.feature L2529). Only a second KIND is a second type.
+      if (previous !== undefined && previous === definition.$type.replace(/Def$/, '').toLowerCase()) continue;
       if (previous) {
         accept(
           'error',
@@ -372,25 +375,31 @@ export class TypeQLiteValidator {
     }
   }
 
-  /** Owning the same attribute twice is redundant at best, and the two may disagree on `@key`. */
+  /**
+   * Owning the same attribute twice is idempotent when the two say the same thing — `owns price, owns
+   * price` (define.feature L319, `@key` alike at L358) — and refused when they disagree, on `@key` or
+   * any annotation, or one is ordered: which would win is not the writer's to guess.
+   */
   checkNoDuplicateOwns(
     node: EntityDef | RelationDef,
     accept: ValidationAcceptor,
   ): void {
-    const seen = new Set<string>();
+    const seen = new Map<string, string>();
     for (const trait of node.traits) {
       if (!isOwnsTrait(trait)) continue;
       const name = trait.attribute.$refText;
-      if (seen.has(name)) {
+      const said = `${trait.ordered ? '[]' : ''}${trait.annotations.map((a) => (a.$cstNode?.text ?? '').replace(/\s+/g, '')).join(' ')}`;
+      const before = seen.get(name);
+      if (before !== undefined && before !== said) {
         accept(
           'error',
-          `'${node.name}' already owns '${name}'. A second \`owns\` is redundant, and the two ` +
-            'may disagree about `@key`.',
+          `'${node.name}' already owns '${name}' differently. Two \`owns\` of one attribute must agree, ` +
+            'on `@key` and every other annotation.',
           { node: trait, property: 'attribute', code: TypeQLiteValidationCode.duplicateOwns },
         );
         continue;
       }
-      seen.add(name);
+      seen.set(name, said);
     }
   }
 

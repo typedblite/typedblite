@@ -120,8 +120,12 @@ describe('type patterns', () => {
     assert.equal(refusal(() => engine.query('match person has name $n;')), DiagnosticCode.mixedPattern);
     assert.equal(refusal(() => engine.query('match $x plays employment:ceo;')), DiagnosticCode.unknownRole);
     assert.equal(refusal(() => engine.query('match $x relates ceo;')), DiagnosticCode.unknownRole);
-    assert.equal(refusal(() => engine.execute('match $t label person; insert $x isa $t, has ref 9;')), DiagnosticCode.notImplemented);
-    assert.equal(refusal(() => engine.execute('insert $x sub person;')), DiagnosticCode.notImplemented);
+    // A write through a type variable an earlier stage bound writes that type (insert.feature L2140); a type
+    // statement in a write stage is refused — a write writes things (put.feature L596).
+    engine.execute('match $t label person; insert $x isa $t, has ref 9;');
+    assert.equal(engine.query('match $x isa person, has ref 9;').rows.length, 1);
+    assert.equal(refusal(() => engine.execute('insert $x isa $t, has ref 10;')), DiagnosticCode.unboundValue);
+    assert.equal(refusal(() => engine.execute('insert $x sub person;')), DiagnosticCode.mixedPattern);
   });
 
   it('two isa on one variable are two filters, in either order — review round 2', () => {

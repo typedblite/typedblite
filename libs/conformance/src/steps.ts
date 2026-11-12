@@ -204,10 +204,35 @@ export const STEPS: ReadonlyArray<StepDefinition> = [
     },
   },
 
+  // ── templated queries — `<answer.x.iid>` is the answer's iid (TypeDB's `apply_query_template`) ──
+  {
+    // Every answer, substituted into the query, matches exactly one answer (match.feature L964).
+    pattern: /^each answer satisfies$/,
+    run: (world, _m, step) => {
+      const template = docString(step);
+      for (const row of answersOf(world).rows) {
+        const query = applyTemplate(world, template, row);
+        const size = world.readQuery(query).length;
+        if (size !== 1) throw new Error(`expected 1 answer for: ${query.trim()} — got ${size}`);
+      }
+    },
+  },
+  {
+    // TypeDB requires exactly ONE answer to template from (match.feature L994).
+    pattern: /^get answers of templated typeql read query$/,
+    run: (world, _m, step) => {
+      const { rows: previous } = answersOf(world);
+      if (previous.length !== 1) throw new Error(`expected a single answer to template from, found ${previous.length}`);
+      const query = applyTemplate(world, docString(step), previous[0]);
+      const { rows, documents } = world.readAnswers(query);
+      world.answers = { rows, documents, query, has: (iid, attribute) => world.attributesOf(iid, attribute), valueTypeOf: (attribute) => world.attributeValueType(attribute) };
+    },
+  },
+
   // ── given rows (given.feature) ──────────────────────────────────────────────────────────────
   {
     pattern: /^set query given rows$/,
-    run: (world, _m, step) => void (world.givenRows = givenRows(table(step))),
+    run: (world, _m, step) => void (world.givenRows = givenRows(table(step), world)),
   },
   {
     pattern: /^get answers of typeql (read|write) query with given rows$/,
@@ -319,11 +344,15 @@ const givenOf = (world: World): GivenRows => {
 
 /**
  * A given-rows table: the header names each variable (`n: string` — the type is the query's to
- * declare), a cell is `value:<type>:<text>` or `none` (absent). 🔴 A cell naming a TypeDB iid
- * (`iid:entity:0:1`) is TypeDB's own storage numbering; nothing here can resolve one, and inventing
- * a mapping would be guessing — the step fails instead.
+ * declare), a cell is `value:<type>:<text>`, `none` (absent), or `iid:<kind>:<type id>:<object id>`.
+ *
+ * 🔴 An iid cell is TypeDB's own storage numbering, both ids in HEX — TypeDB's step reads it as
+ * `iid:<kind>:<typeid-hex>:<instanceid-hex>` and builds `ObjectVertex::build_entity(type_id,
+ * object_id)` (`tests/behaviour/steps/query/typeql.rs`, typedb/typedb, read 2026-11-12, not
+ * guessed). The engine resolves that numbering (`thingNumbered`); one it cannot resolve is passed as
+ * a thing that does not exist, which the engine refuses as TypeDB does (given.feature L279).
  */
-const givenRows = (rows: ReadonlyArray<ReadonlyArray<string>>): GivenRows => {
+const givenRows = (rows: ReadonlyArray<ReadonlyArray<string>>, world: World): GivenRows => {
   const [header, ...body] = rows;
   const names = header.map((column) => column.split(':')[0].trim());
   return body.map((row) =>
@@ -331,14 +360,30 @@ const givenRows = (rows: ReadonlyArray<ReadonlyArray<string>>): GivenRows => {
       row.map((cell, index) => {
         const text = cell.trim();
         if (text === 'none') return [names[index], null];
+        const iid = /^iid:(entity|relation):([0-9a-fA-F]+):([0-9a-fA-F]+)$/.exec(text);
+        if (iid !== null) {
+          const relation = iid[1] === 'relation';
+          const found = world.thingNumbered(relation ? 'relation' : 'entity', Number.parseInt(iid[2], 16), Number.parseInt(iid[3], 16)) ?? -1;
+          return [names[index], relation ? TypeDBLiteValue.relation(found, '') : TypeDBLiteValue.entity(found, '')];
+        }
         const value = /^value:([\w-]+):(.*)$/.exec(text);
-        if (value === null) throw new HarnessError(`a given cell '${text}' names no value this harness can pass — a TypeDB iid cannot be resolved here`);
+        if (value === null) throw new HarnessError(`a given cell '${text}' names no value this harness can pass`);
         const [, type, raw] = value;
         return [names[index], TypeDBLiteValue.value(type, type === 'decimal' ? raw.replace(/dec$/, '') : raw)];
       }),
     ),
   );
 };
+
+/** `<answer.x.iid>` → the iid of the answer's `x`, as TypeDB's `apply_query_template` substitutes it. */
+const applyTemplate = (world: World, template: string, row: Readonly<Record<string, TypeDBLiteValue>>): string =>
+  template.replace(/<([^>]*)>/g, (_whole, placeholder: string) => {
+    const variable = /^answer\.(.+)\.iid$/.exec(placeholder)?.[1];
+    if (variable === undefined) throw new HarnessError(`cannot replace a template not based on an iid: <${placeholder}>`);
+    const cell = row[variable];
+    if (cell === undefined) throw new HarnessError(`the answer has no variable '${variable}' to template`);
+    return world.iidOf(cell);
+  });
 
 const answersOf = (world: World) => {
   if (world.answers === undefined) throw new HarnessError('no answers — run `get answers of …` first');

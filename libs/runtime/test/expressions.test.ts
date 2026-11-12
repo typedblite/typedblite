@@ -197,7 +197,10 @@ describe('value expressions', () => {
     // `insert … has age $v` writes the computed value, once per distinct value.
     engine.execute('match $p isa person, has ref 0, has age $a; let $v = $a + 1; insert $p has age $v;');
     assert.deepEqual(values(engine, 'match $p isa person, has ref 0, has age $a; select $a;'), [{ a: 'age:10' }, { a: 'age:11' }]);
-    engine.execute('match $p isa person, has ref 0, has name $n; insert $q isa person, has ref 12, has nick $n;');
+    // `has nick == $n` copies the name's VALUE; `has nick $n` would write the `name` itself as a nick,
+    // which TypeDB's type inference refuses (insert.feature L235).
+    engine.execute('match $p isa person, has ref 0, has name $n; insert $q isa person, has ref 12, has nick == $n;');
+    assert.equal(refusal(() => engine.execute('match $p isa person, has ref 0, has name $n; insert $q isa person, has ref 14, has nick $n;')).code, DiagnosticCode.valueTypeConflict);
     assert.deepEqual(values(engine, 'match $q isa person, has ref 12, has nick $k; select $k;'), [{ k: 'nick:Lisa' }]);
     // A value nothing binds is refused, not silently dropped; a `let` in a write stage is refused.
     assert.equal(refusal(() => engine.execute('match $p isa person, has ref 0; insert $p has age $v;')).code, DiagnosticCode.unboundValue);

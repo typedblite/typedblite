@@ -416,14 +416,13 @@ describe('a scenario cannot pass without reaching its assertion', () => {
       'get answers of typeql write query with given rows',
       'typeql read query with given rows; fails with a message containing: "x"',
       'typeql write query with given rows; fails with a message containing: "x"',
-    ]) {
-      assert.doesNotThrow(() => findStep(text), text);
-    }
-    for (const text of [
-      'typeql delete',
+      // The templated steps — `<answer.x.iid>` replaced as TypeDB's `apply_query_template` does.
       'each answer satisfies',
       'get answers of templated typeql read query',
     ]) {
+      assert.doesNotThrow(() => findStep(text), text);
+    }
+    for (const text of ['typeql delete']) {
       assert.throws(() => findStep(text), UndefinedStep, text);
     }
   });
