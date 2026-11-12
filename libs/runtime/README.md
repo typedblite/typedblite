@@ -1,150 +1,76 @@
 # @typedblite/runtime
 
-SQLite generator, TypeQLite interpreter, change log, and replication for TypeDBLite.
-
-## What this package provides
-
-- **`SqliteEngine`** — the five-method engine that `TypeDBLiteDatabase.open({ engine })` accepts: `define`, `execute`, `query`, `persist`, and `transaction`.
-- **`TypeDBLiteInterpreter`** — the core interpreter that translates TypeQLite DDL and DML to SQLite. `SqliteEngine` wraps it.
-- **`SqliteDatabase` / `SqliteOpener`** — the binding interface. `node:sqlite` satisfies it via `openNodeSqlite` (`node-sqlite.ts`). Any synchronous SQLite binding satisfies it — including WASM SQLite running inside a Web Worker.
-- **`ChangeLog`** — an append-only log of every committed write, with CouchDB-style `generation-digest` revisions. Written inside the same transaction as the data.
-- **`ChangeStream`** — HTTP hub: an SSE endpoint that pushes new changes, plus a POST endpoint for incoming changes from spokes.
-- **`ChangeStreamClient`** — HTTP spoke: subscribes to the hub's SSE stream and replays received changes locally.
-- **`replicateOnce`** — one-shot push/pull/duplex replication between two `ReplicationEndpoint`s.
-- **`TypeDBLiteReplicator`** — continuous replication session over HTTP (implements the `Replicator` port).
-- **`DiagnosticCode`** — stable string codes for every execution diagnostic. Diagnostics are returned on the result, never thrown.
-- **Full-text search** (`FullTextIndex`) — SQLite FTS5 index maintained alongside the main data.
-
-## Installation
-
-Workspace dependency. Build after `@typedblite/language` and `@typedblite/content-revision`.
+The TypeDBLite engine: it runs TypeQLite against a SQLite database inside your process, and keeps a
+change log that replication and full-text search are built on.
 
 ```bash
-nx run @typedblite/runtime:build
+npm install @typedblite/runtime
 ```
+
+Requires Node.js 22.12 or later (`node:sqlite`), or a synchronous SQLite binding of your own.
 
 ## Quick usage
 
 ```ts
-import { SqliteEngine } from '@typedblite/runtime';
+import { TypeDBLiteInterpreter } from '@typedblite/runtime';
 
-const engine = new SqliteEngine(':memory:');
+const db = new TypeDBLiteInterpreter(':memory:'); // or './my.db'
 
-await engine.define(`
+db.define(`
   define
     entity person, owns name @key;
     attribute name, value string;
 `);
 
-await engine.execute(`insert $p isa person, has name "Alice";`);
+db.execute(`insert $p isa person, has name "Alice";`);
 
-const { rows } = await engine.query(`match $p isa person, has name $n; select $n;`);
-// rows: [{ n: 'Alice' }]
+const { rows } = db.query(`match $p isa person, has name $n; select $n;`);
+rows[0]?.n.asString(); // 'Alice'
 ```
 
-File-backed database:
+**Guides:** [Embedding the runtime](../../docs/guides/embedding-the-runtime.md) ·
+[The TypeQLite language](../../docs/guides/typeqlite-language.md) ·
+[Replication and search](../../docs/guides/replication-and-search.md)
 
-```ts
-const engine = new SqliteEngine('./my.db');
-```
+## What this package provides
+
+| Export | What it is |
+| ------ | ---------- |
+| `TypeDBLiteInterpreter` | The engine. Synchronous: `define`, `execute`, `query`, transactions, `schemaSnapshot`, `changeLog` |
+| `SqliteEngine` | An `async` wrapper with a `transaction(work)` helper, for code written against an asynchronous database interface ([ADR-002](../../docs/architecture/adr-002-typeql-engine-as-a-port.md)) |
+| `TypeDBLiteValue` | A result cell: an entity, relation, attribute, value or type |
+| `DiagnosticCode`, `diagnosticOf` | Stable codes for every fact and refusal, and how to read one from a thrown error ([ADR-004](../../docs/architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md)) |
+| `ChangeLog` | Reached as `db.changeLog`: every committed write, with CouchDB-style revisions ([ADR-003](../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)) |
+| `replicateOnce` | One-shot push, pull or duplex replication between two change logs |
+| `serveChangeStream`, `createChangeStreamHandler` | The hub: an SSE stream of changes, and a POST endpoint for spokes |
+| `TypeDBLiteReplicator`, `ChangeStreamClient` | The spoke: one-shot or continuous replication with a hub over HTTP |
+| `FullTextIndex` | Reached as `db.changeLog.fullText`: FTS5 search over every recorded thing |
+| `SqliteDatabase`, `SqliteOpener`, `openNodeSqlite` | The binding interface, and its `node:sqlite` implementation |
+
+## Storage
+
+The storage model mirrors TypeDB's, not a table per type. Every store has the same fixed tables:
+`thing` (one row per entity or relation), `attribute` (one row per type and value), `has`
+(ownership), `role_player`, `type_parent`, and `schema_*` tables recording the schema. `@key` and
+`@unique` are partial `UNIQUE` indexes, and role players have foreign keys to `thing`. A duplicate
+key or a dangling role player is therefore refused by SQLite itself.
+[Architecture](../../docs/development/architecture.md#the-storage-model) has the details.
 
 ## SQLite binding
 
-The `SqliteDatabase` interface (`src/sqlite-database.ts`) decouples the interpreter from `node:sqlite`. Only `node-sqlite.ts` imports `node:sqlite`; everything else works through the interface.
+Only `node-sqlite.ts` imports `node:sqlite`. Everything else uses the `SqliteDatabase` interface in
+`src/sqlite-database.ts`, so another binding can be passed as `{ openDatabase }`. A binding must be
+**synchronous**, bind named parameters without a prefix (`{ id }` binds `:id`), report `changes`
+exactly, run several statements in one `exec`, and include **FTS5**. A WASM SQLite running
+synchronously in a Web Worker qualifies.
 
-A binding must satisfy these constraints:
-
-| Constraint | Reason |
-|---|---|
-| **Synchronous** | ~250 SQLite calls per query run inside transactions; async would require rewriting the interpreter throughout |
-| Named parameters without `:` prefix | `.all({ id })` binds `:id`; most WASM wrappers require `{ ':id': id }` and need an adapter layer |
-| `run()` reports `changes` exactly | The change log uses `changes > 0` to distinguish a new revision from a duplicate |
-| `exec` handles multiple statements | Schema DDL emits multi-statement strings |
-| Accepts `busy_timeout`, `case_sensitive_like`, `journal_mode` pragmas | Set in the engine constructor |
-
-A WASM SQLite binding running synchronously inside a Web Worker satisfies this interface.
-
-## Schema and data model
-
-TypeQLite entities become rows in a per-type table. Attributes become columns. Relations become junction tables. `@key` generates a `UNIQUE` index enforced at write time.
-
-The SQLite schema is generated by `sqlite-generator.ts` from a `define` statement and applied with `exec`. The interpreter in `interpreter.ts` translates TypeQLite queries to `SELECT`, `INSERT`, `UPDATE`, and `DELETE`.
-
-## Execution diagnostics
-
-The runtime returns diagnostics rather than throwing for user-visible conditions. Diagnostics carry a stable `DiagnosticCode` a consumer can branch on.
-
-```ts
-import { DiagnosticCode } from '@typedblite/runtime';
-
-const result = await engine.execute(query);
-// result.diagnostics — array of LSP Diagnostic objects
-```
-
-Key codes: `parseFailed`, `unknownType`, `unknownAttribute`, `constraintViolated`, `annotationNotEnforced`, `emptyMatch`, `wrote`, `tombstones`.
-
-## Change log
-
-Every committed write appends a row to the change log **inside its own transaction** — a commit followed by a publish cannot lose a change if the process dies between the two.
-
-```ts
-const log = engine.changeLog;
-
-// All changes since cursor position 42
-const records = log.since(42, /* limit */ 100);
-// records: ChangeRecord[] — { seq, entityId, rev, parentRev, deleted, state? }
-```
-
-Revisions are `generation-digest` strings from `@typedblite/content-revision`. The same edit applied independently on two nodes produces the same revision.
-
-## Replication
-
-### One-shot
-
-```ts
-import { replicateOnce } from '@typedblite/runtime';
-
-const outcome = await replicateOnce(localLog, remoteLog, { direction: 'duplex' });
-// outcome: { cursor: { pull, push }, applied, conflicts }
-```
-
-### Continuous (hub and spoke)
-
-**Hub** — exposes an SSE stream and accepts POSTs:
-
-```ts
-import { ChangeStream } from '@typedblite/runtime';
-
-const stream = new ChangeStream(changeLog, { pollMs: 1000, port: 4001 });
-const { port } = await stream.start();
-// GET  http://localhost:4001/changes?since=0  — SSE stream
-// POST http://localhost:4001/changes           — apply a remote change
-```
-
-**Spoke** — subscribes and applies incoming changes:
-
-```ts
-import { TypeDBLiteReplicator } from '@typedblite/runtime';
-
-const replicator = new TypeDBLiteReplicator(localLog, hubUrl, {
-  direction: 'duplex',
-  onChange: (applied) => console.log(`applied ${applied}`),
-});
-const session = replicator.start();
-await session.cancel();
-```
-
-## Tests
+## Development
 
 ```bash
-nx run @typedblite/runtime:test
+npm exec nx -- run typedblite-runtime:build
+npm exec nx -- run typedblite-runtime:test
 ```
 
-Test files live in `test/` with `.test.ts` extension. Additional test suites:
-
-| Config | What it tests | When to run |
-|---|---|---|
-| `vitest.oracle.config.ts` | CouchDB revision-tree parity | After touching `change-log.ts` or `revision.ts` |
-| `vitest.wasm.config.ts` | WASM SQLite binding | After touching the `SqliteDatabase` interface |
-
-Run the oracle suite with `nx run @typedblite/runtime:test-oracle`. It requires the CouchDB stack and skips on CI without it.
+Tests live in `test/*.test.ts`. See [Testing](../../docs/development/testing.md), including the
+note on the two optional configurations (`vitest.oracle.config.ts` and `vitest.wasm.config.ts`) that
+do not currently run.

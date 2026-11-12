@@ -6,12 +6,25 @@ TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) gr
 
 TypeDB's native server is a standalone Rust binary. TypeDBLite brings the same polymorphic type model, schema-first design, and TypeQL query language to contexts where spinning up a separate server is impractical: edge processes, embedded applications, local developer tooling, and browser workers.
 
+**How close is it to TypeDB?** On TypeDB's own behaviour specification, TypeDBLite passes 1,742 of 1,756 scenarios. Of the 14 that do not pass, 12 also fail on TypeDB itself. See [CONFORMANCE.md](CONFORMANCE.md).
+
+## Documentation
+
+| | |
+|---|---|
+| [Getting started](docs/guides/getting-started.md) | From a fresh clone to your first schema and queries, in the CLI and in code |
+| [Embedding the runtime](docs/guides/embedding-the-runtime.md) | The engine API: results, transactions, diagnostics, options |
+| [The TypeQLite language](docs/guides/typeqlite-language.md) | What you can write, and what is not supported yet |
+| [Replication and search](docs/guides/replication-and-search.md) | The change log, syncing stores, full-text search |
+| [Contributing](CONTRIBUTING.md) | Setup, workflow, and the checks a change must pass |
+| [All documentation](docs/README.md) | Including architecture and testing |
+
 ## Packages
 
 | Package | Description |
 |---|---|
 | [`@typedblite/language`](libs/language/) | Langium grammar, generated AST, and language services for TypeQLite. Parsing, validation, formatting, semantic tokens, and scope resolution live here. |
-| [`@typedblite/runtime`](libs/runtime/) | SQLite generator, query interpreter, schema mutation engine, change log, replication, and the `TypeDBLiteDatabase` adapter. The working database lives here. |
+| [`@typedblite/runtime`](libs/runtime/) | The engine: query interpreter, storage, schema changes, change log, replication and full-text search. The working database lives here. |
 | [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
 | [`typedblite-conformance`](libs/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
 | [`typedblite-cli`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
@@ -68,11 +81,12 @@ define
 ```
 
 ```typeql
-redefine entity person owns name @card(0..);
+define attribute email, value string; person owns email @card(0..1);
+redefine person owns email @card(0..3);
 ```
 
 ```typeql
-undefine owns name from person;
+undefine owns email from person;
 ```
 
 ### Data DML
@@ -99,15 +113,15 @@ delete $p;
 
 | Annotation | Effect |
 |---|---|
-| `@key` | Generates a UNIQUE index; enforced at write time |
-| `@unique` | Parsed; semantics tracked on the conformance report card |
-| `@card(min..max)` | Parsed; not yet enforced at write time |
-| `@abstract` | Parsed; no instances of the type itself may be inserted |
-| `@independent` | Parsed; attribute may exist without an owner |
-| `@regex`, `@values`, `@range` | Parsed; not yet enforced |
-| `@doc`, `@meta` | Parsed; metadata stored in the runtime |
+| `@key`, `@unique` | Enforced: one owner per value. A key must also be held exactly once |
+| `@abstract` | Enforced: the type cannot have instances of its own |
+| `@regex` | Enforced on every write |
+| `@independent` | Honoured: the attribute survives without an owner |
+| `@doc` | Retained, and readable with `get_doc(type)` |
+| `@card(min..max)` | Shapes `fetch` and `update`; bounds other than a key's are not enforced on writes |
+| `@range`, `@values`, `@distinct`, `@cascade`, `@meta` | Accepted; not enforced on writes |
 
-Annotations that are parsed but not yet enforced are reported by `define` as a diagnostic, not silently dropped.
+Nothing is silently dropped: see [The TypeQLite language](docs/guides/typeqlite-language.md#annotations) for the measured detail.
 
 ## SQLite binding
 
@@ -144,14 +158,12 @@ npm run test
 # Type-check all packages
 npm run typecheck
 
-# Build a single package
-nx run @typedblite/runtime:build
-
-# Test a single package
-nx run @typedblite/runtime:test
+# Build or test a single project
+npm exec nx -- run typedblite-runtime:build
+npm exec nx -- run typedblite-runtime:test
 ```
 
-Coverage is collected on CI (`CI=true npm run test`) and written to `coverage/`.
+Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-conformance`, `typedblite` (the CLI) and `typeqlite-vscode`. Set `CI=true` to collect coverage into `coverage/`. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
 
 ## Test fixtures
 
@@ -170,8 +182,9 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 | [ADR-005](docs/architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md) | TypeDB's Behaviour Specification is TypeDBLite's Conformance Oracle |
 | [ADR-006](docs/architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md) | An Attribute Is Stored Once per Type and Value |
 | [ADR-007](docs/architecture/adr-007-a-scenario-typedb-itself-fails-is-a-deviation.md) | A Scenario TypeDB Itself Fails Is a Deviation |
+| [ADR-008](docs/architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md) | The TypeQLite Editor Is a Langium Language Server in This Repository |
 
-**Standard:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md)
+**Standards:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md) · [Multi-Phase Lifecycle Standard](docs/standards/governance/multi-phase-lifecycle-standard.md)
 
 References in source code link to `docs/architecture/adr-NNN-*.md` using relative paths — they resolve to this repo's `docs/` tree.
 
