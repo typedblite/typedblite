@@ -1,6 +1,6 @@
 ---
 kind: adr
-status: proposed
+status: accepted
 date: 2026-11-11
 decision-owners: [TypeDBLite maintainers]
 extends: [adr-002, adr-005]
@@ -9,8 +9,8 @@ constrained-by: [adr-003]
 
 # ADR-006: An attribute is stored once per type and value
 
-- **Status:** Proposed. It is held at Proposed until the migration has run against a real
-  file-backed store and the performance check under Consequences has passed.
+- **Status:** Accepted by the founder (Dave Jackson) on 2026-11-11, with the implementation merged
+  (PR #3) and both acceptance checks met. See Measurements.
 - **Date:** 2026-11-11
 - **Decision owners:** Founder; TypeDBLite maintainers
 - **Extends:** [ADR-002](adr-002-typeql-engine-as-a-port.md), whose SQLite adapter this reshapes;
@@ -18,6 +18,11 @@ constrained-by: [adr-003]
   report card names the gap
 - **Constrained by:** [ADR-003](adr-003-typedblite-change-log-and-sync-as-a-port.md). The change log's
   documents, revision digests and wire format must not change.
+
+> ✅ **Accepted 2026-11-11 by the founder.** It was held at Proposed until the migration had run
+> against real file-backed stores and the performance check had passed. Both were measured before
+> acceptance: identical answers on 18 migrated downstream-app stores, and an engine faster than the
+> one it replaced. The card rose from 1,306 to 1,439 of 1,756.
 
 ---
 

@@ -45,4 +45,4 @@ The repo is completely self-contained and self-referential:
 | ADR-003 | Change log belongs to the engine; sync is a port; CouchDB wire protocol in scope |
 | ADR-004 | Execution diagnostics are returned reports, not emitted events |
 | ADR-005 | TypeDB's behaviour spec is TypeDBLite's conformance oracle |
-| ADR-006 | An attribute is stored once per type and value (Proposed) |
+| ADR-006 | An attribute is stored once per type and value |
