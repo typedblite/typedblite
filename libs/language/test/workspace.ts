@@ -93,12 +93,39 @@ export async function workspace(files: Record<string, string>) {
     }));
   };
 
+  /** Apply a workspace edit to the files it names, as an editor would, and rebuild. */
+  const apply = async (edit: { changes?: Record<string, import('vscode-languageserver').TextEdit[]> } | undefined) => {
+    const { TextDocument } = await import('vscode-languageserver-textdocument');
+    const changed: URI[] = [];
+    for (const [uri, edits] of Object.entries(edit?.changes ?? {})) {
+      const document = LangiumDocuments.getDocument(URI.parse(uri))!;
+      disk.files.set(uri, TextDocument.applyEdits(document.textDocument, edits));
+      changed.push(URI.parse(uri));
+    }
+    await DocumentBuilder.update(changed, []);
+  };
+
+  /** Errors and warnings, by file: what "re-validates clean" means. */
+  const problems = () =>
+    Object.fromEntries(
+      LangiumDocuments.all
+        .toArray()
+        .map((document) => [
+          document.uri.path.split('/').pop()!,
+          (document.diagnostics ?? []).filter((d) => (d.severity ?? 1) <= 2).map((d) => d.message),
+        ])
+        .filter(([, messages]) => messages.length > 0),
+    );
+
   return {
     services,
     documentOf,
     positionOf,
     at,
     tokens,
+    apply,
+    problems,
+    text: (name: string) => documentOf(name).textDocument.getText(),
     diagnostics: (name: string): Diagnostic[] => documentOf(name).diagnostics ?? [],
     messages: (name: string): string[] =>
       (documentOf(name).diagnostics ?? []).map((d) =>
