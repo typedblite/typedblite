@@ -1,7 +1,7 @@
 ---
 kind: feature
-status: proposed
-decided-by: []
+status: in-progress
+decided-by: [adr-009]
 title: TypeDBLite Sync Demo
 feature: sync-demo
 branch: feat/sync-demo
@@ -9,8 +9,8 @@ branch: feat/sync-demo
 
 # TypeDBLite Sync Demo — Feature Doc
 
-> **Status:** 📋 Proposed, not started · **Written:** 2026-11-12 · **Branch:** `feat/sync-demo`, from
-> `main` · **Governed by:** ADR-009, which Phase 00 writes
+> **Status:** 🚧 In progress · **Written:** 2026-11-12 · **Branch:** `feat/sync-demo`, from
+> `main` · **Governed by:** [ADR-009](../../architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md)
 >
 > Request, 2026-11-12: *a sync demo like the one in `downstream-app`, with every dependency it needs
 > included, and without the Windows text-to-speech narration.*
@@ -207,7 +207,7 @@ because every store holds the same tasks, which is what the original's driver ch
 
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
-| 00 | Scope, the survey of the original, ADR-009, versions and licences | Not started | |
+| 00 | [Scope, the survey of the original, ADR-009, versions and licences](phases/00-scope-and-adr/summary.md) | Complete | [summary](phases/00-scope-and-adr/summary.md) |
 | 01 | The runtime in a browser: a browser-safe entry, synchronous SHA-256, `Object.groupBy` | Not started | |
 | 02 | The WASM binding, promoted: the export, the peer dependency, tests in Node and Chromium | Not started | |
 | 03 | Replication that fails honestly: 5xx and timeouts, and a warning on a reopened store | Not started | |
