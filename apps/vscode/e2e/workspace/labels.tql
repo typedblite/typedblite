@@ -1,0 +1,3 @@
+match
+$p isa nav-person, has nav-name $n;
+$q isa nav-persn;

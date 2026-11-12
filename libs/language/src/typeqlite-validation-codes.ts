@@ -36,6 +36,11 @@ export const TypeQLiteValidationCode = {
   unboundValue: 'typedblite.unbound-value',
   /** `select $_`, `sort $_`, `reduce … groupby $_` — a stage that names a variable needs a named one. */
   anonymousVariable: 'typedblite.anonymous-variable',
+  /**
+   * A label no file in the workspace defines (ADR-008 D6). 🔴 Editor-only: reported by
+   * `TypeQLiteDocumentValidator`, never by a registered check, so the runtime never sees it (ADR-008 D2).
+   */
+  unknownLabel: 'typedblite.unknown-label',
 } as const;
 
 export type TypeQLiteValidationCodeValue =

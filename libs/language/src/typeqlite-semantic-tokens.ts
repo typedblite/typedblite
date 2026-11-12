@@ -1,16 +1,16 @@
-import type { AstNode } from 'langium';
+import { AstUtils, type AstNode } from 'langium';
 import {
   AbstractSemanticTokenProvider,
+  type LangiumServices,
   type SemanticTokenAcceptor,
 } from 'langium/lsp';
+import type { TypeQLiteLabels } from './typeqlite-labels.js';
 import { SemanticTokenTypes, SemanticTokenModifiers } from 'vscode-languageserver';
 import {
   isAttributeDef,
   isEntityDef,
   isHasProperty,
-  isIsaProperty,
   isOwnsTrait,
-  isTypeExtensionDef,
   isRelatesTrait,
   isRelationDef,
   isRolePlayer,
@@ -26,7 +26,6 @@ import {
   isThingPattern,
   isDeletion,
   isSelectStage,
-  isAnonRelationPattern,
 } from './generated/ast.js';
 
 /**
@@ -44,10 +43,19 @@ import {
  * truth about what TypeQLite means.
  */
 export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvider {
+  private readonly labels: TypeQLiteLabels;
+
+  constructor(services: LangiumServices & { labels: { Labels: TypeQLiteLabels } }) {
+    super(services);
+    this.labels = services.labels.Labels;
+  }
+
   protected highlightElement(
     node: AstNode,
     acceptor: SemanticTokenAcceptor,
   ): void | undefined | 'prune' {
+    this.labelTokens(node, acceptor);
+
     // ── Declarations ────────────────────────────────────────────────────────
     if (isEntityDef(node) || isRelationDef(node)) {
       acceptor({
@@ -91,24 +99,12 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
       this.reference(node, 'role', SemanticTokenTypes.parameter, acceptor);
       return;
     }
-    if (isTypeExtensionDef(node)) {
-      acceptor({ node, property: 'type', type: SemanticTokenTypes.type });
-      return;
-    }
 
     // ── Queries ─────────────────────────────────────────────────────────────
     //
-    // 🔴 These are NOT cross-references in the grammar — `isa skill` is a plain `ID`, because a
-    // query is parsed without its schema in scope. So they are classified by position, and the
-    // "did it resolve" distinction genuinely does not exist here. Saying so is better than
-    // implying a check that is not happening; `checkKnown` in the interpreter is where an unknown
-    // type in a query is actually caught, at execution time.
-    if (isIsaProperty(node) || isAnonRelationPattern(node)) {
-      acceptor({ node, property: 'type', type: SemanticTokenTypes.type });
-      return;
-    }
+    // Labels (`isa skill`, `has name`, a role) are plain `ID`s, coloured by `labelTokens` above.
+    // What is left here is variables and literals.
     if (isHasProperty(node)) {
-      acceptor({ node, property: 'attribute', type: SemanticTokenTypes.property });
       if (node.valueVariable) {
         acceptor({ node, property: 'valueVariable', type: SemanticTokenTypes.variable });
       }
@@ -119,7 +115,6 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
       return;
     }
     if (isRolePlayer(node)) {
-      acceptor({ node, property: 'role', type: SemanticTokenTypes.parameter });
       acceptor({ node, property: 'player', type: SemanticTokenTypes.variable });
       return;
     }
@@ -151,6 +146,40 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
       return;
     }
     return;
+  }
+
+  /**
+   * Labels that are plain `ID`s (ADR-008 D5): `isa skill`, `has name`, a role, a re-open's label.
+   *
+   * 🔴 The same rule as a cross-reference, once the workspace has a schema: a label is coloured only
+   * when it resolves, and by what it resolves to. A workspace with no schema cannot tell a known label
+   * from a typo, because in TypeDB the schema lives in the database (ADR-008 D6). So there, and only
+   * there, a label is coloured by its position, as it was before labels could resolve.
+   */
+  private labelTokens(node: AstNode, acceptor: SemanticTokenAcceptor): void {
+    const sites = this.labels.sitesOfNode(AstUtils.getDocument(node), node);
+    if (sites.length === 0) return;
+    const resolving = this.labels.workspaceHasSchema();
+    for (const site of sites) {
+      let type: string;
+      if (resolving) {
+        const [target] = this.labels.resolve(site);
+        if (!target) continue;
+        type = isAttributeDef(target)
+          ? SemanticTokenTypes.property
+          : isRelatesTrait(target)
+            ? SemanticTokenTypes.parameter
+            : SemanticTokenTypes.type;
+      } else {
+        type =
+          site.kind === 'attribute'
+            ? SemanticTokenTypes.property
+            : site.kind === 'role'
+              ? SemanticTokenTypes.parameter
+              : SemanticTokenTypes.type;
+      }
+      acceptor({ range: site.range, type });
+    }
   }
 
   /**

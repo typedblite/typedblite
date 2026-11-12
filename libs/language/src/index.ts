@@ -6,6 +6,8 @@ export * from './typeqlite-scope.js';
 export * from './typeqlite-scope-computation.js';
 export * from './typeqlite-doc-comments.js';
 export * from './typeqlite-navigation.js';
+export * from './typeqlite-labels.js';
+export * from './typeqlite-label-providers.js';
 export * from './generated/ast.js';
 export * from './generated/grammar.js';
 export * from './generated/module.js';

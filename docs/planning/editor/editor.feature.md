@@ -168,7 +168,7 @@ the end (invariant 1).
 | 01 | [Extension shell: client, server, bundle, e2e harness, and existing services in the editor](phases/01-extension-shell/summary.md) | Complete | [summary](phases/01-extension-shell/summary.md) |
 | 02 | [Workspace schema: cross-file resolution of schema references](phases/02-workspace-schema/summary.md) | Complete | [summary](phases/02-workspace-schema/summary.md) |
 | 03 | [Navigation: definition, references, outline, hover, folding](phases/03-navigation/summary.md) | Complete | [summary](phases/03-navigation/summary.md) |
-| 04 | Query-side labels: pipeline type labels resolve against the schema | ⬜ Not started | — |
+| 04 | [Query-side labels: pipeline type labels resolve against the schema](phases/04-query-labels/summary.md) | Complete | [summary](phases/04-query-labels/summary.md) |
 | 05 | Completion | ⬜ Not started | — |
 | 06 | Code actions and rename | ⬜ Not started | — |
 | 07 | Packaging: the `.vsix` target, install path, and docs | ⬜ Not started | — |
@@ -223,6 +223,9 @@ Anything a phase defers is recorded here, not only in a commit message.
   when a real workspace holds two schemas that share a label.
 - **A configurable ignore-pattern setting for workspace indexing.** Phase 00 (ADR-008 D8, row 11).
   Langium's default already skips `node_modules`, `out` and dot-folders.
+- **Relinking only what a change affects.** Phase 04 (`TypeQLiteDocumentBuilder`). Every document
+  holding labels relinks on any change. The narrower rule, relinking only when a changed document's
+  exported definitions changed, waits for a workspace large enough to feel it.
 - **CI.** The repository has none. When it gets one, the e2e needs a virtual display (ADR-008 D7).
 
 ## Key Documents
