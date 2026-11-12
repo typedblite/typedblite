@@ -212,7 +212,7 @@ because every store holds the same tasks, which is what the original's driver ch
 | 02 | [The WASM binding, promoted: the export, the peer dependency, tests in Node and Chromium](phases/02-wasm-binding/summary.md) | Complete | [summary](phases/02-wasm-binding/summary.md) |
 | 03 | [Replication that fails honestly: 5xx and timeouts, and a warning on a reopened store](phases/03-honest-replication/summary.md) | Complete | [summary](phases/03-honest-replication/summary.md) |
 | 04 | [The hub, the switchboard, the control page, and `smoke`](phases/04-hub-and-switchboard/summary.md) | Complete | [summary](phases/04-hub-and-switchboard/summary.md) |
-| 05 | The PWA client and its service worker | Not started | |
+| 05 | [The PWA client and its service worker](phases/05-pwa/summary.md) | Complete | [summary](phases/05-pwa/summary.md) |
 | 06 | Electron and Android | Not started | |
 | 07 | The story: the Playwright driver, captions, Pause and Play, silent recording | Not started | |
 | 08 | Setup scripts, the README, and the docs | Not started | |
