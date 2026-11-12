@@ -7,7 +7,9 @@
 
 // A `$`-prefixed query variable: $s, $st, $child — and `$0_leading_digit_allowed`, which
 // match.feature writes (Phase 05).
-terminal VAR returns string: /\$[a-zA-Z0-9_][a-zA-Z0-9_-]*/;
+// A variable starts with a letter or a digit, ASCII or not (`$人`, `$0_leading_digit_allowed`); `$_` alone
+// is the anonymous variable, and a leading underscore is otherwise refused (match.feature L5561, L5591).
+terminal VAR returns string: /\$(?:_(?![A-Za-z0-9_\-\u0080-\uFFFF])|[A-Za-z0-9\u0080-\uFFFF][A-Za-z0-9_\-\u0080-\uFFFF]*)/;
 
 // Type and attribute labels. Hyphens are part of the token, which is why `skill-id` lexes as one
 // identifier rather than a subtraction. ⚠️ Since Phase 06 TypeQLite HAS arithmetic here, so `$a-1`
@@ -19,7 +21,8 @@ terminal VAR returns string: /\$[a-zA-Z0-9_][a-zA-Z0-9_-]*/;
 // alone are still identifiers.
 terminal DURATION returns string: /P(?:[0-9]+W|(?=[0-9]|T[0-9])(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+D)?(?:T(?=[0-9])(?:[0-9]+H)?(?:[0-9]+M)?(?:[0-9]+(?:\.[0-9]+)?S)?)?)(?![a-zA-Z0-9_-])/;
 
-terminal ID returns string: /[a-zA-Z_][a-zA-Z0-9_-]*/;
+// A label starts with a letter or `_`, ASCII or not (`人`, `_underscore-relation`) — never a digit (L5518).
+terminal ID returns string: /[A-Za-z_\u0080-\uFFFF][A-Za-z0-9_\-\u0080-\uFFFF]*/;
 
 // Double- or single-quoted — `has name 'Steve'` (expression.feature L1002) beside `"Alice"`.
 terminal STRING returns string: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
@@ -53,7 +56,8 @@ terminal DATE returns string: /(?:[+-][0-9]{4,}|[0-9]{4})-[0-9]{2}-[0-9]{2}/;
 terminal DECIMAL returns string: /[0-9]+(\.[0-9]+)?dec/;
 
 // `123.4567891` — before INT, for the same first-match reason as DATETIME. Stored as its text.
-terminal DOUBLE returns string: /[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?/;
+// `1.5`, `1.0e-2`, and `1e-2` — an exponent needs no fraction (insert.feature L1555).
+terminal DOUBLE returns string: /[0-9]+(\.[0-9]+)?[eE][+-]?[0-9]+|[0-9]+\.[0-9]+/;
 
 terminal INT returns number: /[0-9]+/;
 
