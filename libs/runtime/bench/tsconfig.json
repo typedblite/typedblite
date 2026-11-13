@@ -1,0 +1,19 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "noEmit": true,
+    "importHelpers": false,
+    "paths": {
+      "@typedblite/language": ["../../language/src/index.ts"],
+      "@typedblite/content-revision": ["../../content-revision/src/index.ts"],
+      "@typedblite/runtime": ["../src/index.ts"],
+      "#default-opener": ["../src/default-opener.node.ts"]
+    }
+  },
+  "include": ["*.ts"]
+}
