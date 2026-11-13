@@ -1603,8 +1603,7 @@ export class TypeDBLiteInterpreter {
         const constraints = this.constraintsOf(firstMatch === undefined ? [] : (this.segmentFor(firstMatch, firstMatch.patterns).match?.patterns ?? []));
         for (const constraint of constraints) {
           if (!constraint.type) continue;
-          const withoutRoles = this.candidates(constraint).length;
-          if (withoutRoles !== 0) {
+          if (this.hasCandidate(constraint)) {
             // 🔴 Type and attributes alone find candidates — for a relation, that leaves exactly
             // one thing left that could have excluded every row: its OWN role constraints, which
             // `candidates()` never reads (d-20260912-an-empty-result-caused-only-by).
@@ -1628,7 +1627,7 @@ export class TypeDBLiteInterpreter {
             if (this.relationBindings({ ...constraint, isas: resolveIsas(constraint.isas, {}) }, {}).length !== 0) continue;
             this.diagnostics.fact(
               DiagnosticCode.noCandidates,
-              `\`${constraint.isas.filter((isa) => isa.type !== undefined).map((isa) => `isa${isa.exact ? '!' : ''} ${isa.type}`).join(', ')}\` matched ${withoutRoles} candidate(s) before ` +
+              `\`${constraint.isas.filter((isa) => isa.type !== undefined).map((isa) => `isa${isa.exact ? '!' : ''} ${isa.type}`).join(', ')}\` matched ${this.candidateCount(constraint)} candidate(s) before ` +
                 `${constraint.variable.startsWith('__anon') ? 'its role constraints' : `the role constraints on '${constraint.variable}'`}` +
                 `, and 0 after.`,
               constraint.range,
@@ -1641,9 +1640,10 @@ export class TypeDBLiteInterpreter {
           // constraints were applied" over a store that holds the type sends a reader to the
           // schema for a fault in the data. The type-only count is what separates them.
           //
-          // The extra lookup is affordable because it is reached only when the projection came
-          // back empty *and* the constrained count was already zero — never on a query that
-          // answered.
+          // ⚠️ This was once called affordable because it is reached only on an empty answer. Empty
+          // answers are routine — an optional attribute is read by a query of its own — so it runs
+          // on ordinary reads, and it is a count over the whole type: `candidateCount`, in SQL,
+          // never rows read into memory (docs/development/performance.md).
           // Skipped when the pattern carries neither, because the query would be byte-identical
           // to the one that just returned 0. That is ALL it does — keeping `__anonN` out of the
           // message is the job of the ternary in the message below, and an earlier version of this
@@ -1651,7 +1651,7 @@ export class TypeDBLiteInterpreter {
           const constrained =
             constraint.literals.length > 0 || constraint.bindings.length > 0;
           const ofType = constrained
-            ? this.candidates({ ...constraint, literals: [], bindings: [] }).length
+            ? this.candidateCount({ ...constraint, literals: [], bindings: [] })
             : 0;
 
           // 🔴 Two counts, and no interpretation of them. Earlier revisions tried to name WHICH
@@ -3649,6 +3649,38 @@ export class TypeDBLiteInterpreter {
   /** Candidate row ids per variable, before relation constraints are applied. */
   private candidates(constraint: ThingConstraint, seed?: { sql: string; params: Array<string | number> }): number[] {
     if (this.trace) this.trace.candidatesCalls++;
+    const { sql, params } = this.candidateQuery(constraint, seed);
+    const found = this.db
+      .prepare(sql)
+      .all(...params)
+      .map((row: unknown) => Number((row as { iid: number }).iid));
+    if (this.trace) this.trace.candidateRows += found.length;
+    return found;
+  }
+
+  /**
+   * How many candidates `candidates()` would return, counted by SQLite rather than read into rows.
+   *
+   * 🔴 For the `noCandidates` fact only, which states counts. It used to call `candidates()` and
+   * take `.length` — reading every instance of the type into memory to report one number, on every
+   * empty answer. Empty answers are routine (an optional attribute most rows lack is read by its own
+   * query), so that was a full read of the type on ordinary reads: 27 ms at 125,000 entities
+   * (docs/development/performance.md). `COUNT(*)` still visits the rows, in C, without
+   * materialising them.
+   */
+  private candidateCount(constraint: ThingConstraint): number {
+    const { sql, params } = this.candidateQuery(constraint);
+    return Number((this.db.prepare(`SELECT COUNT(*) AS n FROM (${sql})`).get(...params) as { n: number }).n);
+  }
+
+  /** Whether `candidates()` would return anything — it stops at the first row. */
+  private hasCandidate(constraint: ThingConstraint): boolean {
+    const { sql, params } = this.candidateQuery(constraint);
+    return this.db.prepare(`${sql} LIMIT 1`).get(...params) !== undefined;
+  }
+
+  /** The SQL `candidates()` runs. */
+  private candidateQuery(constraint: ThingConstraint, seed?: { sql: string; params: Array<string | number> }): { sql: string; params: Array<string | number> } {
     const where: string[] = [];
     const params: Array<string | number> = [];
 
@@ -3712,12 +3744,7 @@ export class TypeDBLiteInterpreter {
       params.push(...seed.params);
     }
     const sql = `SELECT t.iid FROM thing t${where.length ? ` WHERE ${where.join(' AND ')}` : ''}${seed !== undefined ? ' ORDER BY t.iid' : ''}`;
-    const found = this.db
-      .prepare(sql)
-      .all(...params)
-      .map((row: unknown) => Number((row as { iid: number }).iid));
-    if (this.trace) this.trace.candidateRows += found.length;
-    return found;
+    return { sql, params };
   }
 
 
