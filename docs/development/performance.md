@@ -37,8 +37,8 @@ Everything ran from source on one machine: an Intel Core Ultra 9 275HX (24 cores
 
 ## What it found
 
-Six problems, and a seventh that belongs to the consumer. Fixes 1 to 4 are on the branch that added
-this page. 5 and 6 are [still open](#still-open).
+Six problems in the engine, all fixed on the branch that added this page, and a seventh that belongs
+to the consumer. What the fixes left behind is under [Still open](#still-open).
 
 ### 1. A second writing process failed instead of waiting
 
@@ -89,18 +89,31 @@ states. The messages are unchanged. Guarded by `empty-answer-cost.test.ts`.
 
 ### 5. One broad `has` value made a selective match slow
 
-`$s isa skill, has skill-id "x", has revision "r1"` builds one `t.iid IN (owners of the value)`
+`$s isa skill, has skill-id "x", has revision "r1"` built one `t.iid IN (owners of the value)`
 subquery per literal, and SQLite materialises each. When one value is owned by thousands of things
-and another by one, the broad one sets the cost: 5.0 ms against 0.017 ms for the same answer
-computed from the selective subquery, with the other checked per candidate by `EXISTS`. **Open.**
+and another by one, the broad one set the cost: 5.0 ms against 0.017 ms for the same answer
+computed from the selective subquery, with the other checked per candidate by `EXISTS`.
+
+**Fixed:** with two or more literals, `candidateQuery` counts each value's owners, stopping at 256,
+and drives from the fewest. Every other literal becomes an `EXISTS` probe through the
+`attribute(type, value)` and `has(owner, attribute)` indexes. SQLite cannot make that choice itself
+without `ANALYZE` statistics. `ORDER BY t.iid` keeps the row order, whichever literal drives.
+Guarded by `literal-selectivity.test.ts`, which asserts which value drives.
 
 ### 6. A two-hop path enumerated everything when its middle had no type
 
 `(dependent: $a, prerequisite: $b) isa step-dependency; (dependent: $b, prerequisite: $c) isa
-step-dependency;` with `$a` pinned answered one row in 1.3 s on a 21,000-step graph. Adding
-`$b isa skill-step` answered it in about 1 ms. The planner seeds a role player from a relation only
-when the player has its own `isa`; an untyped `$b` is never seeded, so `$c` is enumerated whole.
-**Open.** Until it is fixed, give every variable in a relation path a type.
+step-dependency; $c has step-id $y;` with `$a` pinned answered one row in 1.3 s on a 21,000-step
+graph. Adding `$b isa skill-step` answered it in about 1 ms. `$b` has no constraint of its own, so it
+was bound only when the relations bound, after `$c`. And `relationSeed` needed every other player
+of a relation bound, so `$c` got no seed and was enumerated whole: 21,000 candidates and 42,000
+statements.
+
+**Fixed:** `relationSeed` nests the seed of an unbound player that is itself seedable through another
+relation, up to three relations deep. The nested seed is a necessary condition, so it only narrows,
+and rows and their order are unchanged. The untyped path now costs what the typed one does. Guarded
+by `untyped-role-player-seed.test.ts` (trace counts), and by four untyped-chain reads in the
+planned-against-unplanned differential suite.
 
 ### 7. The document store was mostly change log (consumer)
 
@@ -111,114 +124,131 @@ any consumer that rewrites large values will grow the same way.
 
 ## Results, before and after
 
-Both runs used the same snapshots, sizes and sampled keys, on the same machine, each from its own
-worktree. *Before* is the bench commit on its own (`d3103d4`, now `218b2ca`); *after* adds fixes 1 to
-4 (`55b783a`, the same source tree as `0f63c6c` after a rebase that changed only `project.json`).
-Times are milliseconds. Raw files: [before](performance-results/2026-11-12-before.json),
-[after](performance-results/2026-11-12-after.json).
+Three runs of the same harness (`65e68b6`), with the same snapshots, sizes and sampled keys, on the
+same machine, each from its own worktree. Times are milliseconds at the median:
 
-**The headlines:**
+- **original**: the engine before any fix. `libs/runtime/src` was exactly `218b2ca`'s, the bench
+  commit, in a worktree of `65e68b6`; the results file records the worktree's commit.
+- **fixes-1-4**: fixes 1 to 4 (`55b783a`, the same engine as `0f63c6c` after a rebase that
+  changed only `project.json`). It was recorded by the harness before `a key and a broad value` was
+  added, so that row shows `—`. The file records its label as `after`.
+- **fixes-1-6**: all six fixes (`65e68b6`).
 
-| | Before | After |
-| - | -----: | ----: |
-| Bulk load, ms per entity, at 20k → 100k entities | 2.4 → 13.4 (rising) | 0.45 → 0.44 (flat) |
-| `saveStep()` at 100k entities | 36.9 ms | 3.9 ms |
-| Skills catalog at 14×, generated | 302 s | 39 s |
-| Two writer processes: writes lost to `database is locked` | 389 in 10 s | 0 |
-| `saveStep()` throughput, one process / four processes | 53 / 53 per s | 158 / 138 per s |
-| Workflow engine `find()`, 16 queries | 46.2 ms | 19.7 ms |
-| Observability listing, 7,000 rows | 1,132 ms | 398 ms |
+The raw files are in [performance-results/](performance-results/). `2026-11-12-before.json` is the
+first baseline, taken on the original engine with the harness as first committed. The rerun
+reproduces it closely: 13.4 and 13.1 ms per entity at 100,000 entities, and the same lock errors.
 
-Every read and write measured got faster or stayed level. Two costs still grow with the store, and
-both are listed under [Still open](#still-open). The empty-optional read is 4× cheaper but still linear,
-because it counts the type. The untyped 2-hop path is 3.5× cheaper but still enumerates (finding 6).
-`compact()`, `vacuum()` and full-text search did not change, and were not expected to.
+**The headlines,** original → all six fixes:
+
+| | Original | Fixes 1–6 |
+| - | -------: | --------: |
+| Bulk load, ms per entity, at 20k → 100k entities | 2.3 → 13.1 (rising) | 0.43 → 0.43 (flat) |
+| `saveStep()` at 100k entities | 34.7 ms | 5.2 ms |
+| Skills catalog at 14×, generated | 300 s | 39 s |
+| Two writer processes: writes lost to `database is locked`, in 10 s | 606 | 0 |
+| `saveStep()` throughput, one process / four processes | 55 / 52 per s | 160 / 143 per s |
+| Workflow engine `find()`, 16 queries | 46.7 ms | 19.4 ms |
+| Observability listing, 7,000 rows | 1,106 ms | 385 ms |
+| A key and a broad value, at 21,000 steps (finding 5) | 7.44 ms, rising with size | 0.23 ms, flat |
+| Two-hop path with an untyped middle, at 21,000 steps (finding 6) | 1,341 ms | 0.50 ms |
+
+Every read and write measured got faster or stayed level. The exception is `ladder: open`, a single
+sample each run (8.3 and 10.0 ms), which is noise. `compact()`, `vacuum()` and full-text search did
+not change, and were not expected to. Two costs still grow with the store, and both are listed
+under [Still open](#still-open): the empty-optional read (counting the type, now 4.6× cheaper) and
+`every dependency edge` (a full traversal, which grows with its answer).
 
 ### real-stores
 
-| Operation | Rows | Before p50 | After p50 | Before p95 | After p95 | Speed-up (p50) |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| ladder: open |  | 8.92 | 8.34 | 8.92 | 8.34 | 1.1× |
-| ladder: workflow by key | 1 | 0.47 | 0.50 | 1.02 | 1.06 | 0.9× |
-| ladder: step column (present) | 7 | 0.80 | 0.60 | 1.30 | 1.16 | 1.3× |
-| ladder: history column (mostly absent) | 0 | 9.13 | 2.21 | 12.3 | 2.90 | 4.1× |
-| ladder: find() — 16 queries | 113 | 46.2 | 19.7 | 54.5 | 22.9 | 2.3× |
-| ladder: list every workflow id | 1601 | 44.0 | 19.5 | 45.5 | 21.9 | 2.3× |
-| ladder: saveStep() — 3 commits |  | 17.6 | 5.98 | 24.5 | 12.7 | 2.9× |
-| ladder: 100 inserts in one transaction |  | 410 | 55.8 | 417 | 56.1 | 7.4× |
-| obs: getObservation(id) — 5 queries | 1 | 10.7 | 4.82 | 13.0 | 6.12 | 2.2× |
-| obs: list(operation) — 5 queries, ~170 rows | 172 | 17.0 | 6.59 | 17.7 | 8.40 | 2.6× |
-| obs: list(kind) — 5 queries, ~7,000 rows | 7032 | 1132 | 398 | 1174 | 405 | 2.8× |
-| obs: event by key | 1 | 0.33 | 0.20 | 0.41 | 0.39 | 1.6× |
-| obs: append payload + index — 2 commits |  | 14.2 | 3.70 | 19.6 | 7.67 | 3.8× |
-| docs: get(id) — 3 queries | 5 | 2.20 | 0.85 | 3.52 | 1.17 | 2.6× |
-| docs: list every document | 2390 | 204 | 77.8 | 250 | 79.2 | 2.6× |
-| docs: full-text search, limit 150 | 140 | 1.03 | 1.07 | 1.53 | 1.60 | 1.0× |
-| docs: re-ingest (remove + add) — 2 commits |  | 14.4 | 4.82 | 27.9 | 13.7 | 3.0× |
-| docs: compact() the change log |  | 2612 | 2707 | 2612 | 2707 | 1.0× |
-| docs: vacuum() |  | 266 | 267 | 266 | 267 | 1.0× |
-| skills: steps via skill-composition | 6 | 1.40 | 0.81 | 2.39 | 1.25 | 1.7× |
-| skills: sub-workflow children | 0 | 4.60 | 2.07 | 7.07 | 3.05 | 2.2× |
-| skills: step dependencies | 1 | 2.31 | 0.96 | 6.02 | 2.34 | 2.4× |
-| skills: every dependency edge | 167 | 73.9 | 15.4 | 74.6 | 16.3 | 4.8× |
+| Operation | Rows | original p50 | fixes-1-4 p50 | fixes-1-6 p50 | original → fixes-1-6 (p50) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ladder: open |  | 8.29 | 8.34 | 10.0 | 0.8× |
+| ladder: workflow by key | 1 | 0.51 | 0.50 | 0.43 | 1.2× |
+| ladder: step column (present) | 7 | 0.88 | 0.60 | 0.60 | 1.5× |
+| ladder: history column (mostly absent) | 0 | 9.05 | 2.21 | 2.19 | 4.1× |
+| ladder: find() — 16 queries | 113 | 46.7 | 19.7 | 19.4 | 2.4× |
+| ladder: list every workflow id | 1601 | 46.3 | 19.5 | 20.4 | 2.3× |
+| ladder: saveStep() — 3 commits |  | 17.2 | 5.98 | 5.66 | 3.0× |
+| ladder: 100 inserts in one transaction |  | 375 | 55.8 | 50.3 | 7.5× |
+| obs: getObservation(id) — 5 queries | 1 | 10.9 | 4.82 | 4.69 | 2.3× |
+| obs: list(operation) — 5 queries, ~170 rows | 172 | 16.8 | 6.59 | 6.24 | 2.7× |
+| obs: list(kind) — 5 queries, ~7,000 rows | 7032 | 1106 | 398 | 385 | 2.9× |
+| obs: event by key | 1 | 0.33 | 0.20 | 0.20 | 1.7× |
+| obs: append payload + index — 2 commits |  | 14.8 | 3.70 | 3.60 | 4.1× |
+| docs: get(id) — 3 queries | 5 | 2.18 | 0.85 | 1.03 | 2.1× |
+| docs: list every document | 2390 | 212 | 77.8 | 84.3 | 2.5× |
+| docs: full-text search, limit 150 | 140 | 1.06 | 1.07 | 1.09 | 1.0× |
+| docs: re-ingest (remove + add) — 2 commits |  | 15.7 | 4.82 | 5.31 | 3.0× |
+| docs: compact() the change log |  | 2686 | 2707 | 2670 | 1.0× |
+| docs: vacuum() |  | 279 | 267 | 248 | 1.1× |
+| skills: steps via skill-composition | 6 | 1.41 | 0.81 | 0.82 | 1.7× |
+| skills: sub-workflow children | 0 | 4.57 | 2.07 | 2.20 | 2.1× |
+| skills: step dependencies | 1 | 2.21 | 0.96 | 0.99 | 2.2× |
+| skills: every dependency edge | 167 | 73.7 | 15.4 | 16.5 | 4.5× |
 
 ### relations
 
-| Operation | Rows | Before p50 | After p50 | Before p95 | After p95 | Speed-up (p50) |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 200: steps via skill-composition | 7 | 1.56 | 0.77 | 2.01 | 0.95 | 2.0× |
-| 200: step dependencies (2 relations) | 6 | 2.25 | 0.99 | 3.30 | 1.26 | 2.3× |
-| 200: sub-workflow children (2 relations) | 0 | 4.60 | 1.99 | 5.56 | 2.89 | 2.3× |
-| 200: output fields (multi-valued) | 14 | 1.33 | 0.66 | 1.63 | 0.96 | 2.0× |
-| 200: every dependency edge | 1200 | 185 | 56.0 | 185 | 56.0 | 3.3× |
-| 200: 2-hop, untyped middle | 1 | 80.5 | 25.3 | 112 | 28.1 | 3.2× |
-| 200: 2-hop, typed middle | 1 | 1.06 | 0.73 | 1.46 | 1.08 | 1.4× |
-| 1000: steps via skill-composition | 7 | 1.55 | 0.78 | 1.79 | 1.33 | 2.0× |
-| 1000: step dependencies (2 relations) | 6 | 2.14 | 1.01 | 2.40 | 1.42 | 2.1× |
-| 1000: sub-workflow children (2 relations) | 0 | 17.4 | 6.35 | 20.7 | 7.47 | 2.7× |
-| 1000: output fields (multi-valued) | 14 | 1.35 | 0.65 | 1.65 | 0.79 | 2.1× |
-| 1000: every dependency edge | 6000 | 905 | 291 | 905 | 291 | 3.1× |
-| 1000: 2-hop, untyped middle | 1 | 439 | 123 | 530 | 126 | 3.6× |
-| 1000: 2-hop, typed middle | 1 | 1.17 | 0.68 | 33.5 | 1.31 | 1.7× |
-| 3000: steps via skill-composition | 7 | 1.57 | 0.78 | 1.87 | 1.03 | 2.0× |
-| 3000: step dependencies (2 relations) | 6 | 2.18 | 0.98 | 3.09 | 1.24 | 2.2× |
-| 3000: sub-workflow children (2 relations) | 1 | 1.65 | 0.77 | 4.66 | 1.77 | 2.1× |
-| 3000: output fields (multi-valued) | 14 | 1.31 | 0.65 | 1.80 | 0.89 | 2.0× |
-| 3000: every dependency edge | 18000 | 2769 | 849 | 2769 | 849 | 3.3× |
-| 3000: 2-hop, untyped middle | 1 | 1321 | 383 | 1409 | 531 | 3.5× |
-| 3000: 2-hop, typed middle | 1 | 1.05 | 0.70 | 1.42 | 1.35 | 1.5× |
+| Operation | Rows | original p50 | fixes-1-4 p50 | fixes-1-6 p50 | original → fixes-1-6 (p50) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 200: steps via skill-composition | 7 | 1.54 | 0.77 | 0.81 | 1.9× |
+| 200: step dependencies (2 relations) | 6 | 2.18 | 0.99 | 1.05 | 2.1× |
+| 200: sub-workflow children (2 relations) | 0 | 4.63 | 1.99 | 2.08 | 2.2× |
+| 200: output fields (multi-valued) | 14 | 1.33 | 0.66 | 0.70 | 1.9× |
+| 200: a key and a broad value | 1 | 0.74 | — | 0.23 | 3.2× |
+| 200: every dependency edge | 1200 | 190 | 56.0 | 58.5 | 3.3× |
+| 200: 2-hop, untyped middle | 1 | 84.2 | 25.3 | 0.58 | 144.6× |
+| 200: 2-hop, typed middle | 1 | 1.11 | 0.73 | 0.75 | 1.5× |
+| 1000: steps via skill-composition | 7 | 1.59 | 0.78 | 0.82 | 1.9× |
+| 1000: step dependencies (2 relations) | 6 | 2.19 | 1.01 | 1.02 | 2.1× |
+| 1000: sub-workflow children (2 relations) | 0 | 17.2 | 6.35 | 6.54 | 2.6× |
+| 1000: output fields (multi-valued) | 14 | 1.32 | 0.65 | 0.71 | 1.9× |
+| 1000: a key and a broad value | 1 | 2.52 | — | 0.24 | 10.4× |
+| 1000: every dependency edge | 6000 | 923 | 291 | 292 | 3.2× |
+| 1000: 2-hop, untyped middle | 1 | 443 | 123 | 0.49 | 897.7× |
+| 1000: 2-hop, typed middle | 1 | 1.04 | 0.68 | 0.68 | 1.5× |
+| 3000: steps via skill-composition | 7 | 1.57 | 0.78 | 0.77 | 2.0× |
+| 3000: step dependencies (2 relations) | 6 | 2.17 | 0.98 | 1.02 | 2.1× |
+| 3000: sub-workflow children (2 relations) | 1 | 1.67 | 0.77 | 0.81 | 2.1× |
+| 3000: output fields (multi-valued) | 14 | 1.34 | 0.65 | 0.70 | 1.9× |
+| 3000: a key and a broad value | 1 | 7.44 | — | 0.23 | 32.2× |
+| 3000: every dependency edge | 18000 | 2848 | 849 | 851 | 3.3× |
+| 3000: 2-hop, untyped middle | 1 | 1341 | 383 | 0.50 | 2687.8× |
+| 3000: 2-hop, typed middle | 1 | 1.18 | 0.70 | 0.63 | 1.9× |
 
 ### growth
 
-| entities | loadPerEntity before → after | keyed before → after | column before → after | emptyOptional before → after | listAll before → after | saveStep before → after |
+| entities | loadPerEntity | keyed | column | emptyOptional | listAll | saveStep |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 20160 | 2.38 → 0.45 | 0.36 → 0.26 | 2.58 → 0.79 | 3.58 → 1.11 | 20.7 → 9.06 | 13.6 → 4.37 |
-| 40320 | 4.95 → 0.45 | 0.38 → 0.23 | 1.27 → 0.55 | 7.81 → 1.77 | 40.3 → 17.8 | 17.7 → 4.73 |
-| 60480 | 7.85 → 0.44 | 0.36 → 0.22 | 1.39 → 0.65 | 10.8 → 2.46 | 61.7 → 25.7 | 27.3 → 4.44 |
-| 80640 | 10.7 → 0.43 | 0.38 → 0.30 | 1.37 → 0.57 | 15.2 → 3.66 | 80.2 → 35.1 | 29.3 → 3.75 |
-| 100800 | 13.4 → 0.44 | 0.37 → 0.23 | 1.42 → 0.59 | 19.3 → 4.45 | 103 → 43.0 | 36.9 → 3.93 |
+| 20160 | 2.34 → 0.45 → 0.43 | 0.37 → 0.26 → 0.35 | 2.34 → 0.79 → 0.57 | 3.43 → 1.11 → 1.00 | 20.0 → 9.06 → 8.44 | 11.2 → 4.37 → 3.94 |
+| 40320 | 4.95 → 0.45 → 0.44 | 1.50 → 0.23 → 0.26 | 1.46 → 0.55 → 0.56 | 7.29 → 1.77 → 1.79 | 42.8 → 17.8 → 17.2 | 19.0 → 4.73 → 5.02 |
+| 60480 | 7.55 → 0.44 → 0.44 | 0.40 → 0.22 → 0.24 | 1.39 → 0.65 → 0.56 | 13.1 → 2.46 → 2.51 | 62.2 → 25.7 → 28.3 | 23.8 → 4.44 → 5.07 |
+| 80640 | 10.8 → 0.43 → 0.43 | 1.85 → 0.30 → 0.35 | 1.34 → 0.57 → 0.57 | 14.1 → 3.66 → 3.59 | 81.0 → 35.1 → 34.4 | 27.8 → 3.75 → 3.59 |
+| 100800 | 13.1 → 0.44 → 0.43 | 0.35 → 0.23 → 0.23 | 1.30 → 0.59 → 0.59 | 20.6 → 4.45 → 4.50 | 105 → 43.0 → 48.2 | 34.7 → 3.93 → 5.20 |
 
 ### relations-generation
 
-| skills | steps before → after | writes before → after | seconds before → after | msPerWrite before → after |
+| skills | steps | writes | seconds | msPerWrite |
 | --- | ---: | ---: | ---: | ---: |
-| 200 | 1400 → 1400 | 2939 → 2939 | 5.85 → 2.66 | 1.99 → 0.91 |
-| 1000 | 7000 → 7000 | 14699 → 14699 | 47.8 → 12.9 | 3.25 → 0.88 |
-| 3000 | 21000 → 21000 | 44099 → 44099 | 302 → 39.3 | 6.86 → 0.89 |
+| 200 | 1400 → 1400 → 1400 | 2939 → 2939 → 2939 | 5.76 → 2.66 → 2.81 | 1.96 → 0.91 → 0.96 |
+| 1000 | 7000 → 7000 → 7000 | 14699 → 14699 → 14699 | 47.0 → 12.9 → 13.1 | 3.20 → 0.88 → 0.89 |
+| 3000 | 21000 → 21000 → 21000 | 44099 → 44099 → 44099 | 300 → 39.3 → 39.2 | 6.81 → 0.89 → 0.89 |
 
 ### concurrency
 
-| configuration | saveStepsPerSecond before → after | writerP50 before → after | writerP99 before → after | writerErrors before → after | readsPerSecond before → after | readerP99 before → after | readerErrors before → after |
+| configuration | saveStepsPerSecond | writerP50 | writerP99 | writerErrors | readsPerSecond | readerP99 | readerErrors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1W+0R | 53 → 158 | 18.0 → 5.69 | 27.2 → 14.2 | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 |
-| 2W+0R | 52.2 → 149 | 18.5 → 6.01 | 1751 → 545 | 389 → 0 | 0 → 0 | 0 → 0 | 0 → 0 |
-| 4W+0R | 52.5 → 138 | 18.9 → 6.74 | 3392 → 1761 | 1035 → 0 | 0 → 0 | 0 → 0 | 0 → 0 |
-| 2W+2R | 45 → 133 | 21.7 → 6.74 | 1362 → 198 | 442 → 0 | 1097 → 2022 | 7.23 → 2.35 | 0 → 0 |
-| 4W+4R | 41.6 → 105 | 25.0 → 13.0 | 4598 → 1204 | 778 → 0 | 2060 → 3792 | 8.03 → 3.07 | 0 → 0 |
+| 1W+0R | 55.3 → 158 → 160 | 17.2 → 5.69 → 5.61 | 27.4 → 14.2 → 13.5 | 0 → 0 → 0 | 0 → 0 → 0 | 0 → 0 → 0 | 0 → 0 → 0 |
+| 2W+0R | 54 → 149 → 151 | 17.7 → 6.01 → 6.30 | 1564 → 545 → 1045 | 606 → 0 → 0 | 0 → 0 → 0 | 0 → 0 → 0 | 0 → 0 → 0 |
+| 4W+0R | 51.6 → 138 → 143 | 19.8 → 6.74 → 6.85 | 1961 → 1761 → 1825 | 658 → 0 → 0 | 0 → 0 → 0 | 0 → 0 → 0 | 0 → 0 → 0 |
+| 2W+2R | 45.9 → 133 → 141 | 20.9 → 6.74 → 6.58 | 956 → 198 → 238 | 383 → 0 → 0 | 1151 → 2022 → 2243 | 6.91 → 2.35 → 2.29 | 0 → 0 → 0 |
+| 4W+4R | 38.7 → 105 → 108 | 46.5 → 13.0 → 20.4 | 5905 → 1204 → 2458 | 782 → 0 → 0 | 1925 → 3792 → 3655 | 8.89 → 3.07 → 3.44 | 0 → 0 → 0 |
 
 ## Still open
 
-- **5 and 6 above**, both in the planner.
+- **The planner has no cost model.** Fixes 5 and 6 are targeted: the bounded count chooses between
+  literals, and nested seeds follow relation paths. Thing variables are still enumerated in the
+  order they are written, and a variable no relation or literal reaches is enumerated whole.
+  `every dependency edge` is a full traversal and stays linear in the edges.
 - **The empty-answer count still visits the type.** `COUNT(*)` reads no rows into memory, but it is
   still linear in the type's size. Making the fact lazy, or bounding the count, would change what
   the fact says, which is a decision of its own.
@@ -227,8 +257,8 @@ because it counts the type. The untyped 2-hop path is 3.5× cheaper but still en
   round trip.
 - **One writer at a time.** SQLite allows one writer, so write throughput does not grow with
   processes. What the fixes change is how long each write holds the lock. The wait is not fair:
-  with four writers the p99 `saveStep()` still waits 1.8 s for the lock, under the 5 s
-  `busy_timeout` but not far under it.
+  with four writers the p99 `saveStep()` still waits 1.8 s for the lock, and 2.5 s with four
+  readers alongside. That is under the 5 s `busy_timeout`, but not far under it.
 - **No change-log retention policy** (7 above).
 
 ## Running it again
