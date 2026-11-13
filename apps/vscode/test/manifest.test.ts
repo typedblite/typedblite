@@ -51,6 +51,15 @@ describe('the manifest agrees with langium-config.json', () => {
     expect(manifest.contributes['markdown.markdownItPlugins']).toBe(true);
   });
 
+  it("shows the TypeDBLite logo: the brand's own icon, a PNG of at least 128 px", () => {
+    // `sync-icon` copies it in, so `docs/brand/` stays the only copy in git. VS Code shows it in the
+    // Extensions view and on the extension's page, and refuses an SVG for it.
+    const icon = readFileSync(resolve(APP, manifest.icon));
+    expect(icon.equals(readFileSync(resolve(APP, '../../docs/brand/typedblite-icon-512.png')))).toBe(true);
+    expect(icon.subarray(1, 4).toString()).toBe('PNG');
+    expect(Math.min(icon.readUInt32BE(16), icon.readUInt32BE(20))).toBeGreaterThanOrEqual(128);
+  });
+
   it('bundles its dependencies rather than shipping node_modules', () => {
     expect(manifest.vsce).toEqual({ dependencies: false });
     expect(manifest.main).toBe('./out/extension.cjs');

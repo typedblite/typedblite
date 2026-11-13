@@ -21,7 +21,7 @@ around the diamond keeps the mark light.
 | [`typedblite-mark-dark.svg`](typedblite-mark-dark.svg) | The mark alone, on dark backgrounds |
 | [`typedblite-icon.svg`](typedblite-icon.svg) | App icon and favicon: the mark on a dark rounded square |
 | [`typedblite-icon-light.svg`](typedblite-icon-light.svg) | App icon on a light rounded square |
-| [`typedblite-icon-128.png`](typedblite-icon-128.png), [`typedblite-icon-512.png`](typedblite-icon-512.png) | The app icon where SVG is not accepted, such as a VS Code extension icon |
+| [`typedblite-icon-128.png`](typedblite-icon-128.png), [`typedblite-icon-512.png`](typedblite-icon-512.png) | The app icon where SVG is not accepted. The 512 px one is the VS Code extension's icon: the build copies it into `apps/vscode/images/`, and a test checks the two match |
 
 The logo and mark SVGs have transparent backgrounds. The wordmark is outlined, so the files render the
 same everywhere without the font installed.

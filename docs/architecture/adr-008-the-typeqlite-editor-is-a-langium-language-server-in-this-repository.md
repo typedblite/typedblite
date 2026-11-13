@@ -103,7 +103,7 @@ rendered page. CI, when it exists, needs a virtual display (`xvfb`).
 | 11 | `WorkspaceManager` subclass and a `build.ignorePatterns` setting | **Deferred.** The default already skips `node_modules`, `out` and dot-folders |
 | 12 | Railroad-diagram command and webview | **Declined.** TypeQLite is not a grammar language |
 | 13 | `jsonValidation` for `langium-config.json`, and the config handler | **Declined.** Nothing here has a configuration file to validate |
-| 14 | Icon, gallery banner, publisher metadata | **Declined** while there is no marketplace release |
+| 14 | Icon, gallery banner, publisher metadata | **Icon adopted** on 2026-11-13, once the TypeDBLite logo existed (`docs/brand/`): VS Code shows it in the Extensions view and on the extension's page, with no marketplace release. The gallery banner and publisher metadata stay **declined** while there is no marketplace release |
 
 ## Consequences
 

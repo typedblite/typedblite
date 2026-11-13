@@ -21,10 +21,24 @@
         "{projectRoot}/syntaxes"
       ]
     },
+    "sync-icon": {
+      "executor": "nx:run-commands",
+      "inputs": [
+        "{workspaceRoot}/docs/brand/typedblite-icon-512.png"
+      ],
+      "options": {
+        "command": "mkdir -p images && cp ../../docs/brand/typedblite-icon-512.png images/icon.png",
+        "cwd": "apps/vscode"
+      },
+      "outputs": [
+        "{projectRoot}/images"
+      ]
+    },
     "build": {
       "executor": "nx:run-commands",
       "dependsOn": [
         "sync-grammar",
+        "sync-icon",
         "^build"
       ],
       "options": {
@@ -71,6 +85,7 @@
       "executor": "nx:run-commands",
       "dependsOn": [
         "sync-grammar",
+        "sync-icon",
         "^build"
       ],
       "options": {

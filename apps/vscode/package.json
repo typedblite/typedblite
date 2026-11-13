@@ -2,6 +2,7 @@
   "name": "typeqlite",
   "displayName": "TypeQLite",
   "description": "TypeQLite language support from TypeDBLite: diagnostics, formatting and semantic highlighting",
+  "icon": "images/icon.png",
   "version": "0.0.1",
   "license": "MPL-2.0",
   "publisher": "typedblite",
