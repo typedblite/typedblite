@@ -7,7 +7,7 @@
 
 # TypeDBLite
 
-## Special Thanks to TypeDB
+## Special Thanks to TypeDB!
 
 **TypeDBLite exists because of [TypeDB](https://typedb.com).** The data model, the query language and
 the behaviour that TypeDBLite implements are the work of [TypeDB Ltd](https://typedb.com) and the
