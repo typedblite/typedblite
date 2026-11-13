@@ -60,7 +60,7 @@ npm exec nx -- run <project>:typecheck
 
 Nx project names (not the npm package names):
 - `typeqlite-language` — `@typedblite/language`
-- `typedblite-runtime` — `@typedblite/runtime` (no `typecheck` target; `build` type-checks)
+- `typedblite-runtime` — `@typedblite/runtime` (no `typecheck` target; `build` type-checks). Also `bench`, the load test: timings on real schemas and data, never part of `test` ([docs/development/performance.md](docs/development/performance.md))
 - `content-revision` — `@typedblite/content-revision`
 - `typedblite-conformance` — also has `report`
 - `typedblite` — the CLI, `typedblite-cli`

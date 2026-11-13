@@ -107,7 +107,7 @@ Every store has the same fixed tables, whatever its schema:
 | `type_parent` | The `sub` hierarchy, so `isa person` also matches subtypes |
 | `schema_*` | The schema: elements, `owns`, `relates`, `plays`, value types, annotations, functions, structs, specialised roles, ordered ownerships |
 | `change_log`, `key_attribute`, `pending_role` | Replication ([ADR-003](../architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)) |
-| `entity_fts` | The FTS5 full-text index |
+| `entity_fts`, `entity_fts_key` | The FTS5 full-text index, and each entity's row in it, so a write finds that row without scanning the index ([Performance](performance.md#2-every-write-scanned-the-full-text-index)) |
 
 Two guarantees come from SQLite's own constraint machinery rather than from application code:
 - **A duplicate `@key` is unrepresentable.** The partial unique index refuses it.

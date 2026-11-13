@@ -160,4 +160,7 @@ runtime tests. The revision *hash* is pinned: `sha256.spec.ts` proves it identic
   `relation-join-planning-differential.test.ts` runs the planned and unplanned engines and asserts
   the same rows in the same order. Prefer this shape whenever you add an optimisation.
 - **Count work, do not time it.** To guard performance, assert on `lastQueryTrace()` counts, as in
-  `query-trace.test.ts`. Timings are flaky; counts are not.
+  `query-trace.test.ts`. Timings are flaky; counts are not. When the cost is a scan the trace does
+  not count, assert on SQLite's own plan, as `full-text-key.test.ts` does with `EXPLAIN QUERY PLAN`.
+  Timings belong to the load test, `nx run typedblite-runtime:bench`
+  ([Performance](performance.md)), which writes them to a results file.
