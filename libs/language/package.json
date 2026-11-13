@@ -28,7 +28,7 @@
     }
   },
   "scripts": {
-    "langium:generate": "langium generate",
+    "langium:generate": "langium generate && tsx scripts/generate-textmate.mts",
     "build": "tsc -b tsconfig.src.json"
   },
   "dependencies": {

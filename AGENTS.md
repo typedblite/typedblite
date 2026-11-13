@@ -82,9 +82,11 @@ cd libs/language
 npm run langium:generate
 ```
 
-This regenerates `src/generated/ast.ts`, `src/generated/grammar.ts`, and `src/generated/module.ts`. `src/generated/` is gitignored: the `build`, `test` and `typecheck` targets regenerate it first (`langium-generate`), so commit the grammar, not the output.
+This regenerates `src/generated/ast.ts`, `src/generated/grammar.ts`, and `src/generated/module.ts`, and then the TextMate grammar, `syntaxes/typeqlite.tmLanguage.json` (`scripts/generate-textmate.mts`). `src/generated/` and `syntaxes/` are gitignored: the `build`, `test` and `typecheck` targets regenerate it first (`langium-generate`), so commit the grammar, not the output.
 
 **Grammar scope discipline.** A construct is added to the grammar only when a real caller needs it. The rule is "find the caller first". The TypeDB behaviour spec (`libs/conformance/spec/`) is a first-class caller — if the spec's Background steps require a construct, add it.
+
+**Every keyword needs a TextMate scope.** The TextMate grammar takes its keywords from the Langium grammar and their scopes from `KEYWORD_SCOPES` in `typeqlite-textmate.ts`: `keyword.control`, `storage.type` for kinds, `storage.modifier` for value types, and so on, the same scopes as TypeDB's TypeQL grammar, so a theme colours TypeQLite as it colours TypeQL. A new keyword fails `typeqlite-textmate.spec.ts` until it has one, and generation refuses a stale entry. Annotations are scoped by their `@`, with no entry.
 
 **Annotation admissibility.** Which annotations are valid on which positions is tracked in the validator's admissibility table (`typeqlite-annotations.ts`). `@key` is enforced at write time by the runtime. All other annotations parse successfully, but their runtime semantics are tracked scenario-by-scenario on the conformance report card.
 
@@ -174,7 +176,7 @@ The extension also colours TypeQLite code blocks in VS Code's Markdown preview
 The server classifies, through the `typeqlite/highlightBlocks` request: TextMate scopes from the
 grammar file the extension ships, and the editor's own semantic tokens. The client only maps those to
 the active theme's colours, which it reads from the theme's files (`src/markdown/theme.ts` restates
-VS Code's rules for that). 🔴 Keep TypeQLite knowledge out of `src/markdown/`: a keyword list or
+VS Code's rules for that). In the Markdown *editor*, `grammars/typeqlite-markdown-injection.json` injects the same TextMate grammar into fences of the same languages, and a manifest test keeps the two lists equal. 🔴 Keep TypeQLite knowledge out of `src/markdown/`: a keyword list or
 token rule there would be a second definition of the language.
 - Shared TypeQLite schema fixtures used by multiple suites live in `test-fixtures/schemas/`.
 - `typedblite-runtime:test-wasm` runs the whole runtime suite on WASM SQLite, and `typedblite-runtime:test-browser` runs the engine in a real Chromium on OPFS (ADR-009). Run both after touching the binding interface, `src/wasm.ts` or `content-revision`. `test-oracle` needs an external search index and is not routine ([Testing](docs/development/testing.md#the-engine-on-wasm-sqlite)).
@@ -196,12 +198,13 @@ token rule there would be a second definition of the language.
 
 1. Add the production rule to `libs/language/src/typeqlite.langium`.
 2. Run `npm run langium:generate` inside `libs/language/`.
-3. Update the admissibility table in `typeqlite-annotations.ts` if the construct accepts annotations.
-4. Add validation in `typeqlite-validator.ts` if the construct has parse-time constraints.
-5. Add SQLite generation in `libs/runtime/src/sqlite-generator.ts`.
-6. Add interpreter handling in `libs/runtime/src/interpreter.ts`.
-7. Add tests in `libs/runtime/test/` covering the new behaviour.
-8. Run the full conformance suite to check for regressions: `nx run typedblite-conformance:test`.
+3. Give each new keyword a scope in `KEYWORD_SCOPES` (`typeqlite-textmate.ts`). The generator refuses until you do.
+4. Update the admissibility table in `typeqlite-annotations.ts` if the construct accepts annotations.
+5. Add validation in `typeqlite-validator.ts` if the construct has parse-time constraints.
+6. Add SQLite generation in `libs/runtime/src/sqlite-generator.ts`.
+7. Add interpreter handling in `libs/runtime/src/interpreter.ts`.
+8. Add tests in `libs/runtime/test/` covering the new behaviour.
+9. Run the full conformance suite to check for regressions: `nx run typedblite-conformance:test`.
 
 ---
 

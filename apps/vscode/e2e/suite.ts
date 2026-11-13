@@ -1,4 +1,6 @@
 import * as assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
 
@@ -319,6 +321,40 @@ const cases: Record<string, () => Promise<void>> = {
     assert.equal(byText.get('nav-person'), 'type');
     assert.equal(byText.get('nav-name'), 'property');
     assert.equal(byText.has('nav-persn'), false);
+  },
+
+  async "the TextMate grammar scopes keywords by kind, in a .tql file and in a Markdown editor's fences"() {
+    // Outside the workspace, so the fixtures join no other case's schema. The command reads a file
+    // and tokenizes it with VS Code's own TextMate engine (Oniguruma), every injection included.
+    const dir = mkdtempSync(join(tmpdir(), 'typeqlite-scopes-'));
+    const schema = 'define entity person, owns name @key; attribute name, value string;';
+    writeFileSync(join(dir, 'scopes.tql'), `${schema}\n`);
+    writeFileSync(join(dir, 'scopes.md'), ['# Scopes', '', '```typeql', schema, '```', '', 'entity', ''].join('\n'));
+    const scopesOf = async (name: string) => {
+      const tokens = await vscode.commands.executeCommand<{ c: string; t: string }[]>(
+        '_workbench.captureSyntaxTokens',
+        vscode.Uri.file(join(dir, name)),
+      );
+      return tokens.map((token) => ({ text: token.c.trim(), scopes: token.t.split(' ') }));
+    };
+    const expected: [string, string][] = [
+      ['define', 'keyword.control.typeqlite'],
+      ['entity', 'storage.type.typeqlite'],
+      ['owns', 'keyword.control.typeqlite'],
+      ['@key', 'keyword.annotations.typeqlite'],
+      ['string', 'storage.modifier.typeqlite'],
+    ];
+    for (const file of ['scopes.tql', 'scopes.md']) {
+      const tokens = await scopesOf(file);
+      for (const [text, scope] of expected) {
+        const token = tokens.find((t) => t.text === text);
+        assert.ok(token && token.scopes.includes(scope), `${file}: '${text}' has ${token?.scopes.join(' ')}, not ${scope}`);
+        if (file === 'scopes.md') assert.ok(token.scopes.includes('meta.embedded.block.typeqlite'), `${text} is inside the fence`);
+      }
+    }
+    // Outside the fence, `entity` is Markdown text.
+    const prose = (await scopesOf('scopes.md')).filter((t) => t.text === 'entity').at(-1)!;
+    assert.ok(!prose.scopes.some((s) => s.endsWith('.typeqlite')), `prose 'entity' has ${prose.scopes.join(' ')}`);
   },
 
   async 'the Markdown preview colours TypeQLite code blocks in the theme, and again when it changes (ADR-010)'() {

@@ -11,7 +11,8 @@ extends: [adr-002]
 - **Status:** Accepted on 2026-11-12. The founder took Decisions 3, 4 and 7 in
   [Phase 00](../planning/editor/phases/00-scope-and-adr/summary.md) of the
   [TypeQLite Editor](../planning/editor/editor.feature.md) feature, each as recommended. The rest are
-  measurements, and the evidence for each is below.
+  measurements, and the evidence for each is below. **Amended on 2026-11-13** in D8: row 3 (the
+  TextMate grammar scopes keywords by kind) and row 14 (the extension has an icon).
 - **Date:** 2026-11-12
 - **Decision owners:** Founder; TypeDBLite maintainers
 - **Extends:** [ADR-002](adr-002-typeql-engine-as-a-port.md). Its Decision 7 makes the Langium validator the
@@ -92,7 +93,7 @@ rendered page. CI, when it exists, needs a virtual display (`xvfb`).
 | - | ------------------------------------ | ---- |
 | 1 | `main: out/extension.cjs`, `type: module`, activation `onLanguage:<id>` | **Adopted** |
 | 2 | `languages` entry with a `configuration` file | **Adopted.** `language-configuration.json`: `#` line comments, brackets `()` `[]` `{}`, auto-closing `"` and `'` |
-| 3 | `grammars` from the generated TextMate file | **Adopted.** It is copied from `libs/language/syntaxes/` by an Nx target, and is never hand-written or committed |
+| 3 | `grammars` from the generated TextMate file | **Adopted.** It is copied from `libs/language/syntaxes/` by an Nx target, and is never hand-written or committed. **Amended 2026-11-13:** Langium's generator gave every keyword one scope, so themes drew `define`, `entity`, `string` and `@key` alike. `libs/language/scripts/generate-textmate.mts` now writes the file instead. It takes the keywords from the Langium grammar, as Langium's generator does, and scopes each by kind (`typeqlite-textmate.ts`), with the scopes TypeDB's TypeQL grammar uses, so a theme colours both alike. A keyword with no scope fails generation. A second, hand-written grammar injects it into Markdown fences, for the Markdown editor |
 | 4 | Two esbuild entries (extension and language server), CommonJS, `external: ['vscode']`, sourcemaps unless minified | **Adopted.** `target` follows VS Code's Node rather than upstream's `ES2017` |
 | 5 | Client over `TransportKind.ipc`, with a debug server on `--inspect=6009` (`DEBUG_BREAK`, `DEBUG_SOCKET`) | **Adopted** |
 | 6 | `documentSelector: [{ scheme: 'file', language }]` | **Adopted** |
