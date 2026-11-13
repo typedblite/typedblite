@@ -56,6 +56,21 @@ system cannot support WAL, the database still opens, and the first call's report
 Opening a file that already holds a schema loads it. `db.hasSchema` tells you whether any schema has
 been applied.
 
+**To open a store read-only**, pass an opener that opens the connection that way:
+
+```ts
+import { DatabaseSync } from 'node:sqlite';
+
+const reader = new TypeDBLiteInterpreter('./people.db', 5000, {
+  openDatabase: (location) => new DatabaseSync(location, { readOnly: true }),
+});
+```
+
+Reads work as usual, and any write fails with SQLite's own `attempt to write a readonly database`.
+Opening writes nothing to a store that is up to date. A store last written by an older version of
+TypeDBLite may need one writable open first: storage grows additively, and the newer tables are
+created on open.
+
 Call `db.close()` when you are done. It closes the SQLite connection.
 
 ## Defining a schema
