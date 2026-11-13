@@ -1,5 +1,6 @@
 import { defaultOpener } from '#default-opener';
 import type { SqliteDatabase, SqliteOpener } from './sqlite-database.js';
+import { cachingStatements } from './statement-cache.js';
 import { AstUtils, EmptyFileSystem, type AstNode as LangiumNode } from 'langium';
 import {
   createTypeQLiteServices,
@@ -638,7 +639,9 @@ export class TypeDBLiteInterpreter {
   private readonly planJoins: boolean;
 
   constructor(location = ':memory:', busyTimeoutMs = 5000, options: TypeDBLiteOptions = {}) {
-    const raw = (options.openDatabase ?? defaultOpener)(location);
+    // Beneath the tracing proxy, so a trace still counts every `prepare()` the engine asks for —
+    // the shape of the work, which is what tests assert on — not whether the cache answered it.
+    const raw = cachingStatements((options.openDatabase ?? defaultOpener)(location));
     // `process` does not exist in a browser or a WebView; there the environment switches are off.
     const processEnv = typeof process === 'undefined' ? {} : process.env;
     const env = processEnv['TYPEDBLITE_TRACE'];
