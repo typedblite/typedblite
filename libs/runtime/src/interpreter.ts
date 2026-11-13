@@ -1,5 +1,6 @@
 import { defaultOpener } from '#default-opener';
 import type { SqliteDatabase, SqliteOpener } from './sqlite-database.js';
+import { cachingStatements } from './statement-cache.js';
 import { AstUtils, EmptyFileSystem, type AstNode as LangiumNode } from 'langium';
 import {
   createTypeQLiteServices,
@@ -638,7 +639,9 @@ export class TypeDBLiteInterpreter {
   private readonly planJoins: boolean;
 
   constructor(location = ':memory:', busyTimeoutMs = 5000, options: TypeDBLiteOptions = {}) {
-    const raw = (options.openDatabase ?? defaultOpener)(location);
+    // Beneath the tracing proxy, so a trace still counts every `prepare()` the engine asks for —
+    // the shape of the work, which is what tests assert on — not whether the cache answered it.
+    const raw = cachingStatements((options.openDatabase ?? defaultOpener)(location));
     // `process` does not exist in a browser or a WebView; there the environment switches are off.
     const processEnv = typeof process === 'undefined' ? {} : process.env;
     const env = processEnv['TYPEDBLITE_TRACE'];
@@ -1445,7 +1448,13 @@ export class TypeDBLiteInterpreter {
         );
       }
       const savepoint = this.transactionOpen ? `write_${(this.savepointSeq += 1)}` : null;
-      this.db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN');
+      // 🔴 `BEGIN IMMEDIATE`, as `beginTransaction()` and `applySchemaDdl` already were. A write
+      // pipeline reads before it writes, so a deferred `BEGIN` holds a read snapshot that must then
+      // be upgraded — and when another process committed in between, SQLite refuses the upgrade
+      // with SQLITE_BUSY at once, without waiting out `busy_timeout`. Two processes sharing one
+      // store lost ~30% of their writes to "database is locked" (`write-lock-contention.test.ts`,
+      // docs/development/performance.md). Taking the write lock first turns that into a wait.
+      this.db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN IMMEDIATE');
       try {
         const streamed = this.runStages(pipeline, scopes, start);
         // Read inside the transaction, after every write the pipeline made.
@@ -1594,8 +1603,7 @@ export class TypeDBLiteInterpreter {
         const constraints = this.constraintsOf(firstMatch === undefined ? [] : (this.segmentFor(firstMatch, firstMatch.patterns).match?.patterns ?? []));
         for (const constraint of constraints) {
           if (!constraint.type) continue;
-          const withoutRoles = this.candidates(constraint).length;
-          if (withoutRoles !== 0) {
+          if (this.hasCandidate(constraint)) {
             // 🔴 Type and attributes alone find candidates — for a relation, that leaves exactly
             // one thing left that could have excluded every row: its OWN role constraints, which
             // `candidates()` never reads (d-20260912-an-empty-result-caused-only-by).
@@ -1619,7 +1627,7 @@ export class TypeDBLiteInterpreter {
             if (this.relationBindings({ ...constraint, isas: resolveIsas(constraint.isas, {}) }, {}).length !== 0) continue;
             this.diagnostics.fact(
               DiagnosticCode.noCandidates,
-              `\`${constraint.isas.filter((isa) => isa.type !== undefined).map((isa) => `isa${isa.exact ? '!' : ''} ${isa.type}`).join(', ')}\` matched ${withoutRoles} candidate(s) before ` +
+              `\`${constraint.isas.filter((isa) => isa.type !== undefined).map((isa) => `isa${isa.exact ? '!' : ''} ${isa.type}`).join(', ')}\` matched ${this.candidateCount(constraint)} candidate(s) before ` +
                 `${constraint.variable.startsWith('__anon') ? 'its role constraints' : `the role constraints on '${constraint.variable}'`}` +
                 `, and 0 after.`,
               constraint.range,
@@ -1632,9 +1640,10 @@ export class TypeDBLiteInterpreter {
           // constraints were applied" over a store that holds the type sends a reader to the
           // schema for a fault in the data. The type-only count is what separates them.
           //
-          // The extra lookup is affordable because it is reached only when the projection came
-          // back empty *and* the constrained count was already zero — never on a query that
-          // answered.
+          // ⚠️ This was once called affordable because it is reached only on an empty answer. Empty
+          // answers are routine — an optional attribute is read by a query of its own — so it runs
+          // on ordinary reads, and it is a count over the whole type: `candidateCount`, in SQL,
+          // never rows read into memory (docs/development/performance.md).
           // Skipped when the pattern carries neither, because the query would be byte-identical
           // to the one that just returned 0. That is ALL it does — keeping `__anonN` out of the
           // message is the job of the ternary in the message below, and an earlier version of this
@@ -1642,7 +1651,7 @@ export class TypeDBLiteInterpreter {
           const constrained =
             constraint.literals.length > 0 || constraint.bindings.length > 0;
           const ofType = constrained
-            ? this.candidates({ ...constraint, literals: [], bindings: [] }).length
+            ? this.candidateCount({ ...constraint, literals: [], bindings: [] })
             : 0;
 
           // 🔴 Two counts, and no interpretation of them. Earlier revisions tried to name WHICH
@@ -3640,6 +3649,38 @@ export class TypeDBLiteInterpreter {
   /** Candidate row ids per variable, before relation constraints are applied. */
   private candidates(constraint: ThingConstraint, seed?: { sql: string; params: Array<string | number> }): number[] {
     if (this.trace) this.trace.candidatesCalls++;
+    const { sql, params } = this.candidateQuery(constraint, seed);
+    const found = this.db
+      .prepare(sql)
+      .all(...params)
+      .map((row: unknown) => Number((row as { iid: number }).iid));
+    if (this.trace) this.trace.candidateRows += found.length;
+    return found;
+  }
+
+  /**
+   * How many candidates `candidates()` would return, counted by SQLite rather than read into rows.
+   *
+   * 🔴 For the `noCandidates` fact only, which states counts. It used to call `candidates()` and
+   * take `.length` — reading every instance of the type into memory to report one number, on every
+   * empty answer. Empty answers are routine (an optional attribute most rows lack is read by its own
+   * query), so that was a full read of the type on ordinary reads: 27 ms at 125,000 entities
+   * (docs/development/performance.md). `COUNT(*)` still visits the rows, in C, without
+   * materialising them.
+   */
+  private candidateCount(constraint: ThingConstraint): number {
+    const { sql, params } = this.candidateQuery(constraint);
+    return Number((this.db.prepare(`SELECT COUNT(*) AS n FROM (${sql})`).get(...params) as { n: number }).n);
+  }
+
+  /** Whether `candidates()` would return anything — it stops at the first row. */
+  private hasCandidate(constraint: ThingConstraint): boolean {
+    const { sql, params } = this.candidateQuery(constraint);
+    return this.db.prepare(`${sql} LIMIT 1`).get(...params) !== undefined;
+  }
+
+  /** The SQL `candidates()` runs. */
+  private candidateQuery(constraint: ThingConstraint, seed?: { sql: string; params: Array<string | number> }): { sql: string; params: Array<string | number> } {
     const where: string[] = [];
     const params: Array<string | number> = [];
 
@@ -3657,24 +3698,40 @@ export class TypeDBLiteInterpreter {
     // 🔴 The same closure on the attribute type: `has name "Alice"` is satisfied by a `first-name`,
     // as `isa doc` is by an `adr`. Exact matching here is what made an attribute subtype a subtype
     // in the schema and nowhere else.
-    for (const literal of constraint.literals) {
-      if (literal.alternatives !== undefined) {
-        // An abstract attribute with no value type: one spelling per concrete subtype.
-        if (literal.alternatives.length === 0) {
-          where.push('0');
-          continue;
-        }
-        where.push(
-          `t.iid IN (${ownersOfValue(literal.alternatives.map(() => '(v.type = ? AND v.value = ?)').join(' OR '))})`,
-        );
-        for (const alternative of literal.alternatives) params.push(alternative.type, alternative.value);
-        continue;
+    //
+    // 🔴 **One literal drives; the rest are probed.** Each literal used to be its own `t.iid IN
+    // (owners of the value)`, and SQLite materialises every such list — so `has skill-id "x", has
+    // revision "r1"` read every owner of `r1` (thousands) to intersect with the one owner of `x`:
+    // 5 ms where 0.017 ms suffices (docs/development/performance.md, finding 5). SQLite cannot tell
+    // which list is short without `ANALYZE` statistics, so `literalOrder` asks: a count of each
+    // value's owners, stopped at 256, picks the smallest to drive, and every other literal becomes an
+    // `EXISTS` on the candidate — two index lookups, `attribute(type, value)` and `has(owner,
+    // attribute)`. The rows are the same rows; `ORDER BY t.iid` keeps their order the scan's order
+    // whichever literal drives.
+    const condition = (literal: ThingConstraint['literals'][number]): { sql: string; params: string[] } | undefined => {
+      if (literal.alternatives === undefined) {
+        return { sql: `v.type IN ${SUBTYPES_OF} AND v.value = ?`, params: [literal.attribute, literal.value] };
       }
+      // An abstract attribute with no value type: one spelling per concrete subtype, or none at all.
+      if (literal.alternatives.length === 0) return undefined;
+      return {
+        sql: `(${literal.alternatives.map(() => '(v.type = ? AND v.value = ?)').join(' OR ')})`,
+        params: literal.alternatives.flatMap((alternative) => [alternative.type, alternative.value]),
+      };
+    };
+    const conditions = constraint.literals.map(condition);
+    if (conditions.some((c) => c === undefined)) where.push('0');
+    const present = conditions.filter((c): c is { sql: string; params: string[] } => c !== undefined);
+    const ordered = present.length > 1 ? this.literalOrder(present) : present;
+    ordered.forEach((c, index) => {
       where.push(
-        `t.iid IN (${ownersOfValue(`v.type IN ${SUBTYPES_OF} AND v.value = ?`)})`,
+        index === 0
+          ? `t.iid IN (${ownersOfValue(c.sql)})`
+          : `EXISTS (SELECT 1 FROM attribute v JOIN has h ON h.attribute = v.id AND h.owner = t.iid WHERE ${c.sql})`,
       );
-      params.push(literal.attribute, literal.value);
-    }
+      params.push(...c.params);
+    });
+    const probed = ordered.length > 1;
     // `$x iid 0x…` — that one thing, or nothing when the iid names no thing (`iid.ts`).
     for (const iid of constraint.iids ?? []) {
       const decoded = decodeIid(iid);
@@ -3702,13 +3759,20 @@ export class TypeDBLiteInterpreter {
       where.push(`t.iid IN (${seed.sql})`);
       params.push(...seed.params);
     }
-    const sql = `SELECT t.iid FROM thing t${where.length ? ` WHERE ${where.join(' AND ')}` : ''}${seed !== undefined ? ' ORDER BY t.iid' : ''}`;
-    const found = this.db
-      .prepare(sql)
-      .all(...params)
-      .map((row: unknown) => Number((row as { iid: number }).iid));
-    if (this.trace) this.trace.candidateRows += found.length;
-    return found;
+    const sql = `SELECT t.iid FROM thing t${where.length ? ` WHERE ${where.join(' AND ')}` : ''}${seed !== undefined || probed ? ' ORDER BY t.iid' : ''}`;
+    return { sql, params };
+  }
+
+  /**
+   * Literal conditions, the one with the fewest owners first — counted up to 256 each, which is
+   * enough to tell a selective value from a broad one and bounds what the asking costs.
+   */
+  private literalOrder<T extends { sql: string; params: string[] }>(conditions: readonly T[]): T[] {
+    const owners = conditions.map((c) =>
+      Number((this.db.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM attribute v JOIN has h ON h.attribute = v.id WHERE ${c.sql} LIMIT 256)`).get(...c.params) as { n: number }).n),
+    );
+    // A stable sort: equally selective literals keep the order they were written in.
+    return conditions.map((c, i) => ({ c, n: owners[i] ?? 0, i })).sort((a, b) => a.n - b.n || a.i - b.i).map((x) => x.c);
   }
 
 
@@ -4300,37 +4364,73 @@ export class TypeDBLiteInterpreter {
     variable: string,
     relations: readonly ThingConstraint[],
     combination: Record<string, Binding>,
+    // 🔴 Relations already on the path, and how deep it is — see the nested seed below.
+    path: ReadonlySet<ThingConstraint> = new Set(),
   ): { sql: string; params: Array<string | number> } | undefined {
-    for (const relation of relations) {
-      const mine = relation.roles.filter((role) => role.player === variable);
-      if (mine.length === 0) continue;
-      const others = relation.roles.filter((role) => role.player !== variable);
-      if (!others.every((role) => typeof combination[role.player] === 'number')) continue;
+    // 🔴 Two passes: a relation whose other players are all bound first, exactly as before nesting
+    // existed, and only then one reached through a nested seed. Taking the first relation in written
+    // order that could seed either way chose a nested seed over a later direct one: `$c` drawn from
+    // the 50 two-hop neighbours of `$a` instead of its one direct partner (review of finding 6). A
+    // nested seed may only add a seed where there was none, never replace a better one.
+    for (const nesting of [false, true]) {
+      for (const relation of relations) {
+        if (path.has(relation)) continue;
+        const mine = relation.roles.filter((role) => role.player === variable);
+        if (mine.length === 0) continue;
+        const others = relation.roles.filter((role) => role.player !== variable);
+        const allBound = others.every((role) => typeof combination[role.player] === 'number');
+        if (nesting === allBound) continue;
+        // 🔴 An unbound other player may still be SEEDABLE through another relation from players that
+        // are bound — `$a` pinned, `(dependent: $a, prerequisite: $b) …; (dependent: $b, prerequisite:
+        // $c) …` with `$b` untyped. `$b` has no constraint of its own, so it is bound only when the
+        // relations bind, after every thing variable; without this, `$c` was enumerated whole —
+        // 21,000 candidates and 42,000 statements to answer one row (docs/development/performance.md,
+        // finding 6). Nesting `$b`'s own seed keeps the guarantee above: it is a necessary condition on
+        // `$c`, so it only narrows, and the enumeration order of `$c` is unchanged. Three relations
+        // deep at most, and never back through one already on the path.
+        const nested = new Map<string, { sql: string; params: Array<string | number> }>();
+        if (nesting && path.size < 3) {
+          for (const role of others) {
+            if (typeof combination[role.player] === 'number' || nested.has(role.player)) continue;
+            const inner = this.relationSeed(role.player, relations, combination, new Set([...path, relation]));
+            if (inner !== undefined) nested.set(role.player, inner);
+          }
+        }
+        if (!others.every((role) => typeof combination[role.player] === 'number' || nested.has(role.player))) continue;
 
-      const resolved = resolveIsas(relation.isas, combination);
-      const params: Array<string | number> = [];
-      const joins: string[] = [];
-      // A roleless slot (`($p)`) joins on any role (optional.feature L46).
-      const roleOf = (alias: string, role: string | undefined): string => (role === undefined ? '' : this.roleFilter(alias, role, params));
-      mine.forEach((role, index) => {
-        joins.push(
-          index === 0
-            ? `JOIN role_player rv0 ON rv0.rel = t.iid${roleOf('rv0', role.role)}`
-            : `JOIN role_player rv${index} ON rv${index}.rel = t.iid${roleOf(`rv${index}`, role.role)} AND rv${index}.player = rv0.player`,
-        );
-      });
-      others.forEach((role, index) => {
-        joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid${roleOf(`ro${index}`, role.role)} AND ro${index}.player = ?`);
-        params.push(combination[role.player] as number);
-      });
-      const typed: string[] = [];
-      for (const isa of resolved) {
-        if (isa.type === undefined) continue;
-        typed.push(isa.exact ? 't.type = ?' : `t.type IN ${SUBTYPES_OF}`);
-        params.push(isa.type);
+        const resolved = resolveIsas(relation.isas, combination);
+        const params: Array<string | number> = [];
+        const joins: string[] = [];
+        // A roleless slot (`($p)`) joins on any role (optional.feature L46).
+        const roleOf = (alias: string, role: string | undefined): string => (role === undefined ? '' : this.roleFilter(alias, role, params));
+        mine.forEach((role, index) => {
+          joins.push(
+            index === 0
+              ? `JOIN role_player rv0 ON rv0.rel = t.iid${roleOf('rv0', role.role)}`
+              : `JOIN role_player rv${index} ON rv${index}.rel = t.iid${roleOf(`rv${index}`, role.role)} AND rv${index}.player = rv0.player`,
+          );
+        });
+        others.forEach((role, index) => {
+          const bound = combination[role.player];
+          const inner = nested.get(role.player);
+          if (typeof bound === 'number' || inner === undefined) {
+            joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid${roleOf(`ro${index}`, role.role)} AND ro${index}.player = ?`);
+            params.push(bound as number);
+            return;
+          }
+          // `roleOf` pushes its parameters as the string is built, so the subquery's go after them.
+          joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid${roleOf(`ro${index}`, role.role)} AND ro${index}.player IN (${inner.sql})`);
+          params.push(...inner.params);
+        });
+        const typed: string[] = [];
+        for (const isa of resolved) {
+          if (isa.type === undefined) continue;
+          typed.push(isa.exact ? 't.type = ?' : `t.type IN ${SUBTYPES_OF}`);
+          params.push(isa.type);
+        }
+        const where = typed.length > 0 ? ` WHERE ${typed.join(' AND ')}` : '';
+        return { sql: `SELECT rv0.player FROM thing t ${joins.join(' ')}${where}`, params };
       }
-      const where = typed.length > 0 ? ` WHERE ${typed.join(' AND ')}` : '';
-      return { sql: `SELECT rv0.player FROM thing t ${joins.join(' ')}${where}`, params };
     }
     return undefined;
   }

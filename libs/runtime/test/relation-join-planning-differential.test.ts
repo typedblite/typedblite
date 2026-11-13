@@ -81,6 +81,13 @@ const READS = [
   'match $a isa node; $b isa node; (source: $a, target: $b) isa link; select $a;',
   'match $a isa node; $b isa node; select $a, $b;',
   'match $a isa node, has node-id "n99"; $b isa node; (source: $a, target: $b) isa link; select $b;',
+  // Untyped players in the middle of a path: seeded through each other (finding 6 in
+  // docs/development/performance.md), so they must answer the same rows in the same order.
+  'match $a isa node, has tag "l0"; (source: $a, target: $b) isa link; (source: $b, target: $c) isa link; $c has node-id $i; select $a, $b, $i;',
+  'match $a isa node; (source: $a, target: $b) isa link; (source: $b, target: $c) isa link; (source: $c, target: $d) isa link; $d has tag $g; select $a, $d, $g;',
+  'match $c isa node; (source: $a, target: $b) isa link; (source: $b, target: $c) isa link; $a has tag "l2"; select $a, $b, $c;',
+  // Two literals on one variable: one drives, the other is probed (finding 5).
+  'match $a isa node, has tag "l1", has node-id $i; $b isa node, has tag "l1"; (source: $a, target: $b) isa link; select $i, $b;',
 ];
 
 const outcome = (engine: TypeDBLiteInterpreter, text: string): string => {

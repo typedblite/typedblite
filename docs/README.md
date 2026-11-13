@@ -27,6 +27,7 @@ Choose your starting point by what you want to do.
 | [Architecture](development/architecture.md) | The packages and their dependency rule, how a query runs, the storage model, and the design rules that hold it together |
 | [Testing](development/testing.md) | Every test suite, what it proves, and when to run it. Also the conformance report card, the oracles, and the clean-tree gate |
 | [Adding a TypeQLite construct](development/adding-a-construct.md) | The step-by-step path from grammar to engine to conformance |
+| [Performance](development/performance.md) | What the engine costs on real schemas and data, the load test that measures it, what it found, and what is still open |
 | [AGENTS.md](../AGENTS.md) | The same rules, condensed, for AI agents and automated tools |
 
 ## Package references

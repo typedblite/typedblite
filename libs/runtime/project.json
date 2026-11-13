@@ -63,6 +63,17 @@
         "command": "vitest run --config vitest.browser.config.ts",
         "cwd": "libs/runtime"
       }
+    },
+    "bench": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "^langium-generate"
+      ],
+      "cache": false,
+      "options": {
+        "command": "tsc -p bench/tsconfig.json && tsx --tsconfig bench/tsconfig.json bench/run.ts",
+        "cwd": "libs/runtime"
+      }
     }
   }
 }
