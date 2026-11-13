@@ -73,12 +73,23 @@ const TAG_ATTRIBUTE = /(^|-)tags?$/;
 export class FullTextIndex {
   public constructor(private readonly db: SqliteDatabase) {}
 
-  /** Throws with a usable message if this SQLite lacks FTS5, rather than failing obscurely later. */
+  /**
+   * Throws with a usable message if this SQLite lacks FTS5, rather than failing obscurely later.
+   *
+   * 🔴 **In the `temp` schema, and only "no such module" means no FTS5.** The probe used to create
+   * and drop a table in the MAIN database: a write on every open, so every open took the write lock,
+   * and on a read-only connection the write failed and was reported as a missing FTS5 — sending the
+   * reader to their SQLite build for a fault in their file permissions (`fts5-probe.test.ts`).
+   * `temp` is a separate database, writable even on a read-only connection and never shared with
+   * another process. Creating a real FTS5 table there is still the honest test of FTS5; any other
+   * failure is rethrown as itself.
+   */
   public static assertAvailable(db: SqliteDatabase): void {
     try {
-      db.exec('CREATE VIRTUAL TABLE IF NOT EXISTS __fts_probe USING fts5(x)');
-      db.exec('DROP TABLE IF EXISTS __fts_probe');
+      db.exec('CREATE VIRTUAL TABLE IF NOT EXISTS temp.__fts_probe USING fts5(x)');
+      db.exec('DROP TABLE IF EXISTS temp.__fts_probe');
     } catch (error) {
+      if (!/no such module: fts5/i.test(String((error as Error | undefined)?.message ?? error))) throw error;
       throw new Error(
         'This SQLite build has no FTS5, which TypeDBLite full-text search requires. ' +
           `FTS5 is a compile-time option. Underlying error: ${String(error)}`,
