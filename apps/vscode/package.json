@@ -43,22 +43,26 @@
         "scopeName": "source.typeqlite",
         "path": "./syntaxes/typeqlite.tmLanguage.json"
       }
-    ]
+    ],
+    "markdown.markdownItPlugins": true
   },
   "vsce": {
     "dependencies": false
   },
   "dependencies": {
     "@typedblite/language": "0.0.1",
+    "jsonc-parser": "~3.3.1",
     "langium": "~4.3.1",
     "vscode-languageclient": "~10.0.0",
     "vscode-languageserver": "~10.0.1"
   },
   "devDependencies": {
+    "@types/markdown-it": "~14.1.2",
     "@types/vscode": "~1.91.0",
     "@vscode/test-electron": "~3.1.0",
     "@vscode/vsce": "~3.9.2",
     "esbuild": "~0.28.1",
+    "markdown-it": "~14.3.3",
     "vscode-jsonrpc": "~9.0.0"
   }
 }

@@ -321,6 +321,65 @@ const cases: Record<string, () => Promise<void>> = {
     assert.equal(byText.has('nav-persn'), false);
   },
 
+  async 'the Markdown preview colours TypeQLite code blocks in the theme, and again when it changes (ADR-010)'() {
+    const markdown = [
+      '```typeql',
+      'define',
+      'attribute name, value string;',
+      'entity person, owns name;',
+      '```',
+      '',
+      '```typeql',
+      'match $p isa person, has name "Ann";',
+      '```',
+      '',
+    ].join('\n');
+    /** The query block's runs, as `text colour`, once the preview draws them in `expected`'s colour. */
+    const queryRuns = async (expected: string) => {
+      const started = Date.now();
+      let html = '';
+      while (Date.now() - started < 20_000) {
+        // The preview's own engine, with every markdown-it plugin an extension contributes.
+        html = await vscode.commands.executeCommand<string>('markdown.api.render', markdown);
+        const query = html.split('<code').at(-1)!;
+        if (query.toLowerCase().includes(`color:${expected}`)) {
+          return [...query.matchAll(/<span style="color:(#[0-9a-f]+)">([^<]*)<\/span>/gi)].map(
+            ([, colour, text]) => `${text} ${colour!.toLowerCase()}`,
+          );
+        }
+        await new Promise((done) => setTimeout(done, 200));
+      }
+      throw new Error(`The preview never drew the query in ${expected}:\n${html}`);
+    };
+    // Each colour below was read from the theme's files, its includes followed, by hand.
+    // VS Code 1.146's default theme, Dark 2026 → Dark Modern → Dark+ → Dark (Visual Studio).
+    assert.deepEqual(await queryRuns('#c586c0'), [
+      'match #c586c0', // keyword.control: Dark+ (longer than Dark 2026's `keyword`)
+      '$p #c9d1d9', // variable → variable.other.readwrite: Dark 2026's `variable.other`
+      'isa #c586c0',
+      'person #4ec9b0', // type → entity.name.type: Dark+, resolved against the other block
+      'has #c586c0',
+      'name #c9d1d9', // property → variable.other.property: Dark 2026's `variable.other`
+      '&quot;Ann&quot; #a5d6ff', // string: Dark 2026's, later than Dark (Visual Studio)'s
+    ]);
+    const workbench = vscode.workspace.getConfiguration('workbench');
+    await workbench.update('colorTheme', 'Light Modern', vscode.ConfigurationTarget.Global);
+    try {
+      // Light Modern → Light+ → Light (Visual Studio).
+      assert.deepEqual(await queryRuns('#af00db'), [
+        'match #af00db',
+        '$p #001080',
+        'isa #af00db',
+        'person #267f99',
+        'has #af00db',
+        'name #001080',
+        '&quot;Ann&quot; #a31515',
+      ]);
+    } finally {
+      await workbench.update('colorTheme', undefined, vscode.ConfigurationTarget.Global);
+    }
+  },
+
   // Last, because it deletes a file from the workspace.
   async 'a schema split across files resolves, and deleting the defining file unresolves it'() {
     // `split-attributes.typeqlite` is never opened: the server found it by indexing the workspace.

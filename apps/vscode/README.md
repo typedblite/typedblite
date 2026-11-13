@@ -26,6 +26,9 @@ Files: `.typeqlite` and `.tql`.
 - **Quick fixes.** Remove an annotation the position does not admit; keep either of two annotations
   that disagree; change an unknown label or an unresolved reference to the nearest defined name.
 - **Formatting and semantic highlighting.** A label is coloured by what it resolves to.
+- **TypeQLite in the Markdown preview.** Code blocks fenced as `typeql`, `typeqlite` or `tql` are
+  highlighted as the editor would highlight them, in your colour theme, and again when it changes. The
+  blocks on one page are read together, so a schema in one block resolves the labels in the next.
 
 ## Unknown labels, and why they are only warnings
 
@@ -44,6 +47,10 @@ The engine never sees this warning. It is produced by the editor alone.
   a reference resolves to the definition in its own file first, and otherwise to whichever is found
   first.
 - Running queries against a database is not part of this extension.
+- **The Markdown preview reads your theme's files**, because VS Code offers no other way to get a
+  theme's token colours. A theme whose colours are in a `.tmTheme` file gets the preview's own
+  colours instead. On GitHub, TypeQLite code blocks are plain: GitHub has no TypeQL grammar, and allows
+  no colours of a page's own.
 
 ## Install
 
@@ -61,13 +68,14 @@ code --install-extension apps/vscode/dist/typeqlite-0.0.1.vsix
   source.
 - **"Attach to TypeQLite Language Server"** attaches a debugger to its server, which listens on port
   6009.
-- `npm exec nx -- run typeqlite-vscode:test` runs the manifest check and drives the bundled server
-  over stdio.
+- `npm exec nx -- run typeqlite-vscode:test` runs the manifest check, drives the bundled server
+  over stdio, and tests the Markdown preview's theme rules and painting.
 - `npm exec nx -- run typeqlite-vscode:e2e` packages the extension, installs the `.vsix` into a
   downloaded VS Code, and runs the editor cases there. It needs a display; on a headless machine, use
   `xvfb-run`.
 
-The architecture is ADR-008 in this repository: `docs/architecture/`.
+The architecture is ADR-008 in this repository, and ADR-010 for the Markdown preview:
+`docs/architecture/`.
 
 ## License
 

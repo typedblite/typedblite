@@ -149,7 +149,7 @@ npm exec nx -- run typedblite-conformance:report   # the full card and a failure
 - Test files for `libs/runtime` live in `libs/runtime/test/` with `.test.ts` extension.
 - Test files for `apps/cli` live in `apps/cli/test/` with `.test.mts` extension.
 - Test files for `apps/vscode` live in `apps/vscode/test/` (`.test.ts`, run by vitest against the built
-  bundle). Its e2e (`nx run typeqlite-vscode:e2e`) packages the extension, installs the `.vsix` into a
+  bundle; the Markdown preview's modules that import no `vscode` are tested from source). Its e2e (`nx run typeqlite-vscode:e2e`) packages the extension, installs the `.vsix` into a
   downloaded VS Code through `@vscode/test-electron`, and runs the cases there. It is off by default:
   run it when changing anything an editor sees. It needs a display (`xvfb-run` when headless).
 - Language-service specs that involve more than one file use `libs/language/test/workspace.ts`, which
@@ -168,6 +168,14 @@ Labels in queries (`isa person`, `has name`, role players) are plain `ID`s, not 
 must stay so (ADR-008 D5). The editor resolves them through `TypeQLiteLabels`, whose position table
 (`sitesOf`, and `LABEL_POSITIONS` for completion) must change whenever the grammar gains a position
 that names a type. `nx run typeqlite-vscode:package` builds `apps/vscode/dist/typeqlite-0.0.1.vsix`.
+
+The extension also colours TypeQLite code blocks in VS Code's Markdown preview
+([ADR-010](docs/architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md)).
+The server classifies, through the `typeqlite/highlightBlocks` request: TextMate scopes from the
+grammar file the extension ships, and the editor's own semantic tokens. The client only maps those to
+the active theme's colours, which it reads from the theme's files (`src/markdown/theme.ts` restates
+VS Code's rules for that). 🔴 Keep TypeQLite knowledge out of `src/markdown/`: a keyword list or
+token rule there would be a second definition of the language.
 - Shared TypeQLite schema fixtures used by multiple suites live in `test-fixtures/schemas/`.
 - `typedblite-runtime:test-wasm` runs the whole runtime suite on WASM SQLite, and `typedblite-runtime:test-browser` runs the engine in a real Chromium on OPFS (ADR-009). Run both after touching the binding interface, `src/wasm.ts` or `content-revision`. `test-oracle` needs an external search index and is not routine ([Testing](docs/development/testing.md#the-engine-on-wasm-sqlite)).
 

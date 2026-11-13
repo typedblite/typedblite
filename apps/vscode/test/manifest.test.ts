@@ -47,8 +47,22 @@ describe('the manifest agrees with langium-config.json', () => {
     expect(`${manifest.publisher}.${manifest.name}`).toBe('typedblite.typeqlite');
   });
 
+  it('contributes a markdown-it plugin, so the Markdown preview activates it and asks for one (ADR-010)', () => {
+    expect(manifest.contributes['markdown.markdownItPlugins']).toBe(true);
+  });
+
   it('bundles its dependencies rather than shipping node_modules', () => {
     expect(manifest.vsce).toEqual({ dependencies: false });
     expect(manifest.main).toBe('./out/extension.cjs');
+  });
+
+  it('leaves no relative require in either bundle, since nothing ships beside them', () => {
+    // A UMD dependency's `require('./impl/format')` survives bundling and fails only once installed.
+    // 🔴 esbuild renames a UMD factory's `require` parameter (`require2`, or `n` minified), so this
+    // looks for ANY call whose one argument is a relative path, not for `require` by name.
+    for (const bundle of ['out/extension.cjs', 'out/language-server/main.cjs']) {
+      const source = readFileSync(resolve(APP, bundle), 'utf8');
+      expect(source.match(/[\w$]+\(\s*["']\.\.?\/[^"'\s]*["']\s*\)/g) ?? [], bundle).toEqual([]);
+    }
   });
 });
