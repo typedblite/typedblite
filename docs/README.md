@@ -45,3 +45,4 @@ Choose your starting point by what you want to do.
   comments cite them by number, for example "ADR-004 Decision 3".
 - [Standards](standards/governance/) set the rules for conformance claims and for multi-phase work.
 - [Planning](planning/) holds feature documents, both complete and proposed.
+- [Brand](brand/) holds the logo files, the colours and type, and how to use them.
