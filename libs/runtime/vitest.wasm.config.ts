@@ -30,6 +30,7 @@ const WASM_LIMITS = [
   'test/hub-and-spoke.test.ts',
   'test/transaction-crash.test.ts',
   'test/transaction.test.ts',
+  'test/write-lock-contention.test.ts',
   // WAL is a property of a real file; memdb and OPFS report another journal mode.
   'test/journal-mode.test.ts',
   // Needs a live downstream-store Nouveau index (the on-demand oracle).

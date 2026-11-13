@@ -626,8 +626,9 @@ export class ChangeLog {
 
     // One statement, so the leaf set is computed against the same snapshot it deletes from.
     // `NOT IN (SELECT parent_rev …)` is the same predicate `leavesOf` uses, applied to every entity
-    // at once rather than one at a time.
-    this.db.exec('BEGIN');
+    // at once rather than one at a time. `BEGIN IMMEDIATE`, for the reason `execute()` gives: a
+    // deferred transaction that must upgrade to write fails at once under another process's commit.
+    this.db.exec('BEGIN IMMEDIATE');
     try {
       this.db
         .prepare(

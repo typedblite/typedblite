@@ -1445,7 +1445,13 @@ export class TypeDBLiteInterpreter {
         );
       }
       const savepoint = this.transactionOpen ? `write_${(this.savepointSeq += 1)}` : null;
-      this.db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN');
+      // 🔴 `BEGIN IMMEDIATE`, as `beginTransaction()` and `applySchemaDdl` already were. A write
+      // pipeline reads before it writes, so a deferred `BEGIN` holds a read snapshot that must then
+      // be upgraded — and when another process committed in between, SQLite refuses the upgrade
+      // with SQLITE_BUSY at once, without waiting out `busy_timeout`. Two processes sharing one
+      // store lost ~30% of their writes to "database is locked" (`write-lock-contention.test.ts`,
+      // docs/development/performance.md). Taking the write lock first turns that into a wait.
+      this.db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN IMMEDIATE');
       try {
         const streamed = this.runStages(pipeline, scopes, start);
         // Read inside the transaction, after every write the pipeline made.
