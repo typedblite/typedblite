@@ -52,9 +52,11 @@ export function run(work: string, sizes: readonly number[]): void {
     measure(SUITE, `${skills}: step dependencies (2 relations)`, sample, (id) => rows(`match ${pinned(id)} $st isa skill-step, has step-id $i; (owner: $s, step: $st) isa skill-composition; $p isa skill-step, has step-id $pid; (dependent: $st, prerequisite: $p) isa step-dependency; select $i, $pid;`));
     measure(SUITE, `${skills}: sub-workflow children (2 relations)`, sample, (id) => rows(`match ${pinned(id)} $st isa skill-step, has step-id $i; (owner: $s, step: $st) isa skill-composition; $child isa skill, has skill-id $cid; $r isa sub-workflow (parent-step: $st, child-skill: $child); select $i, $cid;`));
     measure(SUITE, `${skills}: output fields (multi-valued)`, sample, (id) => rows(`match ${pinned(id)} $st isa skill-step, has step-id $i, has output-field $f; (owner: $s, step: $st) isa skill-composition; select $i, $f;`));
+    // A key and a value every step shares: the broad literal must not set the cost (finding 5).
+    measure(SUITE, `${skills}: a key and a broad value`, sample, (id) => rows(`match $st isa skill-step, has step-kind "task", has step-id ${str(`${id}:3`)}, has ordinal $o; select $o;`));
     measure(SUITE, `${skills}: every dependency edge`, [0, 1], () => rows(`match $a isa skill-step, has step-id $x; $b isa skill-step, has step-id $y; (dependent: $a, prerequisite: $b) isa step-dependency; select $x, $y;`));
-    // ⚠️ `$b` has no `isa`: the planner does not seed it through the relation, and enumerates `$c`
-    // whole. Typing `$b` makes it constant-time. Tracked here; not yet fixed.
+    // `$b` has no `isa`: seeded through the first relation since finding 6 was fixed; before, `$c`
+    // was enumerated whole.
     measure(SUITE, `${skills}: 2-hop, untyped middle`, sample.slice(0, 10), (id) => rows(`match $a isa skill-step, has step-id ${str(`${id}:6`)}; (dependent: $a, prerequisite: $b) isa step-dependency; (dependent: $b, prerequisite: $c) isa step-dependency; $c has step-id $y; select $y;`));
     measure(SUITE, `${skills}: 2-hop, typed middle`, sample.slice(0, 10), (id) => rows(`match $a isa skill-step, has step-id ${str(`${id}:6`)}; $r1 isa step-dependency (dependent: $a, prerequisite: $b); $b isa skill-step; $r2 isa step-dependency (dependent: $b, prerequisite: $c); $c isa skill-step, has step-id $y; select $y;`));
     db.close();

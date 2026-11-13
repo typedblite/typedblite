@@ -41,7 +41,8 @@ BENCH_STORES=/tmp/stores npm exec nx -- run typedblite-runtime:bench -- real-sto
 
 Every suite works on copies, so the snapshots stay as they were taken.
 
-**Compare two runs** as Markdown tables:
+**Compare runs** as Markdown tables. Give two or more files, oldest first. The speed-up column is
+first to last, and an operation an older harness did not measure shows as `—`:
 
 ```bash
 npx tsx --tsconfig bench/tsconfig.json bench/compare.ts before.json after.json

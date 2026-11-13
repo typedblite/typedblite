@@ -1,39 +1,46 @@
 /**
- * Two results files side by side, as Markdown tables:
+ * Results files side by side, as Markdown tables — the first is the baseline the speed-up is
+ * measured from, the last is the run it is measured to:
  *
- *   npx tsx --tsconfig ../../tsconfig.base.json bench/compare.ts <before.json> <after.json>
+ *   npx tsx --tsconfig ../../tsconfig.base.json bench/compare.ts <before.json> [<middle.json> …] <after.json>
+ *
+ * An operation a run did not measure (an older harness) shows as `—`.
  */
 import { readFileSync } from 'node:fs';
-import { ms, type Measurement, type Results, type Row } from './harness.js';
+import { ms, type Results, type Row } from './harness.js';
 
-const [beforePath, afterPath] = process.argv.slice(2);
-if (beforePath === undefined || afterPath === undefined) throw new Error('usage: compare.ts <before.json> <after.json>');
-const before = JSON.parse(readFileSync(beforePath, 'utf8')) as Results;
-const after = JSON.parse(readFileSync(afterPath, 'utf8')) as Results;
+const paths = process.argv.slice(2);
+if (paths.length < 2) throw new Error('usage: compare.ts <before.json> [<middle.json> …] <after.json>');
+const runs = paths.map((p) => JSON.parse(readFileSync(p, 'utf8')) as Results);
+const first = runs[0] as Results;
+const last = runs[runs.length - 1] as Results;
 
-const speedup = (b: number, a: number): string => (a > 0 ? `${(b / a).toFixed(1)}×` : '—');
-const lines: string[] = [`Before: \`${before.commit}\` (${before.label}). After: \`${after.commit}\` (${after.label}). ${after.machine}.`, ''];
+const speedup = (b: number | undefined, a: number | undefined): string => (b !== undefined && a !== undefined && a > 0 ? `${(b / a).toFixed(1)}×` : '—');
+const cell = (v: number | string | undefined): string => (v === undefined ? '—' : typeof v === 'number' ? (Number.isInteger(v) ? String(v) : ms(v)) : v);
+const lines: string[] = [`Runs: ${runs.map((r) => `${r.label} (\`${r.commit}\`)`).join(', ')}. ${last.machine}.`, ''];
 
-for (const suite of [...new Set(before.measurements.map((m) => m.suite))]) {
-  lines.push(`#### ${suite}`, '', '| Operation | Rows | Before p50 | After p50 | Before p95 | After p95 | Speed-up (p50) |', '| --- | ---: | ---: | ---: | ---: | ---: | ---: |');
-  for (const b of before.measurements.filter((m) => m.suite === suite)) {
-    const a: Measurement | undefined = after.measurements.find((m) => m.suite === suite && m.name === b.name);
-    if (a === undefined) continue;
-    lines.push(`| ${b.name} | ${a.rows === undefined ? '' : a.rows.toFixed(0)} | ${ms(b.p50)} | ${ms(a.p50)} | ${ms(b.p95)} | ${ms(a.p95)} | ${speedup(b.p50, a.p50)} |`);
+// Every operation any run measured, in the order the runs first measured them.
+const suites = [...new Set(runs.flatMap((r) => r.measurements.map((m) => m.suite)))];
+for (const suite of suites) {
+  const names = [...new Set(runs.flatMap((r) => r.measurements.filter((m) => m.suite === suite).map((m) => m.name)))];
+  lines.push(`### ${suite}`, '', `| Operation | Rows | ${runs.map((r) => `${r.label} p50`).join(' | ')} | ${first.label} → ${last.label} (p50) |`, `| --- | ---: | ${runs.map(() => '---:').join(' | ')} | ---: |`);
+  for (const name of names) {
+    const found = runs.map((r) => r.measurements.find((m) => m.suite === suite && m.name === name));
+    const rows = [...found].reverse().find((m) => m?.rows !== undefined)?.rows;
+    lines.push(`| ${name} | ${rows === undefined ? '' : rows.toFixed(0)} | ${found.map((m) => cell(m?.p50)).join(' | ')} | ${speedup(found[0]?.p50, found[found.length - 1]?.p50)} |`);
   }
   lines.push('');
 }
 
-const cell = (v: number | string | undefined): string => (typeof v === 'number' ? (Number.isInteger(v) ? String(v) : ms(v)) : (v ?? ''));
-for (const name of Object.keys(before.tables)) {
-  const b: Row[] = before.tables[name] ?? [];
-  const a: Row[] = after.tables[name] ?? [];
-  const [key, ...columns] = Object.keys(b[0] ?? {});
+for (const name of [...new Set(runs.flatMap((r) => Object.keys(r.tables)))]) {
+  const tables: Row[][] = runs.map((r) => r.tables[name] ?? []);
+  const [key, ...columns] = Object.keys(tables.find((t) => t.length > 0)?.[0] ?? {});
   if (key === undefined) continue;
-  lines.push(`#### ${name}`, '', `| ${key} | ${columns.map((c) => `${c} before → after`).join(' | ')} |`, `| --- | ${columns.map(() => '---:').join(' | ')} |`);
-  for (const row of b) {
-    const match = a.find((r) => r[key] === row[key]);
-    lines.push(`| ${cell(row[key])} | ${columns.map((c) => `${cell(row[c])} → ${cell(match?.[c])}`).join(' | ')} |`);
+  lines.push(`### ${name}`, '', `| ${key} | ${columns.join(' | ')} |`, `| --- | ${columns.map(() => '---:').join(' | ')} |`);
+  const keys = [...new Set(tables.flatMap((t) => t.map((row) => row[key])))];
+  for (const k of keys) {
+    const matches = tables.map((t) => t.find((row) => row[key] === k));
+    lines.push(`| ${cell(k)} | ${columns.map((c) => matches.map((m) => cell(m?.[c])).join(' → ')).join(' | ')} |`);
   }
   lines.push('');
 }
