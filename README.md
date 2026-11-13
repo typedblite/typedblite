@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/typedblite-logo-dark.svg">
+    <img alt="TypeDBLite" src="docs/brand/typedblite-logo.svg" width="360">
+  </picture>
+</p>
+
 # TypeDBLite
 
 ## Built on TypeDB, with thanks
