@@ -111,7 +111,9 @@ statements.
 
 **Fixed:** `relationSeed` nests the seed of an unbound player that is itself seedable through another
 relation, up to three relations deep. The nested seed is a necessary condition, so it only narrows,
-and rows and their order are unchanged. The untyped path now costs what the typed one does. Guarded
+and rows and their order are unchanged. A relation that reaches the variable from a bound player
+directly is still preferred: nesting only adds a seed where there was none. The untyped path now
+costs what the typed one does. Guarded
 by `untyped-role-player-seed.test.ts` (trace counts), and by four untyped-chain reads in the
 planned-against-unplanned differential suite.
 

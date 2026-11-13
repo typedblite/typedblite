@@ -4367,61 +4367,70 @@ export class TypeDBLiteInterpreter {
     // 🔴 Relations already on the path, and how deep it is — see the nested seed below.
     path: ReadonlySet<ThingConstraint> = new Set(),
   ): { sql: string; params: Array<string | number> } | undefined {
-    for (const relation of relations) {
-      if (path.has(relation)) continue;
-      const mine = relation.roles.filter((role) => role.player === variable);
-      if (mine.length === 0) continue;
-      const others = relation.roles.filter((role) => role.player !== variable);
-      // 🔴 An unbound other player may still be SEEDABLE through another relation from players that
-      // are bound — `$a` pinned, `(dependent: $a, prerequisite: $b) …; (dependent: $b, prerequisite:
-      // $c) …` with `$b` untyped. `$b` has no constraint of its own, so it is bound only when the
-      // relations bind, after every thing variable; without this, `$c` was enumerated whole —
-      // 21,000 candidates and 42,000 statements to answer one row (docs/development/performance.md,
-      // finding 6). Nesting `$b`'s own seed keeps the guarantee above: it is a necessary condition on
-      // `$c`, so it only narrows, and the enumeration order of `$c` is unchanged. Three relations
-      // deep at most, and never back through one already on the path.
-      const nested = new Map<string, { sql: string; params: Array<string | number> }>();
-      if (path.size < 3) {
-        for (const role of others) {
-          if (typeof combination[role.player] === 'number' || nested.has(role.player)) continue;
-          const inner = this.relationSeed(role.player, relations, combination, new Set([...path, relation]));
-          if (inner !== undefined) nested.set(role.player, inner);
+    // 🔴 Two passes: a relation whose other players are all bound first, exactly as before nesting
+    // existed, and only then one reached through a nested seed. Taking the first relation in written
+    // order that could seed either way chose a nested seed over a later direct one: `$c` drawn from
+    // the 50 two-hop neighbours of `$a` instead of its one direct partner (review of finding 6). A
+    // nested seed may only add a seed where there was none, never replace a better one.
+    for (const nesting of [false, true]) {
+      for (const relation of relations) {
+        if (path.has(relation)) continue;
+        const mine = relation.roles.filter((role) => role.player === variable);
+        if (mine.length === 0) continue;
+        const others = relation.roles.filter((role) => role.player !== variable);
+        const allBound = others.every((role) => typeof combination[role.player] === 'number');
+        if (nesting === allBound) continue;
+        // 🔴 An unbound other player may still be SEEDABLE through another relation from players that
+        // are bound — `$a` pinned, `(dependent: $a, prerequisite: $b) …; (dependent: $b, prerequisite:
+        // $c) …` with `$b` untyped. `$b` has no constraint of its own, so it is bound only when the
+        // relations bind, after every thing variable; without this, `$c` was enumerated whole —
+        // 21,000 candidates and 42,000 statements to answer one row (docs/development/performance.md,
+        // finding 6). Nesting `$b`'s own seed keeps the guarantee above: it is a necessary condition on
+        // `$c`, so it only narrows, and the enumeration order of `$c` is unchanged. Three relations
+        // deep at most, and never back through one already on the path.
+        const nested = new Map<string, { sql: string; params: Array<string | number> }>();
+        if (nesting && path.size < 3) {
+          for (const role of others) {
+            if (typeof combination[role.player] === 'number' || nested.has(role.player)) continue;
+            const inner = this.relationSeed(role.player, relations, combination, new Set([...path, relation]));
+            if (inner !== undefined) nested.set(role.player, inner);
+          }
         }
-      }
-      if (!others.every((role) => typeof combination[role.player] === 'number' || nested.has(role.player))) continue;
+        if (!others.every((role) => typeof combination[role.player] === 'number' || nested.has(role.player))) continue;
 
-      const resolved = resolveIsas(relation.isas, combination);
-      const params: Array<string | number> = [];
-      const joins: string[] = [];
-      // A roleless slot (`($p)`) joins on any role (optional.feature L46).
-      const roleOf = (alias: string, role: string | undefined): string => (role === undefined ? '' : this.roleFilter(alias, role, params));
-      mine.forEach((role, index) => {
-        joins.push(
-          index === 0
-            ? `JOIN role_player rv0 ON rv0.rel = t.iid${roleOf('rv0', role.role)}`
-            : `JOIN role_player rv${index} ON rv${index}.rel = t.iid${roleOf(`rv${index}`, role.role)} AND rv${index}.player = rv0.player`,
-        );
-      });
-      others.forEach((role, index) => {
-        const bound = combination[role.player];
-        const inner = nested.get(role.player);
-        if (typeof bound === 'number' || inner === undefined) {
-          joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid${roleOf(`ro${index}`, role.role)} AND ro${index}.player = ?`);
-          params.push(bound as number);
-          return;
+        const resolved = resolveIsas(relation.isas, combination);
+        const params: Array<string | number> = [];
+        const joins: string[] = [];
+        // A roleless slot (`($p)`) joins on any role (optional.feature L46).
+        const roleOf = (alias: string, role: string | undefined): string => (role === undefined ? '' : this.roleFilter(alias, role, params));
+        mine.forEach((role, index) => {
+          joins.push(
+            index === 0
+              ? `JOIN role_player rv0 ON rv0.rel = t.iid${roleOf('rv0', role.role)}`
+              : `JOIN role_player rv${index} ON rv${index}.rel = t.iid${roleOf(`rv${index}`, role.role)} AND rv${index}.player = rv0.player`,
+          );
+        });
+        others.forEach((role, index) => {
+          const bound = combination[role.player];
+          const inner = nested.get(role.player);
+          if (typeof bound === 'number' || inner === undefined) {
+            joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid${roleOf(`ro${index}`, role.role)} AND ro${index}.player = ?`);
+            params.push(bound as number);
+            return;
+          }
+          // `roleOf` pushes its parameters as the string is built, so the subquery's go after them.
+          joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid${roleOf(`ro${index}`, role.role)} AND ro${index}.player IN (${inner.sql})`);
+          params.push(...inner.params);
+        });
+        const typed: string[] = [];
+        for (const isa of resolved) {
+          if (isa.type === undefined) continue;
+          typed.push(isa.exact ? 't.type = ?' : `t.type IN ${SUBTYPES_OF}`);
+          params.push(isa.type);
         }
-        // `roleOf` pushes its parameters as the string is built, so the subquery's go after them.
-        joins.push(`JOIN role_player ro${index} ON ro${index}.rel = t.iid${roleOf(`ro${index}`, role.role)} AND ro${index}.player IN (${inner.sql})`);
-        params.push(...inner.params);
-      });
-      const typed: string[] = [];
-      for (const isa of resolved) {
-        if (isa.type === undefined) continue;
-        typed.push(isa.exact ? 't.type = ?' : `t.type IN ${SUBTYPES_OF}`);
-        params.push(isa.type);
+        const where = typed.length > 0 ? ` WHERE ${typed.join(' AND ')}` : '';
+        return { sql: `SELECT rv0.player FROM thing t ${joins.join(' ')}${where}`, params };
       }
-      const where = typed.length > 0 ? ` WHERE ${typed.join(' AND ')}` : '';
-      return { sql: `SELECT rv0.player FROM thing t ${joins.join(' ')}${where}`, params };
     }
     return undefined;
   }

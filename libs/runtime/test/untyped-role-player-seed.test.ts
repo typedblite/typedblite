@@ -49,6 +49,28 @@ describe('an untyped role player in a relation path', () => {
     db.close();
   });
 
+  it('🔴 still prefers a relation that reaches the variable from a bound player directly', () => {
+    // `$a` links to 50 steps, each of which links on to one more; `$a` is paired with one of those
+    // directly. The relation written first reaches `$c` only through the untyped `$b` — two hops,
+    // 50 candidates — while the pair reaches it from `$a` in one. Nesting must not displace that.
+    const db = new TypeDBLiteInterpreter(':memory:', 5000, { trace: true });
+    db.define('define entity node, owns node-id @key, plays link:source, plays link:target, plays pair:left, plays pair:right; attribute node-id, value string; relation link, relates source, relates target; relation pair, relates left, relates right;');
+    db.beginTransaction();
+    db.execute('insert $a isa node, has node-id "a";');
+    for (let i = 0; i < 50; i++) {
+      db.execute(`insert $b isa node, has node-id "b${i}"; $c isa node, has node-id "c${i}";`);
+      db.execute(`match $a isa node, has node-id "a"; $b isa node, has node-id "b${i}"; insert (source: $a, target: $b) isa link;`);
+      db.execute(`match $b isa node, has node-id "b${i}"; $c isa node, has node-id "c${i}"; insert (source: $b, target: $c) isa link;`);
+    }
+    db.execute('match $a isa node, has node-id "a"; $c isa node, has node-id "c7"; insert (left: $a, right: $c) isa pair;');
+    db.commitTransaction();
+    const text = 'match $a isa node, has node-id "a"; $c isa node, has node-id $id; (source: $b, target: $c) isa link; (source: $a, target: $b) isa link; (left: $a, right: $c) isa pair; select $id;';
+    assert.deepEqual(db.query(text).rows.map((r) => r['id']?.asString()), ['c7']);
+    const trace = db.lastQueryTrace();
+    assert.ok((trace?.candidateRows ?? Infinity) <= 2, `candidate rows: ${trace?.candidateRows} — the two-hop seed displaced the direct one`);
+    db.close();
+  });
+
   it('answers what the unplanned engine answers, and what the typed path answers', () => {
     const planned = graph();
     const original = graph(false);
