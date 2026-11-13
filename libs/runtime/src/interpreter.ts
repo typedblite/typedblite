@@ -3698,24 +3698,40 @@ export class TypeDBLiteInterpreter {
     // 🔴 The same closure on the attribute type: `has name "Alice"` is satisfied by a `first-name`,
     // as `isa doc` is by an `adr`. Exact matching here is what made an attribute subtype a subtype
     // in the schema and nowhere else.
-    for (const literal of constraint.literals) {
-      if (literal.alternatives !== undefined) {
-        // An abstract attribute with no value type: one spelling per concrete subtype.
-        if (literal.alternatives.length === 0) {
-          where.push('0');
-          continue;
-        }
-        where.push(
-          `t.iid IN (${ownersOfValue(literal.alternatives.map(() => '(v.type = ? AND v.value = ?)').join(' OR '))})`,
-        );
-        for (const alternative of literal.alternatives) params.push(alternative.type, alternative.value);
-        continue;
+    //
+    // 🔴 **One literal drives; the rest are probed.** Each literal used to be its own `t.iid IN
+    // (owners of the value)`, and SQLite materialises every such list — so `has skill-id "x", has
+    // revision "r1"` read every owner of `r1` (thousands) to intersect with the one owner of `x`:
+    // 5 ms where 0.017 ms suffices (docs/development/performance.md, finding 5). SQLite cannot tell
+    // which list is short without `ANALYZE` statistics, so `literalOrder` asks: a count of each
+    // value's owners, stopped at 256, picks the smallest to drive, and every other literal becomes an
+    // `EXISTS` on the candidate — two index lookups, `attribute(type, value)` and `has(owner,
+    // attribute)`. The rows are the same rows; `ORDER BY t.iid` keeps their order the scan's order
+    // whichever literal drives.
+    const condition = (literal: ThingConstraint['literals'][number]): { sql: string; params: string[] } | undefined => {
+      if (literal.alternatives === undefined) {
+        return { sql: `v.type IN ${SUBTYPES_OF} AND v.value = ?`, params: [literal.attribute, literal.value] };
       }
+      // An abstract attribute with no value type: one spelling per concrete subtype, or none at all.
+      if (literal.alternatives.length === 0) return undefined;
+      return {
+        sql: `(${literal.alternatives.map(() => '(v.type = ? AND v.value = ?)').join(' OR ')})`,
+        params: literal.alternatives.flatMap((alternative) => [alternative.type, alternative.value]),
+      };
+    };
+    const conditions = constraint.literals.map(condition);
+    if (conditions.some((c) => c === undefined)) where.push('0');
+    const present = conditions.filter((c): c is { sql: string; params: string[] } => c !== undefined);
+    const ordered = present.length > 1 ? this.literalOrder(present) : present;
+    ordered.forEach((c, index) => {
       where.push(
-        `t.iid IN (${ownersOfValue(`v.type IN ${SUBTYPES_OF} AND v.value = ?`)})`,
+        index === 0
+          ? `t.iid IN (${ownersOfValue(c.sql)})`
+          : `EXISTS (SELECT 1 FROM attribute v JOIN has h ON h.attribute = v.id AND h.owner = t.iid WHERE ${c.sql})`,
       );
-      params.push(literal.attribute, literal.value);
-    }
+      params.push(...c.params);
+    });
+    const probed = ordered.length > 1;
     // `$x iid 0x…` — that one thing, or nothing when the iid names no thing (`iid.ts`).
     for (const iid of constraint.iids ?? []) {
       const decoded = decodeIid(iid);
@@ -3743,8 +3759,20 @@ export class TypeDBLiteInterpreter {
       where.push(`t.iid IN (${seed.sql})`);
       params.push(...seed.params);
     }
-    const sql = `SELECT t.iid FROM thing t${where.length ? ` WHERE ${where.join(' AND ')}` : ''}${seed !== undefined ? ' ORDER BY t.iid' : ''}`;
+    const sql = `SELECT t.iid FROM thing t${where.length ? ` WHERE ${where.join(' AND ')}` : ''}${seed !== undefined || probed ? ' ORDER BY t.iid' : ''}`;
     return { sql, params };
+  }
+
+  /**
+   * Literal conditions, the one with the fewest owners first — counted up to 256 each, which is
+   * enough to tell a selective value from a broad one and bounds what the asking costs.
+   */
+  private literalOrder<T extends { sql: string; params: string[] }>(conditions: readonly T[]): T[] {
+    const owners = conditions.map((c) =>
+      Number((this.db.prepare(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM attribute v JOIN has h ON h.attribute = v.id WHERE ${c.sql} LIMIT 256)`).get(...c.params) as { n: number }).n),
+    );
+    // A stable sort: equally selective literals keep the order they were written in.
+    return conditions.map((c, i) => ({ c, n: owners[i] ?? 0, i })).sort((a, b) => a.n - b.n || a.i - b.i).map((x) => x.c);
   }
 
 
