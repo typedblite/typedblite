@@ -55,7 +55,7 @@ logo files, text 64 units high sits beside a 112-unit mark with a 24-unit gap.
 - Keep the logo at least 120 px wide. Below that, use the mark or the icon. The icon holds up at 16 px.
 - Use the files as they are: don't recolour, stretch, rotate or rearrange them, or add effects.
 - Don't use the logo in a way that suggests TypeDB Ltd made, sponsors or endorses TypeDBLite. It is
-  an independent project (see the [README](../../README.md#built-on-typedb-with-thanks)). Its
+  an independent project (see the [README](../../README.md#special-thanks-to-typedb)). Its
   colours and shapes are deliberately unlike TypeDB's own branding.
 
 ## The mark's geometry
