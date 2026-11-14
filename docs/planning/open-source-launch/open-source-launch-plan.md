@@ -79,7 +79,7 @@ blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows 
 5. **Decisions:** Windows (fix the 11 tests, or document as unsupported for launch), the coverage policy (decision 9),
    and whether `downstream-app` stays named in the docs (S3, decision 5).
 
-**Next work, in order:** the hub security review (B6); Phase 2 packaging (claim the unscoped `typedblite` and
+**Next work, in order:** Phase 2 packaging (claim the unscoped `typedblite` and
 `typeqlite` npm names; take `private` off the CLI; publish `0.1.0-rc.1` under `next` with provenance; the clean-room
 install test on three platforms); Phase 3 docs and the playground. Parked, and not blocking the flip to public: PL-2 to PL-5 in the
 [parking lot](#parking-lot) (the Langium report, keeping the old PR commits, a commit-message check, watching CI on `main`).
@@ -170,7 +170,7 @@ confirm it and it needs someone to.
 | B3 | **Nothing is published.** No tags, no releases, no npm packages, CLI is private | Verified | Phase 2 |
 | B4 | **npm and domain names.** `@typedblite` (npm org) and `typedblite.dev` are **registered (2026-11-14)**. Still to confirm: the unscoped `typedblite` (the CLI's name) and `typeqlite`, which the scope does not cover | Partly done | Check both unscoped names on npm and claim them (publish a placeholder or `0.0.0` under the org if free). Note that the domain, like the name, contains TypeDB™, so B1 covers it too |
 | B5 | **`node:sqlite` vs `engines`.** `engines` said Node `>=22.12`. Measured: 22.12 has **no** `node:sqlite`; 22.13 to 22.15 have it **without FTS5**, which the engine requires; **22.16.0 is the first that works** (full gate passes there, cache skipped) | **Resolved** | `engines`, the READMEs, CONTRIBUTING and the getting-started guide now say 22.16; 22.16.0 is a blocking CI job. Node still marks `node:sqlite` experimental, which prints a warning on first use: say so in the docs |
-| B6 | **Hub security.** The hub exposes an SSE stream and a POST endpoint. I did not check authentication, binding defaults, or input limits | To check | Review before promoting the sync story. If it is unauthenticated, say so loudly in docs and default to localhost |
+| B6 | **Hub security.** The hub exposes an SSE stream and a POST endpoint. I did not check authentication, binding defaults, or input limits | **Reviewed 2026-11-14: documented, not yet fixed** | Done: the replication guide has a "Security" section with each finding, verified against a live hub. It is unauthenticated, accepts any content type, has no body-size or stream limits, and trusts a pushed revision as given. Binding is already `127.0.0.1` only. **Hardening the handler is PL-6** |
 | B7 | **No `SECURITY.md`** (private reporting channel) | Verified | **Written.** Enable GitHub private vulnerability reporting and create the `security@` alias |
 
 ### 4.2 Should fix before launch
@@ -185,7 +185,17 @@ confirm it and it needs someone to.
 | S6 | Sync demo has Electron and Android toolchains: heavy for a newcomer | Keep it, but give a browser-only "run it in one command" path and a recorded GIF |
 | S7 | Performance "Still open" list (no cost model, one writer, no change-log retention) | Promote to the public roadmap and known-limitations page rather than leaving it in a results doc |
 | S8 | Platform coverage unknown (Windows, macOS) | CI matrix; document support. **Windows: blocking CI job since #39. macOS: green, still experimental. Support stated in CONTRIBUTING and the getting-started guide** |
-| S9 | Run a secret scan across full git history | `gitleaks` or GitHub secret scanning; rotate anything found |
+| S9 | Run a secret scan across full git history | `gitleaks` or GitHub secret scanning; rotate anything found **Manual pass done 2026-11-14, clean; the tool scan is still to run** (see below) |
+
+**S9, what the manual pass covered (2026-11-14).** No scanner is installed here, and none was downloaded, so this
+was a pattern search over all 180 commits on every branch (6.7 MB of patch), **not** a substitute for `gitleaks` or
+GitHub's scanning. It found: no private-key block; no AWS, GitHub, npm, Slack, OpenAI-style or Google key; no JWT; no
+URL with embedded credentials; no `.env`, `.pem`, `.key`, `.p12`, `.pfx`, keystore, `.db`, `.sqlite`, `.log`, `.bak`, `.npmrc` or `.netrc` file ever committed; and no
+personal path (`/home/dave`, `C:\Users\…`) or personal address in any tracked file. Two literals matched a
+"secret-named variable" pattern and are benign: `DEMO_TOKEN` (the sync demo's fixed token, on purpose; see the
+replication guide's Security section) and a test string, `super-secret-value-…`, that checks a diagnostic does not
+echo a value. The lockfile's earlier `localhost:4873` URLs are a registry address, not a credential. **Still to do:**
+run `gitleaks detect` (or enable GitHub secret scanning once the repository is public) before the flip.
 
 ### 4.3 Nice to have
 
@@ -261,7 +271,7 @@ was run locally on Node 22.23 (see [1.1](#11-what-running-the-gate-found)).*
 - [x] Mailbox aliases `security@` and `hello@` on `typedblite.dev`: both forward to the maintainer's mailbox
       *(reported by the maintainer 2026-11-14; no test message has been sent, so send one from outside
       to confirm)*. `SECURITY.md` names `security@`.
-- [ ] Review the hub (B6); write the findings into the replication guide as a "Security" section.
+- [x] Review the hub (B6); write the findings into the replication guide as a "Security" section. *(Done; the code fixes are PL-6.)*
 - [x] After the first CI run: read the results of every experimental job (see [1.2](#12-first-ci-results)). **Promoting
       jobs to blocking is a branch-protection setting only the owner can change.**
 
@@ -644,6 +654,7 @@ Things deliberately set aside, each with the moment it must be revisited. An ite
 | PL-3 | Keep the original commits of PRs #22 and #33 on a branch or tag | Soon: needs the maintainer's OK to push | Nothing | Open |
 | PL-4 | Decide whether to add a commit-message check | Branch protection is enabled, or the first outside pull request | Nothing | Open |
 | PL-5 | Confirm CI on `main` is stable, including the Node 22 gate | The announcement | Announcement | Open |
+| PL-6 | Harden `createChangeStreamHandler`: a body-size limit, a content-type check, a cap on open streams, no echoing of internal errors, an atomic batch, and checking a pushed revision against its content. The guide's Security section lists each as verified behaviour | Before the sync story is promoted | Promoting sync | Open |
 
 ### PL-1. What the plan says about the TypeDB Ltd conversation
 
