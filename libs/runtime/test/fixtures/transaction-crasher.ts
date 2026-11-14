@@ -8,6 +8,7 @@
  *   commit        both written and committed (the control: the pair is distinguishable from a crash)
  */
 import { SqliteEngine } from '../../src/sqlite-engine.js';
+import { killSelf } from './kill-self.js';
 
 const [, , dbPath, mode] = process.argv;
 const engine = new SqliteEngine(dbPath);
@@ -17,8 +18,8 @@ const insert = (id: string) =>
 
 await engine.transaction(async () => {
   await engine.execute(insert('state-1'));
-  if (mode === 'kill-between') process.kill(process.pid, 'SIGKILL');
+  if (mode === 'kill-between') killSelf();
   await engine.execute(insert('event-1'));
-  if (mode === 'kill-before-commit') process.kill(process.pid, 'SIGKILL');
+  if (mode === 'kill-before-commit') killSelf();
 });
 await engine.close();

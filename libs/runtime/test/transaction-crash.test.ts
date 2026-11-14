@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 import { SqliteEngine } from '../src/sqlite-engine';
+import { notKilledOnPurpose } from './fixtures/kill-self';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 
@@ -56,7 +57,7 @@ describe('a crash cannot separate a producer\'s state change from its event reco
 
       const child = runCrasher(path, mode);
 
-      expect(child.signal, 'the child must actually have been killed').toBe('SIGKILL');
+      expect(notKilledOnPurpose(child), 'the child must actually have been killed').toBeUndefined();
       const reopened = new SqliteEngine(path);
       expect(await ids(reopened)).toEqual([]);
       await reopened.execute(

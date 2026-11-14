@@ -7,6 +7,7 @@
  */
 import { TypeDBLiteInterpreter } from '../../src/interpreter.js';
 import { readKeyedSkillsSchema } from './keyed-skills-schema.js';
+import { killSelf } from './kill-self.js';
 
 const [, , dbPath, schemaPath] = process.argv;
 const db = new TypeDBLiteInterpreter(dbPath);
@@ -18,4 +19,4 @@ const raw = (db as unknown as { db: { exec(sql: string): void } }).db;
 raw.exec('BEGIN');
 raw.exec("INSERT INTO thing(type) VALUES ('skill')");
 raw.exec("INSERT INTO change_log(entity_id, rev, deleted) VALUES ('skill/crashed', '1-dead', 0)");
-process.kill(process.pid, 'SIGKILL');
+killSelf();
