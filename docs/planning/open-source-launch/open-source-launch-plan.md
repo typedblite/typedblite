@@ -19,6 +19,7 @@ happens when the gates are green. A suggested calendar is at the end.
 - [10. Risks](#10-risks)
 - [11. Calendar](#11-calendar)
 - [12. Decisions needed](#12-decisions-needed)
+- [Parking lot](#parking-lot)
 
 ---
 
@@ -58,8 +59,9 @@ blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows 
 `typeqlite` npm names; take `private` off the CLI; publish `0.1.0-rc.1` under `next` with provenance; the clean-room
 install test on three platforms); Phase 3 docs and the playground.
 
-**Public-repo check before announcing:** this plan names the TypeDB Ltd conversation (B1). Decide whether that belongs
-in a public file, and remove it if the written confirmation is not yet in hand.
+**Before the repository goes public:** the repository is **private** (maintainer, 2026-11-14), and this plan names the
+TypeDB Ltd conversation. That is parked as [PL-1](#parking-lot), and the "flip the repo to public" step in Phase 4 is
+blocked on it.
 
 **Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run build && npm test`.
 Useful to know:
@@ -399,6 +401,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       source, plus doc fixes and small constructs with a named caller.
 - [ ] Flip the repo to public if it is private; publish `0.1.0` (stable `latest` tag) a few days before
       the announcement so it has settled and the install path is proven in the wild.
+      **Not until every open item in the [parking lot](#parking-lot) is closed** (today: PL-1).
 - [ ] Share with TypeDB Ltd: a courtesy preview of the blog post and README (not a request for
       sign-off on content beyond naming).
 
@@ -564,8 +567,8 @@ These change the plan; the recommendations are what the plan assumes.
    writing, keep the fallback name on file.*
 2. **Public surface.** Publish the three library packages and the CLI to npm; the VS Code extension to
    both marketplaces; leave conformance and sync-demo in the repo. *Recommendation: as in Phase 2.*
-3. **Is the repository already public?** The remote exists on GitHub, but visibility wasn't checked from
-   here. If public, do Phases 0–1 first anyway, and don't announce.
+3. **Is the repository already public?** *Resolved: it is private (maintainer, 2026-11-14).* Nothing in it is public
+   yet. Clear the [parking lot](#parking-lot) before that changes.
 4. **Contribution model.** DCO (recommended) or CLA.
 5. **downstream-app as a named case study** (S3). It's the project's only production consumer and the
    strongest answer to "who uses this?" *Recommendation: keep, link, and have its data reviewed.*
@@ -575,6 +578,37 @@ These change the plan; the recommendations are what the plan assumes.
 9. **Coverage policy.** Four projects are below the 80% floor (1.1). Raise tests, exempt `sync-demo`, or lower
    the floor? *Recommendation: exempt `sync-demo`, and raise the other three, which are within about
    8 points; keep the floor at 80%.*
+
+---
+
+## Parking lot
+
+Things deliberately set aside, each with the moment it must be revisited. An item stays here until it is closed.
+
+| # | Item | Revisit before | Status |
+| --- | --- | --- | --- |
+| PL-1 | Revisit what this plan says about the TypeDB Ltd conversation | The repository is made public, and in any case before the announcement | Open |
+
+### PL-1. What the plan says about the TypeDB Ltd conversation
+
+The plan records that TypeDB Ltd's CEO gave a verbal blessing to the release. That is accurate and useful in a
+private planning file. It is a different thing in a public one: it makes a claim about a third party, names their
+role, and describes a private conversation, before the written confirmation (B1) exists.
+
+**Where it appears** (all in this file): the B1 row in 4.1; the Phase 0 checklist item "Speak to TypeDB Ltd's CEO";
+the risk row "TypeDB Ltd's position changes"; decision 1 in section 12; and [Where to resume](#where-to-resume).
+
+**Decide, when the time comes:**
+
+- *If the written confirmation is in hand:* reword to say a written confirmation was received on a date, without
+  naming a role or describing the conversation, and keep the email itself in private records.
+- *If it is not:* remove the references, or reduce them to "naming to be confirmed with TypeDB Ltd", and keep the
+  detail in private records only.
+
+Either way, the same pass should check the rest of `docs/planning/` for statements about third parties that are
+fine in a private repository and not in a public one.
+
+**Owner:** the maintainer. **Blocks:** the "flip the repo to public" step in Phase 4.
 
 ---
 
