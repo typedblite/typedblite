@@ -7,81 +7,42 @@
 
 # TypeDBLite
 
-## Special Thanks to TypeDB!
+**TypeDBLite brings TypeDB's data model and the TypeQL query language into your own process.** It is a
+TypeScript implementation over SQLite: no server and no native binary. It runs **TypeQLite**, a dialect of TypeQL 3.x,
+on Node.js, and in a browser on WASM SQLite.
 
-**TypeDBLite exists because of [TypeDB](https://typedb.com).** The data model, the query language and
-the behaviour that TypeDBLite implements are the work of [TypeDB Ltd](https://typedb.com) and the
-TypeDB community.
-
-Thank you to the team at TypeDB Ltd for an amazing product suite and ecosystem:
-- a database whose type system makes modelling a domain a pleasure;
-- a query language that reads like the domain it describes;
-- tooling such as TypeDB Studio;
-- and the generosity of publishing it all as open source.
-
-**A special thank-you for the [TypeDB Behaviour Specification](https://github.com/typedb/typedb-behaviour).**
-Its Cucumber scenarios are an executable definition of how TypeDB behaves. TypeDBLite runs 1,756 of
-them as its conformance suite, and is built and tested against them. Without that suite, this project
-could not say how closely it matches TypeDB, and could not have got as close as it has.
-
-| Created by TypeDB Ltd | What it is | Links | How TypeDBLite uses it |
-|---|---|---|---|
-| **TypeDB™** | The polymorphic database | [typedb.com](https://typedb.com) · [GitHub](https://github.com/typedb/typedb) | TypeDBLite reimplements its data model and behaviour in TypeScript, over SQLite |
-| **TypeQL™** | TypeDB's query language | [Reference](https://typedb.com/docs/typeql-reference/) · [GitHub](https://github.com/typedb/typeql) | TypeQLite is a dialect of TypeQL 3.x, and follows its syntax |
-| **TypeDB Studio** | TypeDB's IDE | [Docs](https://typedb.com/docs/tools/studio) · [GitHub](https://github.com/typedb/typedb-studio) | The model for TypeDBLite's proposed [graph explorer](docs/planning/graph-explorer/graph-explorer.feature.md) |
-| **TypeDB Behaviour Specification** | TypeDB's Cucumber conformance suite | [GitHub](https://github.com/typedb/typedb-behaviour) | Vendored unmodified in [`libs/conformance/spec/`](libs/conformance/spec/) as TypeDBLite's [conformance oracle](CONFORMANCE.md) |
-
-**Trademarks.** TypeDB™ and TypeQL™ are trademarks of TypeDB Ltd. TypeDB Studio is a product of
-TypeDB Ltd. These names are used here only to identify TypeDB Ltd's products, and to describe what
-TypeDBLite is compatible with.
-
-**Copyright.** TypeDB, TypeQL, TypeDB Studio and the TypeDB Behaviour Specification are copyright
-TypeDB Ltd and their contributors, and are published under the
-[Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/). The specification files in
-[`libs/conformance/spec/`](libs/conformance/spec/) are TypeDB Ltd's work. They keep their original
-licence headers and [`LICENSE`](libs/conformance/spec/LICENSE).
-
-**Independence.** TypeDBLite is an independent open-source project. It is not affiliated with,
-sponsored by, or endorsed by TypeDB Ltd. For TypeDB itself, visit [typedb.com](https://typedb.com).
-
-## About
-
-TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) graph database engine backed by SQLite. It parses and executes **TypeQLite** — a dialect of TypeQL 3.x — and stores the result in a SQLite database that can be opened with `node:sqlite`, a WASM build in a browser, or any binding that satisfies the `SqliteDatabase` interface.
+TypeDBLite is built on [TypeDB](https://typedb.com), with thanks (see
+[Special Thanks to TypeDB!](#special-thanks-to-typedb)). It is an independent open-source project, not
+affiliated with, sponsored by, or endorsed by TypeDB Ltd.
 
 ## Why
 
-TypeDB's native server is a standalone Rust binary. TypeDBLite brings the same polymorphic type model, schema-first design, and TypeQL query language to contexts where spinning up a separate server is impractical: edge processes, embedded applications, local developer tooling, and browser workers.
+- **No server to run.** It runs inside your process, which suits edge processes, embedded applications,
+  local developer tooling and browser workers: places where spinning up TypeDB's own standalone server is
+  impractical. You keep the polymorphic type model, the schema-first design and the query language.
+- **Offline-first sync.** Every write goes in a change log, and stores replicate hub-and-spoke, converge
+  without conflict when two nodes make the same edit, and keep conflicting edits rather than discarding
+  them. The [sync demo](apps/sync-demo/) runs a browser, a desktop app and a phone against one hub.
+- **Measured, not claimed.** On TypeDB's own behaviour specification, TypeDBLite passes **1,742 of 1,756
+  scenarios**. Of the 14 that do not pass, 12 also fail on TypeDB itself. The run, the method and each
+  non-passing scenario are in [CONFORMANCE.md](CONFORMANCE.md).
 
-**How close is it to TypeDB?** On TypeDB's own behaviour specification, TypeDBLite passes 1,742 of 1,756 scenarios. Of the 14 that do not pass, 12 also fail on TypeDB itself. See [CONFORMANCE.md](CONFORMANCE.md).
+## What it is not, yet
 
-## Documentation
+TypeDBLite is an embedded library, not a server, and it is not TypeDB. Some of what is not there:
 
-| | |
-|---|---|
-| [Getting started](docs/guides/getting-started.md) | From a fresh clone to your first schema and queries, in the CLI and in code |
-| [Embedding the runtime](docs/guides/embedding-the-runtime.md) | The engine API: results, transactions, diagnostics, options |
-| [The TypeQLite language](docs/guides/typeqlite-language.md) | What you can write, and what is not supported yet |
-| [Replication and search](docs/guides/replication-and-search.md) | The change log, syncing stores, full-text search |
-| [Contributing](CONTRIBUTING.md) | Setup, workflow, and the checks a change must pass |
-| [All documentation](docs/README.md) | Including architecture and testing |
+- **Not on npm or a marketplace yet.** You build it from source (below).
+- **Some annotations are accepted and not enforced** on writes, such as `@card` bounds, `@range` and
+  `@values`. Nothing is silently dropped, and the language guide lists them.
+- **One writer at a time,** because SQLite allows one.
+- **A hub needs authentication you add.** The change-stream handler has none, and the replication guide's
+  Security section says what it does and does not protect against.
 
-## Packages
+The full list, with the source of each item, is in [Known limitations](docs/guides/known-limitations.md).
 
-| Package | Description |
-|---|---|
-| [`@typedblite/language`](libs/language/) | Langium grammar, generated AST, and language services for TypeQLite. Parsing, validation, formatting, semantic tokens, and scope resolution live here. |
-| [`@typedblite/runtime`](libs/runtime/) | The engine: query interpreter, storage, schema changes, change log, replication and full-text search. The working database lives here. |
-| [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
-| [`typedblite-conformance`](libs/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
-| [`typedblite-cli`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
-| [`typedblite-sync-demo`](apps/sync-demo/) | Offline-first sync, shown end to end: a browser, a desktop app and an Android phone, each with its own TypeDBLite store, replicating through a TypeDBLite hub. Cut any link or stop the hub, and watch them converge. |
-| [`typeqlite` (VS Code extension)](apps/vscode/) | The TypeQLite editor: diagnostics, cross-file navigation, hover, completion, rename, quick fixes, formatting and semantic highlighting, from a Langium language server that runs the language library unchanged (ADR-008). |
+## Install and first query
 
-## Quick start
-
-```
-node >=22.16
-```
+TypeDBLite is built from source for now. You need Node.js 22.16 or later.
 
 ```bash
 npm install
@@ -112,6 +73,29 @@ Run a `.typeqlite` file against a file-backed database:
 ```bash
 node apps/cli/out/main.js --file schema.typeqlite --database my.db
 ```
+
+## Packages
+
+| Package | Description |
+|---|---|
+| [`@typedblite/language`](libs/language/) | Langium grammar, generated AST, and language services for TypeQLite. Parsing, validation, formatting, semantic tokens, and scope resolution live here. |
+| [`@typedblite/runtime`](libs/runtime/) | The engine: query interpreter, storage, schema changes, change log, replication and full-text search. The working database lives here. |
+| [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
+| [`typedblite-conformance`](libs/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
+| [`typedblite-cli`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
+| [`typedblite-sync-demo`](apps/sync-demo/) | Offline-first sync, shown end to end: a browser, a desktop app and an Android phone, each with its own TypeDBLite store, replicating through a TypeDBLite hub. Cut any link or stop the hub, and watch them converge. |
+| [`typeqlite` (VS Code extension)](apps/vscode/) | The TypeQLite editor: diagnostics, cross-file navigation, hover, completion, rename, quick fixes, formatting and semantic highlighting, from a Langium language server that runs the language library unchanged (ADR-008). |
+
+## Documentation
+
+| | |
+|---|---|
+| [Getting started](docs/guides/getting-started.md) | From a fresh clone to your first schema and queries, in the CLI and in code |
+| [Embedding the runtime](docs/guides/embedding-the-runtime.md) | The engine API: results, transactions, diagnostics, options |
+| [The TypeQLite language](docs/guides/typeqlite-language.md) | What you can write, and what is not supported yet |
+| [Replication and search](docs/guides/replication-and-search.md) | The change log, syncing stores, full-text search |
+| [Contributing](CONTRIBUTING.md) | Setup, workflow, and the checks a change must pass |
+| [All documentation](docs/README.md) | Including architecture and testing |
 
 ## TypeQLite language
 
@@ -212,7 +196,7 @@ npm exec nx -- run typedblite-runtime:build
 npm exec nx -- run typedblite-runtime:test
 ```
 
-Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode` and `sync-demo`. Set `CI=true` to collect coverage into `coverage/`. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
+Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode` and `sync-demo`. Set `CI=true` to collect coverage into `coverage/`. **`npm run gate`** runs the whole check, from a clean tree: build, type-check, the tests with the 80% coverage floor, and the WASM, browser and VS Code suites. GitHub Actions is off for now, so it is the check before a pull request. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
 
 ## Test fixtures
 
@@ -233,10 +217,48 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 | [ADR-007](docs/architecture/adr-007-a-scenario-typedb-itself-fails-is-a-deviation.md) | A Scenario TypeDB Itself Fails Is a Deviation |
 | [ADR-008](docs/architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md) | The TypeQLite Editor Is a Langium Language Server in This Repository |
 | [ADR-009](docs/architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md) | TypeDBLite Runs in the Browser on WASM SQLite |
+| [ADR-010](docs/architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md) | The Markdown Preview Highlights TypeQLite Code Blocks as the Editor Does, in the Theme's Colours |
 
 **Standards:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md) · [Multi-Phase Lifecycle Standard](docs/standards/governance/multi-phase-lifecycle-standard.md)
 
 References in source code link to `docs/architecture/adr-NNN-*.md` using relative paths — they resolve to this repo's `docs/` tree.
+
+## Special Thanks to TypeDB!
+
+**TypeDBLite exists because of [TypeDB](https://typedb.com).** The data model, the query language and
+the behaviour that TypeDBLite implements are the work of [TypeDB Ltd](https://typedb.com) and the
+TypeDB community.
+
+Thank you to the team at TypeDB Ltd for an amazing product suite and ecosystem:
+- a database whose type system makes modelling a domain a pleasure;
+- a query language that reads like the domain it describes;
+- tooling such as TypeDB Studio;
+- and the generosity of publishing it all as open source.
+
+**A special thank-you for the [TypeDB Behaviour Specification](https://github.com/typedb/typedb-behaviour).**
+Its Cucumber scenarios are an executable definition of how TypeDB behaves. TypeDBLite runs 1,756 of
+them as its conformance suite, and is built and tested against them. Without that suite, this project
+could not say how closely it matches TypeDB, and could not have got as close as it has.
+
+| Created by TypeDB Ltd | What it is | Links | How TypeDBLite uses it |
+|---|---|---|---|
+| **TypeDB™** | The polymorphic database | [typedb.com](https://typedb.com) · [GitHub](https://github.com/typedb/typedb) | TypeDBLite reimplements its data model and behaviour in TypeScript, over SQLite |
+| **TypeQL™** | TypeDB's query language | [Reference](https://typedb.com/docs/typeql-reference/) · [GitHub](https://github.com/typedb/typeql) | TypeQLite is a dialect of TypeQL 3.x, and follows its syntax |
+| **TypeDB Studio** | TypeDB's IDE | [Docs](https://typedb.com/docs/tools/studio) · [GitHub](https://github.com/typedb/typedb-studio) | The model for TypeDBLite's proposed [graph explorer](docs/planning/graph-explorer/graph-explorer.feature.md) |
+| **TypeDB Behaviour Specification** | TypeDB's Cucumber conformance suite | [GitHub](https://github.com/typedb/typedb-behaviour) | Vendored unmodified in [`libs/conformance/spec/`](libs/conformance/spec/) as TypeDBLite's [conformance oracle](CONFORMANCE.md) |
+
+**Trademarks.** TypeDB™ and TypeQL™ are trademarks of TypeDB Ltd. TypeDB Studio is a product of
+TypeDB Ltd. These names are used here only to identify TypeDB Ltd's products, and to describe what
+TypeDBLite is compatible with.
+
+**Copyright.** TypeDB, TypeQL, TypeDB Studio and the TypeDB Behaviour Specification are copyright
+TypeDB Ltd and their contributors, and are published under the
+[Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/). The specification files in
+[`libs/conformance/spec/`](libs/conformance/spec/) are TypeDB Ltd's work. They keep their original
+licence headers and [`LICENSE`](libs/conformance/spec/LICENSE).
+
+**Independence.** TypeDBLite is an independent open-source project. It is not affiliated with,
+sponsored by, or endorsed by TypeDB Ltd. For TypeDB itself, visit [typedb.com](https://typedb.com).
 
 ## License
 
