@@ -1,5 +1,9 @@
-# Pull requests are squash-merged, so the PR title becomes the commit message on main.
-# CONTRIBUTING.md asks for Conventional Commits, scoped to the package.
+# The PR title names the merge commit and is what the pull request list and the history show.
+# Pull requests are merged with a merge commit, never squashed or rebased, so each commit keeps its own
+# history; CONTRIBUTING.md asks for Conventional Commits on those commits too.
+#
+# The type is enforced. The scope is not: this repository uses scopes for packages and for areas of the
+# documentation (`docs(debugger)`, `docs(planning)`), and a fixed list rejected a valid one.
 name: PR title
 
 on:
@@ -30,14 +34,4 @@ jobs:
             ci
             chore
             revert
-          scopes: |
-            language
-            runtime
-            revision
-            conformance
-            cli
-            vscode
-            sync-demo
-            docs
-            deps
           requireScope: false

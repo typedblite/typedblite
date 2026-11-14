@@ -1,11 +1,12 @@
 # TypeDBLite — Open Source Launch Plan
 
-Status: draft · Written 2026-11-14 · Basis: a read of the repository at `main` (`77f98c3`)
+Status: in progress · Written 2026-11-14 · Basis: a read of the repository at `main` (`77f98c3`); [where to resume](#where-to-resume) is current as of `82deabb`
 
 This plan takes TypeDBLite from "a strong repository" to "a project strangers can install, trust, and
 contribute to." It is organised as gates, not dates: each phase has exit criteria, and the launch
 happens when the gates are green. A suggested calendar is at the end.
 
+- [Where to resume](#where-to-resume)
 - [1. Where we are](#1-where-we-are)
 - [2. Goals and non-goals](#2-goals-and-non-goals)
 - [3. Positioning and audience](#3-positioning-and-audience)
@@ -18,6 +19,64 @@ happens when the gates are green. A suggested calendar is at the end.
 - [10. Risks](#10-risks)
 - [11. Calendar](#11-calendar)
 - [12. Decisions needed](#12-decisions-needed)
+- [Parking lot](#parking-lot)
+
+---
+
+## Where to resume
+
+*As of 2026-11-14, `main` at `82deabb`.* Read this first; everything it points to is below.
+
+**Merged to `main`** (PR #22, PR #33): CI (Ubuntu on Node 24, 22 and the 22.16.0 minimum; macOS; Windows; conformance
+report; coverage; WASM and browser; VS Code e2e; PR-title check; label sync), the community files (`SECURITY.md`,
+`CHANGELOG.md`, `CODEOWNERS`, Dependabot, issue forms, PR template), `.gitattributes`, and the fixes CI found: a
+lockfile pointing at a local registry, `langium-cli` failing on Node 24.22+, a wrong Node minimum (now 22.16), a
+Windows-only build command, a fixed-wait test, and a Langium race that dropped a document's diagnostics (see 1.1).
+
+**Verified on GitHub** (push run on `main`, `82deabb`): all three Ubuntu gates, macOS, VS Code e2e, WASM and browser
+(3 tests in a real Chromium) and the conformance report pass; the label sync corrected the three truncated labels;
+the PR-title check works. **Not** verified: that the Node 22 gate is stable. It failed once on `main` from the race
+and passed after the fix, but one clean run proves little; the evidence for the fix is the before/after replays and
+the regression test (`libs/language/test/diagnostics-published.spec.ts`).
+
+**Merging:** merge commits only, never squash or rebase, so each commit keeps its own history (the maintainer's rule,
+2026-11-14). PRs #22 and #33 were squashed before that rule; their original commits are still on GitHub at
+`refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head` (`a7557e1`), and are not on any branch.
+
+**Known and left alone:** coverage is under the 80% floor in four projects (`CI=true` switches the floor on; the
+blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows is experimental.
+
+**Only the maintainer can do these:**
+
+1. **Send the written confirmation to TypeDB Ltd** (B1). The draft is deliberately not in this repository. Get a
+   one-line written reply before any announcement.
+2. **Branch protection on `main`.** Require `gate (ubuntu-latest, node 24)`, `gate (ubuntu-latest, node 22)`,
+   `gate (ubuntu-latest, node 22.16.0)`, `conformance report` and `conventional-commit`. Then `vscode e2e`,
+   `wasm and browser` and `gate (macos-latest, node 24)`. Allow merge commits only (no squash, no rebase), so each
+   commit keeps its own history.
+3. **Repository settings:** Discussions, private vulnerability reporting, secret scanning with push protection,
+   Dependabot alerts.
+4. **`CODE_OF_CONDUCT.md`:** Insights, Community Standards, Add (inserts the official Contributor Covenant text).
+5. **Decisions:** Windows (fix the 11 tests, or document as unsupported for launch), the coverage policy (decision 9),
+   and whether `downstream-app` stays named in the docs (S3, decision 5).
+
+**Next work, in order:** the hub security review (B6); Phase 2 packaging (claim the unscoped `typedblite` and
+`typeqlite` npm names; take `private` off the CLI; publish `0.1.0-rc.1` under `next` with provenance; the clean-room
+install test on three platforms); Phase 3 docs and the playground. Parked, and not blocking the flip to public: PL-2 to PL-5 in the
+[parking lot](#parking-lot) (the Langium report, keeping the old PR commits, a commit-message check, watching CI on `main`).
+
+**Before the repository goes public:** the repository is **private** (maintainer, 2026-11-14), and this plan names the
+TypeDB Ltd conversation. That is parked as [PL-1](#parking-lot), and the "flip the repo to public" step in Phase 4 is
+blocked on it.
+
+**Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run build && npm test`.
+Useful to know:
+- `CI=true` turns on the coverage floor. Run with `CI=` to match the blocking gate.
+- A workflow run shows "success" even when an experimental job (Windows, coverage, WASM and browser, e2e, macOS)
+  fails. Read the jobs, not the run.
+- A push cancels CI that is still running on the same ref, so push once the run you care about has finished.
+- `apps/vscode` and the language server share `libs/language`; the Langium override in
+  `TypeQLiteDocumentBuilder.notifyDocumentPhase` must be re-checked on any Langium upgrade.
 
 ---
 
@@ -169,7 +228,7 @@ was run locally on Node 22.23 (see [1.1](#11-what-running-the-gate-found)).*
 - [x] Conformance: `npm test` already fails on a regression below `baseline.json`; a separate job runs
       the report card and uploads it. *(Still to do: the README badge generated from a run.)*
 - [x] Browser job: `test-wasm` and `test-browser` (Playwright Chromium) — **non-blocking for now**, see 1.1.
-- [x] PR-title check (Conventional Commits, squash-merge makes the title the commit message).
+- [x] PR-title check (Conventional Commits on the PR title, which names the merge commit; any scope).
 - [x] `SECURITY.md`, `CHANGELOG.md`, issue forms (bug, TypeDB divergence, feature-with-caller), PR
       template, `CODEOWNERS`, Dependabot (npm and Actions), label file and sync workflow.
 - [ ] `CODE_OF_CONDUCT.md`: **not written.** It should be the official Contributor Covenant 2.1 text,
@@ -178,10 +237,11 @@ was run locally on Node 22.23 (see [1.1](#11-what-running-the-gate-found)).*
 - [x] S2 fixed (`docs/memories/project-overview.md`). **S3 still open**: it needs a decision (decision 5).
 - [ ] **Settings only the owner can change** (cannot be done from files): branch protection on `main`
       (require the `gate (ubuntu-latest, node 24)` and `gate (ubuntu-latest, node 22)` and `PR title`
-      checks, require review, squash-merge only); enable Discussions; enable private vulnerability
+      checks, require review, merge commits only: no squash, no rebase); enable Discussions; enable private vulnerability
       reporting, secret scanning and push protection, Dependabot alerts.
-- [ ] Mailbox aliases `security@` and `hello@` on `typedblite.dev` — **`SECURITY.md` names
-      `security@typedblite.dev`, so it must exist before this branch is merged to a public default branch.**
+- [x] Mailbox aliases `security@` and `hello@` on `typedblite.dev`: both forward to the maintainer's mailbox
+      *(reported by the maintainer 2026-11-14; no test message has been sent, so send one from outside
+      to confirm)*. `SECURITY.md` names `security@`.
 - [ ] Review the hub (B6); write the findings into the replication guide as a "Security" section.
 - [x] After the first CI run: read the results of every experimental job (see [1.2](#12-first-ci-results)). **Promoting
       jobs to blocking is a branch-protection setting only the owner can change.**
@@ -347,6 +407,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       source, plus doc fixes and small constructs with a named caller.
 - [ ] Flip the repo to public if it is private; publish `0.1.0` (stable `latest` tag) a few days before
       the announcement so it has settled and the install path is proven in the wild.
+      **Not until every [parking-lot](#parking-lot) item that blocks the flip is closed** (today: PL-1).
 - [ ] Share with TypeDB Ltd: a courtesy preview of the blog post and README (not a request for
       sign-off on content beyond naming).
 
@@ -512,8 +573,8 @@ These change the plan; the recommendations are what the plan assumes.
    writing, keep the fallback name on file.*
 2. **Public surface.** Publish the three library packages and the CLI to npm; the VS Code extension to
    both marketplaces; leave conformance and sync-demo in the repo. *Recommendation: as in Phase 2.*
-3. **Is the repository already public?** The remote exists on GitHub, but visibility wasn't checked from
-   here. If public, do Phases 0–1 first anyway, and don't announce.
+3. **Is the repository already public?** *Resolved: it is private (maintainer, 2026-11-14).* Nothing in it is public
+   yet. Clear the [parking lot](#parking-lot) before that changes.
 4. **Contribution model.** DCO (recommended) or CLA.
 5. **downstream-app as a named case study** (S3). It's the project's only production consumer and the
    strongest answer to "who uses this?" *Recommendation: keep, link, and have its data reviewed.*
@@ -523,6 +584,82 @@ These change the plan; the recommendations are what the plan assumes.
 9. **Coverage policy.** Four projects are below the 80% floor (1.1). Raise tests, exempt `sync-demo`, or lower
    the floor? *Recommendation: exempt `sync-demo`, and raise the other three, which are within about
    8 points; keep the floor at 80%.*
+
+---
+
+## Parking lot
+
+Things deliberately set aside, each with the moment it must be revisited. An item stays here until it is closed.
+
+| # | Item | Revisit before | Blocks | Status |
+| --- | --- | --- | --- | --- |
+| PL-1 | Revisit what this plan says about the TypeDB Ltd conversation | The repository is made public, and in any case before the announcement | Flip to public | Open |
+| PL-2 | Report the Langium race upstream, and drop our workaround once it is fixed | A Langium upgrade | Nothing | Open |
+| PL-3 | Keep the original commits of PRs #22 and #33 on a branch or tag | Soon: needs the maintainer's OK to push | Nothing | Open |
+| PL-4 | Decide whether to add a commit-message check | Branch protection is enabled, or the first outside pull request | Nothing | Open |
+| PL-5 | Confirm CI on `main` is stable, including the Node 22 gate | The announcement | Announcement | Open |
+
+### PL-1. What the plan says about the TypeDB Ltd conversation
+
+The plan records that TypeDB Ltd's CEO gave a verbal blessing to the release. That is accurate and useful in a
+private planning file. It is a different thing in a public one: it makes a claim about a third party, names their
+role, and describes a private conversation, before the written confirmation (B1) exists.
+
+**Where it appears** (all in this file): the B1 row in 4.1; the Phase 0 checklist item "Speak to TypeDB Ltd's CEO";
+the risk row "TypeDB Ltd's position changes"; decision 1 in section 12; and [Where to resume](#where-to-resume).
+
+**Decide, when the time comes:**
+
+- *If the written confirmation is in hand:* reword to say a written confirmation was received on a date, without
+  naming a role or describing the conversation, and keep the email itself in private records.
+- *If it is not:* remove the references, or reduce them to "naming to be confirmed with TypeDB Ltd", and keep the
+  detail in private records only.
+
+Either way, the same pass should check the rest of `docs/planning/` for statements about third parties that are
+fine in a private repository and not in a public one.
+
+**Owner:** the maintainer. **Blocks:** the "flip the repo to public" step in Phase 4.
+
+### PL-2. Report the Langium race upstream
+
+Langium 4.4.2's `DocumentBuilder.notifyDocumentPhase` checks the cancellation token before each listener, after a
+document is already `Validated` and marked complete. A build cancelled in that gap drops the listener that sends the
+diagnostics, and nothing rebuilds the document. An editor opening several files at once triggers it (about 3 runs in
+10 for five documents).
+
+We work around it in `TypeQLiteDocumentBuilder.notifyDocumentPhase` (`libs/language/src/typeqlite-label-providers.ts`),
+with a regression test that cancels at exactly that point (`libs/language/test/diagnostics-published.spec.ts`). The
+measured evidence is in PR #33: 6 of 20 standalone replays stalled before the fix and 0 of 40 after.
+
+**To do:** file it with Langium with a minimal reproduction (the regression test is close to one), under the
+maintainer's name. When it is fixed upstream: upgrade, delete the override, keep the test. A draft report can be
+written on request.
+
+### PL-3. Keep the original commits of PRs #22 and #33
+
+Both were squash-merged before the rule that pull requests are merged with merge commits. Their original commits
+(15 and 2) are on no branch; they exist only at GitHub's `refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head`
+(`a7557e1`).
+
+**To do:** push a branch or tag for each (for example `archive/pr-22`, `archive/pr-33`) so they stay reachable
+whatever GitHub does with PR refs. That is non-destructive. It needs the maintainer's OK, because it creates refs
+beyond the working branch. `main` is not rewritten.
+
+### PL-4. A commit-message check
+
+With merge commits every commit message is kept, so the PR-title check (which guards only the merge commit's
+title) is no longer the best fit. A per-commit Conventional Commits check would be, but it would also reject
+`Merge branch ...` commits inside a pull request. Decide before enabling branch protection, or when the first
+outside pull request arrives.
+
+### PL-5. Confirm CI on `main` is stable
+
+The Node 22 gate failed once on `main`, from the Langium race, and has passed since. One clean run proves little:
+three clean runs on pull requests did not prove it before. The push runs on `main` for `4288d70` and `63d4c66`
+(docs and CI changes only) have not been read.
+
+**To do:** read the push runs on `main` as they arrive. Any intermittent failure of `typeqlite-vscode`'s
+`server.test.ts` means the fix is incomplete. Treat several consecutive clean runs, not one, as the bar.
 
 ---
 
