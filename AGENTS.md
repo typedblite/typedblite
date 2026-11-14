@@ -216,6 +216,7 @@ token rule there would be a second definition of the language.
 | Changing revision semantics without new tests | CouchDB parity is no longer checked by any suite; stores written by different versions must still converge |
 | Editing the grammar without regenerating locally | Tools run from source (`tsx`, vitest aliases) read `src/generated/`, which only `langium-generate` refreshes |
 | Adding a construct to the grammar with no caller | Grammar scope is measured, not guessed — find the caller first |
+| Squash-merging or rebase-merging a pull request | Merge pull requests with a merge commit only. Squashing collapses its commits into one, and rebasing rewrites their hashes: either loses the individual history, which the maintainer wants kept |
 | Trusting a gate after a dependency bump without a clean build | `build` is `tsc -b`, which is incremental: a library whose sources did not change is not re-emitted, so its dependants are judged against stale declarations, even with `--skip-nx-cache`. Delete `out/` and `*.tsbuildinfo` first (the `vscode-languageserver` 10 bump hid a type error for a whole phase this way) |
 
 ---

@@ -39,6 +39,10 @@ the PR-title check works. **Not** verified: that the Node 22 gate is stable. It 
 and passed after the fix, but one clean run proves little; the evidence for the fix is the before/after replays and
 the regression test (`libs/language/test/diagnostics-published.spec.ts`).
 
+**Merging:** merge commits only, never squash or rebase, so each commit keeps its own history (the maintainer's rule,
+2026-11-14). PRs #22 and #33 were squashed before that rule; their original commits are still on GitHub at
+`refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head` (`a7557e1`), and are not on any branch.
+
 **Known and left alone:** coverage is under the 80% floor in four projects (`CI=true` switches the floor on; the
 blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows is experimental.
 
@@ -48,7 +52,8 @@ blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows 
    one-line written reply before any announcement.
 2. **Branch protection on `main`.** Require `gate (ubuntu-latest, node 24)`, `gate (ubuntu-latest, node 22)`,
    `gate (ubuntu-latest, node 22.16.0)`, `conformance report` and `conventional-commit`. Then `vscode e2e`,
-   `wasm and browser` and `gate (macos-latest, node 24)`. Squash-merge only.
+   `wasm and browser` and `gate (macos-latest, node 24)`. Allow merge commits only (no squash, no rebase), so each
+   commit keeps its own history.
 3. **Repository settings:** Discussions, private vulnerability reporting, secret scanning with push protection,
    Dependabot alerts.
 4. **`CODE_OF_CONDUCT.md`:** Insights, Community Standards, Add (inserts the official Contributor Covenant text).
@@ -222,7 +227,7 @@ was run locally on Node 22.23 (see [1.1](#11-what-running-the-gate-found)).*
 - [x] Conformance: `npm test` already fails on a regression below `baseline.json`; a separate job runs
       the report card and uploads it. *(Still to do: the README badge generated from a run.)*
 - [x] Browser job: `test-wasm` and `test-browser` (Playwright Chromium) — **non-blocking for now**, see 1.1.
-- [x] PR-title check (Conventional Commits, squash-merge makes the title the commit message).
+- [x] PR-title check (Conventional Commits on the PR title, which names the merge commit; any scope).
 - [x] `SECURITY.md`, `CHANGELOG.md`, issue forms (bug, TypeDB divergence, feature-with-caller), PR
       template, `CODEOWNERS`, Dependabot (npm and Actions), label file and sync workflow.
 - [ ] `CODE_OF_CONDUCT.md`: **not written.** It should be the official Contributor Covenant 2.1 text,
@@ -231,7 +236,7 @@ was run locally on Node 22.23 (see [1.1](#11-what-running-the-gate-found)).*
 - [x] S2 fixed (`docs/memories/project-overview.md`). **S3 still open**: it needs a decision (decision 5).
 - [ ] **Settings only the owner can change** (cannot be done from files): branch protection on `main`
       (require the `gate (ubuntu-latest, node 24)` and `gate (ubuntu-latest, node 22)` and `PR title`
-      checks, require review, squash-merge only); enable Discussions; enable private vulnerability
+      checks, require review, merge commits only: no squash, no rebase); enable Discussions; enable private vulnerability
       reporting, secret scanning and push protection, Dependabot alerts.
 - [x] Mailbox aliases `security@` and `hello@` on `typedblite.dev`: both forward to the maintainer's mailbox
       *(reported by the maintainer 2026-11-14; no test message has been sent, so send one from outside
