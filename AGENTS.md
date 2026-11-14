@@ -174,7 +174,10 @@ The extension also colours TypeQLite code blocks in VS Code's Markdown preview
 The server classifies, through the `typeqlite/highlightBlocks` request: TextMate scopes from the
 grammar file the extension ships, and the editor's own semantic tokens. The client only maps those to
 the active theme's colours, which it reads from the theme's files (`src/markdown/theme.ts` restates
-VS Code's rules for that). 🔴 Keep TypeQLite knowledge out of `src/markdown/`: a keyword list or
+VS Code's rules for that). In a remote window the theme is not in the extension's host, so a second
+extension, the TypeQLite Theme Bridge (`theme-bridge/`, `src/theme-bridge.ts`, `extensionKind: ["ui"]`),
+reads the files where VS Code keeps them and answers `typeqlite.themeFiles`. `package` builds both
+`.vsix` files, and `e2e` installs both. 🔴 Keep TypeQLite knowledge out of `src/markdown/`: a keyword list or
 token rule there would be a second definition of the language.
 - Shared TypeQLite schema fixtures used by multiple suites live in `test-fixtures/schemas/`.
 - `typedblite-runtime:test-wasm` runs the whole runtime suite on WASM SQLite, and `typedblite-runtime:test-browser` runs the engine in a real Chromium on OPFS (ADR-009). Run both after touching the binding interface, `src/wasm.ts` or `content-revision`. `test-oracle` needs an external search index and is not routine ([Testing](docs/development/testing.md#the-engine-on-wasm-sqlite)).

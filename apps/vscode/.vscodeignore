@@ -10,3 +10,4 @@ esbuild*.mjs
 vitest.config.ts
 .gitignore
 dist/**
+theme-bridge/**

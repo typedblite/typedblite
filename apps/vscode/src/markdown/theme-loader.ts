@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 // run time, so esbuild leaves the requires in and the installed extension cannot find them.
 import { parse, type ParseError } from 'jsonc-parser/lib/esm/main.js';
 import { resolveTheme, type Theme, type ThemeFile } from './theme.js';
+import { THEME_FILES_COMMAND, themeFiles, type ThemeFilesResult } from './theme-source.js';
 
 /**
  * The active colour theme's token colouring, read from the files of the extension that contributes
@@ -11,28 +12,44 @@ import { resolveTheme, type Theme, type ThemeFile } from './theme.js';
  * 🔴 There is no API for a theme's token colours, so this finds the theme the way the workbench
  * does: by the id or label in `workbench.colorTheme` (or the preferred theme for the OS's scheme when
  * `window.autoDetectColorScheme` is on), among the `contributes.themes` of every extension, the
- * built-in ones included. Undefined when the theme cannot be found or read. The preview then falls
- * back to its own highlighting colours, and says why in the log.
+ * built-in ones included. In a remote window the theme is not in this extension host, and the files
+ * come from the TypeQLite Theme Bridge instead (`theme-source.ts`, ADR-010 D7).
+ *
+ * The customisations are read HERE, never by the bridge: settings for the remote machine apply only
+ * in the remote host. Undefined when the theme cannot be read. The preview then falls back to its
+ * own highlighting colours, and says why in the log.
  */
 export async function loadTheme(log: vscode.OutputChannel): Promise<Theme | undefined> {
   const themeName = activeThemeName();
+  const files = await themeFiles(
+    themeName,
+    {
+      here: readThemeFiles,
+      bridge: (name) => vscode.commands.executeCommand<ThemeFilesResult | undefined>(THEME_FILES_COMMAND, name),
+    },
+    (message) => log.appendLine(`Markdown preview: ${message}`),
+  );
+  if (!files) return undefined;
+  const editor = vscode.workspace.getConfiguration('editor', { languageId: 'typeqlite' });
+  return resolveTheme(files, {
+    themeName,
+    semanticHighlighting: editor.get<boolean | 'configuredByTheme'>('semanticHighlighting.enabled', 'configuredByTheme'),
+    semanticTokenColorCustomizations: editor.get('semanticTokenColorCustomizations'),
+    tokenColorCustomizations: editor.get('tokenColorCustomizations'),
+  });
+}
+
+/**
+ * The files of the theme named, as this extension host sees them: the main extension's first try,
+ * and all the bridge does.
+ */
+export async function readThemeFiles(themeName: string): Promise<ThemeFilesResult> {
   const location = findTheme(themeName);
-  if (!location) {
-    log.appendLine(`Markdown preview: no installed extension contributes the colour theme '${themeName}'.`);
-    return undefined;
-  }
+  if (!location) return { missing: `No extension in this extension host contributes the colour theme '${themeName}'` };
   try {
-    const files = await readThemeChain(location, new Set());
-    const editor = vscode.workspace.getConfiguration('editor', { languageId: 'typeqlite' });
-    return resolveTheme(files, {
-      themeName,
-      semanticHighlighting: editor.get<boolean | 'configuredByTheme'>('semanticHighlighting.enabled', 'configuredByTheme'),
-      semanticTokenColorCustomizations: editor.get('semanticTokenColorCustomizations'),
-      tokenColorCustomizations: editor.get('tokenColorCustomizations'),
-    });
+    return { files: await readThemeChain(location, new Set()) };
   } catch (error) {
-    log.appendLine(`Markdown preview: could not read the colour theme '${themeName}': ${(error as Error).message}`);
-    return undefined;
+    return { missing: `Could not read the colour theme '${themeName}': ${(error as Error).message}` };
   }
 }
 

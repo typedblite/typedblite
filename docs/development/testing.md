@@ -113,8 +113,8 @@ TypeDBLite. The oracle needs a server, so it is never part of the routine run.
 npm exec nx -- run typeqlite-vscode:e2e
 ```
 
-This packages the extension as a `.vsix`, downloads VS Code, installs the `.vsix` into a fresh
-profile, and runs the cases in `apps/vscode/e2e/suite.ts` inside the real editor. It needs a
+This packages the extension and the TypeQLite Theme Bridge as `.vsix` files, downloads VS Code,
+installs both into a fresh profile, and runs the cases in `apps/vscode/e2e/suite.ts` inside the real editor. It needs a
 display: use `xvfb-run` on a headless machine. Run it whenever you change something an editor sees.
 That includes any change to the language library's providers.
 

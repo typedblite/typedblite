@@ -27,11 +27,12 @@
         "{workspaceRoot}/docs/brand/typedblite-icon-512.png"
       ],
       "options": {
-        "command": "node ../../tools/copy-file.mjs ../../docs/brand/typedblite-icon-512.png images/icon.png",
+        "command": "node ../../tools/copy-file.mjs ../../docs/brand/typedblite-icon-512.png images/icon.png && node ../../tools/copy-file.mjs ../../docs/brand/typedblite-icon-512.png theme-bridge/images/icon.png",
         "cwd": "apps/vscode"
       },
       "outputs": [
-        "{projectRoot}/images"
+        "{projectRoot}/images",
+        "{projectRoot}/theme-bridge/images"
       ]
     },
     "build": {
@@ -77,7 +78,7 @@
         "package"
       ],
       "options": {
-        "command": "node esbuild.e2e.mjs && node e2e/out/run.cjs dist/typeqlite-0.0.1.vsix",
+        "command": "node esbuild.e2e.mjs && node e2e/out/run.cjs dist/typeqlite-0.0.1.vsix dist/typeqlite-theme-0.0.1.vsix",
         "cwd": "apps/vscode"
       }
     },
@@ -93,7 +94,9 @@
           "node esbuild.mjs --minify",
           "mkdir -p dist",
           "cp ../../LICENSE LICENSE",
-          "vsce package --no-dependencies --out dist/typeqlite-0.0.1.vsix"
+          "vsce package --no-dependencies --out dist/typeqlite-0.0.1.vsix",
+          "node ../../tools/copy-file.mjs ../../LICENSE theme-bridge/LICENSE",
+          "cd theme-bridge && vsce package --no-dependencies --out ../dist/typeqlite-theme-0.0.1.vsix"
         ],
         "parallel": false,
         "cwd": "apps/vscode"
