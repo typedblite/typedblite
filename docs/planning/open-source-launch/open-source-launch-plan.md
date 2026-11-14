@@ -309,7 +309,7 @@ PR #22, heads `e7f3017` and `a6a36de` (GitHub-hosted runners; Node 24.22.2 for t
 | WASM and browser | Passed on both runs: the WASM suite, and 3 tests in a real Chromium (OPFS persistence across a full browser restart; browser revisions equal Node's; the same `[CNT9]` duplicate-key diagnostic) | Ready to require |
 | gate, macOS, Node 24 | Passed on both runs (and on the run before) | Ready to require |
 | coverage | Failed on the known 80% floor: numbers identical to the local run | Stays non-blocking until decision 9 |
-| gate, Windows, Node 24 | **Build and typecheck pass; 11 tests fail** (12 before `.gitattributes`; below) | Stays experimental |
+| gate, Windows, Node 24 | **Build and typecheck pass; 11 tests fail** (12 before `.gitattributes`; below). **Update 2026-11-14: all four groups fixed (#38, #39); green on two complete runs** | Ready to require: the founder's call (below) |
 | PR title | Did not run: `pull_request_target` runs the workflow from the base branch, which does not have it yet | Starts working after merge |
 
 **Windows, by cause.** 11 tests fail in 3 groups (the first group, below, is fixed: the run on `a6a36de` has no
@@ -320,18 +320,28 @@ groups 2 and 3 are read from the failure messages; group 4's is unknown.
    Windows was converting to CRLF on checkout, which changes every file's bytes. Every tracked file is LF in the
    index. `.gitattributes` (LF everywhere, the spec directory byte-exact) cleared it: the conformance suite now
    passes on Windows.
-2. **Runtime `durability` and `transaction-crash` (3 tests).** They assert the killed child reports
-   `signal === 'SIGKILL'`. Windows has no POSIX signals, so a killed process reports `signal: null`. The tests'
-   assumption is POSIX-only; the engine claim they guard (a killed writer leaves no half-write) is untested on
-   Windows. Needs a platform-aware assertion or a documented skip, and a decision on whether crash safety on
-   Windows must be proven some other way.
-3. **Runtime `role-player-index` (2 tests).** `EPERM` deleting the temporary directory in the test's `finally`
-   while SQLite still holds the file open, which Windows does not allow. Test cleanup: close the database
-   before `rmSync`.
-4. **CLI `repl.test` (6 tests).** The REPL's captured output is empty on Windows. Cause unknown; needs a
-   Windows machine or a few CI iterations to see what the child process printed.
+2. **Runtime `durability` and `transaction-crash` (3 tests): FIXED in #39, with a platform-aware assertion, not
+   a skip.** On Windows, Node makes `process.kill(pid, 'SIGKILL')` a `TerminateProcess`: just as abrupt, but
+   reported as exit 1 with no signal. So the crash was real all along; only its proof was POSIX-only. Exit 1
+   alone proves nothing, because an uncaught exception exits 1 too. So the fixtures now print a marker
+   (synchronously, to fd 1) just before they kill themselves. The tests accept the kill only if the child
+   printed it, wrote nothing to stderr but Node's own warnings, and died by `SIGKILL` (POSIX) or exited 1 with
+   no signal (Windows). **Crash safety is now tested on Windows**, which answers the decision this item asked
+   for. (Node 22.16's `ExperimentalWarning` for `node:sqlite` on stderr first failed the check on that runner;
+   Node's own warnings are now ignored.)
+3. **Runtime `role-player-index` (2 tests): FIXED in #39.** As diagnosed: the test never closed the
+   interpreters it opened on a file. It now does. The engine has no leak: `close()` exists and works.
+4. **CLI `repl.test` (6 tests): FIXED in #38.** The cause was a defect in the CLI, not the test. Its entry check
+   compared the script's file name, split on `/`, with the module's URL. A Windows path has no `/`, so
+   `main()` never ran and the CLI exited 0 having printed nothing. The same check failed through npm's `bin`
+   link on every platform, whose name is `typedblite`, and `out/main.js` had no `#!` line for that link
+   either. All three are fixed.
 
-The seven CLI `main` tests, 686 of 691 runtime tests and all of conformance now pass on Windows.
+**Green on Windows since #39:** run 43618713890 (`41ef856`) and run 43619313563 (`7b5fe1e`), two complete runs
+with every test passing. The job is still marked experimental in `ci.yml`. Making it blocking, and adding it to
+branch protection, is the founder's call, as for the other jobs below.
+
+Before #38 and #39: the seven CLI `main` tests, 686 of 691 runtime tests and all of conformance passed on Windows. Since #39, everything does.
 
 **Recommended branch protection** once this PR has merged and the checks exist: require
 `gate (ubuntu-latest, node 24)`, `gate (ubuntu-latest, node 22)`, `gate (ubuntu-latest, node 22.16.0)`,
