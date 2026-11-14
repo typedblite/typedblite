@@ -39,6 +39,10 @@ the PR-title check works. **Not** verified: that the Node 22 gate is stable. It 
 and passed after the fix, but one clean run proves little; the evidence for the fix is the before/after replays and
 the regression test (`libs/language/test/diagnostics-published.spec.ts`).
 
+**Merging:** merge commits only, never squash or rebase, so each commit keeps its own history (the maintainer's rule,
+2026-11-14). PRs #22 and #33 were squashed before that rule; their original commits are still on GitHub at
+`refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head` (`a7557e1`), and are not on any branch.
+
 **Known and left alone:** coverage is under the 80% floor in four projects (`CI=true` switches the floor on; the
 blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows is experimental.
 
@@ -48,7 +52,8 @@ blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows 
    one-line written reply before any announcement.
 2. **Branch protection on `main`.** Require `gate (ubuntu-latest, node 24)`, `gate (ubuntu-latest, node 22)`,
    `gate (ubuntu-latest, node 22.16.0)`, `conformance report` and `conventional-commit`. Then `vscode e2e`,
-   `wasm and browser` and `gate (macos-latest, node 24)`. Squash-merge only.
+   `wasm and browser` and `gate (macos-latest, node 24)`. Allow merge commits only (no squash, no rebase), so each
+   commit keeps its own history.
 3. **Repository settings:** Discussions, private vulnerability reporting, secret scanning with push protection,
    Dependabot alerts.
 4. **`CODE_OF_CONDUCT.md`:** Insights, Community Standards, Add (inserts the official Contributor Covenant text).
@@ -57,7 +62,8 @@ blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows 
 
 **Next work, in order:** the hub security review (B6); Phase 2 packaging (claim the unscoped `typedblite` and
 `typeqlite` npm names; take `private` off the CLI; publish `0.1.0-rc.1` under `next` with provenance; the clean-room
-install test on three platforms); Phase 3 docs and the playground.
+install test on three platforms); Phase 3 docs and the playground. Parked, and not blocking the flip to public: PL-2 to PL-5 in the
+[parking lot](#parking-lot) (the Langium report, keeping the old PR commits, a commit-message check, watching CI on `main`).
 
 **Before the repository goes public:** the repository is **private** (maintainer, 2026-11-14), and this plan names the
 TypeDB Ltd conversation. That is parked as [PL-1](#parking-lot), and the "flip the repo to public" step in Phase 4 is
@@ -159,7 +165,7 @@ confirm it and it needs someone to.
 | S5 | `.claude/`, `AGENTS.md`, `.github/agents|prompts|skills` ship in the public tree | Fine to keep, and a plus for agent-assisted contributors. Confirm nothing in them is private (paths, tokens, internal URLs) |
 | S6 | Sync demo has Electron and Android toolchains: heavy for a newcomer | Keep it, but give a browser-only "run it in one command" path and a recorded GIF |
 | S7 | Performance "Still open" list (no cost model, one writer, no change-log retention) | Promote to the public roadmap and known-limitations page rather than leaving it in a results doc |
-| S8 | Platform coverage unknown (Windows, macOS) | CI matrix; document support |
+| S8 | Platform coverage unknown (Windows, macOS) | CI matrix; document support. **Windows: blocking CI job since #39. macOS: green, still experimental. Support stated in CONTRIBUTING and the getting-started guide** |
 | S9 | Run a secret scan across full git history | `gitleaks` or GitHub secret scanning; rotate anything found |
 
 ### 4.3 Nice to have
@@ -218,11 +224,11 @@ was run locally on Node 22.23 (see [1.1](#11-what-running-the-gate-found)).*
 
 - [x] `.github/workflows/ci.yml`: install, `build`, `typecheck`, `test` through Nx. Node 24 and 22 on
       Linux are blocking; Node 22.12.0, macOS and Windows are **experimental** (reported, not blocking)
-      until seen green (B5, S8).
+      until seen green (B5, S8). *Windows has been blocking since #39 (2026-11-14), after two green runs.*
 - [x] Conformance: `npm test` already fails on a regression below `baseline.json`; a separate job runs
       the report card and uploads it. *(Still to do: the README badge generated from a run.)*
 - [x] Browser job: `test-wasm` and `test-browser` (Playwright Chromium) — **non-blocking for now**, see 1.1.
-- [x] PR-title check (Conventional Commits, squash-merge makes the title the commit message).
+- [x] PR-title check (Conventional Commits on the PR title, which names the merge commit; any scope).
 - [x] `SECURITY.md`, `CHANGELOG.md`, issue forms (bug, TypeDB divergence, feature-with-caller), PR
       template, `CODEOWNERS`, Dependabot (npm and Actions), label file and sync workflow.
 - [ ] `CODE_OF_CONDUCT.md`: **not written.** It should be the official Contributor Covenant 2.1 text,
@@ -231,7 +237,7 @@ was run locally on Node 22.23 (see [1.1](#11-what-running-the-gate-found)).*
 - [x] S2 fixed (`docs/memories/project-overview.md`). **S3 still open**: it needs a decision (decision 5).
 - [ ] **Settings only the owner can change** (cannot be done from files): branch protection on `main`
       (require the `gate (ubuntu-latest, node 24)` and `gate (ubuntu-latest, node 22)` and `PR title`
-      checks, require review, squash-merge only); enable Discussions; enable private vulnerability
+      checks, require review, merge commits only: no squash, no rebase); enable Discussions; enable private vulnerability
       reporting, secret scanning and push protection, Dependabot alerts.
 - [x] Mailbox aliases `security@` and `hello@` on `typedblite.dev`: both forward to the maintainer's mailbox
       *(reported by the maintainer 2026-11-14; no test message has been sent, so send one from outside
@@ -303,7 +309,7 @@ PR #22, heads `e7f3017` and `a6a36de` (GitHub-hosted runners; Node 24.22.2 for t
 | WASM and browser | Passed on both runs: the WASM suite, and 3 tests in a real Chromium (OPFS persistence across a full browser restart; browser revisions equal Node's; the same `[CNT9]` duplicate-key diagnostic) | Ready to require |
 | gate, macOS, Node 24 | Passed on both runs (and on the run before) | Ready to require |
 | coverage | Failed on the known 80% floor: numbers identical to the local run | Stays non-blocking until decision 9 |
-| gate, Windows, Node 24 | **Build and typecheck pass; 11 tests fail** (12 before `.gitattributes`; below) | Stays experimental |
+| gate, Windows, Node 24 | **Build and typecheck pass; 11 tests fail** (12 before `.gitattributes`; below). **Update 2026-11-14: all four groups fixed (#38, #39); green on two complete runs** | **Blocking since #39** |
 | PR title | Did not run: `pull_request_target` runs the workflow from the base branch, which does not have it yet | Starts working after merge |
 
 **Windows, by cause.** 11 tests fail in 3 groups (the first group, below, is fixed: the run on `a6a36de` has no
@@ -314,22 +320,38 @@ groups 2 and 3 are read from the failure messages; group 4's is unknown.
    Windows was converting to CRLF on checkout, which changes every file's bytes. Every tracked file is LF in the
    index. `.gitattributes` (LF everywhere, the spec directory byte-exact) cleared it: the conformance suite now
    passes on Windows.
-2. **Runtime `durability` and `transaction-crash` (3 tests).** They assert the killed child reports
-   `signal === 'SIGKILL'`. Windows has no POSIX signals, so a killed process reports `signal: null`. The tests'
-   assumption is POSIX-only; the engine claim they guard (a killed writer leaves no half-write) is untested on
-   Windows. Needs a platform-aware assertion or a documented skip, and a decision on whether crash safety on
-   Windows must be proven some other way.
-3. **Runtime `role-player-index` (2 tests).** `EPERM` deleting the temporary directory in the test's `finally`
-   while SQLite still holds the file open, which Windows does not allow. Test cleanup: close the database
-   before `rmSync`.
-4. **CLI `repl.test` (6 tests).** The REPL's captured output is empty on Windows. Cause unknown; needs a
-   Windows machine or a few CI iterations to see what the child process printed.
+2. **Runtime `durability` and `transaction-crash` (3 tests): FIXED in #39, with a platform-aware assertion, not
+   a skip.** On Windows, Node makes `process.kill(pid, 'SIGKILL')` a `TerminateProcess`: just as abrupt, but
+   reported as exit 1 with no signal. So the crash was real all along; only its proof was POSIX-only. Exit 1
+   alone proves nothing, because an uncaught exception exits 1 too. So the fixtures now print a marker
+   (synchronously, to fd 1) just before they kill themselves. The tests accept the kill only if the child
+   printed it, wrote nothing to stderr but Node's own warnings, and died by `SIGKILL` (POSIX) or exited 1 with
+   no signal (Windows). **Crash safety is now tested on Windows**, which answers the decision this item asked
+   for. (Node 22.16's `ExperimentalWarning` for `node:sqlite` on stderr first failed the check on that runner;
+   Node's own warnings are now ignored.)
+3. **Runtime `role-player-index` (2 tests): FIXED in #39.** As diagnosed: the test never closed the
+   interpreters it opened on a file. It now does. The engine has no leak: `close()` exists and works.
+4. **CLI `repl.test` (6 tests): FIXED in #38.** The cause was a defect in the CLI, not the test. Its entry check
+   compared the script's file name, split on `/`, with the module's URL. A Windows path has no `/`, so
+   `main()` never ran and the CLI exited 0 having printed nothing. The same check failed through npm's `bin`
+   link on every platform, whose name is `typedblite`, and `out/main.js` had no `#!` line for that link
+   either. All three are fixed.
 
-The seven CLI `main` tests, 686 of 691 runtime tests and all of conformance now pass on Windows.
+**Green on Windows since #39:** run 43618713890 (`41ef856`) and run 43619313563 (`7b5fe1e`), two complete runs
+with every test passing. The founder made it blocking in #39 (`experimental: false` in `ci.yml`), so a Windows failure
+now fails the CI run, as a Linux one does.
+
+Before #38 and #39: the seven CLI `main` tests, 686 of 691 runtime tests and all of conformance passed on Windows. Since #39, everything does.
 
 **Recommended branch protection** once this PR has merged and the checks exist: require
 `gate (ubuntu-latest, node 24)`, `gate (ubuntu-latest, node 22)`, `gate (ubuntu-latest, node 22.16.0)`,
-`conformance report`, and the PR-title check. Then `vscode e2e`, `wasm and browser` and `gate (macos-latest, node 24)`, each of which has been green on two complete runs.
+`conformance report`, `gate (windows-latest, node 24)` (blocking since #39), and the PR-title check. Then `vscode e2e`, `wasm and browser` and `gate (macos-latest, node 24)`, each of which has been green on two complete runs.
+
+🔴 **GitHub cannot enforce any of these yet.** Branch protection and rulesets return 403 for this
+repository: *"Upgrade to GitHub Pro or make this repository public to enable this feature"* (checked
+2026-11-14). Until the repository goes public, "required" means the job is blocking in `ci.yml`, so its
+failure fails the CI run, and a pull request is merged only on a green run. Set the list above as required
+status checks on the day the repository goes public.
 
 ### Phase 2 — Packaging and first release (week 3–5)
 
@@ -401,7 +423,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       source, plus doc fixes and small constructs with a named caller.
 - [ ] Flip the repo to public if it is private; publish `0.1.0` (stable `latest` tag) a few days before
       the announcement so it has settled and the install path is proven in the wild.
-      **Not until every open item in the [parking lot](#parking-lot) is closed** (today: PL-1).
+      **Not until every [parking-lot](#parking-lot) item that blocks the flip is closed** (today: PL-1).
 - [ ] Share with TypeDB Ltd: a courtesy preview of the blog post and README (not a request for
       sign-off on content beyond naming).
 
@@ -585,9 +607,13 @@ These change the plan; the recommendations are what the plan assumes.
 
 Things deliberately set aside, each with the moment it must be revisited. An item stays here until it is closed.
 
-| # | Item | Revisit before | Status |
-| --- | --- | --- | --- |
-| PL-1 | Revisit what this plan says about the TypeDB Ltd conversation | The repository is made public, and in any case before the announcement | Open |
+| # | Item | Revisit before | Blocks | Status |
+| --- | --- | --- | --- | --- |
+| PL-1 | Revisit what this plan says about the TypeDB Ltd conversation | The repository is made public, and in any case before the announcement | Flip to public | Open |
+| PL-2 | Report the Langium race upstream, and drop our workaround once it is fixed | A Langium upgrade | Nothing | Open |
+| PL-3 | Keep the original commits of PRs #22 and #33 on a branch or tag | Soon: needs the maintainer's OK to push | Nothing | Open |
+| PL-4 | Decide whether to add a commit-message check | Branch protection is enabled, or the first outside pull request | Nothing | Open |
+| PL-5 | Confirm CI on `main` is stable, including the Node 22 gate | The announcement | Announcement | Open |
 
 ### PL-1. What the plan says about the TypeDB Ltd conversation
 
@@ -609,6 +635,47 @@ Either way, the same pass should check the rest of `docs/planning/` for statemen
 fine in a private repository and not in a public one.
 
 **Owner:** the maintainer. **Blocks:** the "flip the repo to public" step in Phase 4.
+
+### PL-2. Report the Langium race upstream
+
+Langium 4.4.2's `DocumentBuilder.notifyDocumentPhase` checks the cancellation token before each listener, after a
+document is already `Validated` and marked complete. A build cancelled in that gap drops the listener that sends the
+diagnostics, and nothing rebuilds the document. An editor opening several files at once triggers it (about 3 runs in
+10 for five documents).
+
+We work around it in `TypeQLiteDocumentBuilder.notifyDocumentPhase` (`libs/language/src/typeqlite-label-providers.ts`),
+with a regression test that cancels at exactly that point (`libs/language/test/diagnostics-published.spec.ts`). The
+measured evidence is in PR #33: 6 of 20 standalone replays stalled before the fix and 0 of 40 after.
+
+**To do:** file it with Langium with a minimal reproduction (the regression test is close to one), under the
+maintainer's name. When it is fixed upstream: upgrade, delete the override, keep the test. A draft report can be
+written on request.
+
+### PL-3. Keep the original commits of PRs #22 and #33
+
+Both were squash-merged before the rule that pull requests are merged with merge commits. Their original commits
+(15 and 2) are on no branch; they exist only at GitHub's `refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head`
+(`a7557e1`).
+
+**To do:** push a branch or tag for each (for example `archive/pr-22`, `archive/pr-33`) so they stay reachable
+whatever GitHub does with PR refs. That is non-destructive. It needs the maintainer's OK, because it creates refs
+beyond the working branch. `main` is not rewritten.
+
+### PL-4. A commit-message check
+
+With merge commits every commit message is kept, so the PR-title check (which guards only the merge commit's
+title) is no longer the best fit. A per-commit Conventional Commits check would be, but it would also reject
+`Merge branch ...` commits inside a pull request. Decide before enabling branch protection, or when the first
+outside pull request arrives.
+
+### PL-5. Confirm CI on `main` is stable
+
+The Node 22 gate failed once on `main`, from the Langium race, and has passed since. One clean run proves little:
+three clean runs on pull requests did not prove it before. The push runs on `main` for `4288d70` and `63d4c66`
+(docs and CI changes only) have not been read.
+
+**To do:** read the push runs on `main` as they arrive. Any intermittent failure of `typeqlite-vscode`'s
+`server.test.ts` means the fix is incomplete. Treat several consecutive clean runs, not one, as the bar.
 
 ---
 

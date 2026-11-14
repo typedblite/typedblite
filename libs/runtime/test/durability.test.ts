@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
+import { notKilledOnPurpose } from './fixtures/kill-self.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
@@ -53,7 +54,7 @@ describe('a crash cannot separate a write from its log row', () => {
     const path = tempDb('crash');
     const child = runChild('crash-writer.ts', [path, SCHEMA]);
 
-    assert.equal(child.signal, 'SIGKILL', 'the child must actually have been killed');
+    assert.equal(notKilledOnPurpose(child), undefined, 'the child must actually have been killed');
 
     const reopened = new TypeDBLiteInterpreter(path);
     const changes = reopened.changeLog.since(0);

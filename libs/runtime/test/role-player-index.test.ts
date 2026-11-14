@@ -46,6 +46,7 @@ describe('the role_player lookup index', () => {
       const engine = new TypeDBLiteInterpreter(file);
       engine.define(SCHEMA);
       engine.execute('insert $a isa node, has node-id "a"; $b isa node, has node-id "b"; (source: $a, target: $b) isa link;');
+      engine.close();
       assert.ok(indexesOf(file).includes('role_player_by_player'), `indexes: ${indexesOf(file).join(', ')}`);
       const plan = planOf(file, 'SELECT rel FROM role_player WHERE role = ? AND player = ?', 'source', 1);
       assert.match(plan, /USING (COVERING )?INDEX/, plan);
@@ -59,14 +60,16 @@ describe('the role_player lookup index', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tq-index-'));
     const file = join(dir, 'b.db');
     try {
-      new TypeDBLiteInterpreter(file).define(SCHEMA);
+      const creating = new TypeDBLiteInterpreter(file);
+      creating.define(SCHEMA);
+      creating.close();
       const raw = new DatabaseSync(file);
       raw.exec('DROP INDEX IF EXISTS role_player_by_player');
       raw.close();
       assert.ok(!indexesOf(file).includes('role_player_by_player'));
-      new TypeDBLiteInterpreter(file);
+      new TypeDBLiteInterpreter(file).close();
       assert.ok(indexesOf(file).includes('role_player_by_player'));
-      new TypeDBLiteInterpreter(file);
+      new TypeDBLiteInterpreter(file).close();
       assert.equal(indexesOf(file).filter((name) => name === 'role_player_by_player').length, 1);
     } finally {
       rmSync(dir, { recursive: true, force: true });

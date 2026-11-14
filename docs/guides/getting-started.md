@@ -9,6 +9,7 @@ line and then from your own code. It takes about ten minutes.
   full-text search (FTS5), which Node's bundled SQLite includes from 22.16. Older releases either have no
   `node:sqlite` (22.12) or lack FTS5 (22.13 to 22.15). Node 24 is what the project is developed on.
 - **npm**, which comes with Node. The repository is an npm workspace.
+- **Linux, macOS or Windows.** CI builds and tests on all three.
 - **git**.
 
 You do not need a native toolchain, Docker, or a TypeDB server.

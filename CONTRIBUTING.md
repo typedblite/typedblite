@@ -30,7 +30,9 @@ is named.
 
 ## Setting up
 
-You need **Node.js 22.16 or later** (the project is developed on Node 24) and **npm**.
+You need **Node.js 22.16 or later** (the project is developed on Node 24) and **npm**. Linux, macOS and
+Windows all work. CI runs the gate on Linux (Node 22.16, 22 and 24) and on Windows (Node 24), and a
+failure on any of them fails the run. macOS (Node 24) runs too, and passes, but does not block yet.
 
 ```bash
 git clone https://github.com/dave-jackson-dev/typedblite.git
@@ -107,6 +109,10 @@ A pull request description says:
 Update the documentation in the same pull request: [the language guide](docs/guides/typeqlite-language.md)
 for new syntax, [CONFORMANCE.md](CONFORMANCE.md) for new numbers, and a package README for a new
 API.
+
+**Merging.** A pull request is merged with a **merge commit**. It is never squashed or rebased, so each
+of its commits stays in the history under its own hash and message. That is why the commits matter:
+write each one as you would want to read it later, with a Conventional Commits message that says *why*.
 
 ## Code conventions
 
