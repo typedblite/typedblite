@@ -62,7 +62,8 @@ blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows 
 
 **Next work, in order:** the hub security review (B6); Phase 2 packaging (claim the unscoped `typedblite` and
 `typeqlite` npm names; take `private` off the CLI; publish `0.1.0-rc.1` under `next` with provenance; the clean-room
-install test on three platforms); Phase 3 docs and the playground.
+install test on three platforms); Phase 3 docs and the playground. Parked, and not blocking the flip to public: PL-2 to PL-5 in the
+[parking lot](#parking-lot) (the Langium report, keeping the old PR commits, a commit-message check, watching CI on `main`).
 
 **Before the repository goes public:** the repository is **private** (maintainer, 2026-11-14), and this plan names the
 TypeDB Ltd conversation. That is parked as [PL-1](#parking-lot), and the "flip the repo to public" step in Phase 4 is
@@ -406,7 +407,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       source, plus doc fixes and small constructs with a named caller.
 - [ ] Flip the repo to public if it is private; publish `0.1.0` (stable `latest` tag) a few days before
       the announcement so it has settled and the install path is proven in the wild.
-      **Not until every open item in the [parking lot](#parking-lot) is closed** (today: PL-1).
+      **Not until every [parking-lot](#parking-lot) item that blocks the flip is closed** (today: PL-1).
 - [ ] Share with TypeDB Ltd: a courtesy preview of the blog post and README (not a request for
       sign-off on content beyond naming).
 
@@ -590,9 +591,13 @@ These change the plan; the recommendations are what the plan assumes.
 
 Things deliberately set aside, each with the moment it must be revisited. An item stays here until it is closed.
 
-| # | Item | Revisit before | Status |
-| --- | --- | --- | --- |
-| PL-1 | Revisit what this plan says about the TypeDB Ltd conversation | The repository is made public, and in any case before the announcement | Open |
+| # | Item | Revisit before | Blocks | Status |
+| --- | --- | --- | --- | --- |
+| PL-1 | Revisit what this plan says about the TypeDB Ltd conversation | The repository is made public, and in any case before the announcement | Flip to public | Open |
+| PL-2 | Report the Langium race upstream, and drop our workaround once it is fixed | A Langium upgrade | Nothing | Open |
+| PL-3 | Keep the original commits of PRs #22 and #33 on a branch or tag | Soon: needs the maintainer's OK to push | Nothing | Open |
+| PL-4 | Decide whether to add a commit-message check | Branch protection is enabled, or the first outside pull request | Nothing | Open |
+| PL-5 | Confirm CI on `main` is stable, including the Node 22 gate | The announcement | Announcement | Open |
 
 ### PL-1. What the plan says about the TypeDB Ltd conversation
 
@@ -614,6 +619,47 @@ Either way, the same pass should check the rest of `docs/planning/` for statemen
 fine in a private repository and not in a public one.
 
 **Owner:** the maintainer. **Blocks:** the "flip the repo to public" step in Phase 4.
+
+### PL-2. Report the Langium race upstream
+
+Langium 4.4.2's `DocumentBuilder.notifyDocumentPhase` checks the cancellation token before each listener, after a
+document is already `Validated` and marked complete. A build cancelled in that gap drops the listener that sends the
+diagnostics, and nothing rebuilds the document. An editor opening several files at once triggers it (about 3 runs in
+10 for five documents).
+
+We work around it in `TypeQLiteDocumentBuilder.notifyDocumentPhase` (`libs/language/src/typeqlite-label-providers.ts`),
+with a regression test that cancels at exactly that point (`libs/language/test/diagnostics-published.spec.ts`). The
+measured evidence is in PR #33: 6 of 20 standalone replays stalled before the fix and 0 of 40 after.
+
+**To do:** file it with Langium with a minimal reproduction (the regression test is close to one), under the
+maintainer's name. When it is fixed upstream: upgrade, delete the override, keep the test. A draft report can be
+written on request.
+
+### PL-3. Keep the original commits of PRs #22 and #33
+
+Both were squash-merged before the rule that pull requests are merged with merge commits. Their original commits
+(15 and 2) are on no branch; they exist only at GitHub's `refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head`
+(`a7557e1`).
+
+**To do:** push a branch or tag for each (for example `archive/pr-22`, `archive/pr-33`) so they stay reachable
+whatever GitHub does with PR refs. That is non-destructive. It needs the maintainer's OK, because it creates refs
+beyond the working branch. `main` is not rewritten.
+
+### PL-4. A commit-message check
+
+With merge commits every commit message is kept, so the PR-title check (which guards only the merge commit's
+title) is no longer the best fit. A per-commit Conventional Commits check would be, but it would also reject
+`Merge branch ...` commits inside a pull request. Decide before enabling branch protection, or when the first
+outside pull request arrives.
+
+### PL-5. Confirm CI on `main` is stable
+
+The Node 22 gate failed once on `main`, from the Langium race, and has passed since. One clean run proves little:
+three clean runs on pull requests did not prove it before. The push runs on `main` for `4288d70` and `63d4c66`
+(docs and CI changes only) have not been read.
+
+**To do:** read the push runs on `main` as they arrive. Any intermittent failure of `typeqlite-vscode`'s
+`server.test.ts` means the fix is incomplete. Treat several consecutive clean runs, not one, as the bar.
 
 ---
 
