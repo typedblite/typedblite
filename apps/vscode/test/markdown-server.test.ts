@@ -62,8 +62,9 @@ describe('typeqlite/highlightBlocks', () => {
 
   it("returns the TextMate layer from the grammar the extension ships", async () => {
     const [block] = await highlight([QUERY]);
-    expect(block!.textmate.slice(0, 2)).toEqual([
+    expect(block!.textmate.slice(0, 3)).toEqual([
       { offset: 0, length: 5, scopes: ['keyword.control.typeqlite'] },
+      { offset: 6, length: 2, scopes: ['variable.parameter.typeqlite'] },
       { offset: 9, length: 3, scopes: ['keyword.control.typeqlite'] },
     ]);
   });
@@ -71,6 +72,6 @@ describe('typeqlite/highlightBlocks', () => {
   it('highlights a block that does not parse, as far as it can', async () => {
     const blocks = ['match $p isa;'];
     const [block] = await highlight(blocks);
-    expect(block!.textmate.map((t) => blocks[0]!.slice(t.offset, t.offset + t.length))).toEqual(['match', 'isa']);
+    expect(block!.textmate.map((t) => blocks[0]!.slice(t.offset, t.offset + t.length))).toEqual(['match', '$p', 'isa']);
   });
 });
