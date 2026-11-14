@@ -26,6 +26,20 @@ describe('telling a deliberate kill from any other exit', () => {
     expect(notKilledOnPurpose({ signal: null, status: 1, stdout: marker, stderr: 'oops' }, 'win32')).toMatch(/wrote to stderr/);
   });
 
+  it("ignores Node's own warnings, which Node 22.16 prints when a child opens node:sqlite", () => {
+    // Verbatim from the Node 22.16.0 CI runner.
+    const warned = [
+      '(node:4105) ExperimentalWarning: SQLite is an experimental feature and might change at any time',
+      '(Use `node --trace-warnings ...` to show where the warning was created)',
+      '',
+    ].join('\n');
+    expect(notKilledOnPurpose({ signal: 'SIGKILL', status: null, stdout: marker, stderr: warned }, 'linux')).toBeUndefined();
+    // A warning does not hide an error written beside it.
+    expect(notKilledOnPurpose({ signal: 'SIGKILL', status: null, stdout: marker, stderr: `${warned}Error: boom\n` }, 'linux')).toMatch(
+      /wrote to stderr/,
+    );
+  });
+
   it('refuses a child that reached the marker but was not killed abruptly', () => {
     expect(notKilledOnPurpose({ signal: null, status: 0, stdout: marker, stderr: '' }, 'linux')).toMatch(/not killed abruptly: exit 0/);
     expect(notKilledOnPurpose({ signal: null, status: 0, stdout: marker, stderr: '' }, 'win32')).toMatch(/not killed abruptly: exit 0/);

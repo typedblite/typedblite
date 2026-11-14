@@ -37,7 +37,22 @@ export function notKilledOnPurpose(child: Exit, platform: NodeJS.Platform = proc
   if (!child.stdout.includes(KILL_MARKER)) {
     return `the child never reached its kill point (${how}). stderr:\n${child.stderr}`;
   }
-  if (child.stderr.trim() !== '') return `the child wrote to stderr (${how}):\n${child.stderr}`;
+  if (withoutNodeWarnings(child.stderr).trim() !== '') return `the child wrote to stderr (${how}):\n${child.stderr}`;
   const abrupt = platform === 'win32' ? child.signal === null && child.status === 1 : child.signal === 'SIGKILL';
   return abrupt ? undefined : `the child was not killed abruptly: ${how}`;
+}
+
+/**
+ * stderr without the warnings Node itself prints, which say nothing about how the child died.
+ *
+ * 🔴 Node 22.16, the declared minimum, prints `(node:PID) ExperimentalWarning: SQLite is an
+ * experimental feature…` when a child opens `node:sqlite`; Node 24 does not. Counting it as an
+ * error failed every crash test on 22.16. Only Node's own warning line and its `--trace-warnings`
+ * hint are dropped: anything else, such as an exception's stack, still counts.
+ */
+function withoutNodeWarnings(stderr: string): string {
+  return stderr
+    .split('\n')
+    .filter((line) => !/^\(node:\d+\) \w*Warning: /.test(line) && !/^\(Use `node --trace-warnings \.\.\.` /.test(line))
+    .join('\n');
 }
