@@ -12,33 +12,84 @@ const GRAMMAR: RawGrammar = JSON.parse(
 
 const KEYWORD = 'keyword.control.typeqlite';
 const DOUBLE = 'string.quoted.double.typeqlite';
+const VARIABLE = 'variable.parameter.typeqlite';
+const OPERATOR = 'keyword.operator.typeqlite';
+const NUMBER = 'constant.numeric.typeqlite';
 
 /** Each token as its text and its scopes. */
 const tokens = (text: string, grammar: RawGrammar = GRAMMAR) =>
   tokenizeTextMate(grammar, text).map((token) => [text.slice(token.offset, token.offset + token.length), ...token.scopes]);
 
 describe('the TextMate layer, on the grammar the editor uses', () => {
-  it('scopes keywords and strings, and leaves labels and variables to the semantic layer', () => {
+  it('scopes keywords, variables and strings, and leaves labels to the semantic layer', () => {
     expect(tokens('match $p isa person, has name "Ann";')).toEqual([
       ['match', KEYWORD],
+      ['$p', VARIABLE],
       ['isa', KEYWORD],
       ['has', KEYWORD],
       ['"Ann"', DOUBLE],
     ]);
   });
 
-  it('scopes annotations as keywords', () => {
-    expect(tokens('entity person, owns email @key;')).toEqual([
-      ['entity', KEYWORD],
+  it("scopes each kind of keyword as TypeDB's TypeQL grammar does, so a theme colours them apart", () => {
+    expect(tokens('define entity person, owns email @key; attribute email, value string;')).toEqual([
+      ['define', KEYWORD],
+      ['entity', 'storage.type.typeqlite'],
       ['owns', KEYWORD],
-      ['@key', KEYWORD],
+      ['@key', 'keyword.annotations.typeqlite'],
+      ['attribute', 'storage.type.typeqlite'],
+      ['value', KEYWORD],
+      ['string', 'storage.modifier.typeqlite'],
+    ]);
+    expect(tokens('not { $x == true; } or { $x like "a"; };')).toEqual([
+      ['not', 'keyword.operator.words.typeqlite'],
+      ['$x', VARIABLE],
+      ['==', OPERATOR],
+      ['true', 'constant.language.typeqlite'],
+      ['or', 'keyword.operator.words.typeqlite'],
+      ['$x', VARIABLE],
+      ['like', 'keyword.operator.words.typeqlite'],
+      ['"a"', DOUBLE],
+    ]);
+  });
+
+  it('reads a hyphen as part of a name, never as a keyword boundary or an operator', () => {
+    // `value-type` is a label, not `value`; `skill-id` has no operator in it; `$start-date` is one variable.
+    expect(tokens('$x isa value-type, has skill-id $start-date;')).toEqual([
+      ['$x', VARIABLE],
+      ['isa', KEYWORD],
+      ['has', KEYWORD],
+      ['$start-date', VARIABLE],
+    ]);
+    expect(tokens('let $y = $a - 1;')).toEqual([
+      ['let', KEYWORD],
+      ['$y', VARIABLE],
+      ['=', OPERATOR],
+      ['$a', VARIABLE],
+      ['-', OPERATOR],
+      ['1', NUMBER],
+    ]);
+  });
+
+  it('does not read a keyword in a path or a name, and scopes numbers in a range', () => {
+    expect(tokens('fetch { "v": $p.value }; limit 10; @card(1..3)')).toEqual([
+      ['fetch', KEYWORD],
+      ['"v"', DOUBLE],
+      ['$p', VARIABLE],
+      ['limit', KEYWORD],
+      ['10', NUMBER],
+      ['@card', 'keyword.annotations.typeqlite'],
+      ['1', NUMBER],
+      ['..', OPERATOR],
+      ['3', NUMBER],
     ]);
   });
 
   it('ends a line comment at the end of its line', () => {
     expect(tokens('# people\nmatch $p isa person;')).toEqual([
-      ['# people', 'comment.line.typeqlite'],
+      ['# people', 'comment.line.number-sign.typeqlite'],
       ['match', KEYWORD],
+      ['$p', VARIABLE],
       ['isa', KEYWORD],
     ]);
   });

@@ -43,6 +43,16 @@
         "language": "typeqlite",
         "scopeName": "source.typeqlite",
         "path": "./syntaxes/typeqlite.tmLanguage.json"
+      },
+      {
+        "scopeName": "markdown.typeqlite.codeblock",
+        "path": "./grammars/typeqlite-markdown-injection.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.typeqlite": "typeqlite"
+        }
       }
     ],
     "markdown.markdownItPlugins": true

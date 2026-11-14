@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { TEXTMATE_OUT } from '../../../libs/language/src/typeqlite-textmate';
+import { FENCE_LANGUAGES } from '../src/markdown/protocol';
 
 const APP = resolve(__dirname, '..');
 const read = (path: string) => JSON.parse(readFileSync(resolve(APP, path), 'utf8'));
@@ -33,10 +35,24 @@ describe('the manifest agrees with langium-config.json', () => {
   it('points its grammar at the generated TextMate file, under the scope that file declares', () => {
     const [grammar] = manifest.contributes.grammars;
     expect(grammar.language).toBe(language.id);
-    expect(grammar.path).toBe(`./syntaxes/${language.textMate.out.split('/').pop()}`);
+    expect(grammar.path).toBe(`./${TEXTMATE_OUT}`);
     // `build` runs `sync-grammar`, which copies the file in, so it exists by the time this runs.
     const tmLanguage = read(grammar.path);
     expect(grammar.scopeName).toBe(tmLanguage.scopeName);
+  });
+
+  it('injects that grammar into Markdown fences of exactly the languages the preview highlights', () => {
+    const injection = manifest.contributes.grammars.find((g: { injectTo?: string[] }) => g.injectTo);
+    expect(injection.injectTo).toEqual(['text.html.markdown']);
+    expect(Object.values(injection.embeddedLanguages)).toEqual([language.id]);
+    const file = read(injection.path);
+    expect(file.scopeName).toBe(injection.scopeName);
+    const fence = file.repository['fenced-typeqlite'];
+    const [content] = fence.patterns;
+    expect(Object.keys(injection.embeddedLanguages)).toEqual([content.contentName]);
+    expect(content.patterns).toEqual([{ include: manifest.contributes.grammars[0].scopeName }]);
+    const languages = /\(\?i:\(([^)]*)\)/.exec(fence.begin)![1]!.split('|');
+    expect(new Set(languages)).toEqual(FENCE_LANGUAGES);
   });
 
   it('has a language configuration file where it says', () => {

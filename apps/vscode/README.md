@@ -25,7 +25,11 @@ Files: `.typeqlite` and `.tql`.
   reference and every query label is renamed with it.
 - **Quick fixes.** Remove an annotation the position does not admit; keep either of two annotations
   that disagree; change an unknown label or an unresolved reference to the nearest defined name.
-- **Formatting and semantic highlighting.** A label is coloured by what it resolves to.
+- **Formatting and semantic highlighting.** A label is coloured by what it resolves to. Keywords are
+  coloured by kind (`define`, `entity`, `string` and `@key` each look different), with the same
+  scopes as TypeDB's TypeQL extension, so your theme colours TypeQLite as it colours TypeQL.
+- **TypeQLite in the Markdown editor.** Code fenced as `typeql`, `typeqlite` or `tql` is highlighted
+  while you write the Markdown, not only in its preview.
 - **TypeQLite in the Markdown preview.** Code blocks fenced as `typeql`, `typeqlite` or `tql` are
   highlighted as the editor would highlight them, in your colour theme, and again when it changes. The
   blocks on one page are read together, so a schema in one block resolves the labels in the next.
