@@ -200,56 +200,54 @@ classifies an error as `'transient'`, such as a network failure that a retry may
 ## Security
 
 **The hub trusts everything that can reach it.** `serveChangeStream` and `createChangeStreamHandler` have
-no authentication, no encryption and no limits, by design: the handler is a piece you mount in your own
-server, and the guide above shows where your authentication goes. Reviewed on 2026-11-14 by reading
-`change-stream.ts` and `change-log.ts` and running each case below against a live hub:
+no authentication and no encryption, by design: the handler is a piece you mount in your own server, and
+the guide above shows where your authentication goes. Reviewed on 2026-11-14 by reading `change-stream.ts`
+and `change-log.ts` and running each case against a live hub. The review found eight problems. Five are
+now handled by the handler itself; three are yours to handle, or open.
 
-| What | Verified behaviour |
+| What the review found | Now |
 | --- | --- |
-| **No authentication** | Anyone who can connect can `GET /changes` and read every change, and `POST /changes` to write. A pushed change is projected into the hub's store, so a stranger's POST **writes real data**. |
-| **Any content type is accepted** | A POST with `content-type: text/plain` is accepted as readily as `application/json`. A web page can send exactly that cross-origin with **no CORS preflight**, so a page open in a browser on the same machine can write to a hub on `127.0.0.1` without the user knowing. It cannot read the answer, but the write happens. |
-| **No body size limit** | A POST of about 64 MB was read into memory and applied (in about 0.5 s). A client can exhaust the hub's memory. |
-| **No cap on open streams** | Each `GET /changes` holds a connection and a timer that queries the log every `pollMs`. The cost grows with every stream, and nothing limits them. |
-| **Revisions are not checked against their content** | `applyRemote` stores the `rev` it is given. A peer can claim `999999-deadbeef`, and the hub accepts it. A revision wins a conflict by its generation, so **a peer can make its own write win**. Replication assumes every peer is trusted. |
-| **A batch is not atomic** | In `[good, null, good]` the first record was applied, the `null` raised an error and answered 400, and the third was never read. A client that retries the same batch retries the bad record too. |
-| **Errors are echoed** | A 400 carries `String(error)`, internal text included (`no such table: attribute` on a store with no schema). |
-| **Plain HTTP** | There is no TLS. Anything beyond loopback needs a TLS-terminating proxy, or the token travels in the clear. |
+| **Any content type was accepted.** A `text/plain` POST was applied, and a web page can send exactly that cross-origin with **no CORS preflight**, so a page open on the same machine could write to a hub on `127.0.0.1` | **Handled.** Anything but `application/json` is refused with 415 |
+| **No body size limit.** A POST of about 64 MB was read into memory and applied | **Handled.** `maxBodyBytes` (default 64 MiB). A body whose length is declared too big is refused with 413 before it is read, and one that grows past it is stopped as it arrives |
+| **No cap on open streams.** Each `GET /changes` holds a connection and a timer that queries the log every `pollMs` | **Handled.** `maxStreams` (default 256). One more gets 503 with `retry-after: 5` |
+| **A batch was not atomic.** `[good, null, good]` applied the first record, then answered 400 | **Handled.** A batch is checked field by field first, and applied all or none (`ChangeLog.applyRemoteBatch`) |
+| **Errors were echoed.** A 400 carried internal text, such as `no such table: attribute` | **Handled.** A malformed batch gets a 400 that names the problem (`change 1 has an invalid rev`). An internal failure gets a 500 and `internal error`. The real error goes to your `onError` callback |
+| **No authentication.** Anyone who can connect can read every change and POST new ones, and a pushed change is projected into the hub's store | **Yours.** Mount the handler behind your own check (below) |
+| **No TLS.** | **Yours.** Anything beyond loopback needs a TLS-terminating proxy, or the token travels in the clear |
+| **Revisions are not checked against their content.** `applyRemote` stores the `rev` it is given. A peer can claim `999999-deadbeef`, and it is accepted. A live revision wins a conflict by its generation, so **a peer can make its own write win** | **Open.** Replication assumes every peer is trusted. Checking a pushed revision against its content would change what a store accepts from its peers, so it needs its own tests and an amendment to ADR-003 |
 
 **What is safe by default.** `serveChangeStream` binds `127.0.0.1` only, so nothing outside the machine can
-reach it unless you mount the handler yourself. Don't treat that as protection from the machine's own
-users, or from a browser on it (second row).
+reach it unless you mount the handler yourself. That is not protection from the machine's own users or
+programs. A browser page on it is stopped from sending `application/json` cross-origin, because that needs
+a CORS preflight and the handler gives none (an `OPTIONS` gets a 404, or a 401 behind authentication).
 
-**If you mount the handler, put these in front of it:**
+**Mount the handler behind authentication.** The limits above are built in. Authentication is not:
 
 ```ts
 import { createServer } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { createChangeStreamHandler } from '@typedblite/runtime';
 
-const changes = createChangeStreamHandler(hub.changeLog, { path: '/changes' });
+const changes = createChangeStreamHandler(hub.changeLog, {
+  path: '/changes',
+  maxBodyBytes: 8 * 1024 * 1024, // tighten what your spokes really send
+  maxStreams: 64,
+  onError: (error) => console.error('hub failed to apply a batch', error),
+});
 const expected = Buffer.from(`Bearer ${process.env.HUB_TOKEN}`); // a long random value, never in source
-const MAX_BODY = 1_000_000; // bytes
 
 createServer((request, response) => {
-  // 1. Authenticate, comparing without a timing difference. A browser cannot add this header
-  //    cross-origin without a preflight, which closes the text/plain hole as well.
+  // Compared without a timing difference. A browser cannot add this header cross-origin without a
+  // preflight, so this also closes the cross-origin hole for good.
   const given = Buffer.from(request.headers.authorization ?? '');
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
     return void response.writeHead(401).end();
-  }
-  if (request.method === 'POST') {
-    // 2. Only JSON. 3. Refuse a large or unsized body before it is read.
-    if (request.headers['content-type']?.split(';')[0] !== 'application/json') return void response.writeHead(415).end();
-    if (Number(request.headers['content-length'] ?? Infinity) > MAX_BODY) return void response.writeHead(413).end();
   }
   changes.handle(request, response);
 }).listen(4001, '127.0.0.1'); // and terminate TLS in front of it
 ```
 
-This was run against a real `TypeDBLiteReplicator`: the spoke syncs through it, and a request with no or a
-wrong token, a `text/plain` body, or an oversized body is refused (401, 401, 415, 413). It does **not** limit
-open streams, check revisions, or make a batch atomic. Cap connections in your proxy, and give a hub only
-spokes you trust.
+Give a hub only spokes you trust, because of the last row.
 
 **The sync demo's hub is not a model.** It uses a fixed token, `DEMO_TOKEN`, written in the source and
 compared with `!==`, and its `/tasks` and `/health` routes need none. It is bound to `127.0.0.1` and exists

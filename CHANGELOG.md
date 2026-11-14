@@ -16,6 +16,15 @@ they are listed here.
   the build and every test passed there on two complete runs.
 
 ### Fixed
+- The change-stream hub (`createChangeStreamHandler`, `serveChangeStream`) is hardened. It refuses a POST that
+  is not `application/json` (415), which closes the door a web page had to write to a hub on `127.0.0.1`
+  cross-origin with no CORS preflight; refuses a body over `maxBodyBytes`, default 64 MiB (413), before
+  reading it when its length is declared and while reading it when not; refuses a stream past `maxStreams`,
+  default 256 (503, `retry-after`); applies a pushed batch **all or none** (`ChangeLog.applyRemoteBatch`)
+  instead of half; and answers a malformed batch with a 400 that names the problem, and an internal failure
+  with a 500 and no detail, reporting the real error to a new `onError` option. **Breaking for a hand-written
+  client** that posts without `content-type: application/json`; `TypeDBLiteReplicator` already sends it. Not
+  changed: a pushed revision is still stored as given (see the replication guide's Security section).
 - The `typedblite` CLI now runs on Windows, and through its npm `bin` link (`npx typedblite`, a global
   install) everywhere. Its entry check compared the script's file name, split on `/`, with the module's
   URL. On Windows the path has no `/`, and through the `bin` link the name is `typedblite`, so `main()`
