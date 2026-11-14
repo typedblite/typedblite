@@ -12,8 +12,16 @@ they are listed here.
   22.15 ship it without FTS5, which the engine requires. Checked: `node:sqlite` and FTS5 probed on
   22.12 to 22.21; the full gate run on 22.13.0 (fails: no FTS5) and 22.16.0 (passes).
 - `langium` and `langium-cli` are now `~4.4`, and `vscode-languageserver` `~10.1`.
+- Windows is a supported platform: CI's Windows job (Node 24) is now blocking, like the Linux ones, after
+  the build and every test passed there on two complete runs.
 
 ### Fixed
+- The `typedblite` CLI now runs on Windows, and through its npm `bin` link (`npx typedblite`, a global
+  install) everywhere. Its entry check compared the script's file name, split on `/`, with the module's
+  URL. On Windows the path has no `/`, and through the `bin` link the name is `typedblite`, so `main()`
+  never ran and the CLI exited 0 having printed nothing; the REPL tests failed on the Windows CI runner
+  for that reason. It now compares real paths. `out/main.js` also gains the `#!/usr/bin/env node` line
+  the `bin` link needs. Without it, a POSIX shell ran the file as a shell script.
 - The language server no longer loses a document's diagnostics when several files are opened at once.
   Langium 4.4 could cancel the build between validating a document and publishing its diagnostics, and
   never revisit it, so the first of a burst of `didOpen`s sometimes showed no diagnostics until it was

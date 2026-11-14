@@ -1,6 +1,8 @@
+#!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { stdin, stdout } from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import { splitStatements, TypeDBLiteSession, type Outcome } from './session.js';
 
@@ -172,9 +174,27 @@ export async function main(argv: readonly string[]): Promise<number> {
   return 1;
 }
 
+/**
+ * Whether this module is the script Node was asked to run, so that tests can import it without
+ * booting a shell.
+ *
+ * 🔴 **Real paths, never names.** This once compared the script's file name, split on `/`, with
+ * the module's URL. Launched through npm's `bin` link the name is `typedblite`, not `main.js`, and on
+ * Windows the path has no `/` to split on. Either way `main()` never ran, and the CLI exited 0
+ * having printed nothing. `realpathSync` follows the link, and `fileURLToPath` gives the module's
+ * path in the platform's own form.
+ */
+function isEntryPoint(script: string | undefined): boolean {
+  if (!script) return false;
+  try {
+    return realpathSync(script) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
 /* v8 ignore start -- @preserve -- entry point only; the module is imported by tests. */
-// `import.meta.url` guard so the module can be imported by tests without booting a shell.
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
+if (isEntryPoint(process.argv[1])) {
   void main(process.argv.slice(2)).then((code) => {
     process.exitCode = code;
   });
