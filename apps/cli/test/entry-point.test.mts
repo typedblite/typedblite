@@ -1,7 +1,7 @@
 import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,5 +40,12 @@ describe('the CLI entry point', () => {
     // Without it, a POSIX shell runs `import { createInterface } …` as a command: ImageMagick's
     // `import`, which waits for a click on the display. npm's Windows shim reads the line too.
     assert.equal(readFileSync(MAIN, 'utf8').split('\n')[0], '#!/usr/bin/env node');
+  });
+
+  it('is executable once built, so the workspace’s bin link runs after a clean build', (context) => {
+    // npm sets the bit when it installs a package, but `tsc` writes a new file without it, and the
+    // gate deletes `out/` first. The link then failed with "Permission denied".
+    if (process.platform === 'win32') return context.skip();
+    assert.notEqual(statSync(MAIN).mode & 0o111, 0, `${MAIN} is not executable`);
   });
 });
