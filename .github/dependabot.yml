@@ -1,10 +1,14 @@
+# 🔴 PAUSED (2026-11-14): `open-pull-requests-limit: 0` on both ecosystems opens no version-update PR.
+# GitHub Actions is off (billing), so nothing would check one, and the update job itself runs on
+# Actions minutes. To resume: restore the limits below (5 for npm, the default 5 for github-actions)
+# once Actions is back on. Security updates are a separate setting, and are not enabled.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0 # paused; was 5
     commit-message:
       prefix: "chore(deps)"
     labels: [dependencies]
@@ -20,6 +24,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0 # paused; was the default, 5
     commit-message:
       prefix: "ci(deps)"
     labels: [dependencies]

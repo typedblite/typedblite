@@ -32,8 +32,9 @@ GitHub refused to start any job on `main`'s run after #40 merged: *"The job was 
 payments have failed or your spending limit needs to be increased."* Every job ran two seconds with no steps; the same
 code had passed on #40's own run 20 minutes earlier, so it was billing, not code. At the maintainer's request the
 workflows were then disabled: CI, Labels and PR title are `disabled_manually` (`gh workflow enable <id>` turns one
-back on). ⚠️ The **Dependabot update job is still active**: GitHub will not let it be disabled by API (HTTP 422), and
-it needs turning off in Settings, Code security, or by setting `open-pull-requests-limit: 0` in `dependabot.yml`.
+back on). GitHub will not let the **Dependabot update job** be disabled by API (HTTP 422), so it is paused in the
+repo instead: `open-pull-requests-limit: 0` on both ecosystems in `dependabot.yml`, so it opens no PR. Ten of its
+earlier PRs (#23 to #32) are still open and unchecked. Security updates are a separate setting, and are not enabled.
 Everything else in this plan that says "CI" or "the PR-title check" describes the workflows as they are written, and
 is **not running**. What that costs:
 - **The gate runs on one OS and one Node.** CI covered Node 22.16, 22 and 24 on Linux, and Node 24 on Windows and
@@ -41,7 +42,7 @@ is **not running**. What that costs:
 - **The PR-title check and label sync do not run.** Conventional Commit titles are on the author and the reviewer.
 - **Branch protection is moot** until the repository is public (it returns 403 on this plan), and CI is off anyway.
 
-To go back: fix billing, `gh workflow enable` the three workflows (and turn Dependabot back on, if it was turned off), and read the first run on
+To go back: fix billing, `gh workflow enable` the three workflows, restore the Dependabot limits in `dependabot.yml`, and read the first run on
 `main` before trusting it. The decisions that wait on CI results (making `coverage` blocking, adding
 `sync-demo:test-browser` to CI) wait on that too.
 
