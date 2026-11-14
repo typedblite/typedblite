@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TEXTMATE_OUT } from '../../../libs/language/src/typeqlite-textmate';
 import { FENCE_LANGUAGES } from '../src/markdown/protocol';
+import { THEME_BRIDGE_ID, THEME_FILES_COMMAND } from '../src/markdown/theme-source';
 
 const APP = resolve(__dirname, '..');
 const read = (path: string) => JSON.parse(readFileSync(resolve(APP, path), 'utf8'));
@@ -81,13 +82,48 @@ describe('the manifest agrees with langium-config.json', () => {
     expect(manifest.main).toBe('./out/extension.cjs');
   });
 
-  it('leaves no relative require in either bundle, since nothing ships beside them', () => {
+  it('leaves no relative require in any bundle, since nothing ships beside them', () => {
     // A UMD dependency's `require('./impl/format')` survives bundling and fails only once installed.
     // 🔴 esbuild renames a UMD factory's `require` parameter (`require2`, or `n` minified), so this
     // looks for ANY call whose one argument is a relative path, not for `require` by name.
-    for (const bundle of ['out/extension.cjs', 'out/language-server/main.cjs']) {
+    for (const bundle of ['out/extension.cjs', 'out/language-server/main.cjs', 'theme-bridge/out/extension.cjs']) {
       const source = readFileSync(resolve(APP, bundle), 'utf8');
       expect(source.match(/[\w$]+\(\s*["']\.\.?\/[^"'\s]*["']\s*\)/g) ?? [], bundle).toEqual([]);
+    }
+  });
+});
+
+/**
+ * The TypeQLite Theme Bridge is a second extension, packaged from this project (ADR-010 D7). It runs
+ * where VS Code keeps colour themes, and answers one command for the main extension.
+ */
+describe('the Theme Bridge manifest', () => {
+  const bridge = read('theme-bridge/package.json');
+
+  it('is the extension the main one tells users to install', () => {
+    expect(`${bridge.publisher}.${bridge.name}`).toBe(THEME_BRIDGE_ID);
+  });
+
+  it('runs only in the UI extension host, where the themes are, even in a remote window', () => {
+    expect(bridge.extensionKind).toEqual(['ui']);
+  });
+
+  it('activates on the command the main extension sends, and contributes nothing else', () => {
+    expect(bridge.activationEvents).toEqual([`onCommand:${THEME_FILES_COMMAND}`]);
+    expect(bridge.contributes).toBeUndefined();
+  });
+
+  it('ships its bundle, its icon and its licence, and nothing of the main extension', () => {
+    expect(existsSync(resolve(APP, 'theme-bridge', bridge.main))).toBe(true);
+    expect(readFileSync(resolve(APP, 'theme-bridge', bridge.icon)).equals(readFileSync(resolve(APP, manifest.icon)))).toBe(true);
+    expect(bridge.vsce).toEqual({ dependencies: false });
+    // The main package must not carry the bridge's folder.
+    expect(readFileSync(resolve(APP, '.vscodeignore'), 'utf8').split('\n')).toContain('theme-bridge/**');
+  });
+
+  it("shares the main extension's version, licence, publisher and engine", () => {
+    for (const field of ['version', 'license', 'publisher', 'engines'] as const) {
+      expect(bridge[field], field).toEqual(manifest[field]);
     }
   });
 });

@@ -9,7 +9,8 @@ extends: [adr-008]
 # ADR-010: The Markdown preview highlights TypeQLite code blocks as the editor does, in the theme's colours
 
 - **Status:** Accepted on 2026-11-13. The founder chose to highlight code blocks in VS Code's
-  Markdown preview, in the active theme's colours, and to leave GitHub plain.
+  Markdown preview, in the active theme's colours, and to leave GitHub plain. **Amended on
+  2026-11-13** with D7, after the preview was found never to reach the theme in a remote window.
 - **Date:** 2026-11-13
 - **Decision owners:** Founder; TypeDBLite maintainers
 - **Extends:** [ADR-008](adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md).
@@ -66,6 +67,27 @@ TypeQLite output channel.
 **D6. GitHub stays plain.** A `github-linguist` grammar is **deferred**. It would bring
 pattern-based highlighting only, in GitHub's colours.
 
+**D7. In a remote window, a second extension reads the theme: the TypeQLite Theme Bridge.** Measured on
+2026-11-13, in a WSL window: every preview render logged that no installed extension contributes the
+active theme, so the preview always fell back to its own colours (D4). The cause is where VS Code
+runs things. The Markdown preview's plugins, and so this extension and its language server, run in
+the **remote** extension host. Colour themes, the built-in ones included, are UI extensions in the
+**local** one: the WSL server ships none. An extension sees only its own host's extensions, and the
+e2e suite, which runs VS Code locally, could not see the gap.
+
+So `typedblite.typeqlite-theme` (`apps/vscode/theme-bridge/`, built from `src/theme-bridge.ts`) is a
+UI extension (`extensionKind: ["ui"]`) with one command, `typeqlite.themeFiles`. Given a theme's name,
+it returns that theme's files, read by the same code the main extension uses. Commands cross between
+extension hosts, and VS Code's remote-extension guide recommends this split. The main extension looks
+in its own host first, and asks the bridge only when the theme is not there. **The user's
+customisations are still applied by the main extension**, because settings for the remote machine
+apply only in the remote host.
+
+The bridge is a separate `.vsix` that the user installs in the local VS Code. It cannot be required
+through `extensionDependencies`, because VS Code installs a dependency only from the marketplace, and
+neither extension is published. Without the bridge, a remote window falls back as D4 says, and the
+log names the bridge to install.
+
 ## Consequences
 
 ### Positive
@@ -82,6 +104,9 @@ pattern-based highlighting only, in GitHub's colours.
   The e2e case pins the colours of two built-in themes, to catch that on a VS Code upgrade.
 - **The first render of a changed block is plain.** The coloured render follows once the server
   answers, usually within a frame or two.
+- **D7 adds a second package**, and a remote-window user who does not install it gets the preview's
+  own colours. The e2e suite installs both packages and drives the bridge's command, but it runs
+  VS Code locally, where the bridge is never needed. A remote window is checked by hand.
 - **Opening a Markdown preview starts the language server**, because the preview activates the
   extension.
 - **Font styles are drawn, and nothing else.** The theme's colour, italic, bold, underline and

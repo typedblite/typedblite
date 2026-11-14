@@ -31,3 +31,18 @@ await esbuild.build({
   minify,
   logLevel: 'warning',
 });
+
+// The TypeQLite Theme Bridge, a second extension that runs where the colour themes are (ADR-010 D7).
+await esbuild.build({
+  entryPoints: { extension: 'src/theme-bridge.ts' },
+  outdir: 'theme-bridge/out',
+  outExtension: { '.js': '.cjs' },
+  bundle: true,
+  format: 'cjs',
+  platform: 'node',
+  target: 'node20',
+  external: ['vscode'],
+  sourcemap: !minify,
+  minify,
+  logLevel: 'warning',
+});

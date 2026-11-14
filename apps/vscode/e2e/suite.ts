@@ -323,6 +323,21 @@ const cases: Record<string, () => Promise<void>> = {
     assert.equal(byText.has('nav-persn'), false);
   },
 
+  async 'the Theme Bridge reads the active theme where VS Code keeps it, for a remote window (ADR-010 D7)'() {
+    // In this local window both extensions share a host, so the preview never needs the bridge. This
+    // drives the command the main extension sends from a remote host, and checks what comes back.
+    const bridge = vscode.extensions.getExtension('typedblite.typeqlite-theme');
+    assert.ok(bridge, 'the Theme Bridge is installed');
+    assert.deepEqual(bridge.packageJSON.extensionKind, ['ui']);
+    type Result = { files?: unknown[]; missing?: string };
+    const dark = await vscode.commands.executeCommand<Result>('typeqlite.themeFiles', 'Dark 2026');
+    assert.ok(dark?.files, `the bridge read Dark 2026: ${JSON.stringify(dark)}`);
+    assert.equal(dark.files.length, 4, 'Dark 2026 → Dark Modern → Dark+ → Dark (Visual Studio), base first');
+    assert.ok(bridge.isActive, 'the command activated the bridge');
+    const unknown = await vscode.commands.executeCommand<Result>('typeqlite.themeFiles', 'No Such Theme');
+    assert.match(unknown?.missing ?? '', /No Such Theme/);
+  },
+
   async "the TextMate grammar scopes keywords by kind, in a .tql file and in a Markdown editor's fences"() {
     // Outside the workspace, so the fixtures join no other case's schema. The command reads a file
     // and tokenizes it with VS Code's own TextMate engine (Oniguruma), every injection included.

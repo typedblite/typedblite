@@ -6,3 +6,6 @@ e2e/out
 dist
 /LICENSE
 images
+theme-bridge/out
+theme-bridge/images
+theme-bridge/LICENSE

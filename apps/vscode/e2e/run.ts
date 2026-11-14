@@ -13,7 +13,8 @@ import {
  *
  * Given a `.vsix` (`node e2e/out/run.cjs dist/typeqlite-0.0.1.vsix`, which is what `nx e2e` does),
  * the downloaded VS Code's own CLI installs it into a fresh extensions folder, and the cases run
- * against **the installed copy**: the artifact a user would install, not the source folder. Without
+ * against **the installed copy**: the artifact a user would install, not the source folder. Any
+ * further packages (`dist/typeqlite-theme-0.0.1.vsix`, the Theme Bridge) are installed beside it. Without
  * one, the cases run against the source folder, which is quicker when iterating.
  *
  * The workspace and the user-data folder are fresh copies, so no case can leak into the next run, and
@@ -31,7 +32,8 @@ async function main(): Promise<void> {
     if (name === 'ELECTRON_RUN_AS_NODE' || name.startsWith('VSCODE_')) delete process.env[name];
   }
   const app = resolve(__dirname, '../..');
-  const vsix = process.argv[2] ? resolve(app, process.argv[2]) : undefined;
+  // The first package is the extension under test. Any after it (the Theme Bridge) are installed beside it.
+  const [vsix, ...companions] = process.argv.slice(2).map((path) => resolve(app, path));
   const root = mkdtempSync(join(tmpdir(), 'typeqlite-e2e-'));
   const workspace = join(root, 'workspace');
   const userData = join(root, 'user-data');
@@ -40,37 +42,48 @@ async function main(): Promise<void> {
   try {
     const vscode = await downloadAndUnzipVSCode();
     let extension = app;
+    // 🔴 `--disable-extensions` (below) disables every installed extension that is not under
+    // development, so a companion runs only if it is a development path too.
+    const companionPaths: string[] = [];
     if (vsix) {
-      if (!existsSync(vsix)) throw new Error(`No package at ${vsix}. Run the package target first.`);
       const [cli, ...cliArgs] = resolveCliArgsFromVSCodeExecutablePath(vscode);
-      const installed = spawnSync(
-        cli!,
-        [
-          ...cliArgs.filter((arg) => !arg.startsWith('--extensions-dir') && !arg.startsWith('--user-data-dir')),
-          `--extensions-dir=${extensions}`,
-          `--user-data-dir=${userData}`,
-          '--install-extension',
-          vsix,
-        ],
-        {
-          encoding: 'utf8',
-          shell: process.platform === 'win32',
-          // Under WSL, VS Code's `bin/code` stops to ask whether to continue; this answers it.
-          env: { ...process.env, DONT_PROMPT_WSL_INSTALL: '1' },
-        },
-      );
-      if (installed.status !== 0) {
-        throw new Error(`Installing ${vsix} failed:\n${installed.stdout}\n${installed.stderr}`);
+      for (const pkg of [vsix, ...companions]) {
+        if (!existsSync(pkg)) throw new Error(`No package at ${pkg}. Run the package target first.`);
+        const installed = spawnSync(
+          cli!,
+          [
+            ...cliArgs.filter((arg) => !arg.startsWith('--extensions-dir') && !arg.startsWith('--user-data-dir')),
+            `--extensions-dir=${extensions}`,
+            `--user-data-dir=${userData}`,
+            '--install-extension',
+            pkg,
+          ],
+          {
+            encoding: 'utf8',
+            shell: process.platform === 'win32',
+            // Under WSL, VS Code's `bin/code` stops to ask whether to continue; this answers it.
+            env: { ...process.env, DONT_PROMPT_WSL_INSTALL: '1' },
+          },
+        );
+        if (installed.status !== 0) {
+          throw new Error(`Installing ${pkg} failed:\n${installed.stdout}\n${installed.stderr}`);
+        }
       }
       extension = join(extensions, 'typedblite.typeqlite-0.0.1');
       if (!existsSync(join(extension, 'out/language-server/main.cjs'))) {
         throw new Error(`The installed extension at ${extension} has no language server.`);
       }
       console.log(`Installed ${vsix} into ${extension}`);
+      for (const pkg of companions) {
+        const id = `typedblite.${pkg.split('/').pop()!.replace(/\.vsix$/, '')}`;
+        if (!existsSync(join(extensions, id, 'package.json'))) throw new Error(`${pkg} did not install as ${id}.`);
+        companionPaths.push(join(extensions, id));
+        console.log(`Installed ${pkg} into ${join(extensions, id)}`);
+      }
     }
     await runTests({
       vscodeExecutablePath: vscode,
-      extensionDevelopmentPath: extension,
+      extensionDevelopmentPath: [extension, ...companionPaths],
       extensionTestsPath: resolve(__dirname, 'suite.cjs'),
       launchArgs: [
         workspace,

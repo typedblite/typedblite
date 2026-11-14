@@ -52,7 +52,9 @@ The engine never sees this warning. It is produced by the editor alone.
   first.
 - Running queries against a database is not part of this extension.
 - **The Markdown preview reads your theme's files**, because VS Code offers no other way to get a
-  theme's token colours. A theme whose colours are in a `.tmTheme` file gets the preview's own
+  theme's token colours. In a remote window (WSL, SSH, a container) the themes stay in your local
+  VS Code, out of this extension's reach. Install the **TypeQLite Theme Bridge** there too (below),
+  or the preview shows TypeQLite in its own colours. A theme whose colours are in a `.tmTheme` file gets the preview's own
   colours instead. On GitHub, TypeQLite code blocks are plain: GitHub has no TypeQL grammar, and allows
   no colours of a page's own.
 
@@ -65,6 +67,11 @@ npm install
 npm exec nx -- run typeqlite-vscode:package
 code --install-extension apps/vscode/dist/typeqlite-0.0.1.vsix
 ```
+
+`package` also builds `apps/vscode/dist/typeqlite-theme-0.0.1.vsix`, the **TypeQLite Theme Bridge**.
+You need it only in remote windows, and it belongs in the **local** VS Code: run the `code` command
+of your local VS Code, not the one in the remote terminal. See
+[its README](theme-bridge/README.md).
 
 ## Develop
 
