@@ -210,6 +210,23 @@ must cite a run in which the oracle was up.**
   runtime.
 - ⛔ **Attachments.** TypeDBLite has no attachment support at all. It is new work.
 
+## Amendment — The hub's side of D8 refuses what it should, and says so (2026-11-14)
+
+D8 defined the hub's transport: SSE out, POST in. It said nothing about what a hub does with a request it
+should not honour, and a review of the hub on 2026-11-14 (the replication guide's Security section) found it
+honoured nearly everything. This changes the hub's side of the wire. **The spoke's side and the protocol's
+shape are unchanged**, and `TypeDBLiteReplicator` needs no change.
+
+- **POST** must be `application/json` (415 otherwise). The body is limited by `maxBodyBytes` (default 64 MiB;
+  413, before it is read when its length is declared and as it arrives when it is not). A malformed batch is a
+  400 that names the problem, and it is checked as a whole before any record is applied. A valid batch is
+  applied **all or none** (`ChangeLog.applyRemoteBatch`, one savepoint around the per-record ones). A failure
+  while applying is a 500 with no detail, reported to the new `onError` option.
+- **GET** past `maxStreams` (default 256) is a 503 with `retry-after`.
+- **Not changed, deliberately:** a pushed `rev` is still stored as given. Verifying it against the content
+  would change what a store accepts from its peers, so it is a decision of its own: it needs tests, and
+  an amendment here. Authentication and TLS stay the mounting server's job, as D8 left them.
+
 ## Alternatives considered
 
 **SQLite's session extension** (`createSession` / `applyChangeset`, present in `node:sqlite`).

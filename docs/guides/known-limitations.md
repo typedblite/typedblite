@@ -82,10 +82,12 @@ From the [load test](../development/performance.md#still-open), run on real stor
 
 ## Replication and the hub
 
-- **The hub trusts everything that can reach it.** The change-stream handler has no authentication, no
-  encryption, and no limits on body size or open streams, and it stores a pushed revision as given. The
-  [replication guide's Security section](replication-and-search.md) lists each case as verified and shows a
-  hardened mount. `serveChangeStream` binds `127.0.0.1` only. Hardening the handler itself is open.
+- **The hub trusts everything that can reach it.** The change-stream handler has no authentication and no
+  encryption, so you mount it behind your own, and it stores a pushed revision as given: a peer can claim
+  any revision, and a live one with a high generation wins a conflict. It refuses non-JSON bodies, bodies
+  over `maxBodyBytes`, and streams over `maxStreams`, applies a batch all or none, and does not echo internal
+  errors. The [replication guide's Security section](replication-and-search.md#security) lists each case as
+  verified and shows an authenticated mount. `serveChangeStream` binds `127.0.0.1` only.
 - **Conflicts are kept, not resolved.** Different edits to the same thing are all kept, with a
   deterministic winner. Which losing revision matters is your application's decision.
 - **Offline-first apps must treat a failed sync as offline.** A sync that did not happen fails; it never
@@ -112,7 +114,8 @@ These are open in the repository's own records, in no order of priority:
 
 - Whether to enforce TypeDB's default `@card(0..1)` (the one failing scenario above).
 - Enforcing `@card` bounds, `@range`, `@values`, `@distinct` and `@cascade` on writes.
-- Hardening the change-stream handler (the hub items above).
+- Checking a pushed revision against its content, so a peer cannot forge one (needs its own tests and an
+  amendment to ADR-003).
 - A cost model for the query planner, and fewer SQL round trips per row.
 - A change-log retention policy.
 - The unsupported constructs listed under [The language](#the-language).

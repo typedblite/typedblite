@@ -559,6 +559,42 @@ export class ChangeLog {
   }
 
   /**
+   * Apply a batch of pushed revisions **all or none**, and return how many were new.
+   *
+   * 🔴 A hub that applied a batch record by record answered `[good, bad, good]` with an error and left
+   * the first record applied and the third unread, so a client that retried the batch retried the bad
+   * record too, and what the hub held depended on where the failure fell. One savepoint around the
+   * batch makes a failure leave the store as it was. (`applyRemote` keeps its own savepoint per
+   * record, which nests inside this one.)
+   */
+  public applyRemoteBatch(
+    records: readonly {
+      entityId: string;
+      rev: Revision;
+      parentRev?: string | null;
+      deleted: boolean;
+      state?: EntityState;
+    }[],
+  ): number {
+    const savepoint = 'apply_remote_batch';
+    this.db.exec(`SAVEPOINT ${savepoint}`);
+    try {
+      let applied = 0;
+      for (const record of records) if (this.applyRemote(record)) applied += 1;
+      this.db.exec(`RELEASE ${savepoint}`);
+      return applied;
+    } catch (error) {
+      try {
+        this.db.exec(`ROLLBACK TO ${savepoint}`);
+        this.db.exec(`RELEASE ${savepoint}`);
+      } catch {
+        // The transaction is already gone (a full disk tears it down), which is what the rollback wanted.
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Everything after `cursor`, in commit order.
    *
    * No gap handling, and that is safe rather than lazy: SQLite permits one writer at a time, so
