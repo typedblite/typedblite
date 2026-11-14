@@ -12,6 +12,8 @@ they are listed here.
   22.15 ship it without FTS5, which the engine requires. Checked: `node:sqlite` and FTS5 probed on
   22.12 to 22.21; the full gate run on 22.13.0 (fails: no FTS5) and 22.16.0 (passes).
 - `langium` and `langium-cli` are now `~4.4`, and `vscode-languageserver` `~10.1`.
+- Windows is a supported platform: CI's Windows job (Node 24) is now blocking, like the Linux ones, after
+  the build and every test passed there on two complete runs.
 
 ### Fixed
 - The `typedblite` CLI now runs on Windows, and through its npm `bin` link (`npx typedblite`, a global
