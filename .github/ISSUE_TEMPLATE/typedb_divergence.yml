@@ -1,0 +1,43 @@
+name: TypeDB divergence
+description: A query that TypeDB answers one way and TypeDBLite another.
+labels: [divergence-from-typedb]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These reports are the most useful ones. See [CONFORMANCE.md](../blob/main/CONFORMANCE.md) for
+        what is already known. If you can, run the same statements against a TypeDB server and say
+        which version you used.
+  - type: textarea
+    id: schema
+    attributes:
+      label: Schema
+      render: typeql
+    validations:
+      required: true
+  - type: textarea
+    id: statements
+    attributes:
+      label: Statements
+      description: The data and the query, in order.
+      render: typeql
+    validations:
+      required: true
+  - type: textarea
+    id: typedb
+    attributes:
+      label: What TypeDB does
+      description: The result or error, and the TypeDB version (for example 3.10.4).
+    validations:
+      required: true
+  - type: textarea
+    id: typedblite
+    attributes:
+      label: What TypeDBLite does
+    validations:
+      required: true
+  - type: input
+    id: scenario
+    attributes:
+      label: Specification scenario, if there is one
+      description: A feature file and line from typedb-behaviour.

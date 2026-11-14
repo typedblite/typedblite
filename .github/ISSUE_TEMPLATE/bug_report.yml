@@ -1,0 +1,48 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. If TypeDB answers a query differently from TypeDBLite, please use
+        the **TypeDB divergence** form instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Smallest reproduction
+      description: A schema and the statements that trigger it. The smaller the better.
+      render: typeql
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TypeDBLite version
+      description: For example `@typedblite/runtime 0.1.0`, or a commit hash.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it run?
+      options: [Node.js, Browser (WASM), CLI, VS Code extension, Sync hub or spoke, Other]
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: Node version and operating system, or browser and version.
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or diagnostics
+      description: Any error, including its diagnostic code (for example `[CNT9]`).
+      render: shell

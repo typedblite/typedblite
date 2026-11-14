@@ -1,0 +1,43 @@
+# Pull requests are squash-merged, so the PR title becomes the commit message on main.
+# CONTRIBUTING.md asks for Conventional Commits, scoped to the package.
+name: PR title
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional-commit:
+    runs-on: ubuntu-latest
+    steps:
+      # This workflow checks out nothing and runs no code from the pull request,
+      # which is what makes pull_request_target safe here.
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            test
+            perf
+            refactor
+            build
+            ci
+            chore
+            revert
+          scopes: |
+            language
+            runtime
+            revision
+            conformance
+            cli
+            vscode
+            sync-demo
+            docs
+            deps
+          requireScope: false

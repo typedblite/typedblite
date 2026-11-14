@@ -112,7 +112,7 @@ This is load-bearing. Check it again before relying on it.
 | Differential precedent | [`relation-join-planning-differential.test.ts`](../../../libs/runtime/test/relation-join-planning-differential.test.ts) runs `planJoins: false` and `planJoins: true` and asserts that the two produce the same rows in the same order. **This is the shape of test that proves the debug hook changes nothing** |
 | Execution facts | [`diagnostics.ts`](../../../libs/runtime/src/diagnostics.ts) (ADR-004): facts are returned, never emitted, have stable codes, and are capped at `MAX_DIAGNOSTICS = 50` |
 | Statement classification | [`apps/cli/src/session.ts`](../../../apps/cli/src/session.ts) chooses between `define`, `query` and `execute` by the statement's leading keyword, and whether it has a write stage. This is textual, and deliberately so. **This logic lives in the CLI, so a debugger cannot reuse it yet** |
-| SQLite | Only [`node-sqlite.ts`](../../../libs/runtime/src/node-sqlite.ts) imports `node:sqlite`. The workspace's Node is ≥ 22.12. Whether the extension host's Electron Node includes `node:sqlite` is **not verified** |
+| SQLite | Only [`node-sqlite.ts`](../../../libs/runtime/src/node-sqlite.ts) imports `node:sqlite`. The workspace's Node is ≥ 22.16. Whether the extension host's Electron Node includes `node:sqlite` is **not verified** |
 | Extension | [`apps/vscode`](../../../apps/vscode) depends on `@typedblite/language` only. It contributes no `debuggers` and no `breakpoints`, and its language server never loads the runtime |
 
 ## 🔴 The invariants every phase is bound by
@@ -231,7 +231,7 @@ These are for the founder.
    What remains is **how data gets in**. Seed files of `insert` statements are the plan. Should a
    launch also be able to **copy an existing store into memory**, so you can debug against real
    data without touching it? `node:sqlite` exposes `backup()` and `DatabaseSync#deserialize` on the
-   Node 24 used here, but their availability on the workspace's minimum Node (22.12) is not
+   Node 24 used here, but their availability on the workspace's minimum Node (22.16) is not
    verified. Either would also need the `SqliteDatabase` binding to accept something other than a
    location.
 3. **Where the adapter runs:** in-process in the extension host (which needs `node:sqlite` in

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question or show what you built
+    url: https://github.com/dave-jackson-dev/typedblite/discussions
+    about: Questions, ideas that are not yet a concrete need, and show-and-tell belong in Discussions.
+  - name: Report a security vulnerability
+    url: https://github.com/dave-jackson-dev/typedblite/security/advisories/new
+    about: Please report privately. Do not open a public issue. See SECURITY.md.

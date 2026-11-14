@@ -92,7 +92,9 @@ export class TypeQLiteRenameProvider extends DefaultRenameProvider {
     document: LangiumDocument,
     params: TextDocumentPositionParams,
     cancelToken?: CancellationToken,
-  ) {
+    // Annotated, not inferred: with Langium 4.4 the LSP types resolve to a nested copy of
+    // `vscode-languageserver-types`, and TypeScript (TS2883) cannot name an inferred `Range` from it.
+  ): ReturnType<DefaultRenameProvider['prepareRename']> {
     const site = this.labels.siteAt(document, document.textDocument.offsetAt(params.position));
     if (site && this.labels.resolve(site).length > 0) return site.range;
     return super.prepareRename(document, params, cancelToken);

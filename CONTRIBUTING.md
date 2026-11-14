@@ -30,7 +30,7 @@ is named.
 
 ## Setting up
 
-You need **Node.js 22.12 or later** (the project is developed on Node 24) and **npm**.
+You need **Node.js 22.16 or later** (the project is developed on Node 24) and **npm**.
 
 ```bash
 git clone https://github.com/dave-jackson-dev/typedblite.git

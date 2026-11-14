@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "license": "MPL-2.0",
   "engines": {
-    "node": ">=22.12"
+    "node": ">=22.16"
   },
   "workspaces": [
     "libs/*",

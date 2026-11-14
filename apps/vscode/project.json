@@ -14,7 +14,7 @@
         "typeqlite-language:langium-generate"
       ],
       "options": {
-        "command": "mkdir -p syntaxes && cp ../../libs/language/syntaxes/typeqlite.tmLanguage.json syntaxes/",
+        "command": "node ../../tools/copy-file.mjs ../../libs/language/syntaxes/typeqlite.tmLanguage.json syntaxes/typeqlite.tmLanguage.json",
         "cwd": "apps/vscode"
       },
       "outputs": [
@@ -27,7 +27,7 @@
         "{workspaceRoot}/docs/brand/typedblite-icon-512.png"
       ],
       "options": {
-        "command": "mkdir -p images && cp ../../docs/brand/typedblite-icon-512.png images/icon.png",
+        "command": "node ../../tools/copy-file.mjs ../../docs/brand/typedblite-icon-512.png images/icon.png",
         "cwd": "apps/vscode"
       },
       "outputs": [

@@ -24,7 +24,7 @@ TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) gr
 
 - **SQLite boundary** — only `node-sqlite.ts` imports `node:sqlite`; all other code uses the `SqliteDatabase` interface (`libs/runtime/src/sqlite-database.ts`)
 - **Sync interpreter** — the `SqliteDatabase` interface is synchronous by design; no async in the interpreter's inner loop
-- **Revision parity** — `computeRevision` in `@typedblite/content-revision` must not be duplicated; proven against CouchDB 3.4.3 oracle
+- **Revision parity** — `computeRevision` in `@typedblite/content-revision` must not be duplicated. The CouchDB oracle that once proved parity was removed (2026-09) and no suite re-checks it, so a change to the algorithm needs its own tests and an ADR-003 amendment; the hash itself is pinned to the `node:crypto` digest by `sha256.spec.ts`
 - **Caller-first grammar** — a TypeQLite construct is added to the grammar only when a real caller needs it ("find the caller first")
 - **Conformance oracle** — `libs/conformance/` vendors TypeDB's `typedb/typedb-behaviour` spec (MPL-2.0); pass count per feature may never go down (ADR-005)
 
