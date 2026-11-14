@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { attachDiagnostic, DiagnosticCode, TypeDBLiteInterpreter, TypeDBLiteValue } from '@typedblite/runtime';
 import { identifierMatches, parseIdentifier, uniquelyIdentify } from '../src/identify.js';
 import { runFeature, validateDeviations } from '../src/runner.js';
-import { checkSums, regressions, reportCard, unraised } from '../src/report.js';
+import { checkSums, regressions, renderFailureDigest, reportCard, unraised } from '../src/report.js';
 import type { SpecFeature, SpecScenario, SpecStep } from '../src/spec.js';
 import { findStep, UndefinedStep } from '../src/steps.js';
 import { World } from '../src/world.js';
@@ -547,5 +547,91 @@ describe('the world', () => {
     assert.throws(() => world.createDatabase('a'), /already exists/);
     world.close();
     assert.equal(world.databaseCount(), 0);
+  });
+});
+
+/**
+ * 🔴 Every step's own refusal, driven. Conformance passes, so on a green run none of these branches
+ * ever runs, and a step that cannot fail would score a scenario it never checked. Each scenario here
+ * is built so its step must fail, and is checked to fail for the step's own reason.
+ */
+describe('every check the steps make can fail', () => {
+  const failsWith = (steps: SpecStep[], reason: RegExp) => {
+    const [result] = runFeature(feature(scenario('x', steps)), noDeclarations);
+    assert.equal(result.outcome, 'fail', `expected a failure matching ${reason}`);
+    assert.match(result.failure?.reason ?? '', reason);
+  };
+  const schema = [...open('schema'), step('typeql schema query', { docString: SCHEMA }), step('transaction commits')];
+
+  it('connection has N databases refuses another count', () => {
+    failsWith([step('connection create database: typedb'), step('connection has 2 databases')], /expected 2 database\(s\), have 1/);
+  });
+
+  it('parsing fails refuses a query that parses and fails for another reason', () => {
+    failsWith(
+      [...schema, ...open('write').slice(1), step('typeql write query; parsing fails', { docString: 'insert $p isa nobody;' })],
+      /expected a parse failure/,
+    );
+  });
+
+  it('fails with a message containing refuses a failure with another message', () => {
+    failsWith(
+      [...schema, ...open('write').slice(1), step('typeql write query; fails with a message containing: "zebra"', { docString: 'insert $p isa nobody;' })],
+      /expected a failure containing "zebra"/,
+    );
+  });
+
+  it('answers do not contain variable refuses an answer that contains it', () => {
+    failsWith(
+      [
+        ...schema,
+        ...open('write').slice(1),
+        step('typeql write query', { docString: 'insert $p isa person, has ref 1, has full-name "Ann";' }),
+        step('get answers of typeql read query', { docString: 'match $p isa person, has full-name $n; select $n;' }),
+        step('answers do not contain variable: n'),
+      ],
+      /an answer contains variable 'n'/,
+    );
+  });
+
+  it('a templated query refuses to template from anything but exactly one answer', () => {
+    failsWith(
+      [
+        ...schema,
+        ...open('read').slice(1),
+        step('get answers of typeql read query', { docString: 'match $p isa person; select $p;' }),
+        step('get answers of templated typeql read query', { docString: 'match $p isa person; select $p;' }),
+      ],
+      /expected a single answer to template from, found 0/,
+    );
+  });
+});
+
+describe('the failure digest', () => {
+  it('counts an undefined step under its own heading, apart from the steps that failed', () => {
+    const results = runFeature(
+      feature(scenario('a', [step('typedb starts'), step('typeql delete')]), scenario('b', [step('typedb starts'), step('typeql delete')])),
+      noDeclarations,
+    );
+    const digest = renderFailureDigest(results);
+    assert.match(digest, /Undefined steps \(2 scenario\(s\)\)\n {5}2 {2}typeql delete/);
+    assert.match(digest, /Stopped in a scenario step \(0 scenario\(s\)\)/);
+  });
+});
+
+describe('the answer identifiers cannot be misread', () => {
+  it('refuses an identifier kind it does not know', () => {
+    assert.throws(() => parseIdentifier('iid:0x1'), /unknown answer identifier 'iid:0x1'/);
+  });
+
+  it('refuses a table whose row count differs from the answers', () => {
+    assert.throws(() => uniquelyIdentify([['p'], ['key:ref:1'], ['key:ref:2']], { rows: [], has: () => [] }), /expected 2 answer\(s\), got 0/);
+  });
+
+  it('compares durations by value, as the driver does', () => {
+    const row = { d: TypeDBLiteValue.attribute('span', 'P462D') };
+    const typed = () => 'duration';
+    assert.equal(identifierMatches(parseIdentifier('attr:span:P66W'), row, 'd', () => [], typed), true);
+    assert.equal(identifierMatches(parseIdentifier('attr:span:P67W'), row, 'd', () => [], typed), false);
   });
 });
