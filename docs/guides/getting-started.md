@@ -5,8 +5,9 @@ line and then from your own code. It takes about ten minutes.
 
 ## Prerequisites
 
-- **Node.js 22.12 or later.** TypeDBLite uses `node:sqlite`, which is built into Node. Node 24 is
-  what the project is developed on.
+- **Node.js 22.16 or later.** TypeDBLite uses `node:sqlite`, which is built into Node, and needs its
+  full-text search (FTS5), which Node's bundled SQLite includes from 22.16. Older releases either have no
+  `node:sqlite` (22.12) or lack FTS5 (22.13 to 22.15). Node 24 is what the project is developed on.
 - **npm**, which comes with Node. The repository is an npm workspace.
 - **git**.
 

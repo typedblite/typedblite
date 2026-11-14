@@ -7,7 +7,7 @@ change log that replication and full-text search are built on.
 npm install @typedblite/runtime
 ```
 
-Requires Node.js 22.12 or later (`node:sqlite`). In a browser, it runs on WASM SQLite: see
+Requires Node.js 22.16 or later (`node:sqlite`). In a browser, it runs on WASM SQLite: see
 [In the browser](#in-the-browser).
 
 ## Quick usage

@@ -1,0 +1,24 @@
+# Type
+- { name: bug, color: d73a4a, description: Something does not work as documented }
+- { name: divergence-from-typedb, color: b60205, description: TypeDB answers one way and TypeDBLite another }
+- { name: enhancement, color: a2eeef, description: A new capability or an improvement }
+- { name: documentation, color: 0075ca, description: Documentation is wrong, missing or unclear }
+- { name: question, color: d876e3, description: A question better asked in Discussions }
+- { name: security, color: ee0701, description: Never put a vulnerability here; see SECURITY.md }
+# Work
+- { name: good first issue, color: 7057ff, description: A small, well-scoped change for a first contribution }
+- { name: help wanted, color: 008672, description: A maintainer would welcome a contribution }
+- { name: conformance, color: fbca04, description: Concerns a scenario of TypeDB's behaviour specification }
+- { name: needs-caller, color: fef2c0, description: Name the real query or scenario that needs this }
+- { name: needs-info, color: ededed, description: Waiting for more information from the reporter }
+- { name: blocker, color: 000000, description: Must be resolved before the next release }
+# Area
+- { name: "area:language", color: c5def5, description: libs/language }
+- { name: "area:runtime", color: c5def5, description: libs/runtime }
+- { name: "area:revision", color: c5def5, description: libs/content-revision }
+- { name: "area:conformance", color: c5def5, description: libs/conformance }
+- { name: "area:cli", color: c5def5, description: apps/cli }
+- { name: "area:vscode", color: c5def5, description: apps/vscode }
+- { name: "area:sync", color: c5def5, description: Replication, the hub, apps/sync-demo }
+- { name: "area:ci", color: c5def5, description: Workflows and release automation }
+- { name: dependencies, color: 0366d6, description: Dependency updates }

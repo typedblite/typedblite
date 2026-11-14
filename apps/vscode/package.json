@@ -53,9 +53,9 @@
   "dependencies": {
     "@typedblite/language": "0.0.1",
     "jsonc-parser": "~3.3.1",
-    "langium": "~4.3.1",
+    "langium": "~4.4.2",
     "vscode-languageclient": "~10.0.0",
-    "vscode-languageserver": "~10.0.1"
+    "vscode-languageserver": "~10.1.0"
   },
   "devDependencies": {
     "@types/markdown-it": "~14.1.2",

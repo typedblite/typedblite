@@ -1,0 +1,13 @@
+# Line endings: LF in the repository and in every checkout, on every platform.
+# Without this, Git for Windows converts text files to CRLF on checkout, which breaks anything that
+# hashes or diffs file bytes (the conformance suite's check that the vendored specification is
+# byte-identical to upstream failed on every one of its 20 files on a Windows runner).
+* text=auto eol=lf
+
+# The vendored TypeDB specification is TypeDB Ltd's, and must stay exactly as upstream has it.
+libs/conformance/spec/** -text
+
+# Binary files: never normalised.
+*.png binary
+*.ico binary
+*.vsix binary

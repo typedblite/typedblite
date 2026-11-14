@@ -22,8 +22,8 @@
   "dependencies": {
     "@typedblite/content-revision": "0.0.1",
     "@typedblite/language": "0.0.1",
-    "langium": "~4.3.1",
-    "vscode-languageserver": "~10.0.1"
+    "langium": "~4.4.2",
+    "vscode-languageserver": "~10.1.0"
   },
   "imports": {
     "#default-opener": {

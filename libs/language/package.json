@@ -32,10 +32,10 @@
     "build": "tsc -b tsconfig.src.json"
   },
   "dependencies": {
-    "langium": "~4.3.1",
-    "vscode-languageserver": "~10.0.1"
+    "langium": "~4.4.2",
+    "vscode-languageserver": "~10.1.0"
   },
   "devDependencies": {
-    "langium-cli": "~4.3.0"
+    "langium-cli": "~4.4.1"
   }
 }

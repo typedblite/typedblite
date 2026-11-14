@@ -49,7 +49,7 @@ entity task, owns task-id @key, owns title, owns done, owns created-at, owns ori
 
 ## Setup
 
-From the repository root, on a machine with Node.js 22.12 or later:
+From the repository root, on a machine with Node.js 22.16 or later:
 
 ```bash
 npm install                              # also downloads Electron 42

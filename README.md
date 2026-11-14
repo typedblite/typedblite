@@ -80,7 +80,7 @@ TypeDB's native server is a standalone Rust binary. TypeDBLite brings the same p
 ## Quick start
 
 ```
-node >=22.12
+node >=22.16
 ```
 
 ```bash
@@ -172,7 +172,7 @@ Nothing is silently dropped: see [The TypeQLite language](docs/guides/typeqlite-
 
 ## SQLite binding
 
-The runtime depends on a `SqliteDatabase` interface rather than `node:sqlite` directly. `node-sqlite.ts` satisfies it for Node.js ≥ 22.12. A WASM SQLite binding running inside a Web Worker satisfies the same interface as long as it is synchronous within the worker. See [`libs/runtime/src/sqlite-database.ts`](libs/runtime/src/sqlite-database.ts) for the full contract.
+The runtime depends on a `SqliteDatabase` interface rather than `node:sqlite` directly. `node-sqlite.ts` satisfies it for Node.js ≥ 22.16. A WASM SQLite binding running inside a Web Worker satisfies the same interface as long as it is synchronous within the worker. See [`libs/runtime/src/sqlite-database.ts`](libs/runtime/src/sqlite-database.ts) for the full contract.
 
 ## Replication
 

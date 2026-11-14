@@ -501,7 +501,13 @@ describe('Round two — findings the fixes themselves introduced', () => {
     };
 
     const session = replicator.replicateContinuously({ direction: 'push' });
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    // Wait for the backlog to land, not for a fixed time: the drain takes ~0.3 s on node:sqlite and
+    // ~1.5 s on WASM SQLite, so a fixed window passed on one binding and failed on the other. A
+    // livelock still fails, because the hub then never reaches 1200 before the deadline.
+    const deadline = Date.now() + 15_000;
+    while (hubDb.changeLog.since(0, 10_000).length < 1200 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
     await session.cancel();
 
     const resentPrefix = firstSeqSent.filter((seq) => seq === firstSeqSent[0]).length;
