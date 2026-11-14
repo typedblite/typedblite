@@ -108,6 +108,10 @@ Update the documentation in the same pull request: [the language guide](docs/gui
 for new syntax, [CONFORMANCE.md](CONFORMANCE.md) for new numbers, and a package README for a new
 API.
 
+**Merging.** A pull request is merged with a **merge commit**. It is never squashed or rebased, so each
+of its commits stays in the history under its own hash and message. That is why the commits matter:
+write each one as you would want to read it later, with a Conventional Commits message that says *why*.
+
 ## Code conventions
 
 - **TypeScript in strict mode.** Avoid `any`; where it is unavoidable, say why in a comment.
