@@ -67,7 +67,11 @@ Nx project names (not the npm package names):
 - `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
 - `sync-demo` — `typedblite-sync-demo`, the offline-first sync demo; also has `smoke`, `test-browser`, `serve`, `demo` and `android-setup`/`android-apk`/`android-emulator`
 
-Coverage is enabled only on CI (`CI=true`). Test suites time out at 30 seconds per test.
+Coverage is enabled only on CI (`CI=true`), with an 80% floor on statements, lines and functions in
+every project. 🔴 Never exclude a file to pass the floor unless it only runs inside a host the unit
+runner lacks (VS Code, a browser or worker, Electron, a live TypeDB, a separate process). Exclude it by
+name in the project's `vitest.config.ts`, saying where it is run instead ([Testing](docs/development/testing.md)).
+Test suites time out at 30 seconds per test.
 
 ---
 
