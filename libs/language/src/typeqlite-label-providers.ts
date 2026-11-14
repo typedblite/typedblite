@@ -1,8 +1,10 @@
 import {
   AstUtils,
+  Cancellation,
   CstUtils,
   DefaultDocumentBuilder,
   DefaultDocumentValidator,
+  DocumentState,
   type AstNode,
   type LangiumDocument,
   type NameProvider,
@@ -183,5 +185,29 @@ export class TypeQLiteDocumentBuilder extends DefaultDocumentBuilder {
     if (super.shouldRelink(document, changedUris)) return true;
     const services = this.serviceRegistry.getServices(document.uri) as Partial<WithLabels>;
     return (services.labels?.Labels.sitesIn(document).length ?? 0) > 0;
+  }
+
+  /**
+   * Publishes a validated document's diagnostics even if a newer update has cancelled the build.
+   *
+   * 🔴 Langium 4.4 sets a document's state to `Validated`, and marks its build completed, and only
+   * then calls the `Validated` phase listeners, which is where the language server sends the
+   * diagnostics. It checks the cancellation token before each listener. An editor that opens several
+   * files at once sends a burst of `didOpen`s, each of which cancels the build in flight, so a cancel
+   * can land between "validated" and "published": the listener is skipped, and because the document
+   * is already `Validated` and complete, no later build revisits it. Its diagnostics are never sent
+   * until the file is edited. It hit the first document of five about three runs in ten
+   * (`apps/vscode/test/server.test.ts`).
+   *
+   * The diagnostics already exist at this point, and sending them is cheap, so cancelling here saves
+   * nothing and loses them for good. Every other phase keeps its token.
+   */
+  protected override notifyDocumentPhase(
+    document: LangiumDocument,
+    state: DocumentState,
+    cancelToken: Cancellation.CancellationToken,
+  ): Promise<void> {
+    const token = state === DocumentState.Validated ? Cancellation.CancellationToken.None : cancelToken;
+    return super.notifyDocumentPhase(document, state, token);
   }
 }

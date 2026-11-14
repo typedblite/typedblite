@@ -14,6 +14,11 @@ they are listed here.
 - `langium` and `langium-cli` are now `~4.4`, and `vscode-languageserver` `~10.1`.
 
 ### Fixed
+- The language server no longer loses a document's diagnostics when several files are opened at once.
+  Langium 4.4 could cancel the build between validating a document and publishing its diagnostics, and
+  never revisit it, so the first of a burst of `didOpen`s sometimes showed no diagnostics until it was
+  edited (about 3 runs in 10 for five documents). `TypeQLiteDocumentBuilder` now publishes a validated
+  document's diagnostics regardless of cancellation.
 - `npm run build` no longer fails on Node 24.22 and later. `langium generate` (langium-cli 4.3.0) threw
   `TypeError: Invalid URL` there, because its `jsonschema` dependency resolved schema references against
   an opaque-path base URL that newer Node versions reject. langium-cli 4.4 does not hit it.
