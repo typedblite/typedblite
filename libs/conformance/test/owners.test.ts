@@ -68,6 +68,15 @@ describe('owner resolution', () => {
     assert.equal(schemaless.resolves('d-20260911-never-opened'), true);
   });
 
+  it('a store that cannot even be opened is the same third outcome, not a crash', () => {
+    // A directory where the store file should be: SQLite refuses to open it at all.
+    const unopenable = repository(false);
+    mkdirSync(join(unopenable, '.mvp', 'defects', 'defects.db'), { recursive: true });
+    const check = ownerCheck(unopenable);
+    assert.match(check.caveat ?? '', /present and could not be read/);
+    assert.equal(check.resolves('d-20260911-never-opened'), true);
+  });
+
   it('without a defect store, a d- owner resolves on format alone and the caveat says so', () => {
     const check = ownerCheck(repository(false));
     assert.match(check.caveat ?? '', /format alone/);

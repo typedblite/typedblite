@@ -89,4 +89,13 @@ describe('redefine', () => {
       ),
     ).toContain(TypeQLiteValidationCode.valueTypeOnThing);
   });
+
+  it('refuses a redefine to a value type TypeDB does not have, listing the ones it does', async () => {
+    const [diagnostic, ...rest] = await validate('redefine attribute age value strng;');
+    expect(rest).toEqual([]);
+    expect(diagnostic?.code).toBe(TypeQLiteValidationCode.unknownValueType);
+    expect(diagnostic?.message).toBe(
+      "'strng' is not a value type. TypeDB 3 has: string, integer, double, decimal, boolean, datetime-tz, datetime, date, duration.",
+    );
+  });
 });

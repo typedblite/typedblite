@@ -53,11 +53,23 @@ describe('painting a block', () => {
     );
   });
 
+  it("draws a semantic token in the theme's colour, over the TextMate one", () => {
+    const theme = resolveTheme(
+      [{ semanticHighlighting: true, semanticTokenColors: { variable: { foreground: '#9cdcfe', italic: true } } }],
+      { themeName: 'x', semanticHighlighting: 'configuredByTheme' },
+    );
+    const block: BlockHighlight = { textmate: [], semantic: [{ offset: 0, length: 2, type: 'variable', modifiers: [] }] };
+    expect(paintBlock('$p', block, themePalette(theme))).toBe('<span style="color:#9cdcfe;font-style:italic">$p</span>');
+  });
+
   it("falls back to the preview's highlight.js classes", () => {
     expect(paintBlock(text, highlight, fallbackPalette)).toBe(
       '<span class="hljs-keyword">match</span> <span class="hljs-variable">$p</span> ' +
         '<span class="hljs-keyword">isa</span> <span class="hljs-type">person</span>;',
     );
+    // A scope the fallback has no class for, and a semantic type it does not know, stay plain.
+    expect(paintBlock('x', { textmate: [{ offset: 0, length: 1, scopes: ['meta.unknown'] }], semantic: [] }, fallbackPalette)).toBe('x');
+    expect(paintBlock('x', { textmate: [], semantic: [{ offset: 0, length: 1, type: 'macro', modifiers: [] }] }, fallbackPalette)).toBe('x');
   });
 });
 

@@ -110,6 +110,11 @@ describe('TextMate colours', () => {
     expect(textMateStyle(t, STRING)).toEqual({ foreground: '#000002', bold: true });
   });
 
+  it('counts a rule once however many of its selectors match the same scope', () => {
+    const t = rules({ scope: ['string', 'string'], settings: { foreground: '#000001' } });
+    expect(textMateStyle(t, STRING)).toEqual({ foreground: '#000001' });
+  });
+
   it('lets fontStyle "" clear an inherited italic', () => {
     const t = rules(
       { scope: 'string', settings: { fontStyle: 'italic' } },

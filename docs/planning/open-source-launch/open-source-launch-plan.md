@@ -265,7 +265,7 @@ that would have turned the first CI run red:
    and `sync-demo` (statements **19.5%**) fail that floor. The blocking gate therefore runs with coverage
    off, and a separate non-blocking `coverage` job reports the numbers. **This is a policy decision**
    (decision 9): raise the tests, exempt `sync-demo` (it is a demo, tested end to end), or lower the floor.
-   I changed none of them.
+   I changed none of them. **Resolved 2026-11-14 (decision 9, below): every project is above the floor.**
 3. **One WASM test failed, deterministically. Cause found and fixed; it was the test, not the engine.**
    `replication-correctness` › *a push that fails midway does not re-send the batches that succeeded*
    waited a fixed 900 ms, then expected the hub to hold all 1,200 changes. The drain takes about
@@ -308,7 +308,7 @@ PR #22, heads `e7f3017` and `a6a36de` (GitHub-hosted runners; Node 24.22.2 for t
 | VS Code e2e | Passed on both runs | Ready to require |
 | WASM and browser | Passed on both runs: the WASM suite, and 3 tests in a real Chromium (OPFS persistence across a full browser restart; browser revisions equal Node's; the same `[CNT9]` duplicate-key diagnostic) | Ready to require |
 | gate, macOS, Node 24 | Passed on both runs (and on the run before) | Ready to require |
-| coverage | Failed on the known 80% floor: numbers identical to the local run | Stays non-blocking until decision 9 |
+| coverage | Failed on the known 80% floor: numbers identical to the local run. **Passes since decision 9 was taken (2026-11-14)** | Ready to make blocking: the founder's call |
 | gate, Windows, Node 24 | **Build and typecheck pass; 11 tests fail** (12 before `.gitattributes`; below). **Update 2026-11-14: all four groups fixed (#38, #39); green on two complete runs** | **Blocking since #39** |
 | PR title | Did not run: `pull_request_target` runs the workflow from the base branch, which does not have it yet | Starts working after merge |
 
@@ -600,6 +600,17 @@ These change the plan; the recommendations are what the plan assumes.
 9. **Coverage policy.** Four projects are below the 80% floor (1.1). Raise tests, exempt `sync-demo`, or lower
    the floor? *Recommendation: exempt `sync-demo`, and raise the other three, which are within about
    8 points; keep the floor at 80%.*
+   **Decided 2026-11-14: raise the tests, and keep the floor at 80%.** Code that runs only inside a host
+   the unit runner lacks is excluded by name, each entry saying where it IS run. No project is exempt.
+   Before → after (statements / lines / functions):
+   - `typeqlite-language`: 84.2 / 87.2 / **79.2** → 86.1 / 89.0 / 81.0, tests only.
+   - `typeqlite-vscode`: **77.6 / 77.8 / 70.3** → 91.7 / 93.8 / 86.1, tests only.
+   - `typedblite-conformance`: **72.7 / 75.2 / 79.5** → 95.6 / 99.0 / 97.8. The TypeDB oracle and the
+     report script are excluded.
+   - `sync-demo`: **19.4 / 20.9 / 21.5** → 91.0 / 94.4 / 87.0. The browser client, Electron, the demo driver
+     and the process entries are excluded; the server is tested over HTTP.
+
+   ⚠️ `sync-demo:test-browser`, which runs that excluded client, Electron and driver code, is not in CI.
 
 ---
 

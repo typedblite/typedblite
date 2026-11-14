@@ -47,14 +47,15 @@ jobs:
       # `npm test` includes the conformance report card: it fails if any feature's passing count
       # drops below libs/conformance/baseline.json, and if an improvement was not raised.
       # GitHub sets CI=true on every runner, and vitest.shared.ts turns coverage, with its 80%
-      # thresholds, on whenever CI is set. Four projects are under 80% today (see the `coverage` job),
-      # so the blocking gate runs without coverage until that policy is decided.
+      # thresholds, on whenever CI is set. The gate runs without coverage, and the `coverage` job
+      # checks the floor separately. Every project has been above it since decision 9 (the launch plan).
       - run: npm test
         env:
           CI: ""
 
-  # The 80% coverage thresholds in vitest.shared.ts, reported but not blocking until the projects
-  # under it (language, conformance, vscode, sync-demo) are brought up, or the policy is changed.
+  # The 80% coverage thresholds in vitest.shared.ts. Every project passes them since decision 9 (the
+  # launch plan): tests raised, and only host-only code excluded, by name, in each project's
+  # vitest.config.ts. Still non-blocking: making it blocking is the founder's call.
   coverage:
     name: coverage (non-blocking)
     runs-on: ubuntu-latest

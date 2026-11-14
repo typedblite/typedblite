@@ -29,7 +29,15 @@ The Nx project names are `typeqlite-language`, `content-revision`, `typedblite-r
 `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode` and `sync-demo`.
 
 Every suite runs on [Vitest](https://vitest.dev), with a 30-second timeout per test. Set `CI=true`
-to collect coverage into `coverage/<project>/`.
+to collect coverage into `coverage/<project>/`, with an 80% floor on statements, lines and functions
+in every project.
+
+**What the floor leaves out, and why.** A file is excluded only by name, in its project's
+`vitest.config.ts`, and only when it runs inside a host the unit runner does not provide: VS Code's
+extension host, a browser or its workers, Electron, a live TypeDB server, or a separate process. Each
+entry says where that code IS run (the e2e suite, `sync-demo:test-browser`, the differential oracle).
+Code that can be unit-tested is tested, not excluded. vscode's modules that import `vscode` are tested
+against `test/fakes/vscode.ts`.
 
 ## The suites
 

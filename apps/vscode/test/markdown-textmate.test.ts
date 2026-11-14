@@ -131,6 +131,20 @@ describe('a grammar construct this tokenizer does not implement is refused, neve
     expect(tokens('(x)', nesting)).toEqual([['(', 'group'], ['x', 'group', 'x'], [')', 'group']]);
   });
 
+  it('scopes captures inside their match, and ignores a capture group the match does not have', () => {
+    const captured = grammar({ match: '(@)(\\w+)', name: 'annotation', captures: { '1': { name: 'sigil' }, '3': { name: 'none' } } });
+    expect(tokens('@key', captured)).toEqual([['@', 'annotation', 'sigil'], ['key', 'annotation']]);
+  });
+
+  it('refuses a rule that is not a match, a begin, an include or a list of patterns', () => {
+    expect(() => tokens('x', grammar({ name: 'empty' }))).toThrow(/A TextMate rule with no match, begin, include or patterns/);
+  });
+
+  it('refuses a grammar that would never advance past a position', () => {
+    // A zero-width begin and a zero-width end at the same place: push, pop, push, pop, forever.
+    expect(() => tokens('ab', grammar({ begin: '(?=b)', end: '(?=b)', name: 'stuck' }))).toThrow(/does not advance/);
+  });
+
   it('steps past a zero-width match instead of matching it forever', () => {
     expect(tokens('aaa', grammar({ match: '(?=a)', name: 'x' }))).toEqual([]);
   });
