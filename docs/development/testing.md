@@ -56,10 +56,19 @@ against `test/fakes/vscode.ts`.
 Before you open a pull request, run the full gate **from a clean tree**:
 
 ```bash
-rm -rf libs/*/out apps/*/out
-find . -name '*.tsbuildinfo' -not -path './node_modules/*' -delete
-npm run build && npm run typecheck && npm test
+npm run gate            # everything below
+npm run gate -- --quick # the first four steps only
 ```
+
+`tools/gate.mjs` runs, in order, and stops at the first failure: **clean** (every `out/`, every
+`*.tsbuildinfo`, `coverage/`), **build**, **typecheck**, **test** with `CI=true` (so the 80% coverage floor
+and the conformance report card both apply), the **WASM** suite, the **browser** suite, and the **VS Code
+e2e**. It sets `NX_SKIP_NX_CACHE`, so no task is replayed from a cache. The last three are skipped by
+`--quick`; they need Playwright's Chromium and, for the e2e, a display.
+
+**GitHub Actions is off for now**, so this is the only check. It covers the one Node and OS you run it on;
+CI used to cover Node 22.16, 22 and 24 on Linux and Node 24 on Windows and macOS. For a change that touches
+paths, child processes, file handles or Node-version behaviour, try it on another if you can.
 
 🔴 **Why clean.** `build` is `tsc -b`, which is incremental. A library whose sources did not change
 is not rebuilt, so the packages that depend on it are checked against stale type declarations, even

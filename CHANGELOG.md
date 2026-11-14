@@ -34,5 +34,8 @@ they are listed here.
   made `npm ci` fail for everyone but the machine that committed it.
 
 ### Added
+- `npm run gate`: the whole check in one command, from a clean tree: build, type-check, tests with the 80%
+  coverage floor, the WASM suite, the browser suite and the VS Code e2e (`-- --quick` skips the last three).
+  GitHub Actions is off for now, so this is how a change is checked.
 - Community files: `SECURITY.md`, issue forms, a pull request template, `CODEOWNERS`, Dependabot
   configuration, and continuous integration.

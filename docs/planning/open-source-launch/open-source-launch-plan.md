@@ -27,6 +27,24 @@ happens when the gates are green. A suggested calendar is at the end.
 
 *As of 2026-11-14, `main` at `82deabb`.* Read this first; everything it points to is below.
 
+🔴 **GitHub Actions is OFF (2026-11-14), so nothing on GitHub checks a change. Run `npm run gate` locally.**
+GitHub refused to start any job on `main`'s run after #40 merged: *"The job was not started because recent account
+payments have failed or your spending limit needs to be increased."* Every job ran two seconds with no steps; the same
+code had passed on #40's own run 20 minutes earlier, so it was billing, not code. At the maintainer's request the
+workflows were then disabled: CI, Labels and PR title are `disabled_manually` (`gh workflow enable <id>` turns one
+back on). ⚠️ The **Dependabot update job is still active**: GitHub will not let it be disabled by API (HTTP 422), and
+it needs turning off in Settings, Code security, or by setting `open-pull-requests-limit: 0` in `dependabot.yml`.
+Everything else in this plan that says "CI" or "the PR-title check" describes the workflows as they are written, and
+is **not running**. What that costs:
+- **The gate runs on one OS and one Node.** CI covered Node 22.16, 22 and 24 on Linux, and Node 24 on Windows and
+  macOS. Node 22.16 has caught a failure that Node 24 hid, and Windows caught real bugs (#38, #39).
+- **The PR-title check and label sync do not run.** Conventional Commit titles are on the author and the reviewer.
+- **Branch protection is moot** until the repository is public (it returns 403 on this plan), and CI is off anyway.
+
+To go back: fix billing, `gh workflow enable` the three workflows (and turn Dependabot back on, if it was turned off), and read the first run on
+`main` before trusting it. The decisions that wait on CI results (making `coverage` blocking, adding
+`sync-demo:test-browser` to CI) wait on that too.
+
 **Merged to `main`** (PR #22, PR #33): CI (Ubuntu on Node 24, 22 and the 22.16.0 minimum; macOS; Windows; conformance
 report; coverage; WASM and browser; VS Code e2e; PR-title check; label sync), the community files (`SECURITY.md`,
 `CHANGELOG.md`, `CODEOWNERS`, Dependabot, issue forms, PR template), `.gitattributes`, and the fixes CI found: a
@@ -69,7 +87,7 @@ install test on three platforms); Phase 3 docs and the playground. Parked, and n
 TypeDB Ltd conversation. That is parked as [PL-1](#parking-lot), and the "flip the repo to public" step in Phase 4 is
 blocked on it.
 
-**Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run build && npm test`.
+**Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run gate`.
 Useful to know:
 - `CI=true` turns on the coverage floor. Run with `CI=` to match the blocking gate.
 - A workflow run shows "success" even when an experimental job (Windows, coverage, WASM and browser, e2e, macOS)

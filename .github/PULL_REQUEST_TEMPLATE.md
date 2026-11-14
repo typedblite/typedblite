@@ -4,8 +4,8 @@
 
 ## How it was tested
 
-<!-- The tests you added, and the result of the gate:
-     rm -rf libs/*/out apps/*/out && npm run build && npm run typecheck && npm test -->
+<!-- The tests you added, and the result of the gate (GitHub Actions is off for now, so this is the
+     only check): npm run gate -->
 
 ## Conformance
 

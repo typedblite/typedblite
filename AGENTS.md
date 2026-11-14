@@ -49,6 +49,10 @@ npm run build
 # Test everything
 npm run test
 
+# The whole gate, from a clean tree: build, typecheck, tests with the coverage floor, WASM, browser, e2e.
+# GitHub Actions is off for now, so this is the only check. `-- --quick` skips the last three.
+npm run gate
+
 # Type-check everything
 npm run typecheck
 

@@ -31,8 +31,12 @@ is named.
 ## Setting up
 
 You need **Node.js 22.16 or later** (the project is developed on Node 24) and **npm**. Linux, macOS and
-Windows all work. CI runs the gate on Linux (Node 22.16, 22 and 24) and on Windows (Node 24), and a
-failure on any of them fails the run. macOS (Node 24) runs too, and passes, but does not block yet.
+Windows all work: the gate has passed on Linux (Node 22.16, 22 and 24), Windows and macOS (Node 24).
+
+> **GitHub Actions is off for now** (the account's billing needs attention), so nothing on GitHub checks a
+> pull request. **Run `npm run gate` before you open one** and put its result in the description. It runs the
+> one Node and OS you have, so a change that touches paths, child processes, file handles or Node-version
+> behaviour is worth trying on another if you can. The workflows are written and will be turned back on.
 
 ```bash
 git clone https://github.com/dave-jackson-dev/typedblite.git
@@ -80,13 +84,15 @@ Start with [Architecture](docs/development/architecture.md) for a map of the cod
 **1. The gate, from a clean tree.**
 
 ```bash
-rm -rf libs/*/out apps/*/out
-find . -name '*.tsbuildinfo' -not -path './node_modules/*' -delete
-npm run build && npm run typecheck && npm test
+npm run gate
 ```
 
-Clean matters: the incremental build can hide type errors from stale declarations
-([Testing](docs/development/testing.md#the-clean-tree-gate)).
+It deletes the build output first, because the incremental build can hide type errors from stale
+declarations ([Testing](docs/development/testing.md#the-clean-tree-gate)), then runs the build, the
+type-check, the tests **with the 80% coverage floor**, the WASM suite, the browser suite and the VS Code e2e.
+Each step stops the gate at the first failure and says which. `npm run gate -- --quick` stops after the tests,
+for a change that cannot touch the engine's WASM build or the editor. The last three suites need Playwright's
+Chromium (`npx playwright-core install chromium`) and a display (`xvfb-run` on a headless machine).
 
 **2. No conformance regression.** `npm test` includes the report card, which fails if any feature's
 passing count drops below `libs/conformance/baseline.json`. If your change makes more scenarios

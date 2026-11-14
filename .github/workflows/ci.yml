@@ -1,3 +1,6 @@
+# 🔴 OFF on GitHub since 2026-11-14 (the workflows are disabled; the account's billing needs attention).
+# Until they are enabled again, `npm run gate` is the check: it runs the same steps locally.
+#
 # The gate from CONTRIBUTING.md, run on every pull request and every push to main.
 # The checkout is clean, so this is the "clean tree" gate: build, typecheck, test.
 name: CI
