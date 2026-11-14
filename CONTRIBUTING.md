@@ -30,7 +30,9 @@ is named.
 
 ## Setting up
 
-You need **Node.js 22.16 or later** (the project is developed on Node 24) and **npm**.
+You need **Node.js 22.16 or later** (the project is developed on Node 24) and **npm**. Linux, macOS and
+Windows all work. CI runs the gate on Linux (Node 22.16, 22 and 24) and on Windows (Node 24), and a
+failure on any of them fails the run. macOS (Node 24) runs too, and passes, but does not block yet.
 
 ```bash
 git clone https://github.com/dave-jackson-dev/typedblite.git
