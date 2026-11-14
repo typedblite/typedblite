@@ -69,6 +69,11 @@ describe('the formatter normalises', () => {
     );
     expect(formatted).toContain('plays membership:member;');
   });
+
+  it('closes up a @card range', async () => {
+    const formatted = await format('define\nentity person, owns name @card( 1 .. 2 );\nattribute name, value string;\n');
+    expect(formatted).toContain('owns name @card(1..2);');
+  });
 });
 
 describe('the formatter is safe', () => {
