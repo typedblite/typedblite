@@ -13,6 +13,7 @@ Choose your starting point by what you want to do.
 | [Getting started](guides/getting-started.md) | Build from source, run your first schema and queries from the CLI, then from code |
 | [Embedding the runtime](guides/embedding-the-runtime.md) | The engine API: `define`, `execute`, `query`, result values, transactions, diagnostics and refusals, options, custom SQLite bindings |
 | [The TypeQLite language](guides/typeqlite-language.md) | What TypeQLite supports: schema, annotations, pipelines, patterns, expressions, functions, `fetch`, and the known gaps |
+| [Known limitations](guides/known-limitations.md) | What TypeDBLite does not do or does differently, each gap with its source, and what is still open |
 | [Replication and search](guides/replication-and-search.md) | The change log, revisions, one-shot and hub-and-spoke replication, conflicts, compaction, full-text search |
 | [CLI](../apps/cli/README.md) | The `typedblite` REPL, file runner and one-shot executor |
 | [Sync demo](../apps/sync-demo/README.md) | A browser, a desktop app and a phone, each with its own store, syncing through a hub: setup, the story, and how to run it |
