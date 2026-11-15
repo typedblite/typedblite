@@ -980,7 +980,7 @@ export class TypeDBLiteInterpreter {
   private persistKeyOwnerships = false;
 
   /**
-   * Whether a caller-held transaction is open on this handle (D7 of ADR-069, in the monorepo this engine came from).
+   * Whether a caller-held transaction is open on this handle.
    *
    * 🔴 While it is, `execute` must not issue its own `BEGIN`: SQLite rejects a nested one, so each
    * write pipeline takes a `SAVEPOINT` instead, and a failing pipeline rolls back to it without

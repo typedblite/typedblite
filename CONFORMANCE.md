@@ -85,12 +85,12 @@ behaviour:
 
 | Store | Ownership declared without `@card` | Owners holding more than one value |
 | --- | --- | ---: |
-| document-store | `document owns doc-facet` | 1,041 |
-| document-store | `document owns doc-tag` | 389 |
-| defects | `defect owns defect-subject-scope` | 64 |
-| defects | `defect owns defect-exclude-path` | 7 |
-| defects | `defect owns defect-red-test-path` | 2 |
-| defects | `defect owns defect-changed-recording` | 1 |
+| a document store | `document owns doc-facet` | 1,041 |
+| a document store | `document owns doc-tag` | 389 |
+| a defect tracker | `defect owns defect-subject-scope` | 64 |
+| a defect tracker | `defect owns defect-exclude-path` | 7 |
+| a defect tracker | `defect owns defect-red-test-path` | 2 |
+| a defect tracker | `defect owns defect-changed-recording` | 1 |
 
 These counts come from a read-only scan of that application's stores on 2026-11-12. If TypeDBLite
 enforced TypeDB's default, those stores would refuse writes to things that already hold several values.

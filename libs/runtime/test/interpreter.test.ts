@@ -3,7 +3,7 @@
 // no longer exists: every suite runs under Vitest, with SWC supplying the `emitDecoratorMetadata`
 // esbuild cannot and Node's real resolution supplying `node:sqlite`. The *reasoning* is kept
 // because it is why the replacement had to satisfy both constraints at once, not because the
-// split it describes is still real. See ADR-028.
+// split it describes is still real.
 import { beforeEach, describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

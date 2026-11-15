@@ -1,5 +1,5 @@
 /**
- * ADR-069 D7's reason to exist: a producer's state change and its event record are written in one
+ * Why the engine-level transaction exists: a producer's state change and its event record are written in one
  * transaction, so a crash leaves both or neither.
  *
  * 🔴 These spawn **real child processes** and kill them with SIGKILL, like durability.test.ts: a

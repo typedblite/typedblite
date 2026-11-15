@@ -703,8 +703,7 @@ RolePlayer:
 // **Added because a real caller needed them, which is this grammar's rule for every construct.**
 // `ValueType` has admitted `boolean` and `datetime` since day one, but nothing could *write* one:
 // A downstream application's schema declares two boolean and two datetime attributes, and real call sites
-// emit `has is-latest true` and `has created-at 2026-09-03T10:00:00`. Neither parsed
-// (Amendment 1(d) of ADR-038, in the monorepo this engine came from).
+// emit `has is-latest true` and `has created-at 2026-09-03T10:00:00`. Neither parsed.
 //
 // **The date and double literals arrived the same way, 2026-09-11.** `fetch.feature`'s Background
 // inserts `has end-date 2021-01-01` and `has karma 123.4567891`; the behaviour spec is the caller.

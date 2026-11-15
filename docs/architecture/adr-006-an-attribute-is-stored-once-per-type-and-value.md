@@ -289,7 +289,7 @@ largest stores, taking the median of five alternating runs:
 | --- | --- | --- |
 | `scm/ladder` | −7% | −82% |
 | `observability` | −2% | −41% |
-| `document-store` | −7% | −77% |
+| a document store | −7% | −77% |
 | `skills/graph` | −11% | −51% |
 
 The first implementation was slower: +8% to +10% on listings and +14% to +57% on lookups. It

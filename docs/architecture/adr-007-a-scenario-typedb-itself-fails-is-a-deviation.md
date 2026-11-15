@@ -85,9 +85,9 @@ Neither is a deviation, because TypeDBLite passes both.
 `update` L959 is the one failure TypeDB passes. TypeDB enforces an `owns` without `@card` as
 `@card(0..1)` at commit. TypeDBLite does not, and a downstream application depends on that:
 
-- its `document-store` schema declares `owns doc-facet, owns doc-tag;` with no `@card`, and 1,041 and
+- its document store's schema declares `owns doc-facet, owns doc-tag;` with no `@card`, and 1,041 and
   389 documents hold more than one value;
-- `defects` does the same for four attributes.
+- its defect tracker does the same for four attributes.
 
 Enforcing the default would make those stores refuse writes to the things they already have. That
 trade is the founder's: fix the downstream schemas, or declare the default unenforced in an ADR of its

@@ -45,8 +45,8 @@ lands locally first, and the stores converge through a hub when they can reach i
 
 A demo like that already exists, in a downstream application, on the branch
 `demo/typedblite-offline-sync-2026-11-12`. It cannot be reused here as it stands:
-- **It depends on that application.** It needs that project's Docker stack (gateway, PIM API, pim-ui,
-  and a hub service), its kernel schema, its token flow, and its PIM repository's record format.
+- **It depends on that application.** It needs that project's Docker stack (a gateway, an API, a UI
+  and a hub service), its own schema, its token flow, and its repository's record format.
 - **It runs TypeDBLite through a spike.** It imports `libs/runtime/spike/wasm-sqlite.ts` from
   *this* repository by a relative path, and aliases `node-sqlite.ts` away in its own esbuild
   configuration.
@@ -66,14 +66,14 @@ client.** Along the way it turns the browser binding into something anyone can u
 | `client/sw.ts` | A network-first service worker, so a reload works offline | **Kept** |
 | `client/polyfills.ts` | `Object.groupBy`, which Chevrotain (Langium's parser library) calls and which needs Chromium 117. Android 14's WebView is Chromium 113 | **Kept**, as part of the supported binding or documented as a requirement (Phase 00) |
 | `server.ts` | esbuild the client, serve it, and run the **switchboard**: `/net/<device>/hub/…` proxies to the hub, and cutting a link destroys that device's sockets | **Kept**. The hub moves in-process or to a child process, and the gateway and token proxy go |
-| `control.html` | The hub's tasks, and a button per device to cut or restore its link | **Kept**, reading the hub's TypeDBLite store directly instead of the PIM API |
+| `control.html` | The hub's tasks, and a button per device to cut or restore its link | **Kept**, reading the hub's TypeDBLite store directly instead of the application's API |
 | `electron/main.ts` | A desktop shell with its own profile, so its own OPFS | **Kept** |
 | Capacitor `android/` project, `android/*.sh`, `*.py` | The Android app, plus SDK setup, an emulator start script, and toolbar hiding | **Kept**, with the SDK setup scripted, not hand-installed |
 | `scripts/demo.ts` | A Playwright driver that opens every window and runs a nine-step story. It has `--auto`, `--open`, `--fresh`, `--no-android`, `--record`, and Pause and Play | **Kept**, **without narration**. Captions are shown on screen, and a recording has no sound track |
 | `scripts/tts.ts`, `tts/synthesize.ps1`, `.build/tts/*.wav` | Windows SAPI narration | 🔴 **Left out**, at the founder's request |
 | `scripts/reset.ts` | Fresh Docker volumes, device grants, and an optional seed | **Replaced** by deleting the hub's store file and the clients' stores |
 | `scripts/repro-*`, `*-check.ts` | One-off investigations from that night | **Left out.** What they found is in the table below |
-| Docker stack, gateway tokens, PIM API, pim-ui, kernel schema | the downstream application itself | 🔴 **Not needed.** TypeDBLite's own hub replaces all of it |
+| Docker stack, gateway tokens, its API, UI and schema | the downstream application itself | 🔴 **Not needed.** TypeDBLite's own hub replaces all of it |
 
 The defects found while building the original matter here:
 
@@ -176,7 +176,7 @@ or the emulator's reversed port. The demo needs no account, no cloud service and
 
 - **Narration.** The Windows SAPI text-to-speech is left out, at the founder's request. Captions
   carry the story.
-- **The downstream application's PIM**: its schema, its API, its token flow and its UI. The demo has its own task
+- **The downstream application's own data**: its schema, its API, its token flow and its UI. The demo has its own task
   schema and talks only to its own hub.
 - **Authentication between spoke and hub**, beyond showing the replicator's `headers` hook with a
   static demo token. Per-record authorisation is ADR-003's open question, not this feature's.

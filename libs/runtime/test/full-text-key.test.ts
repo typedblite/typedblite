@@ -18,7 +18,7 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 import { openNodeSqlite } from '../src/node-sqlite.js';
 import type { SqliteDatabase } from '../src/sqlite-database.js';
 
-const SCHEMA = readFileSync(fileURLToPath(new URL('../../../test-fixtures/schemas/document-store.schema.typeqlite', import.meta.url)), 'utf8');
+const SCHEMA = readFileSync(fileURLToPath(new URL('../../../test-fixtures/schemas/documents.schema.typeqlite', import.meta.url)), 'utf8');
 const dirs: string[] = [];
 const tempStore = (): string => {
   const dir = mkdtempSync(join(tmpdir(), 'typedblite-fts-key-'));

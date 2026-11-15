@@ -70,7 +70,7 @@ type Numeric =
   | { readonly kind: 'decimal'; readonly unscaled: bigint; readonly scale: number };
 
 // ⚠️ No bigint literals (`0n`) and no `**` on a bigint anywhere in this file:
-// `persistence-infrastructure` and `document-store-infrastructure` typecheck these sources under
+// Two downstream packages typecheck these sources under
 // a pre-ES2020 target, and both forms are refused there (TS2737, TS2791). `BigInt(…)`, `ZERO`
 // and `pow10` are the spelling.
 const ZERO = BigInt(0);

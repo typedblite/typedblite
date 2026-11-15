@@ -359,8 +359,8 @@ export class ChangeLog {
    * locally and then searched returned zero rows, for every query, with no error: exactly the
    * "silently returns nothing" failure this engine replaced CouchDB and Nouveau to avoid.
    *
-   * Nobody hit it because no consumer both wrote locally and searched. `graph-store` never
-   * searched, and the FTS parity suite drives `FullTextIndex` directly. `document-store` is the
+   * Nobody hit it because no consumer both wrote locally and searched. A graph store never
+   * searched, and the FTS parity suite drives `FullTextIndex` directly. A document store is the
    * first to do both, and found it on its first search test.
    *
    * It indexes the **winner's** state, not the state just written, because a remote revision may
