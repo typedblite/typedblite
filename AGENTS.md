@@ -157,6 +157,8 @@ Every write appends to a change log. Revisions are `generation-digest` strings (
 
 The hub exposes Server-Sent Events for spokes to subscribe to. The `ChangeStream` interface (`change-stream.ts`) is the hub's side. `ChangeStreamClient` (`change-stream-client.ts`) is the spoke's side.
 
+A store accepts a revision from a peer only if it is derived from what the record carries (`revisionProblem` in `change-log.ts`; the proposed ADR-003 amendment of 2026-11-15). A test that pushes a hand-written `rev` such as `'1-abc'` is refused: derive it with `computeRevision`.
+
 **Do not change the revision algorithm** in `content-revision/src/lib/revision.ts` casually. 🔴 The CouchDB parity oracle that once proved these semantics was removed (2026-09); `test-oracle` now only runs an FTS parity test against an external index. Nothing re-checks CouchDB parity, so a change here needs its own tests and an ADR-003 amendment. The hash itself is pinned to the pre-ADR-009 `node:crypto` digest by `sha256.spec.ts`.
 
 ---

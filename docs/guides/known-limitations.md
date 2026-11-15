@@ -83,8 +83,9 @@ From the [load test](../development/performance.md#still-open), run on real stor
 ## Replication and the hub
 
 - **The hub trusts everything that can reach it.** The change-stream handler has no authentication and no
-  encryption, so you mount it behind your own, and it stores a pushed revision as given: a peer can claim
-  any revision, and a live one with a high generation wins a conflict. It refuses non-JSON bodies, bodies
+  encryption, so you mount it behind your own. It checks that a pushed revision is derived from its content, so a
+  revision names one content everywhere, but a peer that may write can still make its write win: only
+  authentication decides who may write. It refuses non-JSON bodies, bodies
   over `maxBodyBytes`, and streams over `maxStreams`, applies a batch all or none, and does not echo internal
   errors. The [replication guide's Security section](replication-and-search.md#security) lists each case as
   verified and shows an authenticated mount. `serveChangeStream` binds `127.0.0.1` only.
@@ -114,8 +115,6 @@ These are open in the repository's own records, in no order of priority:
 
 - Whether to enforce TypeDB's default `@card(0..1)` (the one failing scenario above).
 - Enforcing `@card` bounds, `@range`, `@values`, `@distinct` and `@cascade` on writes.
-- Checking a pushed revision against its content, so a peer cannot forge one (needs its own tests and an
-  amendment to ADR-003).
 - A cost model for the query planner, and fewer SQL round trips per row.
 - A change-log retention policy.
 - The unsupported constructs listed under [The language](#the-language).
