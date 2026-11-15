@@ -8,6 +8,10 @@ they are listed here.
 ## [Unreleased]
 
 ### Changed
+- Nx is now **24.0.6** (from 23.3.0), with `nx migrate`'s migrations: `nx.json` gains `affected.legacy: true`,
+  so `nx affected` keeps selecting whole projects (nothing here uses it; the gate runs every project). The other
+  two migrations found nothing to change. Nx release's configuration is unchanged in 24, and its dry runs behave as
+  before.
 - **Breaking:** `@typedblite/runtime` exports less. Its entry points now name every export, and these are no
   longer among them: `generateSchema` and `SchemaSql` (the generated SQL, which the compatibility policy does not
   cover), `translateConstraintError`, `DiagnosticCollector`, `rangeOf` and `rangeFromOffset` (internal plumbing),
