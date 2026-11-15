@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import {
   downloadAndUnzipVSCode,
   resolveCliArgsFromVSCodeExecutablePath,
@@ -11,11 +11,12 @@ import {
 /**
  * Launch a real VS Code with this extension and run `suite.cjs` in its extension host (ADR-008 D7).
  *
- * Given a `.vsix` (`node e2e/out/run.cjs dist/typeqlite-0.0.1.vsix`, which is what `nx e2e` does),
- * the downloaded VS Code's own CLI installs it into a fresh extensions folder, and the cases run
- * against **the installed copy**: the artifact a user would install, not the source folder. Any
- * further packages (`dist/typeqlite-theme-0.0.1.vsix`, the Theme Bridge) are installed beside it. Without
- * one, the cases run against the source folder, which is quicker when iterating.
+ * Given a `.vsix` (`node e2e/out/run.cjs dist/typeqlite-0.0.1.vsix`), the downloaded VS Code's own CLI
+ * installs it into a fresh extensions folder, and the cases run against **the installed copy**: the
+ * artifact a user would install, not the source folder. Any further packages (the Theme Bridge's) are
+ * installed beside it. `--packaged`, which is what `nx e2e` passes, means both packages the `package` target
+ * wrote, named from their manifests (`dist/<name>-<version>.vsix`), so a version bump needs no edit here.
+ * Without an argument, the cases run against the source folder, which is quicker when iterating.
  *
  * The workspace and the user-data folder are fresh copies, so no case can leak into the next run, and
  * no setting or extension of the developer's own takes part.
@@ -32,8 +33,16 @@ async function main(): Promise<void> {
     if (name === 'ELECTRON_RUN_AS_NODE' || name.startsWith('VSCODE_')) delete process.env[name];
   }
   const app = resolve(__dirname, '../..');
+  const manifestOf = (dir: string) =>
+    JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { publisher: string; name: string; version: string };
+  const packaged = (dir: string): string => {
+    const { name, version } = manifestOf(dir);
+    return join(app, 'dist', `${name}-${version}.vsix`);
+  };
+  const args = process.argv.slice(2);
   // The first package is the extension under test. Any after it (the Theme Bridge) are installed beside it.
-  const [vsix, ...companions] = process.argv.slice(2).map((path) => resolve(app, path));
+  const [vsix, ...companions] =
+    args[0] === '--packaged' ? [packaged(app), packaged(join(app, 'theme-bridge'))] : args.map((path) => resolve(app, path));
   const root = mkdtempSync(join(tmpdir(), 'typeqlite-e2e-'));
   const workspace = join(root, 'workspace');
   const userData = join(root, 'user-data');
@@ -69,13 +78,14 @@ async function main(): Promise<void> {
           throw new Error(`Installing ${pkg} failed:\n${installed.stdout}\n${installed.stderr}`);
         }
       }
-      extension = join(extensions, 'typedblite.typeqlite-0.0.1');
+      const main = manifestOf(app);
+      extension = join(extensions, `${main.publisher}.${main.name}-${main.version}`);
       if (!existsSync(join(extension, 'out/language-server/main.cjs'))) {
         throw new Error(`The installed extension at ${extension} has no language server.`);
       }
       console.log(`Installed ${vsix} into ${extension}`);
       for (const pkg of companions) {
-        const id = `typedblite.${pkg.split('/').pop()!.replace(/\.vsix$/, '')}`;
+        const id = `typedblite.${basename(pkg).replace(/\.vsix$/, '')}`;
         if (!existsSync(join(extensions, id, 'package.json'))) throw new Error(`${pkg} did not install as ${id}.`);
         companionPaths.push(join(extensions, id));
         console.log(`Installed ${pkg} into ${join(extensions, id)}`);

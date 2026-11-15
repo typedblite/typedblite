@@ -78,7 +78,7 @@
         "package"
       ],
       "options": {
-        "command": "node esbuild.e2e.mjs && node e2e/out/run.cjs dist/typeqlite-0.0.1.vsix dist/typeqlite-theme-0.0.1.vsix",
+        "command": "node esbuild.e2e.mjs && node e2e/out/run.cjs --packaged",
         "cwd": "apps/vscode"
       }
     },
@@ -94,9 +94,9 @@
           "node esbuild.mjs --minify",
           "mkdir -p dist",
           "cp ../../LICENSE LICENSE",
-          "vsce package --no-dependencies --out dist/typeqlite-0.0.1.vsix",
+          "vsce package --no-dependencies --out dist/",
           "node ../../tools/copy-file.mjs ../../LICENSE theme-bridge/LICENSE",
-          "cd theme-bridge && vsce package --no-dependencies --out ../dist/typeqlite-theme-0.0.1.vsix"
+          "cd theme-bridge && vsce package --no-dependencies --out ../dist/"
         ],
         "parallel": false,
         "cwd": "apps/vscode"
