@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TypeDBLite playground</title>
+<meta name="description" content="Try TypeQLite in your browser: TypeDBLite running on WASM SQLite, with nothing to install.">
+<link rel="icon" href="logo-icon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #f4f2ee; --panel: #ffffff; --ink: #15171c; --muted: #55575e; --line: #d9d5cc;
+    --accent: #c2410c; --accent-ink: #ffffff; --error: #b42318; --error-bg: #fef3f2; --code: #f7f5f1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171c; --panel: #1d2026; --ink: #f4f2ee; --muted: #a5a8b0; --line: #343842;
+      --accent: #f97316; --accent-ink: #15171c; --error: #fda29b; --error-bg: #3b1d1a; --code: #14161b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+  .page { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; margin-bottom: 16px; }
+  header.top img { height: 40px; width: auto; }
+  header.top .logo-dark { display: none; }
+  @media (prefers-color-scheme: dark) { header.top .logo-light { display: none; } header.top .logo-dark { display: inline; } }
+  header.top p { margin: 0; color: var(--muted); }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .toolbar label { font-weight: 600; }
+  select, button { font: inherit; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--accent); }
+  #status { color: var(--muted); margin-left: auto; }
+  .panes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  @media (min-width: 900px) { .panes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+  .pane h2 { margin: 0 0 8px; font-size: 1rem; }
+  #editor { width: 100%; min-height: 420px; resize: vertical; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--code); color: var(--ink); font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 2; }
+  #output { min-height: 420px; overflow-x: auto; }
+  .step { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .step > header { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 12px; background: var(--code); font-size: .875rem; color: var(--muted); }
+  .step > header strong { color: var(--ink); }
+  .step .body { padding: 8px 12px; overflow-x: auto; }
+  .step.has-error { border-color: var(--error); }
+  table { border-collapse: collapse; width: 100%; font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  th, td { text-align: left; padding: 4px 12px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  pre.documents { margin: 0 0 8px; padding: 8px; background: var(--code); border-radius: 6px; overflow-x: auto; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  ul.notes { margin: 8px 0 0; padding-left: 20px; color: var(--muted); font-size: .875rem; }
+  .error { margin: 0; padding: 8px 12px; background: var(--error-bg); color: var(--error); border-radius: 6px; font-weight: 500; }
+  .error button { min-height: 32px; margin-left: 8px; padding: 0 8px; }
+  .omitted { color: var(--muted); font-size: .875rem; margin: 8px 0 0; }
+  .empty { color: var(--muted); }
+  footer { margin-top: 16px; color: var(--muted); font-size: .875rem; }
+  footer p { margin: 4px 0; }
+  code { font: .9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--code); padding: 1px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <img class="logo-light" src="logo.svg" alt="TypeDBLite">
+    <img class="logo-dark" src="logo-dark.svg" alt="TypeDBLite">
+    <p>Playground: try TypeQLite here, with nothing to install.</p>
+  </header>
+
+  <div class="toolbar" role="group" aria-label="Run controls">
+    <label for="examples">Example</label>
+    <select id="examples"></select>
+    <button id="run" class="primary" type="button">Run</button>
+    <button id="stop" type="button" hidden>Stop</button>
+    <button id="share" type="button">Copy link</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+
+  <div class="panes">
+    <section class="pane">
+      <h2><label for="editor">Program</label></h2>
+      <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+    </section>
+    <section class="pane">
+      <h2 id="output-title">Results</h2>
+      <div id="output" aria-labelledby="output-title" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <footer>
+    <p>Press <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>Enter</kbd> to run. Each run starts from an empty database.</p>
+    <p>A statement that follows a write or a query ends with <code>end;</code>. In TypeQL 3, a <code>match</code> after an <code>insert</code> is the next stage of the same pipeline, not a new query.</p>
+    <p>Everything runs in your browser, in a worker, on WASM SQLite. Your program is not sent anywhere, and a shared link holds the whole program after the <code>#</code>.</p>
+    <p>TypeDBLite is an independent open-source project, not affiliated with, sponsored by, or endorsed by TypeDB Ltd. It is built on <a href="https://typedb.com">TypeDB</a>, with thanks.</p>
+  </footer>
+</div>
+<script type="module" src="main.js"></script>
+</body>
+</html>

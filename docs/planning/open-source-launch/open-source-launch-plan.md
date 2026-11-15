@@ -81,7 +81,7 @@ blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows 
 
 **Next work, in order:** Phase 2 packaging (claim the unscoped `typedblite` and
 `typeqlite` npm names; take `private` off the CLI; publish `0.1.0-rc.1` under `next` with provenance; the clean-room
-install test on three platforms); Phase 3 docs and the playground. Parked, and not blocking the flip to public: PL-2 to PL-5 in the
+install test on three platforms); Phase 3 docs (the playground is built, and awaits hosting). Parked, and not blocking the flip to public: PL-2 to PL-5 in the
 [parking lot](#parking-lot) (the Langium report, keeping the old PR commits, a commit-message check, watching CI on `main`).
 
 **Before the repository goes public:** the repository is **private** (maintainer, 2026-11-14), and this plan names the
@@ -437,7 +437,12 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       the press kit don't depend on a personal address. Add SPF/DKIM/DMARC if the aliases will send.
 - [ ] Use the domain in package metadata (`homepage`), the VS Code extension manifest, the README badges,
       and the repo's website field.
-- [ ] The **browser playground** (6.1), hosted on the same Pages site.
+- [ ] The **browser playground** (6.1), hosted on the same Pages site. **Built but not hosted, 2026-11-14** (`apps/playground`): the
+      engine on WASM SQLite in a worker, three examples, errors that name their line, a shareable `#code=` link; 60
+      unit tests and 11 in real Chromium, including that nothing leaves the page and that a program's text is never
+      shown as markup. **Not done:** hosting (GitHub Pages needs Actions or a manual publish; build with
+      `node build.mjs --minify`), syntax highlighting (the plan suggested reusing the extension's grammar), and a
+      real-browser test of Stop.
 
 **Exit:** a first-timer test (below) succeeds without the maintainer's help.
 

@@ -1,0 +1,31 @@
+/**
+ * The playground build: the page and its worker, bundled by esbuild for the browser, with SQLite's
+ * `.wasm`, the static shell and the logo, into `.build/`. The bundler's `browser` condition selects
+ * `@typedblite/runtime`'s browser entry (ADR-009 D3); nothing is aliased. Every URL in the page is
+ * relative, so `.build/` can be served from any path.
+ */
+import { build } from 'esbuild';
+import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const OUT = join(HERE, '.build');
+const SRC = join(HERE, 'src');
+const BRAND = join(HERE, '../../docs/brand');
+const require = createRequire(import.meta.url);
+const WASM = join(dirname(require.resolve('@sqlite.org/sqlite-wasm/package.json')), 'dist/sqlite3.wasm');
+const minify = process.argv.includes('--minify');
+
+rmSync(OUT, { recursive: true, force: true });
+mkdirSync(OUT, { recursive: true });
+const common = { bundle: true, platform: 'browser', format: 'esm', target: 'es2022', logLevel: 'warning', sourcemap: true, minify };
+await build({ ...common, entryPoints: [join(SRC, 'worker.ts')], outfile: join(OUT, 'worker.js') });
+await build({ ...common, entryPoints: [join(SRC, 'main.ts')], outfile: join(OUT, 'main.js') });
+copyFileSync(WASM, join(OUT, 'sqlite3.wasm'));
+copyFileSync(join(SRC, 'index.html'), join(OUT, 'index.html'));
+copyFileSync(join(BRAND, 'typedblite-logo.svg'), join(OUT, 'logo.svg'));
+copyFileSync(join(BRAND, 'typedblite-logo-dark.svg'), join(OUT, 'logo-dark.svg'));
+copyFileSync(join(BRAND, 'typedblite-icon.svg'), join(OUT, 'logo-icon.svg'));
+console.log(`playground built into ${OUT}`);

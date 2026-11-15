@@ -73,6 +73,7 @@ const steps = [
     : [
         { name: 'WASM SQLite suite', command: 'npm exec nx -- run typedblite-runtime:test-wasm' },
         { name: 'browser suite (Chromium, OPFS)', run: requireChromium, command: 'npm exec nx -- run typedblite-runtime:test-browser' },
+        { name: 'playground in Chromium', run: requireChromium, command: 'npm exec nx -- run playground:test-browser' },
         { name: 'VS Code e2e', command: () => e2eCommand() },
       ]),
 ];

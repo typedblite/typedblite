@@ -69,6 +69,7 @@ Nx project names (not the npm package names):
 - `typedblite-conformance` — also has `report`
 - `typedblite` — the CLI, `typedblite-cli`
 - `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
+- `playground` — `typedblite-playground`, TypeQLite in a browser (the engine on WASM SQLite in a worker); also has `test-browser` and `serve`
 - `sync-demo` — `typedblite-sync-demo`, the offline-first sync demo; also has `smoke`, `test-browser`, `serve`, `demo` and `android-setup`/`android-apk`/`android-emulator`
 
 Coverage is enabled only on CI (`CI=true`), with an 80% floor on statements, lines and functions in

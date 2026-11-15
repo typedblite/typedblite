@@ -62,6 +62,7 @@ npm exec nx -- run <project>:<target>
 | `typedblite` (CLI) | `apps/cli` | `build`, `test`, `typecheck` |
 | `typeqlite-vscode` | `apps/vscode` | `build`, `test`, `typecheck`, `package`, `e2e` |
 | `sync-demo` | `apps/sync-demo` | `build`, `test`, `typecheck`, `smoke`, `test-browser`, `serve`, `demo`, `android-*` |
+| `playground` | `apps/playground` | `build`, `test`, `typecheck`, `test-browser`, `serve` |
 
 For VS Code, the repository includes launch configurations. **Run TypeQLite Editor** starts a second
 window with the extension loaded from source.
@@ -89,7 +90,8 @@ npm run gate
 
 It deletes the build output first, because the incremental build can hide type errors from stale
 declarations ([Testing](docs/development/testing.md#the-clean-tree-gate)), then runs the build, the
-type-check, the tests **with the 80% coverage floor**, the WASM suite, the browser suite and the VS Code e2e.
+type-check, the tests **with the 80% coverage floor**, the WASM suite, the browser suites (the engine's, and the
+playground's) and the VS Code e2e.
 Each step stops the gate at the first failure and says which. `npm run gate -- --quick` stops after the tests,
 for a change that cannot touch the engine's WASM build or the editor. The last three suites need Playwright's
 Chromium (`npx playwright-core install chromium`) and a display (`xvfb-run` on a headless machine).

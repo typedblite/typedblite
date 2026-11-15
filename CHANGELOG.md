@@ -43,6 +43,11 @@ they are listed here.
   made `npm ci` fail for everyone but the machine that committed it.
 
 ### Added
+- **A browser playground**, `apps/playground`: write TypeQLite and run it in a browser with nothing to install.
+  The engine is TypeDBLite on WASM SQLite in a Web Worker, each run starts from an empty in-memory database,
+  and nothing leaves the page. Three examples, errors that name their line, results as tables or JSON, and a
+  link that carries the whole program after `#code=`. Run it with `npm exec nx -- run playground:serve`. It is not
+  hosted yet.
 - `npm run gate`: the whole check in one command, from a clean tree: build, type-check, tests with the 80%
   coverage floor, the WASM suite, the browser suite and the VS Code e2e (`-- --quick` skips the last three).
   GitHub Actions is off for now, so this is how a change is checked.
