@@ -18,7 +18,7 @@ the [architecture decision records](../architecture/), which the source code cit
 
 ```mermaid
 flowchart LR
-  cli["apps/cli<br/>typedblite-cli"] --> runtime
+  cli["apps/cli<br/>typedblite"] --> runtime
   conformance["libs/conformance<br/>typedblite-conformance"] --> runtime
   vscode["apps/vscode<br/>typeqlite extension"] --> language
   demo["apps/sync-demo<br/>typedblite-sync-demo"] --> runtime
@@ -32,7 +32,7 @@ flowchart LR
 | `@typedblite/content-revision` | `content-revision` | Deterministic revision identifiers. No dependencies |
 | `@typedblite/runtime` | `typedblite-runtime` | The engine: interpreter, storage, change log, replication, full-text search. **The only package that touches SQLite** |
 | `typedblite-conformance` | `typedblite-conformance` | Runs TypeDB's behaviour specification against the runtime |
-| `typedblite-cli` | `typedblite` | The `typedblite` REPL and file runner |
+| `typedblite` | `typedblite` | The `typedblite` CLI: REPL, file runner and one-shot executor |
 | `typeqlite` | `typeqlite-vscode` | The VS Code extension: a Langium language server over the language library |
 | `typedblite-sync-demo` | `sync-demo` | The offline-first sync demo: browser, desktop and Android devices and a TypeDBLite hub. Uses only the runtime's public API |
 

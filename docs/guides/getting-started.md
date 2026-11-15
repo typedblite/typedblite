@@ -152,14 +152,14 @@ Each value in a row is a `TypeDBLiteValue`, a concept such as an entity, a relat
 or a computed value. Call `asString()`, `asInteger()` or `asDouble()` to read an attribute or value
 cell. See [Embedding the runtime](embedding-the-runtime.md#reading-results).
 
-To use the runtime in your own project, install it from npm:
+**Nothing is on npm yet.** Once the first release is out, the runtime installs with:
 
 ```bash
 npm install @typedblite/runtime
 ```
 
-The published packages are early (0.0.x) and can lag behind `main`. For the latest behaviour, build
-from source and depend on the workspace packages.
+Until then, build from source and depend on the workspace packages. What a version number will promise is in
+[Versions and compatibility](compatibility.md).
 
 ## When something is refused
 

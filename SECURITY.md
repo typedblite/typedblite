@@ -31,7 +31,7 @@ TypeDBLite is pre-1.0. Security fixes are made to the **latest released minor ve
 ## Scope
 
 In scope: the packages published from this repository (`@typedblite/runtime`, `@typedblite/language`,
-`@typedblite/content-revision`, `typedblite-cli`), the VS Code extension, and the replication hub and
+`@typedblite/content-revision`, and the `typedblite` CLI), the VS Code extension, and the replication hub and
 spoke code.
 
 Out of scope: TypeDB itself, which is a separate product (report it to [TypeDB Ltd](https://typedb.com)),

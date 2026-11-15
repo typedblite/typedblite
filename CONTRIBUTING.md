@@ -90,10 +90,11 @@ npm run gate
 
 It deletes the build output first, because the incremental build can hide type errors from stale
 declarations ([Testing](docs/development/testing.md#the-clean-tree-gate)), then runs the build, the
-type-check, the tests **with the 80% coverage floor**, the WASM suite, the browser suites (the engine's, and the
-playground's) and the VS Code e2e.
+type-check, the package contents (`npm run check-packages`), the tests **with the 80% coverage floor**, the WASM
+suite, the browser suites (the engine's, and the playground's), the VS Code e2e, and the clean-room install
+(`npm run clean-room`).
 Each step stops the gate at the first failure and says which. `npm run gate -- --quick` stops after the tests,
-for a change that cannot touch the engine's WASM build or the editor. The last three suites need Playwright's
+for a change that cannot touch the engine's WASM build, the editor or the packaging. The last three suites need Playwright's
 Chromium (`npx playwright-core install chromium`) and a display (`xvfb-run` on a headless machine).
 
 **2. No conformance regression.** `npm test` includes the report card, which fails if any feature's
@@ -121,6 +122,16 @@ API.
 **Merging.** A pull request is merged with a **merge commit**. It is never squashed or rebased, so each
 of its commits stays in the history under its own hash and message. That is why the commits matter:
 write each one as you would want to read it later, with a Conventional Commits message that says *why*.
+
+**A breaking change** to anything [Versions and compatibility](docs/guides/compatibility.md) covers (the API,
+the language, diagnostic codes, stores, revisions, the CLI's flags or the requirements) is listed in
+`CHANGELOG.md` under **Changed**, marked **Breaking**, with what a user must do. Say so in the pull request too.
+
+## Releases
+
+The npm packages are released together, at one version, with **Nx release**. A maintainer makes a release:
+the changelog section and `nx release version` on a branch, merged as a pull request, then a tag on `main`
+that the release workflow publishes. [Releasing](docs/development/releasing.md) has the steps and the checks.
 
 ## Code conventions
 
