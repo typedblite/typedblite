@@ -210,7 +210,7 @@ file extensions it claims come from `langium-config.json`, and a test fails if t
 Labels in queries (`isa person`, `has name`, role players) are plain `ID`s, not cross-references, and
 must stay so (ADR-008 D5). The editor resolves them through `TypeQLiteLabels`, whose position table
 (`sitesOf`, and `LABEL_POSITIONS` for completion) must change whenever the grammar gains a position
-that names a type. `nx run typeqlite-vscode:package` builds `apps/vscode/dist/typeqlite-0.0.1.vsix`.
+that names a type. `nx run typeqlite-vscode:package` builds `apps/vscode/dist/typeqlite-<version>.vsix` (and the Theme Bridge's), named by `vsce` from each manifest; `e2e --packaged` finds them the same way.
 
 The extension also colours TypeQLite code blocks in VS Code's Markdown preview
 ([ADR-010](docs/architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md)).

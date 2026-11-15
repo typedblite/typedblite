@@ -12,12 +12,28 @@
     "url": "https://github.com/dave-jackson-dev/typedblite.git",
     "directory": "apps/vscode/theme-bridge"
   },
+  "homepage": "https://github.com/dave-jackson-dev/typedblite/tree/main/apps/vscode/theme-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/dave-jackson-dev/typedblite/issues"
+  },
   "engines": {
     "vscode": "^1.91.0"
   },
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "typeqlite",
+    "typedblite",
+    "markdown",
+    "theme",
+    "remote",
+    "wsl"
+  ],
+  "galleryBanner": {
+    "color": "#15171C",
+    "theme": "dark"
+  },
   "extensionKind": [
     "ui"
   ],

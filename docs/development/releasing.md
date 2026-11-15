@@ -14,7 +14,7 @@ How the npm packages are versioned, checked and published. The promises a versio
 | --- | --- | --- |
 | `@typedblite/content-revision`, `@typedblite/language`, `@typedblite/runtime` | npm | One version for all four, released together |
 | `typedblite` (the CLI, `apps/cli`) | npm | The same version |
-| The `typeqlite` VS Code extension | VS Code Marketplace and Open VSX | Its own version; not covered here yet |
+| The `typeqlite` VS Code extension, and the TypeQLite Theme Bridge (`typeqlite-theme`) | VS Code Marketplace and Open VSX | Each its own version: [below](#the-vs-code-extensions) |
 | `typedblite-conformance`, the playground, the sync demo | Not published | `private: true` |
 
 The list of published packages is [`tools/publishable.mjs`](../../tools/publishable.mjs). `release.projects`
@@ -112,6 +112,51 @@ npm exec nx -- release publish --dry-run --tag next   # each tarball, and where 
 **While Actions is off,** there is no provenance, because provenance is signed by the CI run. A package can
 be published from a laptop (`npm login`, then `npm exec nx -- release publish --tag next`), but it would have
 no provenance, and the plan says to publish with it. Whether to wait is the maintainer's call.
+
+## The VS Code extensions
+
+Two extensions, published by `typedblite`: **TypeQLite** (`apps/vscode`) and the **TypeQLite Theme Bridge**
+(`apps/vscode/theme-bridge`), which a remote window needs to colour Markdown previews. Each has its own version in
+its `package.json` and its own `CHANGELOG.md`, and is released by its own tag. They are not versioned with the npm
+packages.
+
+`npm exec nx -- run typeqlite-vscode:package` builds both, as `apps/vscode/dist/<name>-<version>.vsix`, named by
+`vsce` from each manifest. `typeqlite-vscode:e2e` packages them, installs both into a downloaded VS Code and runs its
+cases against the installed copies, so it is the check that what would be published works. It runs in the full gate.
+
+### One-time setup
+
+Only the maintainer can do these, once:
+
+1. **The Visual Studio Marketplace publisher `typedblite`.** Create it at
+   [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage), signed in with a Microsoft
+   account. Create an Azure DevOps personal access token with the **Marketplace (Manage)** scope, for all accessible
+   organizations, with a short expiry. Save it as the secret `VSCE_PAT`.
+2. **The Open VSX namespace `typedblite`.** Sign in to [open-vsx.org](https://open-vsx.org) with GitHub, link an
+   Eclipse account and sign the Eclipse Foundation Open VSX Publisher Agreement, then create an access token. Create
+   the namespace with `npx ovsx@1.3.0 create-namespace typedblite -p <token>`, and ask for it to be verified (an issue
+   on the open-vsx.org repository), so that it shows as the official publisher. Save the token as `OVSX_PAT`.
+3. **A GitHub environment named `marketplaces`**, holding both secrets, with yourself as a required reviewer.
+
+Both marketplaces show the README, and rewrite its relative links to the repository on GitHub, so the links work
+once the repository is public.
+
+### Making a release
+
+1. **On a branch:** set the version in the extension's `package.json`, rename `## [Unreleased]` in its
+   `CHANGELOG.md` to `## [<version>] - YYYY-MM-DD`, run `npm run gate`, and open a pull request.
+2. **Merge it, then tag the merge commit on `main`:** `typeqlite-v<version>` for TypeQLite, or
+   `typeqlite-theme-v<version>` for the Theme Bridge, and push the tag.
+3. **Approve the run.** [`release-extension.yml`](../../.github/workflows/release-extension.yml) checks the tag
+   against the manifest and the changelog, builds, packages, runs the e2e under `xvfb-run`, then waits for approval
+   on `marketplaces`. It publishes the `.vsix` to both marketplaces (a version with a `-` as a pre-release) and
+   creates the GitHub Release with the `.vsix` attached.
+
+**Checked by hand (2026-11-15):** both extensions package with their marketplace metadata (keywords, gallery banner,
+`homepage`, `bugs`, a changelog), and with both versions set to `0.0.2` the `package` and `e2e` targets built,
+installed and passed (19 cases) with no other edit. Then back to `0.0.1`. The release-notes step reads each
+extension's changelog. The `vsce` and `ovsx` options the workflow uses were checked against `vsce publish --help`
+and `ovsx` 1.3.0's source. **Not checked:** the workflow, the tokens, and a real publish.
 
 ## What has been checked
 
