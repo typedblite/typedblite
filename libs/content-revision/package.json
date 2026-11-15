@@ -3,7 +3,32 @@
   "description": "Canonical state encoding and ADR-003 D3 generation-digest revisions, shared by TypeDBLite's change log and a downstream feature's DocumentVersion",
   "version": "0.0.1",
   "license": "MPL-2.0",
+  "keywords": [
+    "typedblite",
+    "revision",
+    "content-addressed",
+    "canonical-json",
+    "change-log",
+    "replication"
+  ],
+  "homepage": "https://github.com/dave-jackson-dev/typedblite/tree/main/libs/content-revision#readme",
+  "bugs": {
+    "url": "https://github.com/dave-jackson-dev/typedblite/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dave-jackson-dev/typedblite.git",
+    "directory": "libs/content-revision"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "files": [
+    "out",
+    "src",
+    "!src/**/*.spec.ts"
+  ],
   "main": "./out/index.js",
   "exports": {
     ".": {
@@ -13,5 +38,8 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.src.json"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -1,13 +1,42 @@
 {
-  "name": "typedblite-cli",
+  "name": "typedblite",
+  "description": "The TypeDBLite command line: a TypeQLite REPL, file runner and one-shot executor over SQLite",
   "version": "0.0.1",
   "license": "MPL-2.0",
-  "type": "module",
   "private": true,
+  "keywords": [
+    "typedblite",
+    "typeqlite",
+    "typeql",
+    "typedb",
+    "sqlite",
+    "cli",
+    "repl"
+  ],
+  "homepage": "https://github.com/dave-jackson-dev/typedblite/tree/main/apps/cli#readme",
+  "bugs": {
+    "url": "https://github.com/dave-jackson-dev/typedblite/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dave-jackson-dev/typedblite.git",
+    "directory": "apps/cli"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "files": [
+    "out",
+    "src"
+  ],
   "bin": {
     "typedblite": "./out/main.js"
   },
   "dependencies": {
     "@typedblite/runtime": "0.0.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

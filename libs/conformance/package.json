@@ -13,7 +13,7 @@
     }
   },
   "dependencies": {
-    "@typedblite/runtime": "0.0.1",
+    "@typedblite/runtime": "*",
     "@cucumber/gherkin": "^42.0.0",
     "@cucumber/messages": "^34.2.0"
   }
