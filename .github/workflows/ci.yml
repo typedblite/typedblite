@@ -47,6 +47,8 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run typecheck
+      # What `npm publish` would ship (tools/check-packages.mjs).
+      - run: npm run check-packages
       # `npm test` includes the conformance report card: it fails if any feature's passing count
       # drops below libs/conformance/baseline.json, and if an improvement was not raised.
       # GitHub sets CI=true on every runner, and vitest.shared.ts turns coverage, with its 80%
@@ -55,6 +57,33 @@ jobs:
       - run: npm test
         env:
           CI: ""
+
+  # The plan's clean-room test: the npm tarballs installed in an empty directory outside the checkout, and used
+  # (tools/clean-room.mjs). Written after Actions was turned off, so it has never run here; it passes on Linux,
+  # run by hand. macOS and Windows are experimental until they have been seen green: on Windows the CLI goes
+  # through npm's .cmd shim, and the quoting of its arguments is untested.
+  clean-room:
+    name: clean room (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, node: "24", experimental: false }
+          - { os: ubuntu-latest, node: "22.16.0", experimental: false }
+          - { os: macos-latest, node: "24", experimental: true }
+          - { os: windows-latest, node: "24", experimental: true }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run clean-room
 
   # The 80% coverage thresholds in vitest.shared.ts. Every project passes them since decision 9 (the
   # launch plan): tests raised, and only host-only code excluded, by name, in each project's

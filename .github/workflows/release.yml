@@ -1,0 +1,75 @@
+# 🔴 NEVER RUN. GitHub Actions has been off since 2026-11-14 (billing), and this workflow was written after that.
+# Its steps were run by hand on Linux (docs/development/releasing.md says which); the workflow itself, the OIDC
+# exchange and provenance have not been. Read its first run before trusting it.
+#
+# Publishes the npm packages for a version tag, with provenance, then creates the GitHub Release.
+# Make the tag with `nx release version <version>` (it commits and tags `v<version>`), then push the tag.
+# A prerelease (a version with a `-`, such as 0.1.0-rc.1) goes to the `next` dist-tag; anything else to `latest`.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # the GitHub Release
+  id-token: write # npm trusted publishing (OIDC) and provenance
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A protected environment: set "required reviewers" on it, so a pushed tag waits for the maintainer to
+    # approve the publish. npm's trusted-publisher entry can also be pinned to it.
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Check the tag, the versions and the release notes agree
+        id: release
+        shell: bash
+        run: |
+          version="$(node -p "require('./libs/runtime/package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the packages' version $version"; exit 1
+          fi
+          node tools/release-notes.mjs "$version" > "$RUNNER_TEMP/notes.md"
+          # Trusted publishing needs npm 11.5.1 or later.
+          node -e "const [a,b,c]=process.argv[1].split('.').map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)" "$(npm --version)" \
+            || { echo "::error::npm $(npm --version) is older than 11.5.1, which trusted publishing needs"; exit 1; }
+          case "$version" in *-*) tag=next; prerelease=--prerelease ;; *) tag=latest; prerelease= ;; esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "dist-tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm test
+        env:
+          CI: ""
+      - run: npm run check-packages
+      - run: npm run clean-room
+
+      - name: Publish to npm
+        run: npx nx release publish --tag "${{ steps.release.outputs.dist-tag }}"
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+          # Only for the first publish of a package, before npm lets it have a trusted publisher: a granular,
+          # package-scoped token with a short expiry, deleted from the repository's secrets afterwards. With no
+          # secret, npm authenticates by OIDC.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create the GitHub Release
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" ${{ steps.release.outputs.prerelease }}
+        env:
+          GH_TOKEN: ${{ github.token }}
