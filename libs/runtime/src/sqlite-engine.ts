@@ -10,7 +10,7 @@ export interface EngineRow {
  *
  * 🔴 This deliberately has no dependency on application-layer code, and application code should not
  * depend on this class directly — only on the port interface. The port
- * ([ADR-002](../../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 1) is
+ * ([ADR-002](../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 1) is
  * structural: `TypeDBLiteDatabase.open({ engine })` accepts anything with these five methods. A
  * direct dependency either way would work and would quietly make SQLite *the* engine, which
  * Decision 1 exists to prevent — this is the default adapter, and a TypeDB server over the network
@@ -30,7 +30,7 @@ export class SqliteEngine {
    * This engine's change log.
    *
    * 🔴 **This does not widen the port.** `TypeDBLiteDatabase`'s five methods are the port
-   * ([ADR-002](../../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 1) and
+   * ([ADR-002](../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 1) and
    * they stay five — a TypeDB server over the network has no change log and must not be asked for
    * one. What this exposes is a *capability of this adapter*, reachable by whoever composed it.
    * The composition root holds the engine, so it can replicate; a consumer holding only the port
@@ -76,7 +76,7 @@ export class SqliteEngine {
   }
 
   /**
-   * Run `work` in one transaction ([ADR-069](../../../../docs/architecture/adr-069-domain-events-contract-is-a-shared-kernel.md) D7):
+   * Run `work` in one transaction (D7 of ADR-069, in the monorepo this engine came from):
    * `BEGIN IMMEDIATE`, then `COMMIT` if it resolves or `ROLLBACK` if it throws, rethrowing the
    * same error. Inside `work`, this engine's own `execute` and `query` are in the transaction.
    *

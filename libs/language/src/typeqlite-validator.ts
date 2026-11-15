@@ -78,7 +78,7 @@ import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
 /**
  * Validation for what the grammar accepts but the runtime does not implement.
  *
- * 🔴 [ADR-002](../../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 7:
+ * 🔴 [ADR-002](../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 7:
  * unsupported TypeQLite fails loudly at three layers and **never silently succeeds**. Unknown syntax
  * is a parse error; syntax deliberately not implemented is reported here, naming the construct;
  * anything reaching the interpreter unhandled throws.

@@ -1,3 +1,9 @@
+/**
+ * The SQLite binding on the official WASM build, for a browser, a Web Worker, Electron or a Capacitor WebView
+ * (ADR-009). Call {@link initWasmSqlite} once, then pass {@link openWasmSqlite} as `openDatabase`.
+ *
+ * @module @typedblite/runtime/wasm
+ */
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import type {
   SqliteDatabase,

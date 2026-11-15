@@ -1,3 +1,9 @@
+/**
+ * TypeQLite's grammar, generated AST, synchronous validation and language services. Start with
+ * {@link createTypeQLiteServices}.
+ *
+ * @module @typedblite/language
+ */
 export * from './typeqlite-module.js';
 export * from './typeqlite-validator.js';
 export * from './typeqlite-validate-sync.js';

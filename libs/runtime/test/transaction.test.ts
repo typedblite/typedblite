@@ -1,5 +1,5 @@
 /**
- * The engine-level transaction ([ADR-069](../../../../../docs/architecture/adr-069-domain-events-contract-is-a-shared-kernel.md)
+ * The engine-level transaction (ADR-069, in the monorepo this engine came from,
  * D7): `BEGIN IMMEDIATE`, commit on success, roll back on a throw, and a savepoint for each write
  * pipeline inside it, because SQLite rejects a nested `BEGIN`.
  *

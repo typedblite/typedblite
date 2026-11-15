@@ -278,7 +278,12 @@ export interface TemporalValue {
   readonly text: string;
 }
 
-/** A temporal literal, checked and in its one stored spelling — what reading or writing one needs. */
+/**
+ * A temporal literal, checked and in its one stored spelling — what reading or writing one needs.
+ *
+ * Exported for this repository's conformance suite, which compares TypeDB's answers in this spelling.
+ * @internal
+ */
 export function canonicalTemporal(valueType: string, text: string, refuse: Refuse, at: Range | undefined): string {
   switch (valueType) {
     case 'duration':
@@ -304,7 +309,12 @@ export function canonicalTemporal(valueType: string, text: string, refuse: Refus
   }
 }
 
-/** The instant a zoned datetime names, as comparable text — what two `datetime-tz` values are equal by. */
+/**
+ * The instant a zoned datetime names, as comparable text — what two `datetime-tz` values are equal by.
+ *
+ * Exported for this repository's conformance suite.
+ * @internal
+ */
 export function instantOf(text: string, refuse: Refuse = (_c, message) => { throw new Error(message); }): string {
   const { naive, rest } = parseNaive(text, refuse, undefined);
   const zone = parseZone(rest, refuse, undefined) ?? { kind: 'offset', minutes: 0, text: 'Z' };

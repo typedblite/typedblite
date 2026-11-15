@@ -1,7 +1,7 @@
 /**
  * Canonical encoding of an entity's state, and the identity a change log records it under.
  *
- * Implements [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
+ * Implements [ADR-003](../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
  * Decision 3. Two nodes must produce byte-identical output for the same logical state, because the
  * revision digest is derived from it — a disagreement here manufactures conflicts that look like
  * data corruption rather than like a bug in this file.

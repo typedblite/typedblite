@@ -6,7 +6,7 @@
 /**
  * Revision identifiers for the change log.
  *
- * Implements [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
+ * Implements [ADR-003](../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
  * Decision 3: `rev` is `generation-digest`, and the digest is **derived** from the state rather than
  * randomised. That is what makes the same edit, applied to the same parent on two nodes, produce
  * the same revision — so independent identical edits converge instead of manufacturing a conflict

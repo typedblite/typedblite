@@ -1,7 +1,7 @@
 /**
  * Full-text search over TypeDBLite, via SQLite's FTS5.
  *
- * Goal 6 of [TypeDBLite Sync](../../../../../docs/planning/typeqlite-sync/typeqlite-sync.feature.md):
+ * Goal 6 of TypeDBLite Sync (in the monorepo this engine came from):
  * a hard requirement rather than an extra. `downstream-store` needs CouchDB for three things — storage,
  * replication and **search** — so replacing the first two would leave the stack up.
  *
