@@ -10,8 +10,8 @@
   revision generator has a **second consumer outside this engine**, and therefore no longer lives in
   it: `computeRevision` and the canonical encoding moved to `@typedblite/content-revision`. The
   semantics are unchanged — the move is what the boundary rules required, not a redesign.
-- **Proposed amendment, 2026-11-15:** **A store checks a peer's revision against its content** (below). Not yet
-  accepted: it changes what a store accepts from its peers, and waits on the maintainer.
+- **Amended, 2026-11-15:** **A store checks a peer's revision against its content** (below). Accepted by the
+  maintainer on 2026-11-15.
 - **Evidence:** baseline analysis, conflict model, and port-and-transport scoping (phase planning docs, not in this repo)
 
 > ✅ **Accepted by the founder, 2026-08-31.** Drafted by Phase 00 alongside its analysis and held at
@@ -229,10 +229,11 @@ shape are unchanged**, and `TypeDBLiteReplicator` needs no change.
   would change what a store accepts from its peers, so it is a decision of its own: it needs tests, and
   an amendment here. Authentication and TLS stay the mounting server's job, as D8 left them.
 
-## Amendment — A store checks a peer's revision against its content (proposed, 2026-11-15)
+## Amendment — A store checks a peer's revision against its content (accepted, 2026-11-15)
 
-> ⏳ **Proposed, not accepted.** Drafted with its implementation and tests (`verified-revisions.test.ts`), and held
-> at Proposed until the maintainer accepts it, because it changes what every store accepts from its peers.
+> ✅ **Accepted by the maintainer, 2026-11-15.** Drafted with its implementation and tests
+> (`verified-revisions.test.ts`), and held at Proposed until a person accepted it, because it changes what every store
+> accepts from its peers.
 
 **The problem.** Decision 3 derives a revision from its content, but nothing checked that a revision a peer sent
 *was* derived from what it carried: `applyRemote` stored the `rev` it was given. The amendment above left this open

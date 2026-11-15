@@ -2,11 +2,11 @@ grammar TypeQLite
 
 import './terminals';
 
-// TypeQLite 3.x — the subset actually used by the downstream application and downstream-store, and since 2026-09-11 what
+// TypeQLite 3.x — the subset actually used by its first production application and downstream-store, and since 2026-09-11 what
 // TypeDB's own behaviour specification needs to get past its Backgrounds.
 //
 // Scope was measured, not guessed (2026-08-29): every TypeQLite string in
-// `downstream-app/libs/platform/{iam,skills}/infrastructure` and
+// the IAM and Skills infrastructure of its first production application, and
 // `downstream-monorepo/tools/downstream-store/schema`. What is here is what those use. What TypeDB has and
 // this does not — rules/inference, aggregation, negation, `sort`/`limit`/`offset`, expressions,
 // structs — is absent because no caller writes it, not because it was too hard. Adding a

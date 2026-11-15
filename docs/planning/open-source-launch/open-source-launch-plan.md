@@ -76,8 +76,8 @@ Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the
   maintainer's request: nothing can test them while Actions is off.
 - **`apps/playground` is built and not hosted.** `npm run playground` serves it locally.
 - **`gitleaks` has not been run.** The secret scan was a manual pattern search (S9).
-- **A pushed revision is checked against its content** (PL-6, the `feat/verify-pushed-revisions` pull request; its
-  ADR-003 amendment is Proposed and waits on the maintainer). A peer that may write can still make its write win.
+- **A pushed revision is checked against its content** (PL-6, #55; its ADR-003 amendment was accepted on 2026-11-15).
+  A peer that may write can still make its write win.
 - **The coverage job is not blocking**, and `sync-demo:test-browser` (which runs code excluded from coverage) is not
   in CI. Both wait on Actions.
 
@@ -91,9 +91,8 @@ Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the
    secret scanning with push protection, Dependabot alerts.
 4. **`CODE_OF_CONDUCT.md`:** Insights, Community Standards, Add (inserts the official Contributor Covenant text, which
    the tooling here cannot fetch).
-5. **Decisions still open:** the contribution model, DCO or CLA (4); whether `downstream-app` stays named in the docs
-   (5, S3); the launch window (7); capacity: who answers issues, and who is the second reviewer (8). Decided: Windows
-   (fixed and blocking), the coverage policy (decision 9: raise the tests, keep the floor), the Node minimum (22.16).
+5. **Decisions still open:** the contribution model, DCO or CLA (4); the launch window (7); capacity: who answers issues, and who is the second reviewer (8). Decided: the production consumer is not named
+   (5, S3); Windows (fixed and blocking), the coverage policy (decision 9: raise the tests, keep the floor), the Node minimum (22.16).
 6. **Host the playground** at `typedblite.dev/playground`: GitHub Pages needs Actions or a manual publish of
    `apps/playground/.build` (build with `node build.mjs --minify`), plus the domain's DNS.
 7. **Run `gitleaks detect`** over the history before the repository goes public.
@@ -123,13 +122,11 @@ Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the
 2. **Phase 3, docs** (partly done): the Known limitations page, the README restructure and the **API reference**
    (TypeDoc, `npm run docs:api`, checked by `npm run check-api`; not hosted yet) are in. Before it, the runtime's
    API was reviewed: it now names every export, pinned by a test, and the internals it leaked are gone or marked
-   `@internal`. **"Why not X" is drafted** (`docs/guides/why-not-x.md`, the `docs/why-not-x` pull
-   request), for the maintainer's review of its tone and its TypeDB section, and not yet linked from the README. Still
-   to write: a five-minute tour (needs the published packages), "TypeDB vs TypeDBLite" (TypeDB Ltd should read it), the
-   demo GIF, and badges.
-3. **PL-6's last item is written** (the `feat/verify-pushed-revisions` pull request): a store checks a peer's revision
-   against its content, with tests and a **Proposed** ADR-003 amendment. Accepting the amendment is the maintainer's
-   call.
+   `@internal`. **"Why not X" is drafted** (`docs/guides/why-not-x.md`, #57), for the maintainer's review of its tone
+   and its TypeDB section, and not yet linked from the README. Still to write: a five-minute tour (needs the published
+   packages), "TypeDB vs TypeDBLite" (TypeDB Ltd should read it), the demo GIF, and badges.
+3. **PL-6 is done** (#55): a store checks a peer's revision against its content, with tests and an ADR-003 amendment
+   the maintainer accepted on 2026-11-15.
 4. **When Actions is back:** read the first run on `main`, then make `coverage` blocking and add
    `sync-demo:test-browser` to CI.
 
@@ -227,7 +224,7 @@ confirm it and it needs someone to.
 | B3 | **Nothing is published.** No tags, no releases, no npm packages, CLI is private | Verified | Phase 2 |
 | B4 | **npm and domain names.** `@typedblite` (npm org) and `typedblite.dev` are **registered (2026-11-14)**. Still to confirm: the unscoped `typedblite` (the CLI's name) and `typeqlite`, which the scope does not cover: **both still free on 2026-11-15**. The `typedblite` GitHub org is held too (2026-11-15) | Partly done | Check both unscoped names on npm and claim them (publish a placeholder or `0.0.0` under the org if free). Note that the domain, like the name, contains TypeDB™, so B1 covers it too |
 | B5 | **`node:sqlite` vs `engines`.** `engines` said Node `>=22.12`. Measured: 22.12 has **no** `node:sqlite`; 22.13 to 22.15 have it **without FTS5**, which the engine requires; **22.16.0 is the first that works** (full gate passes there, cache skipped) | **Resolved** | `engines`, the READMEs, CONTRIBUTING and the getting-started guide now say 22.16; 22.16.0 is a blocking CI job. Node still marks `node:sqlite` experimental, which prints a warning on first use: say so in the docs |
-| B6 | **Hub security.** The hub exposes an SSE stream and a POST endpoint. I did not check authentication, binding defaults, or input limits | **Reviewed 2026-11-14: documented, not yet fixed** | Done: the replication guide has a "Security" section with each finding, verified against a live hub. Five of the eight are now fixed in the handler (PL-6); authentication and TLS are the mounting server's job; **a pushed revision is now checked against its content (PL-6, Proposed ADR-003 amendment, 2026-11-15)**, though a peer that may write can still make its write win. Binding is `127.0.0.1` only |
+| B6 | **Hub security.** The hub exposes an SSE stream and a POST endpoint. I did not check authentication, binding defaults, or input limits | **Reviewed 2026-11-14: documented, not yet fixed** | Done: the replication guide has a "Security" section with each finding, verified against a live hub. Five of the eight are now fixed in the handler (PL-6); authentication and TLS are the mounting server's job; **a pushed revision is now checked against its content (PL-6, ADR-003 amended 2026-11-15)**, though a peer that may write can still make its write win. Binding is `127.0.0.1` only |
 | B7 | **No `SECURITY.md`** (private reporting channel) | Verified | **Written.** Enable GitHub private vulnerability reporting and create the `security@` alias |
 
 ### 4.2 Should fix before launch
@@ -236,7 +233,7 @@ confirm it and it needs someone to.
 | --- | --- | --- |
 | S1 | No `CODE_OF_CONDUCT.md`, issue templates, PR template, `CHANGELOG.md` | Add. Contributor Covenant 2.1; issue forms for *bug*, *TypeDB-divergence*, *feature (name the caller)* |
 | S2 | **Doc drift.** `docs/memories/project-overview.md` says revision parity is "proven against CouchDB 3.4.3 oracle"; `AGENTS.md` says that oracle was removed (2026-09) and nothing re-checks parity | Fix the overview. A public claim contradicted by the maintainers' own notes is exactly what an early reader finds |
-| S3 | Public docs reference **downstream-app** as "the engine's one production consumer" (performance doc and bench data) | Decide: keep as a named, linked case study (it's a real asset) or neutralise. Check that no private data ships in `performance-results/` or snapshots |
+| S3 | Public docs named the engine's one production consumer (performance doc and bench data) | **Decided 2026-11-15: neutralise.** Every reference to it by name was removed; the docs say "a production application" or "a downstream application". Check that no private data ships in `performance-results/` or snapshots |
 | S4 | README is long and opens with a thanks table | Restructure (see 5.3) |
 | S5 | `.claude/`, `AGENTS.md`, `.github/agents|prompts|skills` ship in the public tree | Fine to keep, and a plus for agent-assisted contributors. Confirm nothing in them is private (paths, tokens, internal URLs) |
 | S6 | Sync demo has Electron and Android toolchains: heavy for a newcomer | Keep it, but give a browser-only "run it in one command" path and a recorded GIF |
@@ -585,7 +582,7 @@ See [section 7](#7-launch-day-runbook).
 - Avoid superlatives. State the conformance number with its denominator.
 
 **First-comment template (post immediately after submitting):** who you are in one line; why you built
-it (the real consumer: downstream-app); what works; what doesn't; the conformance method; one specific
+it (a real production consumer, unnamed); what works; what doesn't; the conformance method; one specific
 question you want answered ("what would you need to try this on a real project?"); thanks to TypeDB.
 
 ## 7. Launch day runbook
@@ -697,8 +694,8 @@ These change the plan; the recommendations are what the plan assumes.
 3. **Is the repository already public?** *Resolved: it is private (maintainer, 2026-11-14).* Nothing in it is public
    yet. Clear the [parking lot](#parking-lot) before that changes.
 4. **Contribution model.** DCO (recommended) or CLA.
-5. **downstream-app as a named case study** (S3). It's the project's only production consumer and the
-   strongest answer to "who uses this?" *Recommendation: keep, link, and have its data reviewed.*
+5. **The production consumer as a named case study** (S3). *Decided 2026-11-15 by the maintainer: no. Every
+   reference to it by name is removed, and the docs call it "a production application".*
 6. **Minimum Node version** after the B5 check.
 7. **Launch window.** Early December versus January. *Recommendation: January 2027.*
 8. **Capacity.** Who answers issues in launch week, and who is the second reviewer?
@@ -730,7 +727,7 @@ Things deliberately set aside, each with the moment it must be revisited. An ite
 | PL-3 | Keep the original commits of PRs #22 and #33 on a branch or tag | Soon: needs the maintainer's OK to push | Nothing | Open |
 | PL-4 | Decide whether to add a commit-message check | Branch protection is enabled, or the first outside pull request | Nothing | Open |
 | PL-5 | Confirm CI on `main` is stable, including the Node 22 gate | The announcement | Announcement | Open |
-| PL-6 | Harden `createChangeStreamHandler`. **Mostly done 2026-11-14:** a content-type check (415), a body-size limit (413), a cap on open streams (503), an atomic batch, and no echoing of internal errors. **Written 2026-11-15:** checking a pushed revision against its content, with tests and a Proposed ADR-003 amendment that waits on the maintainer. Authentication and TLS stay the mounting server's job | The sync story is promoted | Promoting sync | Done, pending the amendment's acceptance |
+| PL-6 | Harden `createChangeStreamHandler`. **Mostly done 2026-11-14:** a content-type check (415), a body-size limit (413), a cap on open streams (503), an atomic batch, and no echoing of internal errors. **Written 2026-11-15:** checking a pushed revision against its content, with tests and an ADR-003 amendment, accepted 2026-11-15. Authentication and TLS stay the mounting server's job | The sync story is promoted | Promoting sync | Done |
 
 ### PL-1. What the plan says about the TypeDB Ltd conversation
 

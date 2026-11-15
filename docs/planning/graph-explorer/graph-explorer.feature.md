@@ -181,7 +181,7 @@ packaged `.vsix`.
 - **Editing data through the graph** (drag to link, delete a node). Writes are statements the user
   writes.
 - **Sample datasets.** Deferred until there is a dataset worth shipping.
-- **downstream-app's store app.** It has its own client. Exploring that store is downstream-app's
+- **A downstream application's store app.** It has its own client. Exploring that store is that application's
   work, built on this feature's host protocol.
 
 ## Open questions for Phase 00

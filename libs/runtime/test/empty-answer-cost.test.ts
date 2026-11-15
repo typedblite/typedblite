@@ -3,7 +3,7 @@
  *
  * 🔴 The fact states two counts, and they used to be taken by running `candidates()` again and
  * taking `.length` — every instance of the type read into rows, on every empty answer. Empty
- * answers are routine: downstream-app reads each optional attribute with a query of its own, and most
+ * answers are routine: a production application reads each optional attribute with a query of its own, and most
  * rows lack most of them. At 125,000 entities that was 27 ms per empty read
  * (docs/development/performance.md). The counts are now SQL `COUNT(*)`, and these tests hold the
  * message to the same numbers.

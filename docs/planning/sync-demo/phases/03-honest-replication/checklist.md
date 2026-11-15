@@ -35,7 +35,7 @@ shown not to reproduce.
 
 - [x] **Not reproduced.** A file store with a `@key`, reopened without `define`, deleted and
       re-inserted the same key 10 times in transactions, with 0 failures, and likewise with
-      `define`. The original's failure came from a downstream-app store with its kernel schema, and
+      `define`. The original's failure came from a downstream store with its own schema, and
       was never reduced to a minimal case. No engine change: the docs already say to `define` on
       every open, and the demo does
 

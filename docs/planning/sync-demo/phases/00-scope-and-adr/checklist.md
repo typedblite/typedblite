@@ -14,7 +14,7 @@ phase: 00-scope-and-adr
 
 ## Survey
 
-- [x] Re-read the original (`downstream-app` `demo/offline-sync/` at `c42c2a7b`): its run-book, worker,
+- [x] Re-read the original (a downstream application's `demo/offline-sync/` at `c42c2a7b`): its run-book, worker,
       server and driver. The feature doc's survey table stands
 - [x] Versions installed and proven on this machine by the original: Electron 38.2.0, Capacitor
       7.4.3, playwright-core 1.62.1 (Chromium revision 1234, present in `~/.cache/ms-playwright`),

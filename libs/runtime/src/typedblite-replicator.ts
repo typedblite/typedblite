@@ -290,7 +290,7 @@ export class TypeDBLiteReplicator {
     }
     // 🔴 So is every other non-OK answer (ADR-009 D7). This returned an empty list for a 502 or a 503,
     // so a spoke whose hub was down reported itself in sync while receiving nothing — found by the
-    // downstream-app offline demo, whose "the hub goes down" step depended on seeing it.
+    // downstream offline demo, whose "the hub goes down" step depended on seeing it.
     if (!response.ok) throw new Error(`pull failed: the hub answered ${response.status}`);
     if (!response.body) throw new Error('pull failed: the hub answered with no stream');
 

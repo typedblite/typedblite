@@ -54,7 +54,7 @@ Load-bearing. Re-verify before relying on it.
 | TextMate | `langium generate` writes `syntaxes/typeqlite.tmLanguage.json`, which is **gitignored as build output**. A second file, `syntaxes/typeql.tmLanguage.json`, is also present and gitignored, but **nothing in `langium-config.json` generates it**. It is stale |
 | Extension | **None.** No `apps/vscode`, no `server.ts`, no `language-configuration.json`, no e2e harness |
 | How the runtime uses the language | [`interpreter.ts`](../../../libs/runtime/src/interpreter.ts) calls `LangiumParser.parse` and then `validateSync`, on `EmptyFileSystem`. 🔴 **It never builds a `LangiumDocument` and never links**, so the scope provider, the linker and every LSP provider are invisible to it. The validator is not |
-| Downstream | downstream-app ships its own `typeqlite-vscode`, which stands up `createTypeQLiteServices` in a language server beside a database client that talks to downstream-app's own store app. That store is why the extension did not move into this repository. It contributes the same language id, plus `.typeql` |
+| Downstream | A downstream application ships its own `typeqlite-vscode`, which stands up `createTypeQLiteServices` in a language server beside a database client that talks to that application's own store app. That store is why the extension did not move into this repository. It contributes the same language id, plus `.typeql` |
 
 ## 🔴 The invariants every phase is bound by
 
@@ -146,9 +146,9 @@ installed into VS Code 1.146.0, 16 of 16 passing.
   TypeDB's own TypeQL extension, and licence review. The `.vsix` is the deliverable here.
 - **A browser (web-worker) build** for vscode.dev. Langium supports it and the services already run
   on `EmptyFileSystem`, but nothing has asked for it.
-- **Migrating the downstream extension.** This feature makes it *possible* for downstream-app's
+- **Migrating the downstream extension.** This feature makes it *possible* for the downstream application's
   extension to depend on this one (`extensionDependencies`) and drop its own language server. Doing
-  that is downstream-app's work, in that repository.
+  that is that application's work, in its repository.
 
 ## How this gets proven
 

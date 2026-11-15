@@ -13,7 +13,7 @@ The numbers come from the load test, `nx run typedblite-runtime:bench`
 
 ## How it was measured
 
-**Real stores.** Snapshots of downstream-app's `.mvp` stores, the engine's one production consumer,
+**Real stores.** Snapshots of the stores of a production application built on the engine,
 taken on 2026-11-12. Each was driven with the query shapes its repository issues, copied from that
 repository's source:
 
@@ -30,7 +30,7 @@ measured every 20,000. A cost that rises while its answer does not is a scan.
 **Relations at scale.** The Skills schema generated at 1×, 5× and 14× the real catalog.
 
 **Contention.** One to four writer processes, with and without readers, on one copy of `ladder.db`.
-downstream-app runs two processes on the same stores.
+That application runs two processes on the same stores.
 
 Everything ran from source on one machine: an Intel Core Ultra 9 275HX (24 cores), WSL2, Node
 24.19.0. Absolute numbers are this machine's. The ratios and the growth curves are the findings.
@@ -80,7 +80,7 @@ of 512, beneath the tracing proxy. Guarded by `statement-cache.test.ts`.
 
 When a query answers nothing, the `noCandidates` fact states two counts. Both were taken by running
 `candidates()` again and taking `.length`, which read every instance of the type into memory. Empty
-answers are routine: downstream-app reads each optional attribute with a query of its own, and most
+answers are routine: that application reads each optional attribute with a query of its own, and most
 rows lack most of them. So ordinary reads paid for a full read of the type, and it is why the
 workflow engine's `find()` took 46 ms.
 
@@ -120,7 +120,7 @@ planned-against-unplanned differential suite.
 ### 7. The document store was mostly change log (consumer)
 
 818 MB of the document store's 967 MB was `change_log`: 195,000 full-state revisions of 2,670
-documents. `changeLog.compact()` and `vacuum()` took it to 81 MB in 3 seconds. downstream-app exposes
+documents. `changeLog.compact()` and `vacuum()` took it to 81 MB in 3 seconds. That application exposes
 compaction as a command and never schedules it. The engine has no retention policy of its own, so
 any consumer that rewrites large values will grow the same way.
 
