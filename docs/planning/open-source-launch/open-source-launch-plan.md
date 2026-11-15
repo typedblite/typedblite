@@ -25,7 +25,7 @@ happens when the gates are green. A suggested calendar is at the end.
 
 ## Where to resume
 
-*As of 2026-11-15, `main` at `f6df397`: every pull request through #58 is merged, and none is open except two of
+*As of 2026-11-15, `main` at `c9340d0`: every pull request through #61 is merged, and none is open except two of
 Dependabot's.* Read this first; everything it points to is below.
 
 🔴 **GitHub Actions is OFF (2026-11-14), so nothing on GitHub checks a change. Run `npm run gate` locally.**
@@ -61,16 +61,22 @@ To go back: fix billing, `gh workflow enable` the three workflows, restore the D
   restructured (#46); and **the browser playground** (#47), now **Monaco with the real language server over LSP**
   (#48), served by `npm run playground`.
 
-- **2026-11-15** (#49 to #58): **packaging** (#50: `files` lists, the CLI renamed `typedblite`, `check-packages`,
+- **2026-11-15** (#49 to #61): **packaging** (#50: `files` lists, the CLI renamed `typedblite`, `check-packages`,
   `clean-room`, Nx release, `release.yml`, the compatibility policy, Releasing); the production consumer and other private projects no longer
   named anywhere (#51, #58); **the API reviewed and its reference generated** (#52:
   explicit exports pinned by a test, `check-api`, `docs:api`); Nx 24 (#53) and Vitest 5 (#54); **a pushed revision
   checked against its content** (#55, PL-6, ADR-003 amended and accepted); both extensions ready to publish (#56:
-  `release-extension.yml`); and a draft of "When to use TypeDBLite, and when not" (#57).
+  `release-extension.yml`); a draft of "When to use TypeDBLite, and when not" (#57); the plan refreshed (#59);
+  **every private name out of the tree** (#58, #60: the downstream application, its a downstream feature, a sibling
+  repository and its stores, the third-party WASM package, and the monorepo's ADR numbers); and **original
+  fixtures** (#61): a project tracker (`tracker`, `people`, `sprint`, `documents` in `test-fixtures/schemas/`)
+  replaces the adapted schemas and example queries, the `real-stores` benchmark is gone, the load test generates
+  its own data, a relation-read performance fix it found is in (empty answers no longer read every relation of
+  a type), and the performance guide is rewritten on the generated data.
 
 **State of the checks (from the last runs on GitHub, before Actions went off):** every gate was green, including
 **Windows on two complete runs** and `coverage`. Windows is blocking in `ci.yml` (`experimental: false`); macOS is not.
-Nothing has run on GitHub since #40, so CI has seen none of #41 to #58, and `release.yml`, `release-extension.yml` and CI's `clean-room` job have never run. Their evidence is `npm run gate` (11 steps, Linux, Node 24), which passed on `main` after #57.
+Nothing has run on GitHub since #40, so CI has seen none of #41 to #61, and `release.yml`, `release-extension.yml` and CI's `clean-room` job have never run. Their evidence is `npm run gate` (11 steps, Linux, Node 24), which passed on `main` after #57.
 
 **Merging:** merge commits only, never squash or rebase, so each commit keeps its own history (the maintainer's rule,
 2026-11-14). PRs #22 and #33 were squashed before that rule; their original commits are still on GitHub at
@@ -81,11 +87,20 @@ Nothing has run on GitHub since #40, so CI has seen none of #41 to #58, and `rel
   past the extension's `engines.vscode ^1.91`, which `vsce` refuses to package; its `@swc/core` and `playwright-core`
   bumps can be taken separately. #32 (Capacitor 8) waits until the Android build can be run. #23 to #27 (Actions
   versions only) were closed, untestable while Actions is off; #28, #29 and #31 were superseded by #53 and #54.
-- **Git history still names the production consumer and other private projects**, in old commit messages and file
-  contents. The tree does not. Rewriting history is the maintainer's decision, and must come before any release
-  tag, a repository move, or going public.
+- **Git history still names the production consumer and the other private projects**, in old commit messages and
+  file contents. The tree does not. A trial rewrite on a scratch clone (2026-11-15, nothing pushed) showed it is
+  small and safe: 223 commits, 19 messages and 33 diffs carry a name, no path does, and `git filter-branch` with a
+  tree filter and a message filter takes 11 seconds and leaves `main`'s tree identical. Two variants slipped past
+  the first pass (`downstream-studio`, `downstream-maintainers`), and the old fixtures, the removed bench and
+  the removed results data are in history too, so the real list needs a second look. **The catch:** GitHub keeps
+  every old commit reachable through each PR's `refs/pull/N/head` (61 PRs), and a force-push cannot rewrite
+  those. The clean way is a **fresh repository in the `typedblite` org** pushed with the rewritten history, which
+  loses PR and issue history; otherwise GitHub Support must purge the refs. It must come before any release tag,
+  the repository move and going public, and every commit hash cited in docs changes with it. `git-filter-repo` is
+  installed (`~/.local/bin`) for the real run. Rewriting is the maintainer's decision.
 - **`apps/playground` and the API reference are built and not hosted.** `npm run playground` and `npm run docs:api`.
-- **`gitleaks` has not been run.** The secret scan was a manual pattern search (S9).
+- **`gitleaks` 8.30.1 found no leaks** in the 152 reachable commits on 2026-11-15 (S9). Run it again on the rewritten
+  history before the repository goes public.
 - **A pushed revision is checked against its content** (PL-6, #55; its ADR-003 amendment was accepted on 2026-11-15).
   A peer that may write can still make its write win.
 - **The coverage job is not blocking**, and `sync-demo:test-browser` (which runs code excluded from coverage) is not
@@ -101,8 +116,10 @@ something is public or published.
    - Start the Open VSX namespace `typedblite`: it needs the Eclipse publisher agreement and a verification request
      ([Releasing](../../development/releasing.md#the-vs-code-extensions)).
 2. **Before anything is public or published.**
-   - Decide whether to rewrite git history to drop the two private names, and run `gitleaks detect` in the same
-     pass (S9). A rewrite changes every commit hash, so it comes before any tag, the repository move and going public.
+   - Decide whether to rewrite git history to drop the private names (see the trial in "Known and left alone"), and
+     run `gitleaks` over the result (S9; it is installed, and was clean on the current history). A rewrite changes
+     every commit hash, so it comes before any tag, the repository move and going public. If the repository is to
+     move into the `typedblite` org, the fresh-repository route does both in one step.
    - Move the repository to the `typedblite` GitHub org, if it is to move: manifests, npm trusted publishing and
      provenance all record the repository URL. It is one line in `tools/publishable.mjs` plus the manifests, held by
      `npm run check-packages`, and the URLs in the READMEs and the extension manifests.
@@ -239,17 +256,17 @@ confirm it and it needs someone to.
 | S6 | Sync demo has Electron and Android toolchains: heavy for a newcomer | Keep it, but give a browser-only "run it in one command" path and a recorded GIF |
 | S7 | Performance "Still open" list (no cost model, one writer, no change-log retention) | Promote to the public roadmap and known-limitations page rather than leaving it in a results doc |
 | S8 | Platform coverage unknown (Windows, macOS) | CI matrix; document support. **Windows: blocking CI job since #39. macOS: green, still experimental. Support stated in CONTRIBUTING and the getting-started guide** |
-| S9 | Run a secret scan across full git history | `gitleaks` or GitHub secret scanning; rotate anything found **Manual pass done 2026-11-14, clean; the tool scan is still to run** (see below) |
+| S9 | Run a secret scan across full git history | `gitleaks` or GitHub secret scanning; rotate anything found **Manual pass 2026-11-14 and `gitleaks` 8.30.1 on 2026-11-15, both clean; run it again on a rewritten history and before the flip** (see below) |
 
-**S9, what the manual pass covered (2026-11-14).** No scanner is installed here, and none was downloaded, so this
-was a pattern search over all 180 commits on every branch (6.7 MB of patch), **not** a substitute for `gitleaks` or
-GitHub's scanning. It found: no private-key block; no AWS, GitHub, npm, Slack, OpenAI-style or Google key; no JWT; no
+**S9, what the manual pass covered (2026-11-14).** No scanner was installed then, so this was a pattern search
+over all 180 commits on every branch (6.7 MB of patch). `gitleaks` was installed on 2026-11-15 (the official
+release binary, checksum verified) and found nothing in 152 commits. It found: no private-key block; no AWS, GitHub, npm, Slack, OpenAI-style or Google key; no JWT; no
 URL with embedded credentials; no `.env`, `.pem`, `.key`, `.p12`, `.pfx`, keystore, `.db`, `.sqlite`, `.log`, `.bak`, `.npmrc` or `.netrc` file ever committed; and no
 personal path (`/home/dave`, `C:\Users\…`) or personal address in any tracked file. Two literals matched a
 "secret-named variable" pattern and are benign: `DEMO_TOKEN` (the sync demo's fixed token, on purpose; see the
 replication guide's Security section) and a test string, `super-secret-value-…`, that checks a diagnostic does not
 echo a value. The lockfile's earlier `localhost:4873` URLs are a registry address, not a credential. **Still to do:**
-run `gitleaks detect` (or enable GitHub secret scanning once the repository is public) before the flip.
+run `gitleaks` again after any history rewrite, and enable GitHub secret scanning once the repository is public.
 
 ### 4.3 Nice to have
 
