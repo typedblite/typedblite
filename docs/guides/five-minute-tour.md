@@ -87,7 +87,7 @@ try {
   } else if (command === 'done' && title) {
     const report = db.execute(
       `given $t: string;
-       match $b isa book, has title $x; $x == $t;
+       match $b isa book, has title == $t;
        update $b has status "done";`,
       [{ t: text(title) }],
     );
@@ -129,7 +129,8 @@ Four things in it are worth knowing:
   `db.hasSchema` is true for it, so the schema is applied only the first time.
 - **Values go in as rows, not as text.** A pipeline that starts with `given` takes its values from the
   caller, so a title containing a quote or a semicolon cannot change the query. Always use this for
-  anything that comes from outside your program.
+  anything that comes from outside your program. `has title == $t` compares the book's title with the
+  value you passed.
 - **Refusals are thrown, with a code.** Adding a title twice breaks the `@key`, and `diagnosticOf` gives
   you `DiagnosticCode.constraintViolated` to branch on, with no string matching.
 - **A write that did nothing says so.** An update whose `match` finds no book does not throw, because
