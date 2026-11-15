@@ -8,6 +8,9 @@ they are listed here.
 ## [Unreleased]
 
 ### Changed
+- Vitest is now **5.1.0** (from 4.1), with `@vitest/coverage-v8` 5.1.0 beside it, as Vitest requires. No test or
+  config needed a change: none of Vitest 5's breaking changes (`vi.mock` inside a function, `sequential`, the removed
+  `vitest/*` entry points, unawaited `rejects`, browser mode) applies here. Every project runs the same test files.
 - Nx is now **24.0.6** (from 23.3.0), with `nx migrate`'s migrations: `nx.json` gains `affected.legacy: true`,
   so `nx affected` keeps selecting whole projects (nothing here uses it; the gate runs every project). The other
   two migrations found nothing to change. Nx release's configuration is unchanged in 24, and its dry runs behave as

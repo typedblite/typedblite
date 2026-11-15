@@ -29,13 +29,13 @@
     "@swc/core": "~1.15.5",
     "@swc/helpers": "~0.5.18",
     "@types/node": "^26.6.6",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.1.0",
     "nx": "24.0.6",
     "tsx": "^4.23.15",
     "typedoc": "^0.28.20",
     "typescript": "~6.0.3",
     "vite": "7.3.7",
-    "vitest": "^4.0.8"
+    "vitest": "^5.1.0"
   },
   "allowScripts": {
     "@swc/core@1.15.47": true,
