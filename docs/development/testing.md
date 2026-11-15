@@ -65,11 +65,11 @@ npm run gate -- --quick # the first six steps only
 `*.tsbuildinfo`, `coverage/`), **build**, **typecheck**, **package contents** (what `npm publish` would ship,
 `npm run check-packages`), **API** (the API reference builds cleanly and every type it mentions is exported,
 `npm run check-api`), **test** with `CI=true` (so the 80% coverage floor and the conformance report card
-both apply), the **WASM** suite, the engine's **browser** suite, the **playground** in Chromium, the **VS Code
+both apply), the **WASM** suite, the engine's **browser** suite, the **playground** in Chromium, the **website** (built, with every internal link followed), the **VS Code
 e2e**, and the **clean-room install** (`npm run clean-room`: the npm tarballs installed in an empty directory
 and used; see [Releasing](releasing.md#the-checks-a-package-must-pass)), and the **five-minute tour**
 (`npm run tour`: the guide's commands and files run as written, from the tarballs). It sets `NX_SKIP_NX_CACHE`, so no
-task is replayed from a cache. The last six are skipped by `--quick`. The browser suites need Playwright's
+task is replayed from a cache. The last seven are skipped by `--quick`. The browser suites need Playwright's
 Chromium, the e2e a display, and the clean room the npm registry, for the packages' dependencies.
 
 **GitHub Actions is off for now**, so this is the only check. It covers the one Node and OS you run it on;

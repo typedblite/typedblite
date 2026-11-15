@@ -1,0 +1,44 @@
+---
+import Default from '@astrojs/starlight/components/Head.astro';
+---
+
+<Default {...Astro.props}><slot /></Default>
+
+<script>
+  // A ```mermaid fence arrives as a code block. Swap each one for a diagram drawn in the reader's theme, and
+  // draw it again when the reader switches between light and dark. Mermaid is loaded only on a page with one.
+  const sources = new WeakMap<HTMLElement, string>();
+
+  function collect(): HTMLElement[] {
+    for (const pre of Array.from(document.querySelectorAll<HTMLElement>('pre[data-language="mermaid"]'))) {
+      const source = Array.from(pre.querySelectorAll('.ec-line')).map((line) => line.textContent ?? '').join('\n');
+      const diagram = document.createElement('pre');
+      diagram.className = 'mermaid';
+      diagram.textContent = source;
+      sources.set(diagram, source);
+      (pre.closest('.expressive-code') ?? pre).replaceWith(diagram);
+    }
+    return Array.from(document.querySelectorAll<HTMLElement>('pre.mermaid'));
+  }
+
+  async function draw() {
+    const diagrams = collect();
+    if (diagrams.length === 0) return;
+    const { default: mermaid } = await import('mermaid');
+    const dark = document.documentElement.dataset.theme !== 'light';
+    mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'strict' });
+    for (const diagram of diagrams) {
+      diagram.removeAttribute('data-processed');
+      diagram.textContent = sources.get(diagram) ?? '';
+    }
+    await mermaid.run({ nodes: diagrams });
+  }
+
+  // One draw at a time: Starlight sets data-theme while the first draw may still be running.
+  let queue: Promise<void> = Promise.resolve();
+  const schedule = () => {
+    queue = queue.then(draw).catch((error) => console.error('Could not draw a diagram', error));
+  };
+  schedule();
+  new MutationObserver(schedule).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+</script>

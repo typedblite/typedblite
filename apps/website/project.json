@@ -1,0 +1,39 @@
+{
+  "name": "website",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/website/src",
+  "projectType": "application",
+  "tags": ["scope:tooling", "type:app"],
+  "targets": {
+    "prepare": {
+      "executor": "nx:run-commands",
+      "options": { "command": "node scripts/sync-content.mjs", "cwd": "apps/website" }
+    },
+    "api": {
+      "executor": "nx:run-commands",
+      "options": { "command": "typedoc", "cwd": "." },
+      "outputs": ["{workspaceRoot}/dist/api"]
+    },
+    "build-site": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["prepare", "api", "playground:build"],
+      "options": { "commands": ["astro build", "node scripts/assemble.mjs"], "parallel": false, "cwd": "apps/website" },
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "check": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build-site"],
+      "options": { "command": "node scripts/check-site.mjs", "cwd": "apps/website" }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["prepare"],
+      "options": { "command": "astro dev", "cwd": "apps/website" }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build-site"],
+      "options": { "command": "astro preview", "cwd": "apps/website" }
+    }
+  }
+}

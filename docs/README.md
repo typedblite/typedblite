@@ -32,13 +32,14 @@ Choose your starting point by what you want to do.
 | [Testing](development/testing.md) | Every test suite, what it proves, and when to run it. Also the conformance report card, the oracles, and the clean-tree gate |
 | [Adding a TypeQLite construct](development/adding-a-construct.md) | The step-by-step path from grammar to engine to conformance |
 | [Releasing](development/releasing.md) | What is published, the checks a package must pass, the one-time setup, and how a release is made |
+| [The website](development/website.md) | How the `typedblite.dev` site is built from these documents, checked and published |
 | [Performance](development/performance.md) | What the engine costs on real schemas and data, the load test that measures it, what it found, and what is still open |
 | [AGENTS.md](../AGENTS.md) | The same rules, condensed, for AI agents and automated tools |
 
 ## Package references
 
-The API reference is generated from the source: `npm run docs:api` writes it to `dist/api`. It is not
-hosted yet.
+The API reference is generated from the source: `npm run docs:api` writes it to `dist/api`. The website
+hosts it at `/api/` (see [The website](development/website.md)); it is not live yet.
 
 | Package | README |
 | ------- | ------ |

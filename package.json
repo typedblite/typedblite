@@ -16,6 +16,7 @@
     "typecheck": "nx run-many -t typecheck",
     "gate": "node tools/gate.mjs",
     "playground": "nx run playground:serve",
+    "site": "nx run website:serve",
     "check-packages": "node tools/check-packages.mjs",
     "clean-room": "node tools/clean-room.mjs",
     "tour": "node tools/tour.mjs",

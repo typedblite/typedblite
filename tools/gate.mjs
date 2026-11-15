@@ -78,6 +78,9 @@ const steps = [
         { name: 'WASM SQLite suite', command: 'npm exec nx -- run typedblite-runtime:test-wasm' },
         { name: 'browser suite (Chromium, OPFS)', run: requireChromium, command: 'npm exec nx -- run typedblite-runtime:test-browser' },
         { name: 'playground in Chromium', run: requireChromium, command: 'npm exec nx -- run playground:test-browser' },
+        // The site: the guides, the API reference and the playground built into one folder, and every internal
+        // link in it followed (apps/website/scripts/check-site.mjs).
+        { name: 'website', command: 'npm exec nx -- run website:check' },
         { name: 'VS Code e2e', command: () => e2eCommand() },
         // The tarballs installed in an empty directory and used (tools/clean-room.mjs). It installs their
         // dependencies from the configured registry, so it needs the network the first time.
