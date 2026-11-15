@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 4 56 56" width="16" height="16" role="img" aria-label="TypeQLite file">
+  <title>TypeQLite file</title>
+  <g fill="#15171C" stroke="#15171C">
+    <path d="M32 38V14M32 38L11.2 50M32 38L52.8 50" stroke-width="6.5" stroke-linecap="round"/>
+    <circle cx="32" cy="14" r="8" stroke="none"/>
+    <circle cx="11.2" cy="50" r="8" stroke="none"/>
+    <circle cx="52.8" cy="50" r="8" stroke="none"/>
+  </g>
+  <rect x="24.5" y="30.5" width="15" height="15" rx="2.5" transform="rotate(45 32 38)" fill="#E8590C"/>
+</svg>

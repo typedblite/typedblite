@@ -24,10 +24,12 @@
     "sync-icon": {
       "executor": "nx:run-commands",
       "inputs": [
-        "{workspaceRoot}/docs/brand/typedblite-icon-512.png"
+        "{workspaceRoot}/docs/brand/typedblite-icon-512.png",
+        "{workspaceRoot}/docs/brand/typedblite-file-icon.svg",
+        "{workspaceRoot}/docs/brand/typedblite-file-icon-dark.svg"
       ],
       "options": {
-        "command": "node ../../tools/copy-file.mjs ../../docs/brand/typedblite-icon-512.png images/icon.png && node ../../tools/copy-file.mjs ../../docs/brand/typedblite-icon-512.png theme-bridge/images/icon.png",
+        "command": "node ../../tools/copy-file.mjs ../../docs/brand/typedblite-icon-512.png images/icon.png && node ../../tools/copy-file.mjs ../../docs/brand/typedblite-icon-512.png theme-bridge/images/icon.png && node ../../tools/copy-file.mjs ../../docs/brand/typedblite-file-icon.svg images/typeqlite-file.svg && node ../../tools/copy-file.mjs ../../docs/brand/typedblite-file-icon-dark.svg images/typeqlite-file-dark.svg",
         "cwd": "apps/vscode"
       },
       "outputs": [
