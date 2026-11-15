@@ -15,12 +15,12 @@ spike is gone.
 
 ## Before starting
 
-- [x] Read downstream-app's spike analysis (`docs/analysis/typedblite-wasm-engine-spike.md`) and its
+- [x] Read the downstream spike analysis (`docs/analysis/typedblite-wasm-engine-spike.md`) and its
       ADR-076. It recorded 494 of 515 runtime tests passing on WASM, the 21 failures being binding
       limits (a second connection on a real file, several processes on one file, WAL), and three
       binding mismatches (bare named parameters, `errcode`, and `changes`). The binding already
       handles all three
-- [x] The only importer of the spike outside this repository is downstream-app's never-merged demo
+- [x] The only importer of the spike outside this repository is a downstream application's never-merged demo
       branch (`demo/offline-sync`), which this feature replaces
 
 ## Build

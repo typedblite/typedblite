@@ -80,7 +80,7 @@ this scenario, `surname` and its subtype `old-surname` together leave a person w
 values, so TypeDB refuses the commit. TypeDBLite does not enforce the default, so the commit goes
 through.
 
-**This is a product decision that is still open, not an oversight.** downstream-app depends on the current
+**This is a product decision that is still open, not an oversight.** A downstream application depends on the current
 behaviour:
 
 | Store | Ownership declared without `@card` | Owners holding more than one value |
@@ -92,11 +92,11 @@ behaviour:
 | defects | `defect owns defect-red-test-path` | 2 |
 | defects | `defect owns defect-changed-recording` | 1 |
 
-These counts come from a read-only scan of downstream-app's `.mvp` stores on 2026-11-12. If TypeDBLite
+These counts come from a read-only scan of that application's stores on 2026-11-12. If TypeDBLite
 enforced TypeDB's default, those stores would refuse writes to things that already hold several values.
 There are two ways forward:
 
-1. **Conform:** add `@card(0..)` to those ownerships in the downstream-app schemas, then enforce the
+1. **Conform:** add `@card(0..)` to those ownerships in that application's schemas, then enforce the
    default. The scenario then passes.
 2. **Deviate:** record in an ADR that TypeDBLite does not enforce the default `@card(0..1)`, and declare
    the scenario as a deviation owned by it.
@@ -212,14 +212,14 @@ Where a step's meaning was unclear, the harness copies TypeDB's own step definit
 ## Recent behaviour changes
 
 The push from 1,676 to 1,742 (PR #6) changed behaviour that callers can notice. Projects that load the
-built runtime, such as downstream-app, see these changes after their next rebuild:
+built runtime see these changes after their next rebuild:
 
 - **Deleting a thing keeps relations that still have other players.** Before, every relation the thing
   played in was deleted. Now a relation is deleted only once it has no player left, as on TypeDB.
 - **A relation emptied inside a transaction is removed at commit**, so the transaction's own answers can
   still name it.
 - **`plays` is enforced once the store records roles**, even after the last `plays` is undefined. The
-  check is skipped only for a store that records no roles at all. Every real downstream-app store that
+  check is skipped only for a store that records no roles at all. Every real store we have seen that
   has roles also records its `plays`.
 - **Writes are type-checked as TypeDB checks them:**
   - `delete has $e of $p` requires every type the match lets `$p` be to own every type `$e` can be.
@@ -247,7 +247,7 @@ built runtime, such as downstream-app, see these changes after their next rebuil
 
 ## Caveats
 
-- **The built `out/` folders lag behind the source.** downstream-app loads `libs/*/out` through symlinks,
+- **The built `out/` folders lag behind the source.** A downstream application loads `libs/*/out` through symlinks,
   so this checkout's runtime and language packages were not rebuilt during this work. Whatever its
   `out/` holds when it starts is the engine it runs. Nine runtime tests start child processes that load
   `out/`. They pass against source with `TSX_TSCONFIG_PATH=tsconfig.base.json`, and under `nx test`,

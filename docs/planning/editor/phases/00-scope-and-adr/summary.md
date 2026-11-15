@@ -22,7 +22,7 @@ No code, as planned.
 - [ADR-008](../../../../architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md),
   accepted.
 - The [Multi-Phase Lifecycle Standard](../../../../standards/governance/multi-phase-lifecycle-standard.md),
-  adapted from downstream-app and adopted here. This repository had no process standard, and the
+  adapted from the parent project and adopted here. This repository had no process standard, and the
   feature document was restating one inline.
 - The [feature document](../../editor.feature.md), updated to match the ADR.
 - ADR-007 and ADR-008 added to the project overview's ADR table. ADR-007 had been missing since it

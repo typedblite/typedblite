@@ -1,6 +1,6 @@
 /**
- * Several processes on one store file — the shape downstream-app runs in (two `mvp --mcp` processes
- * share `.mvp/`). Writers run the workflow engine's `saveStep()` on disjoint partitions of the steps,
+ * Several processes on one store file — the shape a production application runs in (two of its processes
+ * share one store directory). Writers run the workflow engine's `saveStep()` on disjoint partitions of the steps,
  * so every failure is the engine's and none is a logical conflict; readers run `find()`-style reads.
  *
  * The parent spawns each worker as `node --import tsx concurrency.ts worker …`.

@@ -1,6 +1,6 @@
 /**
  * Relations at scale: the Skills schema (`test-fixtures/schemas/skills.schema.typeqlite`) generated at
- * multiples of downstream-app's real catalog (217 skill versions, 1,482 steps). Each skill has 7 steps
+ * multiples of a production application's real catalog (217 skill versions, 1,482 steps). Each skill has 7 steps
  * (`skill-composition`), a `step-dependency` chain between consecutive steps, and one step in ten
  * nests the previous skill (`sub-workflow`).
  *

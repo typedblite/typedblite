@@ -1,6 +1,6 @@
 // TypeQLite terminals.
 //
-// Deliberately NOT reusing `downstream-script`'s terminals.langium: that file is built around
+// Deliberately NOT reusing the parent monorepo's scripting-language terminals.langium: that file is built around
 // PascalCase/HYPHENATED_NAME identifiers for a modelling language written by humans in prose
 // style. TypeQLite identifiers are lowercase-hyphenated (`skill-id`, `membership-key`), variables
 // are `$`-prefixed, and comments are `#` — three incompatible lexical decisions.

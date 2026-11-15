@@ -23,9 +23,9 @@ extends: [adr-002]
 ## Context
 
 `@typedblite/language` holds a grammar, a validator, a scope provider, a formatter and semantic
-tokens, and none of them reaches an editor from this repository. downstream-app ships an extension
-that stands up these services, but it also bundles a database client for downstream-app's own store
-app. That store is why the extension stayed in downstream-app when the engine moved here.
+tokens, and none of them reaches an editor from this repository. A downstream application ships an extension
+that stands up these services, but it also bundles a database client for that application's own store
+app. That store is why the extension stayed in that application's repository when the engine moved here.
 
 Measured on 2026-11-12, before deciding:
 
@@ -43,7 +43,7 @@ Measured on 2026-11-12, before deciding:
 **D1. The extension lives at `apps/vscode/`.** Its Nx project is `typeqlite-vscode`. Its npm
 package is private and named `typeqlite`, because VS Code builds the id from `publisher.name`. Its
 extension id is `typedblite.typeqlite`, with the display name *TypeQLite*.
-That id cannot be mistaken for downstream-app's `downstream-app.typeqlite-vscode`. It depends on
+That id cannot be mistaken for the downstream extension's id. It depends on
 `@typedblite/language` only, never on the runtime: `vscode → language`.
 
 **D2. 🔴 Nothing the editor knows reaches the runtime.** Every editor feature is built from services
@@ -114,7 +114,7 @@ rendered page. CI, when it exists, needs a virtual display (`xvfb`).
   `@typedblite/language`.
 - D2 makes "does this editor feature change the runtime?" a question with a mechanical answer: is it
   registered in `ValidationRegistry`?
-- downstream-app's extension can depend on this one through `extensionDependencies` and drop its own
+- The downstream extension can depend on this one through `extensionDependencies` and drop its own
   language server. That is its own work, not this ADR's.
 
 ### Negative / Constraints

@@ -4,7 +4,7 @@
  * 🔴 `entity_fts.entity_id` is UNINDEXED, so the old `DELETE FROM entity_fts WHERE entity_id = ?`
  * scanned the whole index on every write — half an insert's CPU, growing with the store (19 ms per
  * write at 150,000 entities; docs/development/performance.md). These tests hold the replacement
- * to the old answers, including on a store an older engine wrote to: downstream-app loads this
+ * to the old answers, including on a store an older engine wrote to: a downstream application loads this
  * checkout's build and restarts its processes one at a time, so a store sees both.
  */
 import { afterEach, describe, it } from 'vitest';
