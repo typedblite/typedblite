@@ -123,8 +123,10 @@ Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the
 2. **Phase 3, docs** (partly done): the Known limitations page, the README restructure and the **API reference**
    (TypeDoc, `npm run docs:api`, checked by `npm run check-api`; not hosted yet) are in. Before it, the runtime's
    API was reviewed: it now names every export, pinned by a test, and the internals it leaked are gone or marked
-   `@internal`. Still to write: a five-minute tour (needs the published packages), "TypeDB vs TypeDBLite" (TypeDB
-   Ltd should read it) and "Why not X", the demo GIF, and badges.
+   `@internal`. **"Why not X" is drafted** (`docs/guides/why-not-x.md`, the `docs/why-not-x` pull
+   request), for the maintainer's review of its tone and its TypeDB section, and not yet linked from the README. Still
+   to write: a five-minute tour (needs the published packages), "TypeDB vs TypeDBLite" (TypeDB Ltd should read it), the
+   demo GIF, and badges.
 3. **PL-6's last item is written** (the `feat/verify-pushed-revisions` pull request): a store checks a peer's revision
    against its content, with tests and a **Proposed** ADR-003 amendment. Accepting the amendment is the maintainer's
    call.
@@ -494,7 +496,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       only partly enforced, the 14 non-passing scenarios, and the performance "Still open" list.
 - [ ] "TypeDB vs TypeDBLite" page: what's the same, what differs, when to use which. Written to be
       fair to TypeDB; ask TypeDB Ltd to read it (Phase 0 contact).
-- [ ] "Why not X?" page (4.3).
+- [ ] "Why not X?" page (4.3). *Drafted 2026-11-15, `docs/guides/why-not-x.md`, for review; not linked from the README yet.*
 - [ ] API reference generated from TSDoc (TypeDoc) and published to GitHub Pages; link from the README.
       *Generated and checked (2026-11-15): `npm run docs:api`, `npm run check-api` in the gate. Publishing it waits
       with the playground's hosting.*
