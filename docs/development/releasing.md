@@ -71,8 +71,7 @@ Only the maintainer can do these, once, before the first release:
    trusted publisher. Create a granular access token limited to the four packages (and the org, to create
    them), with a short expiry. Save it as the repository secret `NPM_TOKEN`.
 5. **After the first publish, switch to trusted publishing.** On npmjs.com, for each package: Settings →
-   Trusted publishing → GitHub Actions, repository `dave-jackson-dev/typedblite` (or the `typedblite` org's,
-   if the repository moves), workflow `release.yml`, environment `npm`. Then delete the `NPM_TOKEN` secret,
+   Trusted publishing → GitHub Actions, repository `typedblite/typedblite`, workflow `release.yml`, environment `npm`. Then delete the `NPM_TOKEN` secret,
    revoke the token, and set each package to require 2FA and disallow tokens.
 
 ## Making a release

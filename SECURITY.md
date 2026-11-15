@@ -5,7 +5,7 @@
 **Please do not open a public issue for a security problem.** Report it privately, in either of these ways:
 
 1. **GitHub private vulnerability reporting** (preferred): use
-   [Report a vulnerability](https://github.com/dave-jackson-dev/typedblite/security/advisories/new)
+   [Report a vulnerability](https://github.com/typedblite/typedblite/security/advisories/new)
    on the repository's Security tab.
 2. **Email** `security@typedblite.dev`.
 

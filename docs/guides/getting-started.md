@@ -17,7 +17,7 @@ You do not need a native toolchain, Docker, or a TypeDB server.
 ## Build from source
 
 ```bash
-git clone https://github.com/dave-jackson-dev/typedblite.git
+git clone https://github.com/typedblite/typedblite.git
 cd typedblite
 npm install
 npm run build

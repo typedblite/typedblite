@@ -39,7 +39,7 @@ Windows all work: the gate has passed on Linux (Node 22.16, 22 and 24), Windows 
 > behaviour is worth trying on another if you can. The workflows are written and will be turned back on.
 
 ```bash
-git clone https://github.com/dave-jackson-dev/typedblite.git
+git clone https://github.com/typedblite/typedblite.git
 cd typedblite
 npm install
 npm run build

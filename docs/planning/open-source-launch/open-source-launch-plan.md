@@ -116,13 +116,14 @@ something is public or published.
    - Start the Open VSX namespace `typedblite`: it needs the Eclipse publisher agreement and a verification request
      ([Releasing](../../development/releasing.md#the-vs-code-extensions)).
 2. **Before anything is public or published.**
-   - Decide whether to rewrite git history to drop the private names (see the trial in "Known and left alone"), and
-     run `gitleaks` over the result (S9; it is installed, and was clean on the current history). A rewrite changes
-     every commit hash, so it comes before any tag, the repository move and going public. If the repository is to
-     move into the `typedblite` org, the fresh-repository route does both in one step.
-   - Move the repository to the `typedblite` GitHub org, if it is to move: manifests, npm trusted publishing and
-     provenance all record the repository URL. It is one line in `tools/publishable.mjs` plus the manifests, held by
-     `npm run check-packages`, and the URLs in the READMEs and the extension manifests.
+   - **Decided 2026-11-15: a fresh repository, `typedblite/typedblite`, created private and pushed with rewritten
+     history; it is made public at launch.** The history rewrite drops the private names (see the trial in "Known
+     and left alone") and `gitleaks` runs over the result (S9; it was clean on the current history). A rewrite
+     changes every commit hash, so it comes before any tag and going public. The old repository stays private as
+     the archive, and PR and issue history stay there.
+   - The repository URL moved to `https://github.com/typedblite/typedblite` in `tools/publishable.mjs` and the
+     manifests (held by `npm run check-packages`), the READMEs and the extension manifests. npm trusted publishing
+     and provenance record that URL.
    - Fix GitHub billing and re-enable the workflows (the notice at the top). It unblocks CI on three platforms,
      provenance, both release workflows and hosting.
 3. **Accounts** ([Releasing](../../development/releasing.md#one-time-setup)): claim the unscoped `typedblite` and

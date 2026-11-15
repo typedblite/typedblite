@@ -13,13 +13,13 @@
     "cli",
     "repl"
   ],
-  "homepage": "https://github.com/dave-jackson-dev/typedblite/tree/main/apps/cli#readme",
+  "homepage": "https://github.com/typedblite/typedblite/tree/main/apps/cli#readme",
   "bugs": {
-    "url": "https://github.com/dave-jackson-dev/typedblite/issues"
+    "url": "https://github.com/typedblite/typedblite/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dave-jackson-dev/typedblite.git",
+    "url": "git+https://github.com/typedblite/typedblite.git",
     "directory": "apps/cli"
   },
   "type": "module",

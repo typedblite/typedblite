@@ -1,6 +1,6 @@
 # TypeQLite for VS Code
 
-Language support for **TypeQLite**, the TypeQL 3.x dialect that [TypeDBLite](https://github.com/dave-jackson-dev/typedblite)
+Language support for **TypeQLite**, the TypeQL 3.x dialect that [TypeDBLite](https://github.com/typedblite/typedblite)
 speaks. The editor runs the same grammar and the same rules as the engine, so what it reports is what
 the engine would say.
 

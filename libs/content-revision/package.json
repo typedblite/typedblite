@@ -11,13 +11,13 @@
     "change-log",
     "replication"
   ],
-  "homepage": "https://github.com/dave-jackson-dev/typedblite/tree/main/libs/content-revision#readme",
+  "homepage": "https://github.com/typedblite/typedblite/tree/main/libs/content-revision#readme",
   "bugs": {
-    "url": "https://github.com/dave-jackson-dev/typedblite/issues"
+    "url": "https://github.com/typedblite/typedblite/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dave-jackson-dev/typedblite.git",
+    "url": "git+https://github.com/typedblite/typedblite.git",
     "directory": "libs/content-revision"
   },
   "type": "module",
