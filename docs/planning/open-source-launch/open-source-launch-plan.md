@@ -25,7 +25,7 @@ happens when the gates are green. A suggested calendar is at the end.
 
 ## Where to resume
 
-*As of 2026-11-14, `main` at `82deabb`.* Read this first; everything it points to is below.
+*As of 2026-11-15, `main` at `599e606`.* Read this first; everything it points to is below.
 
 🔴 **GitHub Actions is OFF (2026-11-14), so nothing on GitHub checks a change. Run `npm run gate` locally.**
 GitHub refused to start any job on `main`'s run after #40 merged: *"The job was not started because recent account
@@ -46,50 +46,80 @@ To go back: fix billing, `gh workflow enable` the three workflows, restore the D
 `main` before trusting it. The decisions that wait on CI results (making `coverage` blocking, adding
 `sync-demo:test-browser` to CI) wait on that too.
 
-**Merged to `main`** (PR #22, PR #33): CI (Ubuntu on Node 24, 22 and the 22.16.0 minimum; macOS; Windows; conformance
-report; coverage; WASM and browser; VS Code e2e; PR-title check; label sync), the community files (`SECURITY.md`,
-`CHANGELOG.md`, `CODEOWNERS`, Dependabot, issue forms, PR template), `.gitattributes`, and the fixes CI found: a
-lockfile pointing at a local registry, `langium-cli` failing on Node 24.22+, a wrong Node minimum (now 22.16), a
-Windows-only build command, a fixed-wait test, and a Langium race that dropped a document's diagnostics (see 1.1).
+**Merged to `main`:**
+- **Before 2026-11-14** (#22, #33): CI, the community files (`SECURITY.md`, `CHANGELOG.md`, `CODEOWNERS`, Dependabot,
+  issue forms, PR template), `.gitattributes`, and the fixes CI found (a lockfile pointing at a local registry,
+  `langium-cli` on Node 24.22+, the Node 22.16 minimum, a Windows build command, a fixed-wait test, and a Langium
+  race that dropped a document's diagnostics).
+- **2026-11-14 to 15** (#18 to #21, #37 to #48): the logo and the extension's icon (#18, #20); the Markdown
+  preview's highlighting in the theme's colours (#19) and, in remote windows, the Theme Bridge (#37); TypeQLite
+  keywords scoped by kind, and fences highlighted in the Markdown editor (#21); the CLI running on Windows and
+  through its npm `bin` link (#38); the runtime's crash and index tests fixed on Windows (#39); every project above
+  the 80% coverage floor, decision 9 (#40); **`npm run gate`** (#41); Dependabot paused (#42); the hub security
+  review and a manual secret scan (#43); the Known limitations page (#44); the hub hardened (#45); the README
+  restructured (#46); and **the browser playground** (#47), now **Monaco with the real language server over LSP**
+  (#48), served by `npm run playground`.
 
-**Verified on GitHub** (push run on `main`, `82deabb`): all three Ubuntu gates, macOS, VS Code e2e, WASM and browser
-(3 tests in a real Chromium) and the conformance report pass; the label sync corrected the three truncated labels;
-the PR-title check works. **Not** verified: that the Node 22 gate is stable. It failed once on `main` from the race
-and passed after the fix, but one clean run proves little; the evidence for the fix is the before/after replays and
-the regression test (`libs/language/test/diagnostics-published.spec.ts`).
+**State of the checks (from the last runs on GitHub, before Actions went off):** every gate was green, including
+**Windows on two complete runs** and `coverage`. Windows is blocking in `ci.yml` (`experimental: false`); macOS is not.
+Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the playground (#47, #48) or the README work (#46). Their evidence is `npm run gate`.
 
 **Merging:** merge commits only, never squash or rebase, so each commit keeps its own history (the maintainer's rule,
 2026-11-14). PRs #22 and #33 were squashed before that rule; their original commits are still on GitHub at
 `refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head` (`a7557e1`), and are not on any branch.
 
-**Known and left alone:** coverage is under the 80% floor in four projects (`CI=true` switches the floor on; the
-blocking gate runs with `CI` empty); 11 tests fail on Windows (1.2), so Windows is experimental.
+**Known and left alone:**
+- **Ten Dependabot PRs (#23 to #32)** are open and unchecked: they were opened before Dependabot was paused, and
+  nothing has run on them. Close them, or update and merge them one at a time with `npm run gate`.
+- **`apps/playground` is built and not hosted.** `npm run playground` serves it locally.
+- **`gitleaks` has not been run.** The secret scan was a manual pattern search (S9).
+- **A pushed revision is trusted as given** (PL-6): a peer can forge one and win a conflict.
+- **The coverage job is not blocking**, and `sync-demo:test-browser` (which runs code excluded from coverage) is not
+  in CI. Both wait on Actions.
 
 **Only the maintainer can do these:**
 
-1. **Send the written confirmation to TypeDB Ltd** (B1). The draft is deliberately not in this repository. Get a
-   one-line written reply before any announcement.
-2. **Branch protection on `main`.** Require `gate (ubuntu-latest, node 24)`, `gate (ubuntu-latest, node 22)`,
-   `gate (ubuntu-latest, node 22.16.0)`, `conformance report` and `conventional-commit`. Then `vscode e2e`,
-   `wasm and browser` and `gate (macos-latest, node 24)`. Allow merge commits only (no squash, no rebase), so each
-   commit keeps its own history.
-3. **Repository settings:** Discussions, private vulnerability reporting, secret scanning with push protection,
-   Dependabot alerts.
-4. **`CODE_OF_CONDUCT.md`:** Insights, Community Standards, Add (inserts the official Contributor Covenant text).
-5. **Decisions:** Windows (fix the 11 tests, or document as unsupported for launch), the coverage policy (decision 9),
-   and whether `downstream-app` stays named in the docs (S3, decision 5).
+1. **Fix GitHub billing**, then re-enable the workflows (see the notice at the top).
+2. **Send the written confirmation to TypeDB Ltd** (B1). The draft is deliberately not in this repository. Get a
+   one-line written reply before any announcement, and settle [PL-1](#parking-lot).
+3. **Branch protection and repository settings** (they return 403 until the repository is public or the plan is
+   upgraded): require the checks listed in 1.2 (Windows included), Discussions, private vulnerability reporting,
+   secret scanning with push protection, Dependabot alerts.
+4. **`CODE_OF_CONDUCT.md`:** Insights, Community Standards, Add (inserts the official Contributor Covenant text, which
+   the tooling here cannot fetch).
+5. **Decisions still open:** the contribution model, DCO or CLA (4); whether `downstream-app` stays named in the docs
+   (5, S3); the launch window (7); capacity: who answers issues, and who is the second reviewer (8). Decided: Windows
+   (fixed and blocking), the coverage policy (decision 9: raise the tests, keep the floor), the Node minimum (22.16).
+6. **Host the playground** at `typedblite.dev/playground`: GitHub Pages needs Actions or a manual publish of
+   `apps/playground/.build` (build with `node build.mjs --minify`), plus the domain's DNS.
+7. **Run `gitleaks detect`** over the history before the repository goes public.
 
-**Next work, in order:** Phase 2 packaging (claim the unscoped `typedblite` and
-`typeqlite` npm names; take `private` off the CLI; publish `0.1.0-rc.1` under `next` with provenance; the clean-room
-install test on three platforms); Phase 3 docs (the playground is built, and awaits hosting). Parked, and not blocking the flip to public: PL-2 to PL-5 in the
-[parking lot](#parking-lot) (the Langium report, keeping the old PR commits, a commit-message check, watching CI on `main`).
+**Next work, in order:**
+1. **Phase 2, packaging** (not started): claim the unscoped `typedblite` and `typeqlite` npm names; take `private` off
+   the packages and the CLI; a compatibility policy and `0.1.0`; release automation (needs Actions); a clean-room
+   install test on three platforms; `0.1.0-rc.1` under `next` with provenance.
+2. **Phase 3, docs** (partly done): the Known limitations page and the README restructure are in. Still to write: a
+   five-minute tour (needs the published packages), "TypeDB vs TypeDBLite" (TypeDB Ltd should read it) and "Why not
+   X", the TypeDoc API reference, the demo GIF, and badges.
+3. **PL-6, the one item left:** check a pushed revision against its content. It changes what a store accepts from
+   its peers, so it needs its own tests and an ADR-003 amendment.
+4. **When Actions is back:** read the first run on `main`, then make `coverage` blocking and add
+   `sync-demo:test-browser` to CI.
+
+Parked, and not blocking the flip to public: PL-2 to PL-5 in the [parking lot](#parking-lot).
 
 **Before the repository goes public:** the repository is **private** (maintainer, 2026-11-14), and this plan names the
 TypeDB Ltd conversation. That is parked as [PL-1](#parking-lot), and the "flip the repo to public" step in Phase 4 is
 blocked on it.
 
-**Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run gate`.
+**Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run gate` (about 75
+seconds; it needs Playwright's Chromium, `npx playwright-core install chromium`, and a display, or `-- --quick`).
 Useful to know:
+- **`npm install` of a new package can write local-registry URLs into `package-lock.json`** if your npm is pointed
+  at a local proxy (`localhost:4873`). Rewrite them to `https://registry.npmjs.org/` after checking each integrity
+  hash against `npm view <pkg> dist.integrity --registry https://registry.npmjs.org/`, and check
+  `grep -c localhost package-lock.json` prints 0.
+- **In TypeQL 3, a `match` after an `insert` is the next stage of the same pipeline.** Separate statements with `end;`.
 - `CI=true` turns on the coverage floor. Run with `CI=` to match the blocking gate.
 - A workflow run shows "success" even when an experimental job (Windows, coverage, WASM and browser, e2e, macOS)
   fails. Read the jobs, not the run.
