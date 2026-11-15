@@ -94,8 +94,8 @@ export function conflicts(leaves: readonly Leaf[]): readonly Leaf[] {
  * order, applied to whatever a caller's own row shape is, rather than each caller mapping to
  * `Leaf` and finding its own row back by hand.
  *
- * 🔴 **Promoted here after two bounded contexts wrote the identical six lines** (`DocumentVersion`'s
- * `latestOf`, `SkillVersion`'s `latestSkillVersionOf` — code review, 2026-09-13, reuse angle): both
+ * 🔴 **Promoted here after two bounded contexts of a downstream application wrote the identical six
+ * lines** (code review, 2026-09-13, reuse angle): both
  * were already fully generic over `{ revision: Revision }`, so the second one was a copy with a new
  * name, not a genuinely different operation. Neither domain package depends on the other; both may
  * depend on this one.

@@ -3,9 +3,9 @@
  * conflict-model.md (in the monorepo this engine came from)
  * makes, tested rather than asserted in prose.
  *
- * 🔴 **These moved here with the code in a downstream feature Phase 07.** They used to live in
+ * 🔴 **These moved here with the code.** They used to live in
  * `typedblite-runtime`, which is `type:infrastructure` and therefore off-limits to a `type:domain`
- * library — and `DocumentVersion` needs this generator. The `entityId` cases stayed behind, because
+ * library — and a downstream domain library needs this generator. The `entityId` cases stayed behind, because
  * a `local:` id is a fact about TypeDBLite's storage rather than about content.
  *
  * ⚠️ **Semantics unchanged, deliberately.** ADR-003 D3's revision behaviour was proven against real

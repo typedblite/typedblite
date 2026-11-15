@@ -2,7 +2,7 @@
  * Replication **identity** — which entity two nodes agree they are describing.
  *
  * 🔴 **This is the half of the old `canonical.ts` that did not move.** The canonical *encoding* and
- * the revision generator derived from it are content addressing, and a downstream feature needs them
+ * the revision generator derived from it are content addressing, and a downstream application needs them
  * from a `type:domain` library — which may not depend on `type:infrastructure`, so they now live in
  * [`@typedblite/content-revision`](../../content-revision/src/lib/canonical.ts). What stays here
  * is the part that is genuinely about *this engine's* replication: a `local:` id is a TypeDBLite

@@ -700,9 +700,9 @@ RolePlayer:
 // terminal order in `terminals.langium` — all begin with digits, and the alternation is resolved by
 // the token the lexer already chose.
 //
-// **Added because a downstream feature needed them, which is this grammar's rule for every construct.**
+// **Added because a real caller needed them, which is this grammar's rule for every construct.**
 // `ValueType` has admitted `boolean` and `datetime` since day one, but nothing could *write* one:
-// `workbench.schema.typeqlite` declares two boolean and two datetime attributes, and real call sites
+// A downstream application's schema declares two boolean and two datetime attributes, and real call sites
 // emit `has is-latest true` and `has created-at 2026-09-03T10:00:00`. Neither parsed
 // (Amendment 1(d) of ADR-038, in the monorepo this engine came from).
 //

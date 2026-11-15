@@ -11,7 +11,7 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
  * boolean would have been stored as an empty string and every later match on it would simply never
  * fire, with no error anywhere. These tests are the roundtrip that proves it does not.
  *
- * The schema below is a downstream feature's, reduced to the attributes that made this necessary:
+ * The schema below is a downstream application's, reduced to the attributes that made this necessary:
  * `is-latest` (boolean) and `created-at` (datetime), which no schema in this repository had before.
  */
 const SCHEMA = `

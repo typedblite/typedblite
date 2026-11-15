@@ -17,7 +17,7 @@ import type { Literal } from '../src/generated/ast.js';
  * Boolean and datetime literals — ADR-038 Amendment 1(d).
  *
  * 🔴 `ValueType` has admitted `boolean` and `datetime` since day one, and nothing could ever *write*
- * one: `Literal` was `StringLiteral | IntLiteral`. a downstream feature's schema declares two of each,
+ * one: `Literal` was `StringLiteral | IntLiteral`. A downstream application's schema declares two of each,
  * and its real call sites emit `has is-latest true` and `has created-at 2026-09-03T10:00:00`.
  */
 

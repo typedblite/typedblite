@@ -2,7 +2,7 @@
  * Replication identity — the half of the old `revision.test.ts` that did not move.
  *
  * 🔴 **The canonical encoding and the revision generator moved to
- * `@typedblite/content-revision`** in a downstream feature Phase 07, and their cases went with them.
+ * `@typedblite/content-revision`**, and their cases went with them.
  * What is left is `entityId`, which is about *this engine's* storage: a keyless thing has no
  * cross-node identity and is marked `local:` so replication refuses it rather than inventing an
  * equivalence.
