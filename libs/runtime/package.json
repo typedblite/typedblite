@@ -64,7 +64,7 @@
   },
   "devDependencies": {
     "@sqlite.org/sqlite-wasm": "3.54.1-build1",
-    "playwright-core": "1.62.1"
+    "playwright-core": "1.65.0"
   },
   "peerDependencies": {
     "@sqlite.org/sqlite-wasm": ">=3.54.1-build1 <3.54.2"
