@@ -54,6 +54,12 @@ they are listed here.
   the build and every test passed there on two complete runs.
 
 ### Fixed
+- A value read as an attribute is refused, as TypeDB refuses it. `given $t: string; match $b isa book, has title $t;`
+  matched nothing and said so only in an `empty-match` fact; it now throws `typedblite.mixed-pattern` ("The variable
+  't' cannot be declared as both a 'Value' and as a 'Attribute'"), the words TypeDB uses and TypeDBLite already used
+  for a `let` in the same match. A `reduce` result used that way is refused now too. `has title == $t` is the form
+  that compares a value, and works on both. A `given` of an attribute type (`given $t: title`) is still an attribute and still joins.
+  Found by running the five-minute tour on a live TypeDB 3.10.4. **A query that relied on the empty answer now fails.**
 - An empty answer that joins through a relation no longer reads every relation of the type to explain itself.
   A project's sub-projects took 0.8 ms when it had one and 21 ms (3,000 projects) when it had none, because the
   explanation, and `relationHolds`, read all rows to learn whether there were any. They now stop at the first.

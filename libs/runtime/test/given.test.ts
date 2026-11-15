@@ -41,6 +41,31 @@ describe('given rows', () => {
     assert.equal(engine.query('given $n: string; match $p isa person, has name == $n;', [{ n: str('Ann') }]).rows.length, 1);
   });
 
+  it('a given value of a value type is not an attribute: `has name $n` is refused, as TypeDB refuses it', () => {
+    // It used to match nothing, and said so only in an `empty-match` fact.
+    const message = /The variable 'n' cannot be declared as both a 'Value' and as a 'Attribute'/;
+    const attempt = (): void => void engine.query('given $n: string; match $p isa person, has name $n;', [{ n: str('Ann') }]);
+    assert.equal(refusal(attempt).code, DiagnosticCode.mixedPattern);
+    assert.match(refusal(attempt).message, message);
+    // A write's match too, and a `let` or a `reduce` result read the same way.
+    assert.match(refusal(() => engine.execute('given $n: string; match $p isa person, has name $n; update $p has name "Bea";', [{ n: str('Ann') }])).message, message);
+    assert.match(refusal(() => engine.query('match let $n = "Ann"; $p isa person, has name $n;')).message, message);
+    assert.match(refusal(() => engine.query('match $q isa person; reduce $n = count; match $p isa person, has name $n;')).message, message);
+    // The refusal does not wait for a row: an empty store refuses it too.
+    const empty = new TypeDBLiteInterpreter(':memory:');
+    empty.define(SCHEMA);
+    assert.match(refusal(() => empty.query('given $n: string; match $p isa person, has name $n;', [{ n: str('Ann') }])).message, message);
+    empty.close();
+    // The forms that say the same thing, and work.
+    assert.equal(engine.query('given $n: string; match $p isa person, has name == $n;', [{ n: str('Ann') }]).rows.length, 1);
+    assert.equal(engine.query('given $n: string; match $p isa person, has name $x; $x == $n;', [{ n: str('Ann') }]).rows.length, 1);
+  });
+
+  it('what the refusal must not catch: a given attribute, and an attribute an earlier stage bound', () => {
+    assert.equal(engine.query('given $n: name; match $p isa person, has name $n;', [{ n: str('Ann') }]).rows.length, 1);
+    assert.equal(engine.query('match $p isa person, has name $n; select $n; match $q isa person, has name $n;').rows.length, 1);
+  });
+
   it('an integer widens to a double; a string does not decode as an integer — given L184', () => {
     assert.deepEqual(engine.query('given $x: double; match let $y = 2 * $x;', [{ x: int(3) }]).rows.map((r) => r['y'].asString()), ['6.0']);
     assert.match(refusal(() => engine.query('given $x: integer; match let $y = 2 * $x;', [{ x: str('abc') }])).message, /The provided value '"abc"' has type 'string' and could not be decoded as the value type 'integer'/);
