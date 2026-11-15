@@ -77,6 +77,19 @@ describe('the manifest agrees with langium-config.json', () => {
     expect(Math.min(icon.readUInt32BE(16), icon.readUInt32BE(20))).toBeGreaterThanOrEqual(128);
   });
 
+  it("gives .typeqlite and .tql files the logo's mark as their file icon, in a light and a dark form", () => {
+    // `contributes.languages[].icon` is the only way an extension names a file icon. VS Code uses it when the
+    // file icon theme has no icon of its own for the language, so a theme that does have one wins. `sync-icon`
+    // copies the SVGs from `docs/brand/`.
+    const language = manifest.contributes.languages.find((l: { id: string }) => l.id === 'typeqlite');
+    expect(language.extensions).toEqual(expect.arrayContaining(['.typeqlite', '.tql']));
+    for (const [variant, source] of [['light', 'typedblite-file-icon.svg'], ['dark', 'typedblite-file-icon-dark.svg']] as const) {
+      const icon = readFileSync(resolve(APP, language.icon[variant]), 'utf8');
+      expect(icon, variant).toBe(readFileSync(resolve(APP, '../../docs/brand', source), 'utf8'));
+      expect(icon.startsWith('<svg'), variant).toBe(true);
+    }
+  });
+
   it('bundles its dependencies rather than shipping node_modules', () => {
     expect(manifest.vsce).toEqual({ dependencies: false });
     expect(manifest.main).toBe('./out/extension.cjs');

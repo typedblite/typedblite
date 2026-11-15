@@ -13,6 +13,8 @@ The first release. Nothing has been published to a marketplace yet.
   and labels in queries resolve to their definitions.
 - Go to definition, find references, an outline, workspace symbols, folding and hover.
 - Completion, rename, and quick fixes.
+- The TypeDBLite mark as the icon of `.typeqlite` and `.tql` files, in light and dark forms. VS Code uses it
+  when your file icon theme has no icon of its own for TypeQLite.
 - Formatting, and semantic highlighting that colours a label by what it resolves to and keywords by kind.
 - TypeQLite code blocks coloured in your theme, in the Markdown preview and the Markdown editor. In a remote
   window, the preview needs the optional TypeQLite Theme Bridge, installed in your local VS Code.

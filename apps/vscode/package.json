@@ -55,7 +55,11 @@
           ".typeqlite",
           ".tql"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./images/typeqlite-file.svg",
+          "dark": "./images/typeqlite-file-dark.svg"
+        }
       }
     ],
     "grammars": [
