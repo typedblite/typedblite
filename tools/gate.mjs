@@ -82,6 +82,8 @@ const steps = [
         // The tarballs installed in an empty directory and used (tools/clean-room.mjs). It installs their
         // dependencies from the configured registry, so it needs the network the first time.
         { name: 'clean-room install', command: 'npm run clean-room' },
+        // The five-minute tour run as written, from the tarballs (tools/tour.mjs).
+        { name: 'five-minute tour', command: 'npm run tour' },
       ]),
 ];
 

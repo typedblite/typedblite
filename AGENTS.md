@@ -89,6 +89,7 @@ is what a version promises.
 ```bash
 npm run check-packages   # what `npm publish` would ship, read from `npm pack --dry-run` (after a build)
 npm run clean-room       # the tarballs installed in an empty directory and used (needs the registry)
+npm run tour             # docs/guides/five-minute-tour.md run as written, from the tarballs (needs the registry)
 npm run check-api        # the API reference builds cleanly, and every type the API mentions is exported
 npm run docs:api         # the HTML API reference, in dist/api
 ```

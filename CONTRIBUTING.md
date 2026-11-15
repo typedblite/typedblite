@@ -91,8 +91,8 @@ npm run gate
 It deletes the build output first, because the incremental build can hide type errors from stale
 declarations ([Testing](docs/development/testing.md#the-clean-tree-gate)), then runs the build, the
 type-check, the package contents (`npm run check-packages`), the API (`npm run check-api`), the tests **with the 80% coverage floor**, the WASM
-suite, the browser suites (the engine's, and the playground's), the VS Code e2e, and the clean-room install
-(`npm run clean-room`).
+suite, the browser suites (the engine's, and the playground's), the VS Code e2e, the clean-room install
+(`npm run clean-room`), and the five-minute tour (`npm run tour`).
 Each step stops the gate at the first failure and says which. `npm run gate -- --quick` stops after the tests,
 for a change that cannot touch the engine's WASM build, the editor or the packaging. The last three suites need Playwright's
 Chromium (`npx playwright-core install chromium`) and a display (`xvfb-run` on a headless machine).
