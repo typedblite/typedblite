@@ -12,13 +12,33 @@
     "url": "https://github.com/dave-jackson-dev/typedblite.git",
     "directory": "apps/vscode"
   },
+  "homepage": "https://github.com/dave-jackson-dev/typedblite/tree/main/apps/vscode#readme",
+  "bugs": {
+    "url": "https://github.com/dave-jackson-dev/typedblite/issues"
+  },
   "type": "module",
   "engines": {
     "vscode": "^1.91.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Formatters"
   ],
+  "keywords": [
+    "typeqlite",
+    "typeql",
+    "typedb",
+    "typedblite",
+    "sqlite",
+    "graph",
+    "database",
+    "schema",
+    "langium"
+  ],
+  "galleryBanner": {
+    "color": "#15171C",
+    "theme": "dark"
+  },
   "main": "./out/extension.cjs",
   "activationEvents": [
     "onLanguage:typeqlite"
