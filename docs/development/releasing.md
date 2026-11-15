@@ -28,8 +28,12 @@ generation is off.
 
 ## The checks a package must pass
 
-Both run in `npm run gate` (the second only in the full gate, not `--quick`), and both run in CI and in the
+All three run in `npm run gate` (the clean room only in the full gate, not `--quick`), in CI, and in the
 release workflow:
+
+- **`npm run check-api`** ([`tools/check-api.mjs`](../../tools/check-api.mjs)) builds the API reference with
+  TypeDoc, every warning an error, and fails if a public signature mentions a type the package does not export.
+  `npm run docs:api` writes the reference as HTML to `dist/api`.
 
 - **`npm run check-packages`** ([`tools/check-packages.mjs`](../../tools/check-packages.mjs)) reads
   `npm pack --dry-run`, the exact file list `npm publish` would use, for each package. It fails if: a file

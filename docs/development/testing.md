@@ -58,12 +58,13 @@ Before you open a pull request, run the full gate **from a clean tree**:
 
 ```bash
 npm run gate            # everything below
-npm run gate -- --quick # the first five steps only
+npm run gate -- --quick # the first six steps only
 ```
 
 `tools/gate.mjs` runs, in order, and stops at the first failure: **clean** (every `out/`, every
 `*.tsbuildinfo`, `coverage/`), **build**, **typecheck**, **package contents** (what `npm publish` would ship,
-`npm run check-packages`), **test** with `CI=true` (so the 80% coverage floor and the conformance report card
+`npm run check-packages`), **API** (the API reference builds cleanly and every type it mentions is exported,
+`npm run check-api`), **test** with `CI=true` (so the 80% coverage floor and the conformance report card
 both apply), the **WASM** suite, the engine's **browser** suite, the **playground** in Chromium, the **VS Code
 e2e**, and the **clean-room install** (`npm run clean-room`: the npm tarballs installed in an empty directory
 and used; see [Releasing](releasing.md#the-checks-a-package-must-pass)). It sets `NX_SKIP_NX_CACHE`, so no

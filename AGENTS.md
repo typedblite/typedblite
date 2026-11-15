@@ -89,6 +89,8 @@ is what a version promises.
 ```bash
 npm run check-packages   # what `npm publish` would ship, read from `npm pack --dry-run` (after a build)
 npm run clean-room       # the tarballs installed in an empty directory and used (needs the registry)
+npm run check-api        # the API reference builds cleanly, and every type the API mentions is exported
+npm run docs:api         # the HTML API reference, in dist/api
 ```
 
 - 🔴 A published package has a `files` allowlist. Without one npm falls back to `.gitignore`, which excludes
@@ -99,6 +101,12 @@ npm run clean-room       # the tarballs installed in an empty directory and used
 - `@sqlite.org/sqlite-wasm` versions all carry a `-buildN` suffix, a semver prerelease, so a range such as
   `^3.54.0` matches none of them. The runtime's optional peer range names the tested SQLite version's builds.
 - The registry for publishing is set on `nx-release-publish` in `nx.json`, not in a manifest.
+- 🔴 **What an entry point exports is public API**, covered by semver. The runtime's entry points
+  (`index.browser.ts`, `index.ts`) name every export, never `export *` from a module, and
+  `test/public-api.test.ts` pins the list of values. Adding or removing one is a decision: update the test and
+  the changelog. Something public in JavaScript only so the engine's own modules, or the conformance suite, can
+  reach it is marked `@internal` in its doc comment: left out of the API reference and not covered.
+- A public signature may only mention exported types. `npm run check-api` fails on one it doesn't.
 
 ---
 

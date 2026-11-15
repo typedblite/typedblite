@@ -35,6 +35,9 @@ Choose your starting point by what you want to do.
 
 ## Package references
 
+The API reference is generated from the source: `npm run docs:api` writes it to `dist/api`. It is not
+hosted yet.
+
 | Package | README |
 | ------- | ------ |
 | `@typedblite/language` | [libs/language](../libs/language/README.md) |

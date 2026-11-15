@@ -36,7 +36,7 @@ These are the public surface. Changing them in a way that can stop working code 
 
 | Surface | What is covered |
 | --- | --- |
-| **The API** | What the packages' entry points export (`@typedblite/runtime`, `@typedblite/runtime/wasm`, `@typedblite/language`, `@typedblite/content-revision`), and its TypeScript types. A file that is not an entry point is not public, even though it is in the package: package.json `exports` blocks importing it |
+| **The API** | What the packages' entry points export (`@typedblite/runtime`, `@typedblite/runtime/wasm`, `@typedblite/language`, `@typedblite/content-revision`), and its TypeScript types: the API reference (`npm run docs:api`). A file that is not an entry point is not public, even though it is in the package: package.json `exports` blocks importing it |
 | **The language** | A TypeQLite statement that runs in one version runs in the next, with the same meaning. Rejecting a statement that was accepted is breaking, unless it was accepted by mistake: then it is a fix, and the changelog says so |
 | **Diagnostic codes** | The `DiagnosticCode` values, and which condition each one names ([ADR-004](../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md)). A new code is not breaking. Renaming or reusing one is. The wording of a message is not covered |
 | **Stores** | A store written by one version opens in every later version: see [Stores and upgrades](#stores-and-upgrades) |
@@ -50,8 +50,11 @@ These are **not** covered and may change in any release:
 - The SQL that a query is translated to, and the query plan. Only the answers are covered.
 - Performance, except a regression large enough to be a bug.
 - The wording of error messages. Use the diagnostic code.
-- An export whose documentation marks it `@internal` or `@experimental`. None is marked yet. The mark is
-  how a future export can ship before its shape is settled.
+- An export or member whose documentation marks it `@internal`. These are public in JavaScript only so the
+  engine's own modules, or this repository's conformance suite, can reach them: `attachDiagnostic`,
+  `canonicalTemporal`, `instantOf`, and three methods of `TypeDBLiteInterpreter`. They are left out of the API
+  reference. An `@experimental` mark, which nothing has yet, would let an export ship before its shape is
+  settled.
 - Anything in the repository that is not published: the conformance suite, the demos and the playground.
 
 ## Stores and upgrades
