@@ -2045,6 +2045,7 @@ export class TypeDBLiteInterpreter {
         const patterns = segment.match?.patterns ?? [];
         const constraints = this.constraintsOf(patterns);
         this.matchStatements(patterns, constraints, before.available, conceptOf, before.available);
+        this.refuseValueAsAttribute(before, constraints, patterns, rangeOf(stage));
         // Each block's own rules first — a cycle inside one block is refused there, in its words — then
         // the order across branches, which only the whole stage can see.
         this.checkNested(patterns, new Set([...before.available, ...this.ownBound(patterns)]), conceptOf, 'conjunction', before.available, undefined, before.available);
@@ -3801,6 +3802,28 @@ export class TypeDBLiteInterpreter {
    * enumerated whole. A real nested-project query was 211,000 combinations and 32 s before
    * this; it is 59 combinations now (`relation-join-planning.test.ts` asserts the counts).
    */
+  /**
+   * `given $t: string; match $b isa book, has title $t;` — an earlier stage's VALUE (a `given` of a value type,
+   * a `let`, a `reduce`) read where an attribute is bound. TypeDB refuses it when it compiles the query:
+   * *"The variable 't' cannot be declared as both a 'Value' and as a 'Attribute'."* — the same words as for a
+   * `let` that reassigns an attribute (`orderValueStatements`). Without this it matched nothing, and said so
+   * only in an `empty-match` fact. `has title == $t` is the form that compares a value.
+   *
+   * Only a variable with an inferred value type is refused, and never one an earlier stage bound as an
+   * attribute (`attributeOf`), which a later `has` joins on: a `given $t: title` is an attribute too.
+   */
+  private refuseValueAsAttribute(before: StreamScope,constraints: readonly ThingConstraint[], patterns: readonly Pattern[], stageRange: Range | undefined): void {
+    const isEarlierValue = (variable: string): boolean =>
+      before.kinds.get(variable) === 'value' && before.valueTypes.get(variable) !== undefined && !before.attributeOf.has(variable);
+    const refuseAt = (variable: string, range: Range | undefined): void => {
+      if (isEarlierValue(variable)) {
+        this.refuse(DiagnosticCode.mixedPattern, `The variable '${variable.slice(1)}' cannot be declared as both a 'Value' and as a 'Attribute'.`, range ?? stageRange);
+      }
+    };
+    for (const constraint of constraints) for (const binding of constraint.bindings) refuseAt(binding.variable, binding.range);
+    for (const binding of this.nestedAttributeBindings(patterns)) refuseAt(binding.variable, undefined);
+  }
+
   /**
    * What a `match` is refused for WITHOUT a row — a thing or a type as an attribute value, and its
    * `let`s and comparisons (`orderValueStatements`) — and the `let`s in evaluation order. `combinations`
