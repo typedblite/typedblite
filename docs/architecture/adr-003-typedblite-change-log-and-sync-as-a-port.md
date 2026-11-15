@@ -10,6 +10,8 @@
   revision generator has a **second consumer outside this engine**, and therefore no longer lives in
   it: `computeRevision` and the canonical encoding moved to `@typedblite/content-revision`. The
   semantics are unchanged — the move is what the boundary rules required, not a redesign.
+- **Amended, 2026-11-15:** **A store checks a peer's revision against its content** (below). Accepted by the
+  maintainer on 2026-11-15.
 - **Evidence:** baseline analysis, conflict model, and port-and-transport scoping (phase planning docs, not in this repo)
 
 > ✅ **Accepted by the founder, 2026-08-31.** Drafted by Phase 00 alongside its analysis and held at
@@ -226,6 +228,47 @@ shape are unchanged**, and `TypeDBLiteReplicator` needs no change.
 - **Not changed, deliberately:** a pushed `rev` is still stored as given. Verifying it against the content
   would change what a store accepts from its peers, so it is a decision of its own: it needs tests, and
   an amendment here. Authentication and TLS stay the mounting server's job, as D8 left them.
+
+## Amendment — A store checks a peer's revision against its content (accepted, 2026-11-15)
+
+> ✅ **Accepted by the maintainer, 2026-11-15.** Drafted with its implementation and tests
+> (`verified-revisions.test.ts`), and held at Proposed until a person accepted it, because it changes what every store
+> accepts from its peers.
+
+**The problem.** Decision 3 derives a revision from its content, but nothing checked that a revision a peer sent
+*was* derived from what it carried: `applyRemote` stored the `rev` it was given. The amendment above left this open
+deliberately. Two things followed:
+
+- **A revision could name two contents.** A peer could send a revision another store already holds, with different
+  content. Each store then holds one revision with a different state, each believes it is in sync, and they never
+  converge: the divergence Decision 3's derivation exists to prevent, reached from outside.
+- **Any string was a revision.** `999999-deadbeef` was stored, and won by its generation.
+
+**Decision.** `ChangeLog.applyRemote` accepts a revision from a peer only if it equals
+`computeRevision({ state, parent: parentRev, deleted })` of what the record carries, and only if a live revision
+carries its state. Otherwise it throws, with the diagnostic code `typedblite.revision-not-derived` and a message that
+names the entity and the revision. That is a refusal, not a skip: skipping would leave two stores believing they are
+in sync.
+
+- **The hub** checks every record of a pushed batch first, so a bad one is a **400** that names it (`change 1 is
+  refused: …`) and none of the batch is applied, as for any malformed batch.
+- **A pull** stops at the bad record with that error. `TypeDBLiteReplicator` reports an apply failure as terminal,
+  which this is: the same record will fail the same way.
+- A `local:` id is still skipped before the check, as before.
+
+**What it does not do, and why.** The parent a revision claims is **not** required to be known to the store.
+`compact()` deletes non-leaf revisions, so a store pulling from a compacted one legitimately receives leaves whose
+parents exist nowhere. Requiring a known parent would break that. So a peer can still claim any parent, and a
+correctly derived revision with a high-generation parent wins. **This check does not, and cannot, stop a peer that may
+write from making its write win.** Such a peer can always write a legitimate child of the current winner, which wins
+by its generation anyway. Who may push is authentication, which D8 leaves to the mounting server.
+
+**A stateless live revision is refused** because it can be neither checked nor projected, and as a winner it would
+freeze the entity on every store that took it. ⚠️ A store whose change log predates its `state` column holds such
+rows. They could never project anywhere, and they now stop a pull from that store at the first one, naming it.
+
+**Consequences.** A client that pushed hand-made revisions is refused. `TypeDBLiteReplicator` and `replicateOnce`
+send what `since()` returns, which is derived, so they are unaffected. The revision algorithm itself is unchanged.
 
 ## Alternatives considered
 

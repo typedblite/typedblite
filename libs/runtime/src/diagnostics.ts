@@ -131,6 +131,11 @@ export const DiagnosticCode = {
   /** A write stage handed to `query()`, which reads — `execute()` runs writes. */
   writeInRead: 'typedblite.write-in-read',
   truncated: 'typedblite.diagnostics-truncated',
+  /**
+   * A revision from a peer that is not derived from its content, or a live one with no state: refused by
+   * `ChangeLog.applyRemote` (ADR-003, amendment of 2026-11-15).
+   */
+  revisionNotDerived: 'typedblite.revision-not-derived',
 } as const;
 
 export type DiagnosticCodeValue =

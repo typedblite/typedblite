@@ -8,6 +8,14 @@ they are listed here.
 ## [Unreleased]
 
 ### Changed
+- **Breaking for a hand-written client:** a store now checks a revision from a peer against its content, instead
+  of storing the `rev` it is given (ADR-003, amended 2026-11-15). A revision must equal `computeRevision` of its
+  state, parent and deleted flag, and a live one must carry its state. Otherwise `ChangeLog.applyRemote` throws with
+  the new code `typedblite.revision-not-derived`, a batch is refused whole, and the hub answers 400 naming the
+  change. Before, a peer could send `999999-deadbeef`, or a revision another store held with different content,
+  which left the two stores split for good while each believed it was in sync. `TypeDBLiteReplicator` and
+  `replicateOnce` send derived revisions and are unaffected. A peer that may write can still make its write win;
+  authentication decides who may write.
 - Vitest is now **5.1.0** (from 4.1), with `@vitest/coverage-v8` 5.1.0 beside it, as Vitest requires. No test or
   config needed a change: none of Vitest 5's breaking changes (`vi.mock` inside a function, `sequential`, the removed
   `vitest/*` entry points, unawaited `rejects`, browser mode) applies here. Every project runs the same test files.
@@ -53,7 +61,7 @@ they are listed here.
   instead of half; and answers a malformed batch with a 400 that names the problem, and an internal failure
   with a 500 and no detail, reporting the real error to a new `onError` option. **Breaking for a hand-written
   client** that posts without `content-type: application/json`; `TypeDBLiteReplicator` already sends it. Not
-  changed: a pushed revision is still stored as given (see the replication guide's Security section).
+  changed by that work: a pushed revision was still stored as given. It is now checked against its content (the entry under **Changed**).
 - The `typedblite` CLI now runs on Windows, and through its npm `bin` link (`npx typedblite`, a global
   install) everywhere. Its entry check compared the script's file name, split on `/`, with the module's
   URL. On Windows the path has no `/`, and through the `bin` link the name is `typedblite`, so `main()`

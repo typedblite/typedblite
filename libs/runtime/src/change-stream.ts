@@ -16,7 +16,8 @@ import {
   type Server,
   type ServerResponse,
 } from 'node:http';
-import type { ChangeLog, ChangeRecord } from './change-log.js';
+import { revisionProblem, type ChangeLog, type ChangeRecord } from './change-log.js';
+import { isReplicable } from './canonical.js';
 
 export interface ChangeStreamOptions {
   /**
@@ -87,6 +88,13 @@ function parseBatch(body: string): PushedRecord[] | string {
     if (r['parentRev'] !== undefined && r['parentRev'] !== null && typeof r['parentRev'] !== 'string') return bad('parentRev');
     const state = r['state'];
     if (state !== undefined && state !== null && (typeof state !== 'object' || Array.isArray(state))) return bad('state');
+    // A revision not derived from its content is the client's fault, so a 400 that names it, before anything is
+    // applied, rather than the 500 `applyRemote`'s refusal would otherwise become. A `local:` id is skipped by
+    // `applyRemote` before it is checked, so it is not checked here either.
+    if (isReplicable(r['entityId'])) {
+      const problem = revisionProblem(r as unknown as PushedRecord);
+      if (problem !== undefined) return `change ${index} is refused: ${problem}`;
+    }
   }
   return parsed as PushedRecord[];
 }

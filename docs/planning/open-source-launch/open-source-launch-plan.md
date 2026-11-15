@@ -76,7 +76,8 @@ Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the
   maintainer's request: nothing can test them while Actions is off.
 - **`apps/playground` is built and not hosted.** `npm run playground` serves it locally.
 - **`gitleaks` has not been run.** The secret scan was a manual pattern search (S9).
-- **A pushed revision is trusted as given** (PL-6): a peer can forge one and win a conflict.
+- **A pushed revision is checked against its content** (PL-6, #55; its ADR-003 amendment was accepted on 2026-11-15).
+  A peer that may write can still make its write win.
 - **The coverage job is not blocking**, and `sync-demo:test-browser` (which runs code excluded from coverage) is not
   in CI. Both wait on Actions.
 
@@ -121,8 +122,8 @@ Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the
    API was reviewed: it now names every export, pinned by a test, and the internals it leaked are gone or marked
    `@internal`. Still to write: a five-minute tour (needs the published packages), "TypeDB vs TypeDBLite" (TypeDB
    Ltd should read it) and "Why not X", the demo GIF, and badges.
-3. **PL-6, the one item left:** check a pushed revision against its content. It changes what a store accepts from
-   its peers, so it needs its own tests and an ADR-003 amendment.
+3. **PL-6 is done** (#55): a store checks a peer's revision against its content, with tests and an ADR-003 amendment
+   the maintainer accepted on 2026-11-15.
 4. **When Actions is back:** read the first run on `main`, then make `coverage` blocking and add
    `sync-demo:test-browser` to CI.
 
@@ -220,7 +221,7 @@ confirm it and it needs someone to.
 | B3 | **Nothing is published.** No tags, no releases, no npm packages, CLI is private | Verified | Phase 2 |
 | B4 | **npm and domain names.** `@typedblite` (npm org) and `typedblite.dev` are **registered (2026-11-14)**. Still to confirm: the unscoped `typedblite` (the CLI's name) and `typeqlite`, which the scope does not cover: **both still free on 2026-11-15**. The `typedblite` GitHub org is held too (2026-11-15) | Partly done | Check both unscoped names on npm and claim them (publish a placeholder or `0.0.0` under the org if free). Note that the domain, like the name, contains TypeDB™, so B1 covers it too |
 | B5 | **`node:sqlite` vs `engines`.** `engines` said Node `>=22.12`. Measured: 22.12 has **no** `node:sqlite`; 22.13 to 22.15 have it **without FTS5**, which the engine requires; **22.16.0 is the first that works** (full gate passes there, cache skipped) | **Resolved** | `engines`, the READMEs, CONTRIBUTING and the getting-started guide now say 22.16; 22.16.0 is a blocking CI job. Node still marks `node:sqlite` experimental, which prints a warning on first use: say so in the docs |
-| B6 | **Hub security.** The hub exposes an SSE stream and a POST endpoint. I did not check authentication, binding defaults, or input limits | **Reviewed 2026-11-14: documented, not yet fixed** | Done: the replication guide has a "Security" section with each finding, verified against a live hub. Five of the eight are now fixed in the handler (PL-6); authentication and TLS are the mounting server's job; **a pushed revision is still trusted as given (PL-6)**. Binding is `127.0.0.1` only |
+| B6 | **Hub security.** The hub exposes an SSE stream and a POST endpoint. I did not check authentication, binding defaults, or input limits | **Reviewed 2026-11-14: documented, not yet fixed** | Done: the replication guide has a "Security" section with each finding, verified against a live hub. Five of the eight are now fixed in the handler (PL-6); authentication and TLS are the mounting server's job; **a pushed revision is now checked against its content (PL-6, ADR-003 amended 2026-11-15)**, though a peer that may write can still make its write win. Binding is `127.0.0.1` only |
 | B7 | **No `SECURITY.md`** (private reporting channel) | Verified | **Written.** Enable GitHub private vulnerability reporting and create the `security@` alias |
 
 ### 4.2 Should fix before launch
@@ -723,7 +724,7 @@ Things deliberately set aside, each with the moment it must be revisited. An ite
 | PL-3 | Keep the original commits of PRs #22 and #33 on a branch or tag | Soon: needs the maintainer's OK to push | Nothing | Open |
 | PL-4 | Decide whether to add a commit-message check | Branch protection is enabled, or the first outside pull request | Nothing | Open |
 | PL-5 | Confirm CI on `main` is stable, including the Node 22 gate | The announcement | Announcement | Open |
-| PL-6 | Harden `createChangeStreamHandler`. **Mostly done 2026-11-14:** a content-type check (415), a body-size limit (413), a cap on open streams (503), an atomic batch, and no echoing of internal errors. **Still open:** checking a pushed revision against its content (it changes what a store accepts from its peers, so it needs its own tests and an ADR-003 amendment). Authentication and TLS stay the mounting server's job | The sync story is promoted | Promoting sync | Open (one item) |
+| PL-6 | Harden `createChangeStreamHandler`. **Mostly done 2026-11-14:** a content-type check (415), a body-size limit (413), a cap on open streams (503), an atomic batch, and no echoing of internal errors. **Written 2026-11-15:** checking a pushed revision against its content, with tests and an ADR-003 amendment, accepted 2026-11-15. Authentication and TLS stay the mounting server's job | The sync story is promoted | Promoting sync | Done |
 
 ### PL-1. What the plan says about the TypeDB Ltd conversation
 

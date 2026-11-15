@@ -56,6 +56,16 @@ import { serveChangeStream } from '../src/change-stream.js';
 import { ChangeStreamClient } from '../src/change-stream-client.js';
 import { TypeDBLiteReplicator } from '../src/typedblite-replicator.js';
 import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
+import { computeRevision } from '../src/revision.js';
+import type { EntityState } from '../src/canonical.js';
+
+/** A record as another store would send it: its `rev` is what its content gives (ADR-003, 2026-11-15). */
+const remote = <R extends { entityId: string; parentRev: string | null; deleted: boolean; state?: EntityState }>(
+  record: R,
+): R & { rev: string } => ({
+  ...record,
+  rev: computeRevision({ state: record.state, parent: record.parentRev ?? undefined, deleted: record.deleted }),
+});
 
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
 const SCHEMA = readKeyedSkillsSchema(join(SCHEMAS, 'skills.schema.typeqlite'));
@@ -258,9 +268,8 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
 
     assert.throws(
       () =>
-        log.applyRemote({
+        log.applyRemote(remote({
           entityId: 'skill/s-remote',
-          rev: '1-deadbeef',
           parentRev: null,
           deleted: false,
           state: {
@@ -268,7 +277,7 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
             attributes: [{ type: 'skill-id', value: 's-remote' }],
             roles: [],
           },
-        }),
+        })),
       /projection failed/,
     );
 
@@ -281,9 +290,8 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
 
     // And having rolled back, a redelivery still works — which is the point.
     assert.equal(
-      log.applyRemote({
+      log.applyRemote(remote({
         entityId: 'skill/s-remote',
-        rev: '1-deadbeef',
         parentRev: null,
         deleted: false,
         state: {
@@ -291,7 +299,7 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
           attributes: [{ type: 'skill-id', value: 's-remote' }],
           roles: [],
         },
-      }),
+      })),
       true,
       'redelivery must be able to succeed after a rolled-back attempt',
     );
@@ -306,9 +314,8 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
     const raw = handleOf(db);
     raw.exec('BEGIN');
     assert.doesNotThrow(() =>
-      db.changeLog.applyRemote({
+      db.changeLog.applyRemote(remote({
         entityId: 'skill/s-inner',
-        rev: '1-aa',
         parentRev: null,
         deleted: false,
         state: {
@@ -316,7 +323,7 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
           attributes: [{ type: 'skill-id', value: 's-inner' }],
           roles: [],
         },
-      }),
+      })),
     );
     raw.exec('COMMIT');
     assert.equal(
@@ -532,9 +539,8 @@ describe('Round two — findings the fixes themselves introduced', () => {
     // player someone then created *locally* stayed unlinked forever, because `recordWrite` never
     // projects and the hub's echo comes back isNew=false and skips projection too.
     const target = freshIam();
-    target.changeLog.applyRemote({
+    target.changeLog.applyRemote(remote({
       entityId: 'membership/p-9::o-9',
-      rev: '1-aa',
       parentRev: null,
       deleted: false,
       state: {
@@ -545,7 +551,7 @@ describe('Round two — findings the fixes themselves introduced', () => {
           { role: 'org', player: 'organization/o-9' },
         ],
       },
-    });
+    }));
 
     // Both players arrive by ordinary local writes, never by replication.
     target.execute(
@@ -700,9 +706,8 @@ describe('Tier 3 — contract and liveness', () => {
     // Without a guard the first cycle is a stack overflow rather than a missing edge.
     const db = freshIam();
     assert.doesNotThrow(() => {
-      db.changeLog.applyRemote({
+      db.changeLog.applyRemote(remote({
         entityId: 'membership/self',
-        rev: '1-aa',
         parentRev: null,
         deleted: false,
         state: {
@@ -710,7 +715,7 @@ describe('Tier 3 — contract and liveness', () => {
           attributes: [{ type: 'membership-key', value: 'self' }],
           roles: [{ role: 'member', player: 'membership/self' }],
         },
-      });
+      }));
     }, 'a self-referencing projection must terminate');
     db.close();
   });
