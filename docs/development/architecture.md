@@ -250,4 +250,4 @@ declared deviation, not a TypeDBLite bug
 
 `spec.ts` loads the vendored features. `steps.ts` and `world.ts` implement their Cucumber steps
 against the runtime. `runner.ts` and `conformance.ts` run them. `report.ts` and `cli.ts` print the
-report card. `oracle.ts` and `typedb-oracle.ts` run the same steps against a live TypeDB.
+report card. `oracle.ts` and `typedb-oracle.ts` run the same steps against a live TypeDB, and `oracle-bench.ts` times the load test's workloads on both (see the conformance README).

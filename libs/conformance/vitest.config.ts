@@ -23,6 +23,9 @@ export default defineConfig({
         // against `typedb/typedb:3.10.4` (CONFORMANCE.md), never in the routine suite.
         'src/typedb-oracle.ts',
         'src/oracle.ts',
+        // The speed comparison against the same server (`oracle-bench` target): it times two engines, which a
+        // unit test cannot do without one running, and prints a report.
+        'src/oracle-bench.ts',
         // The `report` target's script: it prints the card and sets the exit code. What it prints
         // is `report.ts`, which is tested; this file only wires it to the console.
         'src/cli.ts',

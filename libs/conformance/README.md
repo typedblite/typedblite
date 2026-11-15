@@ -48,6 +48,22 @@ where it and TypeDBLite disagree. A scenario TypeDB itself fails is a deviation 
 an engine gap. It needs a server, so it is never part of the routine suite. Given rows cannot be passed
 over HTTP, and TypeDB 3.10.4 panics on a few spec queries; `--restart always` lets the run continue.
 
+### Comparing speed against TypeDB
+
+```bash
+npm exec nx -- run typedblite-conformance:oracle-bench -- --growth=100,400,1000 --relations=200,1000 --out=results.md
+```
+
+Runs the load test's `growth` and `relations` workloads (`libs/runtime/bench`) on TypeDBLite and on the same
+live TypeDB, with the same statements and fixture schemas, and checks that both return the same number of
+answers. It needs the server from the section above. TypeDBLite runs in process and TypeDB over HTTP, which
+costs about 2 ms a call whatever the query is, so a raw comparison measures the embedding. The tool takes
+the network out three ways (one open read transaction on TypeDB, count-only reads so no rows are
+transferred, and each engine's floor subtracted: the header of
+[`src/oracle-bench.ts`](src/oracle-bench.ts) explains each), and a cost under 0.15 ms is shown as `~0`, because
+it cannot be told from the floor. Writes are not adjusted and are not comparable. Treat one run as one run:
+this machine's results vary by up to 2x, and TypeDB runs in Docker. No results are kept in the repository.
+
 The test suite exits non-zero if any scenario is below its baseline. The report CLI also prints:
 - Improvements whose baseline has not been raised (`⬆ above baseline — raise it`)
 - Deviations that now pass and must be removed (`✅ deviation now passing`)
