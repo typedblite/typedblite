@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 import { serveChangeStream, type ChangeStreamOptions } from '../src/change-stream.js';
 import { TypeDBLiteReplicator } from '../src/typedblite-replicator.js';
+import { computeRevision } from '../src/revision.js';
 import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
 
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
@@ -24,7 +25,9 @@ const node = () => {
   return db;
 };
 const held = (db: TypeDBLiteInterpreter): string[] => db.changeLog.since(0).map((r) => r.entityId).sort();
-const record = (id: string, rev = '1-aaaa') => ({ entityId: id, rev, deleted: true });
+// A first tombstone, with the revision its content gives: a hub refuses one that does not (ADR-003, 2026-11-15).
+const TOMBSTONE = computeRevision({ deleted: true });
+const record = (id: string, rev = TOMBSTONE) => ({ entityId: id, rev, deleted: true });
 
 let closers: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -124,7 +127,7 @@ describe('a batch that fails while it is applied', () => {
       if (calls === 2) throw new Error('disk exploded: /var/lib/secret/hub.db');
       return original(r);
     });
-    const response = await post(JSON.stringify([record('probe/a', '1-aaaa'), record('probe/b', '1-bbbb'), record('probe/c', '1-cccc')]));
+    const response = await post(JSON.stringify([record('probe/a'), record('probe/b'), record('probe/c')]));
     expect(response.status).toBe(500);
     const text = await response.text();
     expect(JSON.parse(text)).toEqual({ error: 'internal error' });

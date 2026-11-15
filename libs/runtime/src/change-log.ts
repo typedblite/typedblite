@@ -19,6 +19,7 @@ import {
   type EntityState,
 } from './canonical.js';
 import { OWNED, ownAttribute, sweepAttributes } from './attribute-store.js';
+import { attachDiagnostic, DiagnosticCode, DiagnosticCollector } from './diagnostics.js';
 import { FullTextIndex } from './full-text.js';
 import {
   computeRevision,
@@ -27,6 +28,49 @@ import {
   type Leaf,
   type Revision,
 } from './revision.js';
+
+/**
+ * Why a revision from a peer is refused, or `undefined` when it is accepted (ADR-003, amendment of 2026-11-15).
+ *
+ * A revision is derived from its content (Decision 3): `computeRevision` of its state, its parent and its deleted
+ * flag. A store now checks that, instead of storing the `rev` it is given. Without the check a peer could send a
+ * revision some other store already holds, with **different content**: each store would then hold one revision
+ * with two contents, believe it is in sync, and never converge. The check makes a revision name one content
+ * everywhere, and refuses a malformed one (`999999-deadbeef`) outright.
+ *
+ * ⚠️ **It does not stop a peer that may write from winning, and nothing can.** A peer allowed to push can always
+ * write a legitimate child of the current winner, which wins by its generation. It can also claim a parent this
+ * store has never seen: the parent is not required to be known, because compaction deletes ancestors, so a store
+ * pulling from a compacted one legitimately receives leaves whose parents are gone everywhere. Who may push at
+ * all is the mounting server's authentication (D8).
+ *
+ * A live revision must carry its state: without one it can be neither checked nor projected, and a stateless
+ * winner would freeze the entity on every store that took it.
+ */
+export function revisionProblem(record: {
+  readonly rev: Revision;
+  readonly parentRev?: string | null;
+  readonly deleted: boolean;
+  readonly state?: EntityState | null;
+}): string | undefined {
+  if (!record.deleted && !record.state) {
+    return `live revision ${record.rev} carries no state, so it can be neither checked nor projected`;
+  }
+  let expected: Revision;
+  try {
+    expected = computeRevision({
+      state: record.state ?? undefined,
+      parent: record.parentRev ?? undefined,
+      deleted: record.deleted,
+    });
+  } catch {
+    return `revision ${record.rev} names a malformed parent revision, ${record.parentRev}`;
+  }
+  if (expected !== record.rev) {
+    return `revision ${record.rev} is not derived from its content, which gives ${expected}`;
+  }
+  return undefined;
+}
 
 /** One revision in the change log: what `since()` returns, and what replication sends. */
 export interface ChangeRecord {
@@ -522,6 +566,15 @@ export class ChangeLog {
     // and `localIid` cannot resolve it, so every revision inserts another `thing` row. Refusing is
     // the behaviour `canonical.ts` documents; until now nothing performed it.
     if (!isReplicable(record.entityId)) return false;
+
+    // 🔴 Refused, not skipped: a revision that does not match its content is a peer that is broken or hostile,
+    // and skipping it would let two stores believe they are in sync while holding different content. Inside a
+    // batch the throw unwinds the whole batch, and on a pull it stops the replication with the reason.
+    const problem = revisionProblem(record);
+    if (problem !== undefined) {
+      const message = `Refused a revision of ${record.entityId}: ${problem}.`;
+      throw attachDiagnostic(new Error(message), new DiagnosticCollector().error(DiagnosticCode.revisionNotDerived, message));
+    }
 
     // 🔴 One transaction over the log row *and* the projection it implies.
     //

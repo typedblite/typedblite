@@ -239,14 +239,20 @@ describe('the conflict-model worked examples hold against the real store', () =>
     const db = node();
     const root = computeRevision({ state: skillState('s-1', 'A') });
     db.changeLog.applyRemote({ entityId: 'skill/s-1', rev: root, parentRev: null, deleted: false, state: skillState('s-1', 'A') });
-    for (const salt of ['a', 'b']) {
+    // Two live branches, each then deleted, so that both leaves are tombstones. (Two tombstones of one parent
+    // would be one revision: a tombstone carries no state, so its revision is its parent's alone.)
+    for (const name of ['a', 'b']) {
+      const state = skillState('s-1', name);
+      const branch = computeRevision({ state, parent: root });
+      db.changeLog.applyRemote({ entityId: 'skill/s-1', rev: branch, parentRev: root, deleted: false, state });
       db.changeLog.applyRemote({
         entityId: 'skill/s-1',
-        rev: computeRevision({ state: skillState('s-1', salt), parent: root, deleted: true }),
-        parentRev: root,
+        rev: computeRevision({ parent: branch, deleted: true }),
+        parentRev: branch,
         deleted: true,
       });
     }
+    assert.equal(db.changeLog.leavesOf('skill/s-1').length, 2, 'two leaves, both tombstones');
     assert.equal(db.changeLog.winnerOf('skill/s-1')?.deleted, true);
     db.close();
   });
