@@ -1,0 +1,55 @@
+/* TypeDBLite's colours: ink #15171C, paper #F4F2EE, signal orange #E8590C (docs/brand/README.md).
+   Orange text on paper is 3.6:1, short of 4.5:1, so text accents use a darker orange in the light theme. */
+:root {
+  --sl-color-accent-low: #3a1a0a;
+  --sl-color-accent: #c2410c;
+  --sl-color-accent-high: #fdba74;
+}
+:root[data-theme='light'] {
+  --sl-color-accent-low: #fde6d6;
+  --sl-color-accent: #b53a08;
+  --sl-color-accent-high: #8a2b05;
+  --sl-color-bg: #fbfaf7;
+}
+:root[data-theme='dark'] {
+  --sl-color-bg: #15171c;
+  --sl-color-accent: #f97316;
+}
+
+.site-disclaimer a {
+  color: var(--sl-color-text-accent);
+}
+.site-disclaimer {
+  margin-top: 1.5rem;
+  max-width: 60ch;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-xs);
+}
+
+pre.mermaid {
+  background: transparent;
+  border: 0;
+  text-align: center;
+}
+
+/* Landing page */
+.hero-install {
+  margin-block: 1rem;
+}
+.numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+  margin-block: 1.5rem;
+}
+.numbers > div {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+.numbers strong {
+  display: block;
+  font-size: var(--sl-text-3xl);
+  line-height: 1.1;
+  color: var(--sl-color-accent-high);
+}

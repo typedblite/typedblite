@@ -1,0 +1,60 @@
+# The website
+
+`apps/website` builds the static site planned for `typedblite.dev`: a landing page, the guides, the five-minute
+tour, the API reference, the playground, and the project's own documents, all from this repository. It is
+[Astro](https://astro.build) with [Starlight](https://starlight.astro.build), published as plain files to GitHub Pages.
+
+## One copy of every page
+
+The site holds no page of its own except the landing page (`apps/website/src/content/docs/index.mdx`). Every other
+page is **generated at build time from a Markdown file in the repository**, by `scripts/sync-content.mjs`, so a guide is
+edited where it always was and the site and GitHub cannot disagree. The generated pages are git-ignored.
+
+`scripts/content-map.mjs` is the table of which documents are published and at which route:
+
+| Section | Route | Source |
+| ------- | ----- | ------ |
+| Guides | `/guide/…` | `docs/guides/*.md` (not the draft `why-not-x.md`), `CONFORMANCE.md` |
+| Tools | `/tools/…` | the READMEs of `apps/cli`, `apps/vscode`, `apps/playground`, `apps/sync-demo` |
+| Packages | `/packages/…` | the READMEs of the four libraries |
+| Project | `/project/…` | `CONTRIBUTING.md`, `docs/development/*.md`, `CHANGELOG.md`, `SECURITY.md`, the brand page |
+| Decisions | `/decisions/…` | every `docs/architecture/adr-*.md`, found by listing the folder |
+
+For each page the script takes the title from the first `# ` heading, the description from the first paragraph, and
+rewrites relative links: a link to another published document becomes a link to its page, a link to any other file in
+the repository becomes a GitHub link, and **a link to a file that does not exist fails the build**. A list item that
+links to an unpublished document is dropped. To publish another document, add a row to the table (and to the sidebar in
+`astro.config.mjs` if it is not in an auto-generated group).
+
+Also generated, from other places: the brand files (`docs/brand/`) and the favicon, and the TypeQLite grammar that
+colours code fences, which is the VS Code extension's own (`apps/vscode/syntaxes/typeqlite.tmLanguage.json`), so a
+`typeql` fence looks on the site as it does in the editor. ```` ```mermaid ```` fences are drawn in the browser,
+in the reader's theme.
+
+## Commands
+
+```bash
+npm exec nx -- run website:dev          # astro dev with live reload (the playground and API are not served)
+npm exec nx -- run website:build-site   # the whole site into apps/website/dist
+npm exec nx -- run website:check        # build it, then follow every internal link in dist/
+npm run site                            # build, then serve dist/ on http://localhost:4321
+```
+
+`build-site` builds the playground (`/playground/`, which uses relative URLs and so works from any path), generates
+the API reference with TypeDoc (`/api/`), runs `astro build`, then `scripts/assemble.mjs` puts the first two into
+`dist/` with the `CNAME` file. `check` is `scripts/check-site.mjs`: every `href` and `src` resolves to a file, every
+`#fragment` on a guide page resolves to an id, and the playground, the API, the search index and `CNAME` exist. It is a
+step of `npm run gate`.
+
+## Publishing
+
+`.github/workflows/site.yml` builds with `website:check` and deploys `apps/website/dist` to GitHub Pages. **It has
+never run** (Actions is off, see the launch plan). To publish:
+
+1. Make the repository public, or use a plan that allows Pages on a private one.
+2. Settings, Pages, Source: **GitHub Actions**. Enable the workflow.
+3. Point `typedblite.dev` at GitHub Pages (four `A` records and an `AAAA` set for the apex, or a `CNAME` for `www`,
+   per GitHub's custom-domain documentation), then set the domain in Settings, Pages, and enable **Enforce HTTPS**.
+4. Before launch, read the landing page's "Pre-release" notice and the guides' "not on npm yet" notes, and remove them.
+
+The site is not public until step 2, so nothing here is visible before launch.

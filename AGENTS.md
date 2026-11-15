@@ -70,6 +70,7 @@ Nx project names (not the npm package names):
 - `typedblite` — the CLI, npm package `typedblite` (it was `typedblite-cli`; `npx typedblite` needs the unscoped name)
 - `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
 - `playground` — `typedblite-playground`, TypeQLite in a browser: the engine on WASM SQLite in a worker, and Monaco with the real language server over LSP in another; also has `test-browser` and `serve`
+- `website` — `typedblite-website`, the `typedblite.dev` static site (Astro Starlight): pages generated from the repository's Markdown, the API reference and the playground; targets `build-site`, `check`, `dev`, `serve` (it has no `build`, so `npm run build` does not build it; [docs/development/website.md](docs/development/website.md))
 - `sync-demo` — `typedblite-sync-demo`, the offline-first sync demo; also has `smoke`, `test-browser`, `serve`, `demo` and `android-setup`/`android-apk`/`android-emulator`
 
 Coverage is enabled only on CI (`CI=true`), with an 80% floor on statements, lines and functions in

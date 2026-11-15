@@ -107,7 +107,7 @@ Nothing has run on GitHub since #40 of the old repository, so CI has seen none o
   launch plan itself had listed the removed names, so the new `main`'s tree differs from the old one in those two
   lines. `55b783a`, cited in `docs/development/performance.md`, is not a commit in this repository (a stale
   citation, left).
-- **`apps/playground` and the API reference are built and not hosted.** `npm run playground` and `npm run docs:api`.
+- **`apps/playground` and the API reference are built and not hosted.** `npm run playground` and `npm run docs:api`. The site that will host them, with the guides, is `apps/website` (`npm run site`; [The website](../../development/website.md)), also not hosted.
 - **`gitleaks` 8.30.1 found no leaks** in the 152 reachable commits on 2026-11-15 (S9). Run it again on the rewritten
   history before the repository goes public.
 - **A pushed revision is checked against its content** (PL-6, #55; its ADR-003 amendment was accepted on 2026-11-15).
@@ -534,9 +534,12 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
 - [ ] API reference generated from TSDoc (TypeDoc) and published to GitHub Pages; link from the README.
       *Generated and checked (2026-11-15): `npm run docs:api`, `npm run check-api` in the gate. Publishing it waits
       with the playground's hosting.*
-- [ ] Docs site: GitHub Pages from `docs/` is enough, served at `typedblite.dev` (CNAME plus DNS records,
-      "Enforce HTTPS" on). Don't build a bespoke site pre-launch. Suggested layout: `typedblite.dev` for the
-      landing page and docs, `/playground` for the playground, `/api` for the TypeDoc reference.
+- [ ] Docs site: GitHub Pages, served at `typedblite.dev` (CNAME plus DNS records, "Enforce HTTPS" on). Layout:
+      `typedblite.dev` for the landing page and docs, `/playground` for the playground, `/api` for the TypeDoc
+      reference. **Built, not published (2026-11-15): `apps/website`** (Astro Starlight; every page generated from the
+      repository's Markdown; `website:check` follows every internal link; [The website](../../development/website.md)).
+      `site.yml` deploys it and has never run. Left: public repository or Pages-capable plan, Pages source, DNS and
+      HTTPS, and removing the "not on npm yet" notices at launch.
 - [ ] Mail on the domain: a `security@` and a `hello@` alias (forwarding is enough) so `SECURITY.md` and
       the press kit don't depend on a personal address. Add SPF/DKIM/DMARC if the aliases will send.
 - [ ] Use the domain in package metadata (`homepage`), the VS Code extension manifest, the README badges,

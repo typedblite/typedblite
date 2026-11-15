@@ -1,0 +1,117 @@
+---
+title: TypeQL in your own process
+editUrl: false
+description: TypeDB's data model and the TypeQL query language in your own process. A TypeScript engine over SQLite, with no server and no native binary.
+template: splash
+hero:
+  tagline: TypeDB's data model and the TypeQL query language, inside your own process. A TypeScript engine over SQLite, with no server and no native binary.
+  image:
+    light: ../../assets/brand/typedblite-mark.svg
+    dark: ../../assets/brand/typedblite-mark-dark.svg
+    alt: The TypeDBLite mark, an orange diamond joining three entities
+  actions:
+    - text: Try it in your browser
+      link: /playground/
+      icon: rocket
+      variant: primary
+      attrs:
+        target: _self
+    - text: Five-minute tour
+      link: /guide/five-minute-tour/
+      icon: right-arrow
+      variant: secondary
+    - text: View on GitHub
+      link: https://github.com/typedblite/typedblite
+      icon: external
+      variant: minimal
+---
+
+import { Aside, Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Pre-release">
+  TypeDBLite is not on npm yet, so the guides build it from source until the first release.
+</Aside>
+
+## What you get
+
+<CardGrid>
+  <Card title="No server to run" icon="seti:json">
+    It runs inside your process: on Node.js with the built-in `node:sqlite`, and in a browser on WASM SQLite.
+    You keep the polymorphic type model, the schema-first design and the query language.
+  </Card>
+  <Card title="Offline-first sync" icon="random">
+    Every write goes in a change log. Stores replicate hub-and-spoke and converge without conflict when two
+    nodes make the same edit, and a conflicting edit is kept, not discarded.
+  </Card>
+  <Card title="Measured, not claimed" icon="approve-check">
+    It passes 1,742 of the 1,756 scenarios in TypeDB's own behaviour specification. Twelve of the 14 that do not
+    pass also fail on TypeDB itself.
+  </Card>
+  <Card title="An editor and a playground" icon="laptop">
+    A VS Code extension with a Langium language server, and a browser playground that runs the same
+    language server over LSP.
+  </Card>
+</CardGrid>
+
+## A schema, a write, a query
+
+<Tabs>
+  <TabItem label="Schema">
+```typeql
+define
+  entity book, owns title @key, owns author, owns status;
+  attribute title, value string;
+  attribute author, value string;
+  attribute status, value string;
+```
+  </TabItem>
+  <TabItem label="Write">
+```typeql
+insert $b isa book,
+  has title "Dune",
+  has author "Frank Herbert",
+  has status "to-read";
+```
+  </TabItem>
+  <TabItem label="Query">
+```typeql
+match $b isa book, has title $t, has author $a, has status $s;
+select $t, $a, $s;
+sort $t;
+```
+  </TabItem>
+  <TabItem label="From Node">
+```js
+import { TypeDBLiteInterpreter } from '@typedblite/runtime';
+
+const db = new TypeDBLiteInterpreter('readlist.db'); // a file is a database
+const { rows } = db.query(`
+  match $b isa book, has title $t, has author $a;
+  select $t, $a;
+`);
+for (const row of rows) console.log(row.t.asString(), 'by', row.a.asString());
+db.close();
+```
+  </TabItem>
+</Tabs>
+
+The [five-minute tour](/guide/five-minute-tour/) builds this into a small program, and the
+[playground](/playground/) lets you run it now.
+
+## Where to go
+
+<CardGrid>
+  <LinkCard title="Getting started" description="From a fresh clone to your first schema and queries." href="/guide/getting-started/" />
+  <LinkCard title="The TypeQLite language" description="What you can write, and what is not supported yet." href="/guide/typeqlite-language/" />
+  <LinkCard title="Embedding the runtime" description="Results, transactions, diagnostics and options." href="/guide/embedding-the-runtime/" />
+  <LinkCard title="Replication and search" description="The change log, syncing stores, full-text search." href="/guide/replication-and-search/" />
+  <LinkCard title="API reference" description="Every exported type and function, generated from the source." href="/api/" />
+  <LinkCard title="Known limitations" description="What it does not do, stated plainly, with the source of each gap." href="/guide/known-limitations/" />
+</CardGrid>
+
+## Thanks to TypeDB
+
+TypeDBLite exists because of [TypeDB](https://typedb.com). The data model, the query language and the behaviour it
+implements are the work of TypeDB Ltd and the TypeDB community, and its
+[behaviour specification](https://github.com/typedb/typedb-behaviour) is what TypeDBLite's conformance is measured
+against. TypeDBLite is an independent project, not affiliated with, sponsored by, or endorsed by TypeDB Ltd.

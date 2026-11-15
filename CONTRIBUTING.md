@@ -63,6 +63,7 @@ npm exec nx -- run <project>:<target>
 | `typeqlite-vscode` | `apps/vscode` | `build`, `test`, `typecheck`, `package`, `e2e` |
 | `sync-demo` | `apps/sync-demo` | `build`, `test`, `typecheck`, `smoke`, `test-browser`, `serve`, `demo`, `android-*` |
 | `playground` | `apps/playground` | `build`, `test`, `typecheck`, `test-browser`, `serve` |
+| `website` | `apps/website` | `build-site`, `check`, `dev`, `serve`, `prepare`, `api` |
 
 For VS Code, the repository includes launch configurations. **Run TypeQLite Editor** starts a second
 window with the extension loaded from source.
