@@ -25,8 +25,10 @@ happens when the gates are green. A suggested calendar is at the end.
 
 ## Where to resume
 
-*As of 2026-11-15: history was rewritten into the fresh repository `typedblite/typedblite` (private until launch).
-The pre-rewrite history is kept privately, and every hash cited below is from the rewritten history.* Read this first; everything it points to is below.
+*As of 2026-11-15 (end of day): the work lives in the fresh repository `typedblite/typedblite`, private until launch,
+with its history rewritten to drop the private names. Its pull requests restart at #1; #1 to #4 are merged and none
+is open. The pre-rewrite history is kept privately (the old repository, which holds PRs #1 to #64), and every hash
+cited below is from the rewritten history.* Read this first; everything it points to is below.
 
 🔴 **GitHub Actions is OFF (2026-11-14), so nothing on GitHub checks a change. Run `npm run gate` locally.**
 GitHub refused to start any job on `main`'s run after #40 merged: *"The job was not started because recent account
@@ -74,30 +76,37 @@ To go back: fix billing, `gh workflow enable` the three workflows, restore the D
   its own data, a relation-read performance fix it found is in (empty answers no longer read every relation of
   a type), and the performance guide is rewritten on the generated data.
 
+- **2026-11-15, after the move** (`typedblite/typedblite` #1 to #4; the old repository's #62 to #64 did the
+  handoff, the `@swc/core` and `playwright-core` bumps that replace Dependabot #30, and the URL change): **the
+  five-minute tour** (#1, `docs/guides/five-minute-tour.md`, run as written from the tarballs by `npm run tour`, a gate
+  step; #2 matches a title with `has title == $t`); **a value read as an attribute is refused** (#3: found by running
+  the tour's TypeQL on a live TypeDB; `given $t: string; … has title $t` matched nothing and said so only in an
+  `empty-match` fact, and TypeDB refuses it, so TypeDBLite now does too: a behaviour change in the changelog); and
+  **`oracle-bench`** (#4: the load test's `growth` and `relations` workloads on TypeDBLite and on a live TypeDB, with
+  the network taken out; no results are kept in the repository).
+
 **State of the checks (from the last runs on GitHub, before Actions went off):** every gate was green, including
 **Windows on two complete runs** and `coverage`. Windows is blocking in `ci.yml` (`experimental: false`); macOS is not.
-Nothing has run on GitHub since #40, so CI has seen none of #41 to #61, and `release.yml`, `release-extension.yml` and CI's `clean-room` job have never run. Their evidence is `npm run gate` (11 steps, Linux, Node 24), which passed on `main` after #57.
+Nothing has run on GitHub since #40 of the old repository, so CI has seen none of the work since, and `release.yml`, `release-extension.yml` and CI's `clean-room` job have never run, on either repository. Their evidence is `npm run gate` (12 steps, Linux, Node 24), which passed on every change in the new repository.
 
 **Merging:** merge commits only, never squash or rebase, so each commit keeps its own history (the maintainer's rule,
 2026-11-14). PRs #22 and #33 were squashed before that rule; their original commits are still on GitHub at
 `refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head` (`a7557e1`), and are not on any branch.
 
 **Known and left alone:**
-- **Two Dependabot PRs are open.** #30 (dev-tooling) must not merge as it stands: it raises `@types/vscode` to 1.146,
-  past the extension's `engines.vscode ^1.91`, which `vsce` refuses to package; its `@swc/core` and `playwright-core`
-  bumps can be taken separately. #32 (Capacitor 8) waits until the Android build can be run. #23 to #27 (Actions
-  versions only) were closed, untestable while Actions is off; #28, #29 and #31 were superseded by #53 and #54.
-- **Git history still names the production consumer and the other private projects**, in old commit messages and
-  file contents. The tree does not. A trial rewrite on a scratch clone (2026-11-15, nothing pushed) showed it is
-  small and safe: 223 commits, 19 messages and 33 diffs carry a name, no path does, and `git filter-branch` with a
-  tree filter and a message filter takes 11 seconds and leaves `main`'s tree identical. Two variants slipped past
-  the first pass (two spelling variants of the application's name), and the old fixtures, the removed bench and
-  the removed results data are in history too, so the real list needs a second look. **The catch:** GitHub keeps
-  every old commit reachable through each PR's `refs/pull/N/head` (61 PRs), and a force-push cannot rewrite
-  those. The clean way is a **fresh repository in the `typedblite` org** pushed with the rewritten history, which
-  loses PR and issue history; otherwise GitHub Support must purge the refs. It must come before any release tag,
-  the repository move and going public, and every commit hash cited in docs changes with it. `git-filter-repo` is
-  installed (`~/.local/bin`) for the real run. Rewriting is the maintainer's decision.
+- **No Dependabot PR is open in the new repository, and it is paused there too** (`open-pull-requests-limit: 0`).
+  In the old one, #30 is closed (its `@swc/core` and `playwright-core` bumps were taken in #63; its `@types/vscode`
+  bump must not land while the extension declares `engines.vscode ^1.91`, which `vsce` refuses to package) and #32
+  (Capacitor 8) waits there until the Android build can be run: it did not carry over, so re-raise it when
+  Dependabot is turned back on.
+- **The history was rewritten** into the fresh repository (2026-11-15): 221 commits and one remapping commit, 0 hits
+  for any private name in diffs, messages or any stored file, `gitleaks` clean, the full gate green on a fresh clone.
+  Thirteen retired paths were dropped (the private fixtures, the real-store bench and the old results data) and 16
+  ordered rules replaced the names. The older component names (`document-store`, `graph-store`, `iam`,
+  `workflow-engine`, `mvp`) are still in history on purpose: the maintainer has not asked for them to go. The
+  launch plan itself had listed the removed names, so the new `main`'s tree differs from the old one in those two
+  lines. `55b783a`, cited in `docs/development/performance.md`, is not a commit in this repository (a stale
+  citation, left).
 - **`apps/playground` and the API reference are built and not hosted.** `npm run playground` and `npm run docs:api`.
 - **`gitleaks` 8.30.1 found no leaks** in the 152 reachable commits on 2026-11-15 (S9). Run it again on the rewritten
   history before the repository goes public.
@@ -116,11 +125,9 @@ something is public or published.
    - Start the Open VSX namespace `typedblite`: it needs the Eclipse publisher agreement and a verification request
      ([Releasing](../../development/releasing.md#the-vs-code-extensions)).
 2. **Before anything is public or published.**
-   - **Decided 2026-11-15: a fresh repository, `typedblite/typedblite`, created private and pushed with rewritten
-     history; it is made public at launch.** The history rewrite drops the private names (see the trial in "Known
-     and left alone") and `gitleaks` runs over the result (S9; it was clean on the current history). A rewrite
-     changes every commit hash, so it comes before any tag and going public. The old repository stays private as
-     the archive, and PR and issue history stay there.
+   - **Done 2026-11-15: the fresh repository `typedblite/typedblite`**, created private, holds the rewritten history
+     and is made public at launch. The old repository stays private as the archive, with PR and issue history.
+     Re-run `gitleaks` on the repository the day it goes public.
    - The repository URL moved to `https://github.com/typedblite/typedblite` in `tools/publishable.mjs` and the
      manifests (held by `npm run check-packages`), the READMEs and the extension manifests. npm trusted publishing
      and provenance record that URL.
@@ -133,7 +140,9 @@ something is public or published.
 4. **The first release candidate.** Read the first CI run on `main` and fix what macOS, Windows and Node 22.16 turn
    up (then make `coverage` blocking and add `sync-demo:test-browser` to CI). Publish `0.1.0-rc.1` under `next` with
    provenance, run the clean room against the published packages on three platforms, and publish the extensions.
-5. **Docs that need published packages:** the five-minute tour; hosting the playground and the API reference at
+5. **Docs that need published packages:** run the five-minute tour again against the registry (it is written and
+   tested from the tarballs; `npm run tour` swaps two commands for them, and the guide is not linked from the README
+   until then); hosting the playground and the API reference at
    `typedblite.dev` (GitHub Pages, plus DNS); the demo GIF and badges; "TypeDB vs TypeDBLite", which TypeDB Ltd
    should have the chance to read.
 6. **Governance, before going public:** `CODE_OF_CONDUCT.md` (Insights, Community Standards, Add: the official
@@ -147,6 +156,14 @@ something is public or published.
 
 Decided already: the production consumer is not named (5, S3); Windows is fixed and blocking; the coverage policy
 (decision 9); the Node minimum (22.16); ADR-003's amendment (accepted).
+
+Engineering that is open and not blocking: **full scans and long relation traversals are several times slower than
+TypeDB's** (`npm exec nx -- run typedblite-conformance:oracle-bench` shows it against the same live server; keyed
+and anchored access is at or near the noise floor). The next step would be to profile those two shapes before
+changing anything: the cost looks like per-row overhead. No comparison results are kept in the repository, because
+TypeDB Ltd should read a comparison before it is published. TypeDB 3.10.4 has no `EXPLAIN` (no TypeQL keyword; the
+HTTP API's `query` field is the parsed structure, not a plan), so TypeDBLite's trace and `no-candidates` facts have no
+counterpart there.
 
 Parked, and not blocking the flip to public: PL-2 to PL-5 in the [parking lot](#parking-lot).
 
