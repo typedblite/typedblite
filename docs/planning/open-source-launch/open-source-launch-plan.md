@@ -116,8 +116,10 @@ Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the
    content-revision would have published no JavaScript, and the SQLite WASM peer range matched no version. **Left:**
    the maintainer's npm steps (8 above), then `0.1.0-rc.1` under `next` with provenance, which needs Actions (or a
    decision to publish once from a laptop, without provenance), and the clean room on three platforms from the
-   *published* packages (CI's `clean-room` job, once Actions is on). The extension's marketplace publishing (a
-   publisher account on each) is not started.
+   *published* packages (CI's `clean-room` job, once Actions is on). The extensions' marketplace publishing is
+   written and not run (the `build/extension-publishing` pull request: `release-extension.yml`, the one-time setup in
+   [Releasing](../../development/releasing.md#the-vs-code-extensions)). It waits on a Marketplace publisher and an Open
+   VSX namespace, both `typedblite`, which only the maintainer can create.
 2. **Phase 3, docs** (partly done): the Known limitations page, the README restructure and the **API reference**
    (TypeDoc, `npm run docs:api`, checked by `npm run check-api`; not hosted yet) are in. Before it, the runtime's
    API was reviewed: it now names every export, pinned by a test, and the internals it leaked are gone or marked
