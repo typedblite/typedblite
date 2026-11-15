@@ -9,7 +9,7 @@ they are listed here.
 
 ### Changed
 - **Breaking for a hand-written client:** a store now checks a revision from a peer against its content, instead
-  of storing the `rev` it is given (proposed ADR-003 amendment). A revision must equal `computeRevision` of its
+  of storing the `rev` it is given (ADR-003, amended 2026-11-15). A revision must equal `computeRevision` of its
   state, parent and deleted flag, and a live one must carry its state. Otherwise `ChangeLog.applyRemote` throws with
   the new code `typedblite.revision-not-derived`, a batch is refused whole, and the hub answers 400 naming the
   change. Before, a peer could send `999999-deadbeef`, or a revision another store held with different content,
