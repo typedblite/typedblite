@@ -1,6 +1,6 @@
 # TypeDBLite — Open Source Launch Plan
 
-Status: in progress · Written 2026-11-14 · Basis: a read of the repository at `main` (`77f98c3`); [where to resume](#where-to-resume) is current as of `82deabb`
+Status: in progress · Written 2026-11-14 · Basis: a read of the repository at `main` (`5aac641`); [where to resume](#where-to-resume) is current as of `d3c7c78`
 
 This plan takes TypeDBLite from "a strong repository" to "a project strangers can install, trust, and
 contribute to." It is organised as gates, not dates: each phase has exit criteria, and the launch
@@ -25,8 +25,8 @@ happens when the gates are green. A suggested calendar is at the end.
 
 ## Where to resume
 
-*As of 2026-11-15, `main` at `c9340d0`: every pull request through #61 is merged, and none is open except two of
-Dependabot's.* Read this first; everything it points to is below.
+*As of 2026-11-15: history was rewritten into the fresh repository `typedblite/typedblite` (private until launch).
+The pre-rewrite history is kept privately, and every hash cited below is from the rewritten history.* Read this first; everything it points to is below.
 
 🔴 **GitHub Actions is OFF (2026-11-14), so nothing on GitHub checks a change. Run `npm run gate` locally.**
 GitHub refused to start any job on `main`'s run after #40 merged: *"The job was not started because recent account
@@ -67,7 +67,7 @@ To go back: fix billing, `gh workflow enable` the three workflows, restore the D
   explicit exports pinned by a test, `check-api`, `docs:api`); Nx 24 (#53) and Vitest 5 (#54); **a pushed revision
   checked against its content** (#55, PL-6, ADR-003 amended and accepted); both extensions ready to publish (#56:
   `release-extension.yml`); a draft of "When to use TypeDBLite, and when not" (#57); the plan refreshed (#59);
-  **every private name out of the tree** (#58, #60: the downstream application, its a downstream feature, a sibling
+  **every private name out of the tree** (#58, #60: the downstream application, one of its features, a sibling
   repository and its stores, the third-party WASM package, and the monorepo's ADR numbers); and **original
   fixtures** (#61): a project tracker (`tracker`, `people`, `sprint`, `documents` in `test-fixtures/schemas/`)
   replaces the adapted schemas and example queries, the `real-stores` benchmark is gone, the load test generates
@@ -91,7 +91,7 @@ Nothing has run on GitHub since #40, so CI has seen none of #41 to #61, and `rel
   file contents. The tree does not. A trial rewrite on a scratch clone (2026-11-15, nothing pushed) showed it is
   small and safe: 223 commits, 19 messages and 33 diffs carry a name, no path does, and `git filter-branch` with a
   tree filter and a message filter takes 11 seconds and leaves `main`'s tree identical. Two variants slipped past
-  the first pass (`downstream-studio`, `downstream-maintainers`), and the old fixtures, the removed bench and
+  the first pass (two spelling variants of the application's name), and the old fixtures, the removed bench and
   the removed results data are in history too, so the real list needs a second look. **The catch:** GitHub keeps
   every old commit reachable through each PR's `refs/pull/N/head` (61 PRs), and a force-push cannot rewrite
   those. The clean way is a **fresh repository in the `typedblite` org** pushed with the rewritten history, which
@@ -438,7 +438,7 @@ groups 2 and 3 are read from the failure messages; group 4's is unknown.
    link on every platform, whose name is `typedblite`, and `out/main.js` had no `#!` line for that link
    either. All three are fixed.
 
-**Green on Windows since #39:** run 43618713890 (`41ef856`) and run 43619313563 (`7b5fe1e`), two complete runs
+**Green on Windows since #39:** run 43618713890 (`c794265`) and run 43619313563 (`c2c3217`), two complete runs
 with every test passing. The founder made it blocking in #39 (`experimental: false` in `ci.yml`), so a Windows failure
 now fails the CI run, as a Linux one does.
 
@@ -803,7 +803,7 @@ outside pull request arrives.
 ### PL-5. Confirm CI on `main` is stable
 
 The Node 22 gate failed once on `main`, from the Langium race, and has passed since. One clean run proves little:
-three clean runs on pull requests did not prove it before. The push runs on `main` for `4288d70` and `63d4c66`
+three clean runs on pull requests did not prove it before. The push runs on `main` for `983f738` and `90cf7d8`
 (docs and CI changes only) have not been read.
 
 **To do:** read the push runs on `main` as they arrive. Any intermittent failure of `typeqlite-vscode`'s

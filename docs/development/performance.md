@@ -142,10 +142,10 @@ any consumer that rewrites large values will grow the same way.
 Four runs of the same harness on the same generated data and the same machine. Times are milliseconds at
 the median:
 
-- **original**: the engine before any fix (`65e68b6`'s harness on `218b2ca`'s engine, 2026-11-12).
-- **fixes 1–4** (`55b783a`) and **fixes 1–6** (`65e68b6`), the same day. Fixes 1–4 predate the
+- **original**: the engine before any fix (`2041031`'s harness on `711b535`'s engine, 2026-11-12).
+- **fixes 1–4** (`55b783a`) and **fixes 1–6** (`2041031`), the same day. Fixes 1–4 predate the
   `a key and a broad value` measurement, so that row shows `—`.
-- **now**: 2026-11-15, all seven fixes (`fa75d31`), on this repository's generated data.
+- **now**: 2026-11-15, all seven fixes (`101f972`), on this repository's generated data.
 
 The raw files are in [performance-results/](performance-results/). The 2026-11-12 files are renamed to this
 page's vocabulary: the data they measured was generated with the same shapes and sizes, and only the names

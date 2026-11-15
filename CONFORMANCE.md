@@ -4,7 +4,7 @@ How closely TypeDBLite matches TypeDB, measured against TypeDB's own behaviour s
 gives the latest numbers, what each non-passing scenario is and why, and how to reproduce or update the
 count.
 
-> **Cited run:** 2026-11-12, at `main` `fa3e075`, against the spec pin
+> **Cited run:** 2026-11-12, at `main` `72c2013`, against the spec pin
 > `typedb/typedb-behaviour@7d35851` (`query/language/*.feature`, surveyed against TypeDB 3.10.4).
 > The [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md)
 > requires any compatibility claim to cite a run. Cite this one, or a later one.

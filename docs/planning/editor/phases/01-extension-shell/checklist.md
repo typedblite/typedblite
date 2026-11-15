@@ -17,7 +17,7 @@ the editor. That covers diagnostics, formatting and semantic tokens.
 
 ## The gate was red before the phase started
 
-On `main` at `20649bc`, `nx run-many -t typecheck` failed in two places:
+On `main` at `0cba654`, `nx run-many -t typecheck` failed in two places:
 
 - [x] `typeqlite-language:typecheck`: `annotation-admissibility.spec.ts` had no rows for the
       `owns list` and `relates list` subjects added to `AnnotationSubject`. The rows are added, and
