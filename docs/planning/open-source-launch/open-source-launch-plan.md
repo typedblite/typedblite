@@ -506,7 +506,9 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
 **Docs work**
 
 - [ ] A task-based "5-minute tour" ending in a working app, distinct from the existing getting-started
-      guide (which starts from a clone).
+      guide (which starts from a clone). *Written 2026-11-15, `docs/guides/five-minute-tour.md`, and run as written
+      from the tarballs by `npm run tour` (a gate step); not linked from the README until the packages are on npm,
+      then run it again against the registry.*
 - [ ] A **Known limitations & roadmap** page assembled from: `@range/@values/...` not enforced, `@card`
       only partly enforced, the 14 non-passing scenarios, and the performance "Still open" list.
 - [ ] "TypeDB vs TypeDBLite" page: what's the same, what differs, when to use which. Written to be

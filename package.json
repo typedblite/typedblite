@@ -18,6 +18,7 @@
     "playground": "nx run playground:serve",
     "check-packages": "node tools/check-packages.mjs",
     "clean-room": "node tools/clean-room.mjs",
+    "tour": "node tools/tour.mjs",
     "check-api": "node tools/check-api.mjs",
     "docs:api": "typedoc"
   },
