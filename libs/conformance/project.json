@@ -53,6 +53,16 @@
         "command": "tsx src/cli.ts",
         "cwd": "libs/conformance"
       }
+    },
+    "oracle-bench": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "^build"
+      ],
+      "options": {
+        "command": "tsx --tsconfig ../../tsconfig.base.json src/oracle-bench.ts",
+        "cwd": "libs/conformance"
+      }
     }
   }
 }
