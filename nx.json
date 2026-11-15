@@ -65,5 +65,8 @@
         "registry": "https://registry.npmjs.org/"
       }
     }
+  },
+  "affected": {
+    "legacy": true
   }
 }

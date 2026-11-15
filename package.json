@@ -22,15 +22,15 @@
     "docs:api": "typedoc"
   },
   "devDependencies": {
-    "@nx/js": "23.3.0",
-    "@nx/workspace": "23.3.0",
+    "@nx/js": "24.0.6",
+    "@nx/workspace": "24.0.6",
     "@swc-node/register": "^1.12.1",
     "@swc/cli": "~0.8.1",
     "@swc/core": "~1.15.5",
     "@swc/helpers": "~0.5.18",
     "@types/node": "^26.6.6",
     "@vitest/coverage-v8": "^4.1.11",
-    "nx": "23.3.0",
+    "nx": "24.0.6",
     "tsx": "^4.23.15",
     "typedoc": "^0.28.20",
     "typescript": "~6.0.3",
@@ -39,7 +39,7 @@
   },
   "allowScripts": {
     "@swc/core@1.15.47": true,
-    "nx@23.3.0": true,
+    "nx@24.0.6": true,
     "esbuild@0.28.2": true,
     "electron@42.11.18": true
   }
