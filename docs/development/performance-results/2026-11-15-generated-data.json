@@ -1,0 +1,373 @@
+{
+  "label": "generated-data",
+  "commit": "fa75d31",
+  "date": "2026-11-15T19:15:34.512Z",
+  "machine": "linux 6.6.87.2-microsoft-standard-WSL2, Intel(R) Core(TM) Ultra 9 275HX \u00d724, Node v24.19.0",
+  "measurements": [
+    {
+      "suite": "relations",
+      "name": "200: tasks via project-task",
+      "n": 60,
+      "p50": 1.1510619999971823,
+      "p95": 1.5226609999954235,
+      "max": 3.2811639999999898,
+      "mean": 1.2304513833327897,
+      "rows": 7
+    },
+    {
+      "suite": "relations",
+      "name": "200: task dependencies (2 relations)",
+      "n": 60,
+      "p50": 0.9141740000050049,
+      "p95": 1.29228900000453,
+      "max": 2.4540539999943576,
+      "mean": 0.9555179833330233,
+      "rows": 6
+    },
+    {
+      "suite": "relations",
+      "name": "200: subproject children (2 relations)",
+      "n": 60,
+      "p50": 0.8239140000005136,
+      "p95": 1.5778120000031777,
+      "max": 2.247503999999026,
+      "mean": 0.8972469833331463,
+      "rows": 0.31666666666666665
+    },
+    {
+      "suite": "relations",
+      "name": "200: log fields (multi-valued)",
+      "n": 60,
+      "p50": 0.6250510000027134,
+      "p95": 0.7989239999951678,
+      "max": 1.0206029999972088,
+      "mean": 0.642637349999859,
+      "rows": 14
+    },
+    {
+      "suite": "relations",
+      "name": "200: a key and a broad value",
+      "n": 60,
+      "p50": 0.21323299999494338,
+      "p95": 0.40128200000617653,
+      "max": 1.434957999998005,
+      "mean": 0.24677598333316078,
+      "rows": 1
+    },
+    {
+      "suite": "relations",
+      "name": "200: every dependency edge",
+      "n": 2,
+      "p50": 56.0451979999998,
+      "p95": 56.0451979999998,
+      "max": 56.0451979999998,
+      "mean": 55.98493950000193,
+      "rows": 1200
+    },
+    {
+      "suite": "relations",
+      "name": "200: 2-hop, untyped middle",
+      "n": 10,
+      "p50": 0.5036009999967064,
+      "p95": 1.9289849999986473,
+      "max": 1.9289849999986473,
+      "mean": 0.6420597000011184,
+      "rows": 1
+    },
+    {
+      "suite": "relations",
+      "name": "200: 2-hop, typed middle",
+      "n": 10,
+      "p50": 0.6539580000026035,
+      "p95": 0.7916130000012345,
+      "max": 0.7916130000012345,
+      "mean": 0.652952800001367,
+      "rows": 1
+    },
+    {
+      "suite": "relations",
+      "name": "1000: tasks via project-task",
+      "n": 60,
+      "p50": 1.1802849999949103,
+      "p95": 1.454334000001836,
+      "max": 2.0426579999984824,
+      "mean": 1.2159694833325678,
+      "rows": 7
+    },
+    {
+      "suite": "relations",
+      "name": "1000: task dependencies (2 relations)",
+      "n": 60,
+      "p50": 0.9388869999966118,
+      "p95": 1.3054189999966184,
+      "max": 2.46017700000084,
+      "mean": 0.998732533333047,
+      "rows": 6
+    },
+    {
+      "suite": "relations",
+      "name": "1000: subproject children (2 relations)",
+      "n": 60,
+      "p50": 0.801313999996637,
+      "p95": 1.0646859999978915,
+      "max": 1.8594019999945886,
+      "mean": 0.8338201333330896,
+      "rows": 0.31666666666666665
+    },
+    {
+      "suite": "relations",
+      "name": "1000: log fields (multi-valued)",
+      "n": 60,
+      "p50": 0.6122189999950933,
+      "p95": 0.8773900000014692,
+      "max": 1.6484809999965364,
+      "mean": 0.643562366666447,
+      "rows": 14
+    },
+    {
+      "suite": "relations",
+      "name": "1000: a key and a broad value",
+      "n": 60,
+      "p50": 0.20924699999886798,
+      "p95": 0.3134589999972377,
+      "max": 0.6112299999949755,
+      "mean": 0.22541821666588172,
+      "rows": 1
+    },
+    {
+      "suite": "relations",
+      "name": "1000: every dependency edge",
+      "n": 2,
+      "p50": 278.4372129999974,
+      "p95": 278.4372129999974,
+      "max": 278.4372129999974,
+      "mean": 278.07773349999843,
+      "rows": 6000
+    },
+    {
+      "suite": "relations",
+      "name": "1000: 2-hop, untyped middle",
+      "n": 10,
+      "p50": 0.43619500000204425,
+      "p95": 1.369416999994428,
+      "max": 1.369416999994428,
+      "mean": 0.5449527999997372,
+      "rows": 1
+    },
+    {
+      "suite": "relations",
+      "name": "1000: 2-hop, typed middle",
+      "n": 10,
+      "p50": 0.5468850000033854,
+      "p95": 0.7042939999955706,
+      "max": 0.7042939999955706,
+      "mean": 0.5594088999998348,
+      "rows": 1
+    },
+    {
+      "suite": "relations",
+      "name": "3000: tasks via project-task",
+      "n": 60,
+      "p50": 1.1739629999938188,
+      "p95": 1.4736740000080317,
+      "max": 3.209907000011299,
+      "mean": 1.2274471666678437,
+      "rows": 7
+    },
+    {
+      "suite": "relations",
+      "name": "3000: task dependencies (2 relations)",
+      "n": 60,
+      "p50": 0.8971339999989141,
+      "p95": 1.321074999999837,
+      "max": 2.5973640000011073,
+      "mean": 0.9491009833325127,
+      "rows": 6
+    },
+    {
+      "suite": "relations",
+      "name": "3000: subproject children (2 relations)",
+      "n": 60,
+      "p50": 0.7022320000105537,
+      "p95": 0.8760739999997895,
+      "max": 1.8774819999962347,
+      "mean": 0.7267935500002447,
+      "rows": 0.9833333333333333
+    },
+    {
+      "suite": "relations",
+      "name": "3000: log fields (multi-valued)",
+      "n": 60,
+      "p50": 0.6039739999978337,
+      "p95": 0.7779540000046836,
+      "max": 1.8385630000120727,
+      "mean": 0.6345822999993591,
+      "rows": 14
+    },
+    {
+      "suite": "relations",
+      "name": "3000: a key and a broad value",
+      "n": 60,
+      "p50": 0.20472199999494478,
+      "p95": 0.3091359999962151,
+      "max": 0.46626699999615084,
+      "mean": 0.21456251666653164,
+      "rows": 1
+    },
+    {
+      "suite": "relations",
+      "name": "3000: every dependency edge",
+      "n": 2,
+      "p50": 828.3268320000061,
+      "p95": 828.3268320000061,
+      "max": 828.3268320000061,
+      "mean": 827.6277205000079,
+      "rows": 18000
+    },
+    {
+      "suite": "relations",
+      "name": "3000: 2-hop, untyped middle",
+      "n": 10,
+      "p50": 0.5998269999981858,
+      "p95": 2.4134780000022147,
+      "max": 2.4134780000022147,
+      "mean": 0.7898409999979776,
+      "rows": 1
+    },
+    {
+      "suite": "relations",
+      "name": "3000: 2-hop, typed middle",
+      "n": 10,
+      "p50": 0.6726880000060191,
+      "p95": 0.8531039999943459,
+      "max": 0.8531039999943459,
+      "mean": 0.6822767999998177,
+      "rows": 1
+    }
+  ],
+  "tables": {
+    "growth": [
+      {
+        "entities": 20160,
+        "loadPerEntity": 0.3785048020833334,
+        "keyed": 0.435744700000032,
+        "column": 0.6623461499999849,
+        "emptyOptional": 1.1425363000000288,
+        "listAll": 8.477249500000198,
+        "ticketUpdate": 4.437497600000006
+      },
+      {
+        "entities": 40320,
+        "loadPerEntity": 0.3774286913194444,
+        "keyed": 0.20678104999997232,
+        "column": 0.5302513500000714,
+        "emptyOptional": 1.6690644999998767,
+        "listAll": 17.695107000000462,
+        "ticketUpdate": 4.636075700000037
+      },
+      {
+        "entities": 60480,
+        "loadPerEntity": 0.3694255217757933,
+        "keyed": 0.213728699999956,
+        "column": 0.5335027499999342,
+        "emptyOptional": 2.4324643999996622,
+        "listAll": 26.127827000000252,
+        "ticketUpdate": 5.140135300000111
+      },
+      {
+        "entities": 80640,
+        "loadPerEntity": 0.37345829985119045,
+        "keyed": 0.18913155000009282,
+        "column": 0.6005404500001532,
+        "emptyOptional": 3.228853199999867,
+        "listAll": 33.17178950000016,
+        "ticketUpdate": 3.952608600000167
+      },
+      {
+        "entities": 100800,
+        "loadPerEntity": 0.36847901279761913,
+        "keyed": 0.1845218999998906,
+        "column": 0.5097231499999907,
+        "emptyOptional": 4.198488200000429,
+        "listAll": 43.36844050000218,
+        "ticketUpdate": 4.488559499999974
+      }
+    ],
+    "relations-generation": [
+      {
+        "projects": 200,
+        "tasks": 1400,
+        "writes": 2939,
+        "seconds": 2.4556693129999987,
+        "msPerWrite": 0.8355458703640689
+      },
+      {
+        "projects": 1000,
+        "tasks": 7000,
+        "writes": 14699,
+        "seconds": 11.692894829999997,
+        "msPerWrite": 0.7954891373562826
+      },
+      {
+        "projects": 3000,
+        "tasks": 21000,
+        "writes": 44099,
+        "seconds": 35.393316748000004,
+        "msPerWrite": 0.8025877400394568
+      }
+    ],
+    "concurrency": [
+      {
+        "configuration": "1W+0R",
+        "updatesPerSecond": 174.7,
+        "writerP50": 5.0295930000002045,
+        "writerP99": 13.127706999999646,
+        "writerErrors": 0,
+        "readsPerSecond": 0,
+        "readerP99": 0,
+        "readerErrors": 0
+      },
+      {
+        "configuration": "2W+0R",
+        "updatesPerSecond": 170,
+        "writerP50": 5.88893999999982,
+        "writerP99": 946.3509379999999,
+        "writerErrors": 0,
+        "readsPerSecond": 0,
+        "readerP99": 0,
+        "readerErrors": 0
+      },
+      {
+        "configuration": "4W+0R",
+        "updatesPerSecond": 93.2,
+        "writerP50": 12.54548799999975,
+        "writerP99": 1255.7145290000003,
+        "writerErrors": 0,
+        "readsPerSecond": 0,
+        "readerP99": 0,
+        "readerErrors": 0
+      },
+      {
+        "configuration": "2W+2R",
+        "updatesPerSecond": 70,
+        "writerP50": 13.064199000000372,
+        "writerP99": 752.5462630000002,
+        "writerErrors": 0,
+        "readsPerSecond": 2581.6,
+        "readerP99": 2.191730999998981,
+        "readerErrors": 0
+      },
+      {
+        "configuration": "4W+4R",
+        "updatesPerSecond": 57.4,
+        "writerP50": 15.92298000000028,
+        "writerP99": 1575.8778309999998,
+        "writerErrors": 0,
+        "readsPerSecond": 4571.1,
+        "readerP99": 2.731973999999809,
+        "readerErrors": 0
+      }
+    ]
+  },
+  "note": "Measured on this repository's generated data, after the empty-answer fix (perf(runtime): stop at the first relation row). The contention table is from one run; its numbers vary a lot between runs on a busy machine."
+}
