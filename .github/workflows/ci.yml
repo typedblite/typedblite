@@ -49,6 +49,8 @@ jobs:
       - run: npm run typecheck
       # What `npm publish` would ship (tools/check-packages.mjs).
       - run: npm run check-packages
+      # The API reference builds cleanly, and every type the API mentions is exported (tools/check-api.mjs).
+      - run: npm run check-api
       # `npm test` includes the conformance report card: it fails if any feature's passing count
       # drops below libs/conformance/baseline.json, and if an improvement was not raised.
       # GitHub sets CI=true on every runner, and vitest.shared.ts turns coverage, with its 80%

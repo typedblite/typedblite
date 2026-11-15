@@ -6,7 +6,7 @@
 /**
  * The change log — TypeDBLite's record of what changed, in the order it committed.
  *
- * Implements [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
+ * Implements [ADR-003](../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
  * Decisions 1 and 2. The rows are written by `TypeDBLiteInterpreter` **inside its existing
  * transaction**, never after it — a row committed and then published loses the change entirely if
  * the process dies between the two.
@@ -28,32 +28,43 @@ import {
   type Revision,
 } from './revision.js';
 
+/** One revision in the change log: what `since()` returns, and what replication sends. */
 export interface ChangeRecord {
+  /** Its position in this store's log, increasing. A cursor for `since()`; local to the store. */
   readonly seq: number;
+  /** The thing it revises, as `entityId` spells it: `type/key`, or `local:…` for a thing with no key. */
   readonly entityId: string;
+  /** Its revision, `generation-digest`, derived from its content: the same edit gives the same revision on every store. */
   readonly rev: Revision;
+  /** The revision it follows, or `null` for the thing's first. */
   readonly parentRev: string | null;
+  /** Whether it is a tombstone: the thing was deleted. */
   readonly deleted: boolean;
   /** The revision's content. Absent for a tombstone, which has no state. */
   readonly state?: EntityState;
 }
 
-/** What a thing is, resolved to node-independent terms. Captured before a delete removes it. */
 /** How much history `compact` may keep behind each leaf. */
 export interface CompactionOptions {
   /** Non-leaf revisions retained per entity, most recent first. Default 0 — leaves only. */
   readonly keepAncestors?: number;
 }
 
+/** What `compact` did. */
 export interface CompactionReport {
+  /** Things with history in the log. */
   readonly entities: number;
+  /** Revisions in the log before. */
   readonly revisionsBefore: number;
+  /** Revisions in the log after. */
   readonly revisionsAfter: number;
+  /** Revisions removed: `revisionsBefore - revisionsAfter`. */
   readonly removed: number;
   /** Bytes of revision *state* dropped. Not the file size change — see `vacuum`. */
   readonly bytesReclaimed: number;
 }
 
+/** What a thing is, resolved to node-independent terms. Captured before a delete removes it. */
 export interface EntityIdentity {
   readonly entityId: string;
   readonly state: EntityState;
@@ -628,7 +639,7 @@ export class ChangeLog {
   /**
    * Drop revision history that nothing can read, keeping every leaf.
    *
-   * 🔴 **What it may never remove, and why.** [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
+   * 🔴 **What it may never remove, and why.** [ADR-003](../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
    * Decision 4 requires losing revisions to be *retained and enumerable* — `conflictsOf` is part of
    * the deliverable, not a convenience. So every **leaf** survives with its state: the winner and
    * every conflicting loser. Only revisions that are somebody's parent are candidates, and

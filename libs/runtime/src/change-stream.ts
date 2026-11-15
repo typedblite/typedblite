@@ -1,7 +1,7 @@
 /**
  * The hub's side of the wire: an SSE stream out, and a POST in.
  *
- * Implements [ADR-003](../../../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
+ * Implements [ADR-003](../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
  * Decision 8.
  *
  * 🔴 **Named `ChangeStream`, not `EventSource`.** `EventSource` is a well-established name for the

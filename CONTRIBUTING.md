@@ -90,7 +90,7 @@ npm run gate
 
 It deletes the build output first, because the incremental build can hide type errors from stale
 declarations ([Testing](docs/development/testing.md#the-clean-tree-gate)), then runs the build, the
-type-check, the package contents (`npm run check-packages`), the tests **with the 80% coverage floor**, the WASM
+type-check, the package contents (`npm run check-packages`), the API (`npm run check-api`), the tests **with the 80% coverage floor**, the WASM
 suite, the browser suites (the engine's, and the playground's), the VS Code e2e, and the clean-room install
 (`npm run clean-room`).
 Each step stops the gate at the first failure and says which. `npm run gate -- --quick` stops after the tests,
@@ -137,7 +137,9 @@ that the release workflow publishes. [Releasing](docs/development/releasing.md) 
 
 - **TypeScript in strict mode.** Avoid `any`; where it is unavoidable, say why in a comment.
 - **ESM throughout.** Import paths in source end in `.js`.
-- **Named exports only.** A package's `index.ts` exports its public API and nothing else.
+- **Named exports only.** A package's entry point exports its public API and nothing else, by name. Something
+  public only so another module of the package can call it is marked `@internal` in its doc comment.
+  `npm run check-api` checks that every type the API mentions is exported.
 - **The interpreter is synchronous.** Do not introduce `async` into it.
 - **Only `node-sqlite.ts` imports `node:sqlite`.** Everything else goes through `SqliteDatabase`.
 - **Fail loudly.** A user-visible problem is a structured diagnostic with a `DiagnosticCode`, not a

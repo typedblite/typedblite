@@ -13,7 +13,6 @@ import {
 import {
   DefaultDefinitionProvider,
   DefaultReferencesProvider,
-  type LangiumServices,
 } from 'langium/lsp';
 import {
   DiagnosticSeverity,
@@ -24,7 +23,7 @@ import {
   type Location,
   type ReferenceParams,
 } from 'vscode-languageserver';
-import { TypeQLiteLabels, type LabelSite } from './typeqlite-labels.js';
+import { TypeQLiteLabels, type LabelSite, type TypeQLiteLabelServices } from './typeqlite-labels.js';
 import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
 
 /**
@@ -33,7 +32,7 @@ import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
  * cross-references first; these add what the labels resolve to.
  */
 
-type WithLabels = LangiumServices & { labels: { Labels: TypeQLiteLabels } };
+type WithLabels = TypeQLiteLabelServices;
 
 /** A link from a label to a definition it names. */
 function linkTo(target: AstNode, origin: LabelSite, names: NameProvider): LocationLink | undefined {

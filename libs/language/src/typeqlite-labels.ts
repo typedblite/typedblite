@@ -81,6 +81,9 @@ const TARGETS: Record<Exclude<LabelKind, 'role'>, readonly string[]> = {
  * query has no schema in scope when it runs. So they are resolved here, in the editor, through the
  * workspace index (ADR-008 D3), and nothing here is a validation check (ADR-008 D2).
  */
+/** The Langium services, with TypeQLite's label resolver: what the label-aware providers are constructed with. */
+export type TypeQLiteLabelServices = LangiumServices & { labels: { Labels: TypeQLiteLabels } };
+
 export class TypeQLiteLabels {
   private readonly index: IndexManager;
   private readonly documents: LangiumDocuments;

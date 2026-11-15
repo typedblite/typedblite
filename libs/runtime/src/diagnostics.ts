@@ -174,6 +174,9 @@ type WithDiagnostic = { diagnostic?: Diagnostic };
  * 🔴 Deliberately not a subclass. Consumers match on the error message text; a new subclass would
  * silently break them. A new error type here would break the duplicate-registration guarantee in
  * exactly the way ADR-004 Decision 3 exists to prevent.
+ *
+ * Exported for this repository's conformance suite, which attaches TypeDB's refusals the same way.
+ * @internal
  */
 export function attachDiagnostic<E>(error: E, diagnostic: Diagnostic): E {
   if (error && typeof error === 'object') {

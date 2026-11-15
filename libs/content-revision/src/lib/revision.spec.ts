@@ -1,6 +1,6 @@
 /**
  * The properties the conflict model's convergence rests on. Each case is a claim
- * [conflict-model.md](../../../../../docs/planning/typeqlite-sync/phases/00-scope-and-adr/conflict-model.md)
+ * conflict-model.md (in the monorepo this engine came from)
  * makes, tested rather than asserted in prose.
  *
  * 🔴 **These moved here with the code in a downstream feature Phase 07.** They used to live in

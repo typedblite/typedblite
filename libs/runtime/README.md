@@ -29,7 +29,7 @@ const { rows } = db.query(`match $p isa person, has name $n; select $n;`);
 rows[0]?.n.asString(); // 'Alice'
 ```
 
-**Guides:** [Embedding the runtime](../../docs/guides/embedding-the-runtime.md) ·
+**API reference:** `npm run docs:api` at the repository root (not hosted yet). **Guides:** [Embedding the runtime](../../docs/guides/embedding-the-runtime.md) ·
 [The TypeQLite language](../../docs/guides/typeqlite-language.md) ·
 [Replication and search](../../docs/guides/replication-and-search.md)
 

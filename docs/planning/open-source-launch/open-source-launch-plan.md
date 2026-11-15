@@ -116,9 +116,11 @@ Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the
    decision to publish once from a laptop, without provenance), and the clean room on three platforms from the
    *published* packages (CI's `clean-room` job, once Actions is on). The extension's marketplace publishing (a
    publisher account on each) is not started.
-2. **Phase 3, docs** (partly done): the Known limitations page and the README restructure are in. Still to write: a
-   five-minute tour (needs the published packages), "TypeDB vs TypeDBLite" (TypeDB Ltd should read it) and "Why not
-   X", the TypeDoc API reference, the demo GIF, and badges.
+2. **Phase 3, docs** (partly done): the Known limitations page, the README restructure and the **API reference**
+   (TypeDoc, `npm run docs:api`, checked by `npm run check-api`; not hosted yet) are in. Before it, the runtime's
+   API was reviewed: it now names every export, pinned by a test, and the internals it leaked are gone or marked
+   `@internal`. Still to write: a five-minute tour (needs the published packages), "TypeDB vs TypeDBLite" (TypeDB
+   Ltd should read it) and "Why not X", the demo GIF, and badges.
 3. **PL-6, the one item left:** check a pushed revision against its content. It changes what a store accepts from
    its peers, so it needs its own tests and an ADR-003 amendment.
 4. **When Actions is back:** read the first run on `main`, then make `coverage` blocking and add
@@ -489,6 +491,8 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       fair to TypeDB; ask TypeDB Ltd to read it (Phase 0 contact).
 - [ ] "Why not X?" page (4.3).
 - [ ] API reference generated from TSDoc (TypeDoc) and published to GitHub Pages; link from the README.
+      *Generated and checked (2026-11-15): `npm run docs:api`, `npm run check-api` in the gate. Publishing it waits
+      with the playground's hosting.*
 - [ ] Docs site: GitHub Pages from `docs/` is enough, served at `typedblite.dev` (CNAME plus DNS records,
       "Enforce HTTPS" on). Don't build a bespoke site pre-launch. Suggested layout: `typedblite.dev` for the
       landing page and docs, `/playground` for the playground, `/api` for the TypeDoc reference.

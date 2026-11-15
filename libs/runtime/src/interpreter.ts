@@ -980,7 +980,7 @@ export class TypeDBLiteInterpreter {
   private persistKeyOwnerships = false;
 
   /**
-   * Whether a caller-held transaction is open on this handle ([ADR-069](../../../../docs/architecture/adr-069-domain-events-contract-is-a-shared-kernel.md) D7).
+   * Whether a caller-held transaction is open on this handle (D7 of ADR-069, in the monorepo this engine came from).
    *
    * 🔴 While it is, `execute` must not issue its own `BEGIN`: SQLite rejects a nested one, so each
    * write pipeline takes a `SAVEPOINT` instead, and a failing pipeline rolls back to it without
@@ -1888,7 +1888,11 @@ export class TypeDBLiteInterpreter {
 
   // ── query-local functions ───────────────────────────────────────────────────
 
-  /** What evaluating an expression in one combination may read: the schema, the bindings, and calls. */
+  /**
+   * What evaluating an expression in one combination may read: the schema, the bindings, and calls.
+   * Public so the interpreter's own modules can call it; not part of the API (docs/guides/compatibility.md).
+   * @internal
+   */
   evaluationContext(combination: Record<string, Binding>): SchemaContext {
     return {
       facts: this.schema,
@@ -1958,7 +1962,11 @@ export class TypeDBLiteInterpreter {
     return this.returned(definition.body.returnStage, this.runStages(definition.body, plan, [seed]), plan[plan.length - 1], at);
   }
 
-  /** What a `return` answers over a body's rows — shared by functions and fetch's return sub-queries. */
+  /**
+   * What a `return` answers over a body's rows — shared by functions and fetch's return sub-queries.
+   * Public so the interpreter's own modules can call it; not part of the API (docs/guides/compatibility.md).
+   * @internal
+   */
   returned(stage: ReturnStage, rows: Array<Record<string, Binding>>, scope: StreamScope, at: Range | undefined): Array<Array<ValueBinding | undefined>> {
     const value = (binding: Binding | undefined): ValueBinding | undefined => {
       if (binding === undefined || typeof binding === 'object') return binding;
@@ -4739,6 +4747,11 @@ export class TypeDBLiteInterpreter {
   /** The `match` a segment of patterns is, with `has T op expr` rewritten — once per AST node. */
   private readonly segments = new WeakMap<LangiumNode, Segment>();
 
+  /**
+   * The segment for `key`, built once.
+   * Public so the interpreter's own modules can call it; not part of the API (docs/guides/compatibility.md).
+   * @internal
+   */
   segmentFor(key: LangiumNode, patterns: readonly Pattern[]): Segment {
     const known = this.segments.get(key);
     if (known !== undefined) return known;

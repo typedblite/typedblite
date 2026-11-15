@@ -11,7 +11,6 @@ import {
 import {
   DefaultRenameProvider,
   type CodeActionProvider,
-  type LangiumServices,
 } from 'langium/lsp';
 import {
   CodeActionKind,
@@ -28,7 +27,7 @@ import {
   type WorkspaceEdit,
 } from 'vscode-languageserver';
 import { isAnnotation, type Annotation } from './generated/ast.js';
-import type { TypeQLiteLabels } from './typeqlite-labels.js';
+import type { TypeQLiteLabels, TypeQLiteLabelServices } from './typeqlite-labels.js';
 import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
 import { isReservedKeyword } from './typeqlite-validator.js';
 
@@ -37,7 +36,7 @@ import { isReservedKeyword } from './typeqlite-validator.js';
  * workspace index (ADR-008 D2).
  */
 
-type WithLabels = LangiumServices & { labels: { Labels: TypeQLiteLabels } };
+type WithLabels = TypeQLiteLabelServices;
 
 /**
  * Rename a type or a role everywhere the workspace names it.

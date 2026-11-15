@@ -704,8 +704,7 @@ RolePlayer:
 // `ValueType` has admitted `boolean` and `datetime` since day one, but nothing could *write* one:
 // `workbench.schema.typeqlite` declares two boolean and two datetime attributes, and real call sites
 // emit `has is-latest true` and `has created-at 2026-09-03T10:00:00`. Neither parsed
-// ([ADR-038](../../../../../docs/architecture/adr-038-port-prompt-workbench-as-a-domain-cqrs-app.md)
-// Amendment 1(d)).
+// (Amendment 1(d) of ADR-038, in the monorepo this engine came from).
 //
 // **The date and double literals arrived the same way, 2026-09-11.** `fetch.feature`'s Background
 // inserts `has end-date 2021-01-01` and `has karma 123.4567891`; the behaviour spec is the caller.
