@@ -365,6 +365,8 @@ export interface QueryTrace {
   /** `candidates()` lookups, and the rows they returned. */
   candidatesCalls: number;
   candidateRows: number;
+  /** Rows the relation lookups read (`findRelationsCalls`): role-player combinations, before they are bound. */
+  relationRows: number;
   /** SQLite statements prepared and executed (`all`/`get`/`run`/`exec`) during the query. */
   statementsPrepared: number;
   statementsExecuted: number;
@@ -395,6 +397,7 @@ const newTrace = (): QueryTrace => ({
   findRelationsCalls: 0,
   candidatesCalls: 0,
   candidateRows: 0,
+  relationRows: 0,
   statementsPrepared: 0,
   statementsExecuted: 0,
 });
@@ -1624,7 +1627,7 @@ export class TypeDBLiteInterpreter {
               (other) => other.variable !== constraint.variable && other.roles.some((role) => role.player === constraint.variable),
             );
             if (boundByOuterRelation) continue;
-            if (this.relationBindings({ ...constraint, isas: resolveIsas(constraint.isas, {}) }, {}).length !== 0) continue;
+            if (this.relationBindings({ ...constraint, isas: resolveIsas(constraint.isas, {}) }, {}, true).length !== 0) continue;
             this.diagnostics.fact(
               DiagnosticCode.noCandidates,
               `\`${constraint.isas.filter((isa) => isa.type !== undefined).map((isa) => `isa${isa.exact ? '!' : ''} ${isa.type}`).join(', ')}\` matched ${this.candidateCount(constraint)} candidate(s) before ` +
@@ -4477,6 +4480,9 @@ export class TypeDBLiteInterpreter {
   private relationBindings(
     relation: ThingConstraint,
     combination: Record<string, Binding>,
+    // Only whether there is ANY way: stop at the first row instead of reading them all. For the callers
+    // that ask `.length > 0`, where a relation type with many instances would otherwise be read whole.
+    existenceOnly = false,
   ): Array<Record<string, Binding>> {
     if (this.trace) this.trace.findRelationsCalls++;
     const params: Array<string | number> = [];
@@ -4606,16 +4612,20 @@ export class TypeDBLiteInterpreter {
       // `($r: $x)` — the role each slot plays, and the relation's type to name its declaring relation.
       ...(roleVariables ? ['t.type AS relationType', ...relation.roles.map((_, index) => `rp${index}.role AS r${index}`)] : []),
     ].join(', ');
-    const rows = this.db
-      .prepare(
-        `SELECT DISTINCT ${columns} FROM thing t ${joins}` +
-          `${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`,
-      )
-      .all(...params) as Array<Record<string, number>>;
-
     // (Phase 05) `$r isa $t (employee: $x)` with `$t` unbound — every relation this found rebinds
     // it, one row per candidate type, as `bindTypeVariables` does for an entity.
     const unbound = relation.isas.filter((isa) => isa.typeVariable !== undefined && isa.type === undefined);
+
+    // 🔴 One row answers "is there any?" only when every row found yields a binding. A role variable
+    // or an unbound type variable can still reject a row below, so those read every row as before.
+    const firstRowDecides = existenceOnly && !roleVariables && unbound.length === 0;
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT ${columns} FROM thing t ${joins}` +
+          `${where.length ? ` WHERE ${where.join(' AND ')}` : ''}${firstRowDecides ? ' LIMIT 1' : ''}`,
+      )
+      .all(...params) as Array<Record<string, number>>;
+    if (this.trace) this.trace.relationRows += rows.length;
 
     return rows.flatMap((row) => {
       const next: Record<string, Binding> = { ...combination };
@@ -4649,7 +4659,7 @@ export class TypeDBLiteInterpreter {
     combination: Record<string, Binding>,
   ): boolean {
     if (this.trace) this.trace.relationHoldsCalls++;
-    return this.relationBindings(relation, combination).length > 0;
+    return this.relationBindings(relation, combination, true).length > 0;
   }
 
   // ── projection ────────────────────────────────────────────────────────────

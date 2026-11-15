@@ -44,7 +44,7 @@ function sprintWriter(db: ReturnType<typeof open>) {
 }
 
 export function run(work: string, target: number, every: number): void {
-  console.log(`\n## growth — sprint engine, to ${target.toLocaleString()} entities`);
+  console.log(`\n## growth — sprint board, to ${target.toLocaleString()} entities`);
   const file = `${work}/growth.db`;
   removeStore(file);
   const db = open(file);
