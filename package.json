@@ -14,7 +14,8 @@
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
     "typecheck": "nx run-many -t typecheck",
-    "gate": "node tools/gate.mjs"
+    "gate": "node tools/gate.mjs",
+    "playground": "nx run playground:serve"
   },
   "devDependencies": {
     "@nx/js": "23.3.0",

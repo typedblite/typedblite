@@ -49,6 +49,7 @@ against `test/fakes/vscode.ts`.
 | `typedblite-conformance` | `libs/conformance/test/*.test.ts` | The [report card](#the-conformance-report-card) has not regressed, plus the harness itself |
 | `typedblite` | `apps/cli/test/*.test.mts` | The CLI. `repl.test.mts` spawns the real binary and pipes input into it |
 | `typeqlite-vscode` | `apps/vscode/test/*.test.ts` | The manifest matches the language library, and the bundled language server answers over stdio |
+| `playground` | `apps/playground/test/`, `apps/playground/test-browser/` | The browser playground. The unit tests run `runProgram` on `node:sqlite`, the examples, share links, the runner's timeout, the static server's path-traversal guard, and the **language server over the real LSP** in Node. `test-browser` runs the page in Chromium: the engine in a worker, nothing requested from another origin, a program's text shown as text, and the Monaco editor driven by the language server. Names coloured by what they resolve to, squiggles, completion, hover and formatting each fail if the LSP client is switched off (keyword colours need no server, and are checked without one) |
 | `sync-demo` | `apps/sync-demo/test/smoke.test.ts` | The sync demo's story with headless devices, a real hub process and the real switchboard: convergence after every network event. `test-browser` adds the PWA in Chromium, the Electron app, and the whole story headless |
 
 ## The clean-tree gate

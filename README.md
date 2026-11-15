@@ -74,7 +74,7 @@ Run a `.typeqlite` file against a file-backed database:
 node apps/cli/out/main.js --file schema.typeqlite --database my.db
 ```
 
-Or try it in a browser, with three examples to start from: `npm exec nx -- run playground:serve`, then open
+Or try it in a browser, with three examples to start from: `npm run playground`, then open
 <http://127.0.0.1:4400>. See the [playground](apps/playground/).
 
 ## Packages

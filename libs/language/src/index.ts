@@ -15,3 +15,4 @@ export * from './generated/grammar.js';
 export * from './generated/module.js';
 export * from './typeqlite-annotations.js';
 export * from './typeqlite-definitions.js';
+export * from './typeqlite-textmate.js';
