@@ -10,4 +10,4 @@ export const PUBLISHABLE = [
 
 // Every published manifest points here. Moving the repository is a change to this line and to the manifests,
 // which the check then holds to it.
-export const REPOSITORY = 'https://github.com/dave-jackson-dev/typedblite';
+export const REPOSITORY = 'https://github.com/typedblite/typedblite';
