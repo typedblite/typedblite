@@ -2,12 +2,12 @@ grammar TypeQLite
 
 import './terminals';
 
-// TypeQLite 3.x — the subset actually used by its first production application and downstream-store, and since 2026-09-11 what
+// TypeQLite 3.x — the subset actually used by its first production application and a documentation store, and since 2026-09-11 what
 // TypeDB's own behaviour specification needs to get past its Backgrounds.
 //
 // Scope was measured, not guessed (2026-08-29): every TypeQLite string in
 // the IAM and Skills infrastructure of its first production application, and
-// `downstream-monorepo/tools/downstream-store/schema`. What is here is what those use. What TypeDB has and
+// a documentation store's schema. What is here is what those use. What TypeDB has and
 // this does not — rules/inference, aggregation, negation, `sort`/`limit`/`offset`, expressions,
 // structs — is absent because no caller writes it, not because it was too hard. Adding a
 // construct starts by finding a caller that needs it.
@@ -44,7 +44,7 @@ StructField:
     name=ID 'value' valueType=ValueType (optional?='?')? annotations+=Annotation*;
 
 // `entity skill, owns skill-id @key, plays skill-composition:owner;`
-// `entity adr sub doc;`                     <- downstream-store's subtyping
+// `entity adr sub doc;`                     <- a documentation store's subtyping
 // `entity person plays employment:employee, owns name @card(0..);`  <- the spec's form
 // `entity abstract-type @abstract;`
 //
@@ -239,7 +239,7 @@ KeyAnnotation:
 UniqueAnnotation:
     {infer UniqueAnnotation} '@unique';
 
-// `@card(0..)` — downstream-store's multi-valued attributes. An absent upper bound is unbounded.
+// `@card(0..)` — a documentation store's multi-valued attributes. An absent upper bound is unbounded.
 // `@card(2)` is exactly two (update.feature L727).
 CardAnnotation:
     '@card' '(' min=INT (range?='..' (max=INT)?)? ')';

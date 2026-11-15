@@ -91,7 +91,7 @@ import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
  *
  * ⚠️ **"Loudly" changed shape on 2026-09-11, by founder decision.** An unenforced annotation was
  * an *error* — the schema was refused. That refused every valid TypeDB schema that used one:
- * `downstream-store`'s could not be applied at all, and every Background in TypeDB's own behaviour
+ * a documentation store's schema could not be applied at all, and every Background in TypeDB's own behaviour
  * specification was turned away before a single semantic could be measured (ADR-005). It is now a
  * diagnostic **below error severity**: `define` applies the schema and the runtime forwards the
  * diagnostic as a fact in its report, so the reader sees *"`@card` is parsed and not enforced"*
@@ -138,7 +138,7 @@ export class TypeQLiteValidator {
    *
    * One rule, one message shape, for every kind: the annotation's name comes from the node's own
    * keyword, so adding an annotation to the grammar and registering it above is the whole cost of
-   * reporting it. `@card(0..)` is the live one — `downstream-store`'s schema uses it.
+   * reporting it. `@card(0..)` is the live one — a documentation store's schema uses it.
    */
   checkAnnotationNotEnforced(node: Annotation, accept: ValidationAcceptor): void {
     if (isKeyAnnotation(node) || isUniqueAnnotation(node) || isAbstractAnnotation(node)) return;

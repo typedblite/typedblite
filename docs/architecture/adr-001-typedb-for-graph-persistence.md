@@ -4,7 +4,7 @@
 - **Date:** 2026-08-28
 - **Decision owners:** TypeDBLite maintainers
 - **Amended by:** [ADR-002](adr-002-typeql-engine-as-a-port.md) — what this ADR depends on is TypeQL and its guarantees, not the TypeDB product; the engine becomes a port
-- **Engine replaced 2026-08-29** — `@downstream/typedb-wasm` removed; TypeDBLite is the engine. Decisions 1 and 2 below are left as written and annotated
+- **Engine replaced 2026-08-29** — the third-party TypeDB WASM build was removed; TypeDBLite is the engine. Decisions 1 and 2 below are left as written and annotated
 
 ## Context
 
@@ -28,7 +28,7 @@ in-process, in ordinary `nx test`, with no container and no port.
 
 ## Decision
 
-> 🔴 **Decisions 1 and 2 were overtaken on 2026-08-29.** `@downstream/typedb-wasm` was removed and
+> 🔴 **Decisions 1 and 2 were overtaken on 2026-08-29.** The third-party TypeDB WASM build was removed and
 > **TypeDBLite** — a TypeQL engine on SQLite — is now what `TypeDbDatabase.open` loads. The reasoning
 > below is untouched and still holds: it argues for **embedded, in-process, no daemon, TypeQL with
 > store-level `@key` and relation guarantees**, and every word of that describes the replacement.
@@ -44,12 +44,12 @@ in-process, in ordinary `nx test`, with no container and no port.
 > - **The fetch shim and the WASM binary at boot are gone**, along with the cost this ADR accepted
 >   for them in its Consequences.
 
-1. **The durable store is TypeDB, embedded in-process via `@downstream/typedb-wasm`, not a TypeDB
+1. **The durable store is TypeDB, embedded in-process via the third-party TypeDB WASM build, not a TypeDB
    server.**
 
-   The package is `@downstream/typedb-wasm`, installed under the `@downstream` alias, and needs
-   `@jsr:registry=https://npm.jsr.io` in `.npmrc` — without it `npm install` fails with a bare 404
-   against `registry.npmjs.org` that reads as a typo in the package name.
+   The package came from a second registry, which needed its own line in `.npmrc` — without it
+   `npm install` failed with a bare 404 against `registry.npmjs.org` that read as a typo in the
+   package name.
 
    A server was the obvious choice and is rejected for a concrete reason rather than a
    preferential one: this repository has **no `docker-compose.yml` at all**, Docker here is Docker

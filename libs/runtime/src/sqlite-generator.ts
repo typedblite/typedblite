@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS thing (
   type  TEXT NOT NULL
 );
 
--- Subtype closure, so \`isa doc\` also matches \`adr\` (downstream-store's \`entity adr sub doc\`).
+-- Subtype closure, so \`isa doc\` also matches \`adr\` (a documentation store's \`entity adr sub doc\`).
 CREATE TABLE IF NOT EXISTS type_parent (
   type   TEXT PRIMARY KEY,
   parent TEXT NOT NULL

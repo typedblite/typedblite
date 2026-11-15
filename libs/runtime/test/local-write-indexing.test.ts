@@ -10,7 +10,7 @@
  * `fullText.index` was reachable only from `projectWinnerOnce`, which only `applyRemote` calls. So
  * a store written locally and then searched returned **zero rows, for every query, with no error** —
  * exactly the "silently returns nothing" failure this engine replaced CouchDB and Nouveau to avoid,
- * and the one `downstream-store`'s capitalised status values already demonstrate.
+ * and the one a documentation store's capitalised status values already demonstrate.
  *
  * Nobody hit it because no consumer both wrote locally and searched. `graph-store` never searched;
  * `fts-parity.test.ts` drives `FullTextIndex` directly, bypassing the write path entirely.
