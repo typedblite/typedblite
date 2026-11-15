@@ -58,6 +58,7 @@ jobs:
         env:
           CI: ""
       - run: npm run check-packages
+      - run: npm run check-api
       - run: npm run clean-room
 
       - name: Publish to npm

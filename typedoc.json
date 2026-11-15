@@ -1,0 +1,34 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "TypeDBLite",
+  "entryPoints": [
+    "libs/runtime/src/index.ts",
+    "libs/runtime/src/wasm.ts",
+    "libs/language/src/index.ts",
+    "libs/content-revision/src/index.ts"
+  ],
+  "tsconfig": "tsconfig.typedoc.json",
+  "out": "dist/api",
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "invalidPath": true,
+    "rewrittenLink": false,
+    "notDocumented": false
+  },
+  "externalSymbolLinkMappings": {
+    "langium": {
+      "*": "https://langium.org/docs/"
+    },
+    "vscode-languageserver-types": {
+      "*": "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/"
+    },
+    "typescript": {
+      "Iterable": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols"
+    }
+  },
+  "treatWarningsAsErrors": true
+}

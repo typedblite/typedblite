@@ -1,7 +1,7 @@
 // The gate, run locally: `npm run gate`. GitHub Actions is off for now, so this is the only check.
 //
 //   npm run gate               everything below
-//   npm run gate -- --quick    the first five steps only: no e2e, WASM, browser or clean-room steps
+//   npm run gate -- --quick    the first six steps only: no e2e, WASM, browser or clean-room steps
 //
 // Every step runs from a CLEAN tree and with Nx's cache off. `build` is `tsc -b`, which is incremental:
 // a library whose sources did not change is not re-emitted, so its dependants are judged against stale
@@ -67,6 +67,8 @@ const steps = [
   { name: 'typecheck', command: 'npm run typecheck' },
   // What `npm publish` would ship, read from `npm pack --dry-run` (tools/check-packages.mjs).
   { name: 'package contents', command: 'npm run check-packages' },
+  // The API reference builds with no warning, and every type the API mentions is exported (tools/check-api.mjs).
+  { name: 'API', command: 'npm run check-api' },
   // CI=true switches on the 80% coverage floor (vitest.shared.ts), so this is the blocking gate and the
   // coverage job in one. It includes the conformance report card, which fails below baseline.json.
   { name: 'test (with the coverage floor)', command: 'npm test', env: { CI: 'true' } },
