@@ -4,7 +4,7 @@ Try TypeQLite in a browser, with nothing to install. The engine is TypeDBLite on
 Worker. Each run starts from an empty in-memory database, and nothing leaves the page.
 
 ```bash
-npm exec nx -- run playground:serve      # then open http://127.0.0.1:4400
+npm run playground                       # then open http://127.0.0.1:4400
 ```
 
 ## Using it
