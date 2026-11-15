@@ -25,8 +25,8 @@ happens when the gates are green. A suggested calendar is at the end.
 
 ## Where to resume
 
-*As of 2026-11-15, `main` at `dea79a2`, with Phase 2's local half (packaging) open as a pull request from
-`feat/packaging`.* Read this first; everything it points to is below.
+*As of 2026-11-15, `main` at `f6df397`: every pull request through #58 is merged, and none is open except two of
+Dependabot's.* Read this first; everything it points to is below.
 
 🔴 **GitHub Actions is OFF (2026-11-14), so nothing on GitHub checks a change. Run `npm run gate` locally.**
 GitHub refused to start any job on `main`'s run after #40 merged: *"The job was not started because recent account
@@ -34,8 +34,8 @@ payments have failed or your spending limit needs to be increased."* Every job r
 code had passed on #40's own run 20 minutes earlier, so it was billing, not code. At the maintainer's request the
 workflows were then disabled: CI, Labels and PR title are `disabled_manually` (`gh workflow enable <id>` turns one
 back on). GitHub will not let the **Dependabot update job** be disabled by API (HTTP 422), so it is paused in the
-repo instead: `open-pull-requests-limit: 0` on both ecosystems in `dependabot.yml`, so it opens no PR. Ten of its
-earlier PRs (#23 to #32) are still open and unchecked. Security updates are a separate setting, and are not enabled.
+repo instead: `open-pull-requests-limit: 0` on both ecosystems in `dependabot.yml`, so it opens no PR. Two of its
+earlier PRs (#30, #32) are still open. Security updates are a separate setting, and are not enabled.
 Everything else in this plan that says "CI" or "the PR-title check" describes the workflows as they are written, and
 is **not running**. What that costs:
 - **The gate runs on one OS and one Node.** CI covered Node 22.16, 22 and 24 on Linux, and Node 24 on Windows and
@@ -61,74 +61,74 @@ To go back: fix billing, `gh workflow enable` the three workflows, restore the D
   restructured (#46); and **the browser playground** (#47), now **Monaco with the real language server over LSP**
   (#48), served by `npm run playground`.
 
+- **2026-11-15** (#49 to #58): **packaging** (#50: `files` lists, the CLI renamed `typedblite`, `check-packages`,
+  `clean-room`, Nx release, `release.yml`, the compatibility policy, Releasing); the production consumer and its
+  a downstream feature no longer named anywhere (#51, #58); **the API reviewed and its reference generated** (#52:
+  explicit exports pinned by a test, `check-api`, `docs:api`); Nx 24 (#53) and Vitest 5 (#54); **a pushed revision
+  checked against its content** (#55, PL-6, ADR-003 amended and accepted); both extensions ready to publish (#56:
+  `release-extension.yml`); and a draft of "When to use TypeDBLite, and when not" (#57).
+
 **State of the checks (from the last runs on GitHub, before Actions went off):** every gate was green, including
 **Windows on two complete runs** and `coverage`. Windows is blocking in `ci.yml` (`experimental: false`); macOS is not.
-Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the playground (#47, #48) or the README work (#46). Their evidence is `npm run gate`.
+Nothing has run on GitHub since #40, so CI has seen none of #41 to #58, and `release.yml`, `release-extension.yml` and CI's `clean-room` job have never run. Their evidence is `npm run gate` (11 steps, Linux, Node 24), which passed on `main` after #57.
 
 **Merging:** merge commits only, never squash or rebase, so each commit keeps its own history (the maintainer's rule,
 2026-11-14). PRs #22 and #33 were squashed before that rule; their original commits are still on GitHub at
 `refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head` (`a7557e1`), and are not on any branch.
 
 **Known and left alone:**
-- **Six Dependabot PRs (#23, #28 to #32)** are open and unchecked: they were opened before Dependabot was paused,
-  and nothing has run on them. Three are major upgrades (nx 24, vitest 5, Capacitor 8): real work, best after
-  packaging. The four that only bumped GitHub Actions versions (#24 to #27) were closed on 2026-11-15, at the
-  maintainer's request: nothing can test them while Actions is off.
-- **`apps/playground` is built and not hosted.** `npm run playground` serves it locally.
+- **Two Dependabot PRs are open.** #30 (dev-tooling) must not merge as it stands: it raises `@types/vscode` to 1.146,
+  past the extension's `engines.vscode ^1.91`, which `vsce` refuses to package; its `@swc/core` and `playwright-core`
+  bumps can be taken separately. #32 (Capacitor 8) waits until the Android build can be run. #23 to #27 (Actions
+  versions only) were closed, untestable while Actions is off; #28, #29 and #31 were superseded by #53 and #54.
+- **Git history still names the production consumer and its a downstream feature**, in old commit messages and file
+  contents. The tree does not. Rewriting history is the maintainer's decision, and must come before any release
+  tag, a repository move, or going public.
+- **`apps/playground` and the API reference are built and not hosted.** `npm run playground` and `npm run docs:api`.
 - **`gitleaks` has not been run.** The secret scan was a manual pattern search (S9).
 - **A pushed revision is checked against its content** (PL-6, #55; its ADR-003 amendment was accepted on 2026-11-15).
   A peer that may write can still make its write win.
 - **The coverage job is not blocking**, and `sync-demo:test-browser` (which runs code excluded from coverage) is not
   in CI. Both wait on Actions.
 
-**Only the maintainer can do these:**
+**What is left, in the order to do it.** The engineering is essentially done; what remains is accounts, outside
+parties and decisions, nearly all the maintainer's. The order matters because several steps are hard to undo once
+something is public or published.
 
-1. **Fix GitHub billing**, then re-enable the workflows (see the notice at the top).
-2. **Send the written confirmation to TypeDB Ltd** (B1). The draft is deliberately not in this repository. Get a
-   one-line written reply before any announcement, and settle [PL-1](#parking-lot).
-3. **Branch protection and repository settings** (they return 403 until the repository is public or the plan is
-   upgraded): require the checks listed in 1.2 (Windows included), Discussions, private vulnerability reporting,
-   secret scanning with push protection, Dependabot alerts.
-4. **`CODE_OF_CONDUCT.md`:** Insights, Community Standards, Add (inserts the official Contributor Covenant text, which
-   the tooling here cannot fetch).
-5. **Decisions still open:** the contribution model, DCO or CLA (4); the launch window (7); capacity: who answers issues, and who is the second reviewer (8). Decided: the production consumer is not named
-   (5, S3); Windows (fixed and blocking), the coverage policy (decision 9: raise the tests, keep the floor), the Node minimum (22.16).
-6. **Host the playground** at `typedblite.dev/playground`: GitHub Pages needs Actions or a manual publish of
-   `apps/playground/.build` (build with `node build.mjs --minify`), plus the domain's DNS.
-7. **Run `gitleaks detect`** over the history before the repository goes public.
-8. **npm, before the first release** ([Releasing](../../development/releasing.md#one-time-setup) has the steps):
-   claim the unscoped `typedblite` (the CLI's name; `npx typedblite` needs it) and `typeqlite`, both still free on
-   2026-11-15; 2FA for the `@typedblite` org and a second owner; take `private` off `apps/cli`; a GitHub environment
-   `npm` with yourself as reviewer; a short-lived token for the first publish, then trusted publishing.
-9. **Review the [compatibility policy](../../guides/compatibility.md)**: it is a promise to users. Two calls in it
-   are worth a look: the SQLite WASM peer range (only the tested version's builds, because no semver range can
-   span its `-buildN` versions), and "run the same minor version on a hub and its spokes".
-10. **The `typedblite` GitHub org** (owned since 2026-11-15): whether to move the repository there. The package
-    manifests point at `dave-jackson-dev/typedblite`; moving it is one line in `tools/publishable.mjs` plus the
-    manifests, and `npm run check-packages` holds them to it.
+1. **Start now, in parallel: the long waits.**
+   - Send the written confirmation to TypeDB Ltd (B1). The draft is deliberately not in this repository. Get a
+     one-line written reply before any announcement, and settle [PL-1](#parking-lot). It blocks going public.
+   - Start the Open VSX namespace `typedblite`: it needs the Eclipse publisher agreement and a verification request
+     ([Releasing](../../development/releasing.md#the-vs-code-extensions)).
+2. **Before anything is public or published.**
+   - Decide whether to rewrite git history to drop the two private names, and run `gitleaks detect` in the same
+     pass (S9). A rewrite changes every commit hash, so it comes before any tag, the repository move and going public.
+   - Move the repository to the `typedblite` GitHub org, if it is to move: manifests, npm trusted publishing and
+     provenance all record the repository URL. It is one line in `tools/publishable.mjs` plus the manifests, held by
+     `npm run check-packages`, and the URLs in the READMEs and the extension manifests.
+   - Fix GitHub billing and re-enable the workflows (the notice at the top). It unblocks CI on three platforms,
+     provenance, both release workflows and hosting.
+3. **Accounts** ([Releasing](../../development/releasing.md#one-time-setup)): claim the unscoped `typedblite` and
+   `typeqlite` on npm (both free on 2026-11-15); 2FA on the `@typedblite` org and a second owner; take `private` off
+   `apps/cli`; the Marketplace publisher `typedblite`; the `npm` and `marketplaces` GitHub environments and their
+   tokens.
+4. **The first release candidate.** Read the first CI run on `main` and fix what macOS, Windows and Node 22.16 turn
+   up (then make `coverage` blocking and add `sync-demo:test-browser` to CI). Publish `0.1.0-rc.1` under `next` with
+   provenance, run the clean room against the published packages on three platforms, and publish the extensions.
+5. **Docs that need published packages:** the five-minute tour; hosting the playground and the API reference at
+   `typedblite.dev` (GitHub Pages, plus DNS); the demo GIF and badges; "TypeDB vs TypeDBLite", which TypeDB Ltd
+   should have the chance to read.
+6. **Governance, before going public:** `CODE_OF_CONDUCT.md` (Insights, Community Standards, Add: the official
+   Contributor Covenant text, which the tooling here cannot fetch); DCO or CLA (decision 4); who answers issues and
+   who is the second reviewer (8); the launch window (7); and a review of the
+   [compatibility policy](../../guides/compatibility.md) and the ["Why not X" draft](../../guides/why-not-x.md),
+   which is not linked from the README until then.
+7. **Go public**, then set branch protection and the repository settings, which return 403 until then: the required
+   checks listed in 1.2 (Windows included), Discussions, private vulnerability reporting, secret scanning with push
+   protection, Dependabot alerts. Then the private beta (Phase 4) and the launch (Phase 5).
 
-**Next work, in order:**
-1. **Phase 2, packaging: the local half is done** (the `feat/packaging` pull request): every package's `files`,
-   LICENSE and metadata; the CLI renamed `typedblite`; `npm run check-packages` and `npm run clean-room` in the gate,
-   each seen to fail on a broken package; Nx release configured and dry-run; a release workflow (never run); the
-   compatibility policy and [Releasing](../../development/releasing.md). It found two launch bugs: the runtime and
-   content-revision would have published no JavaScript, and the SQLite WASM peer range matched no version. **Left:**
-   the maintainer's npm steps (8 above), then `0.1.0-rc.1` under `next` with provenance, which needs Actions (or a
-   decision to publish once from a laptop, without provenance), and the clean room on three platforms from the
-   *published* packages (CI's `clean-room` job, once Actions is on). The extensions' marketplace publishing is
-   written and not run (the `build/extension-publishing` pull request: `release-extension.yml`, the one-time setup in
-   [Releasing](../../development/releasing.md#the-vs-code-extensions)). It waits on a Marketplace publisher and an Open
-   VSX namespace, both `typedblite`, which only the maintainer can create.
-2. **Phase 3, docs** (partly done): the Known limitations page, the README restructure and the **API reference**
-   (TypeDoc, `npm run docs:api`, checked by `npm run check-api`; not hosted yet) are in. Before it, the runtime's
-   API was reviewed: it now names every export, pinned by a test, and the internals it leaked are gone or marked
-   `@internal`. **"Why not X" is drafted** (`docs/guides/why-not-x.md`, #57), for the maintainer's review of its tone
-   and its TypeDB section, and not yet linked from the README. Still to write: a five-minute tour (needs the published
-   packages), "TypeDB vs TypeDBLite" (TypeDB Ltd should read it), the demo GIF, and badges.
-3. **PL-6 is done** (#55): a store checks a peer's revision against its content, with tests and an ADR-003 amendment
-   the maintainer accepted on 2026-11-15.
-4. **When Actions is back:** read the first run on `main`, then make `coverage` blocking and add
-   `sync-demo:test-browser` to CI.
+Decided already: the production consumer is not named (5, S3); Windows is fixed and blocking; the coverage policy
+(decision 9); the Node minimum (22.16); ADR-003's amendment (accepted).
 
 Parked, and not blocking the flip to public: PL-2 to PL-5 in the [parking lot](#parking-lot).
 
@@ -136,8 +136,8 @@ Parked, and not blocking the flip to public: PL-2 to PL-5 in the [parking lot](#
 TypeDB Ltd conversation. That is parked as [PL-1](#parking-lot), and the "flip the repo to public" step in Phase 4 is
 blocked on it.
 
-**Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run gate` (about 75
-seconds; it needs Playwright's Chromium, `npx playwright-core install chromium`, and a display, or `-- --quick`).
+**Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run gate` (about two
+minutes; it needs Playwright's Chromium, `npx playwright-core install chromium`, and a display, or `-- --quick`).
 Useful to know:
 - **`npm install` of a new package can write local-registry URLs into `package-lock.json`** if your npm is pointed
   at a local proxy (`localhost:4873`). Rewrite them to `https://registry.npmjs.org/` after checking each integrity
