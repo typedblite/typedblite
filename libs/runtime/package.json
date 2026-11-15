@@ -3,7 +3,37 @@
   "description": "The TypeDBLite engine: TypeQLite on SQLite, with a change log, replication and full-text search",
   "version": "0.0.1",
   "license": "MPL-2.0",
+  "keywords": [
+    "typedblite",
+    "typeqlite",
+    "typeql",
+    "typedb",
+    "sqlite",
+    "graph",
+    "database",
+    "embedded",
+    "replication",
+    "offline-first",
+    "full-text-search",
+    "wasm"
+  ],
+  "homepage": "https://github.com/dave-jackson-dev/typedblite/tree/main/libs/runtime#readme",
+  "bugs": {
+    "url": "https://github.com/dave-jackson-dev/typedblite/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dave-jackson-dev/typedblite.git",
+    "directory": "libs/runtime"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "files": [
+    "out",
+    "src"
+  ],
   "main": "./out/index.js",
   "exports": {
     ".": {
@@ -37,11 +67,14 @@
     "playwright-core": "1.62.1"
   },
   "peerDependencies": {
-    "@sqlite.org/sqlite-wasm": "^3.50.0"
+    "@sqlite.org/sqlite-wasm": ">=3.54.1-build1 <3.54.2"
   },
   "peerDependenciesMeta": {
     "@sqlite.org/sqlite-wasm": {
       "optional": true
     }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

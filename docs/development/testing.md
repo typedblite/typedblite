@@ -58,14 +58,17 @@ Before you open a pull request, run the full gate **from a clean tree**:
 
 ```bash
 npm run gate            # everything below
-npm run gate -- --quick # the first four steps only
+npm run gate -- --quick # the first five steps only
 ```
 
 `tools/gate.mjs` runs, in order, and stops at the first failure: **clean** (every `out/`, every
-`*.tsbuildinfo`, `coverage/`), **build**, **typecheck**, **test** with `CI=true` (so the 80% coverage floor
-and the conformance report card both apply), the **WASM** suite, the **browser** suite, and the **VS Code
-e2e**. It sets `NX_SKIP_NX_CACHE`, so no task is replayed from a cache. The last three are skipped by
-`--quick`; they need Playwright's Chromium and, for the e2e, a display.
+`*.tsbuildinfo`, `coverage/`), **build**, **typecheck**, **package contents** (what `npm publish` would ship,
+`npm run check-packages`), **test** with `CI=true` (so the 80% coverage floor and the conformance report card
+both apply), the **WASM** suite, the engine's **browser** suite, the **playground** in Chromium, the **VS Code
+e2e**, and the **clean-room install** (`npm run clean-room`: the npm tarballs installed in an empty directory
+and used; see [Releasing](releasing.md#the-checks-a-package-must-pass)). It sets `NX_SKIP_NX_CACHE`, so no
+task is replayed from a cache. The last five are skipped by `--quick`. The browser suites need Playwright's
+Chromium, the e2e a display, and the clean room the npm registry, for the packages' dependencies.
 
 **GitHub Actions is off for now**, so this is the only check. It covers the one Node and OS you run it on;
 CI used to cover Node 22.16, 22 and 24 on Linux and Node 24 on Windows and macOS. For a change that touches

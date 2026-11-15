@@ -1,7 +1,7 @@
 // The gate, run locally: `npm run gate`. GitHub Actions is off for now, so this is the only check.
 //
 //   npm run gate               everything below
-//   npm run gate -- --quick    the first four steps only: no e2e, WASM or browser suites
+//   npm run gate -- --quick    the first five steps only: no e2e, WASM, browser or clean-room steps
 //
 // Every step runs from a CLEAN tree and with Nx's cache off. `build` is `tsc -b`, which is incremental:
 // a library whose sources did not change is not re-emitted, so its dependants are judged against stale
@@ -65,6 +65,8 @@ const steps = [
   { name: 'clean', run: clean },
   { name: 'build', command: 'npm run build' },
   { name: 'typecheck', command: 'npm run typecheck' },
+  // What `npm publish` would ship, read from `npm pack --dry-run` (tools/check-packages.mjs).
+  { name: 'package contents', command: 'npm run check-packages' },
   // CI=true switches on the 80% coverage floor (vitest.shared.ts), so this is the blocking gate and the
   // coverage job in one. It includes the conformance report card, which fails below baseline.json.
   { name: 'test (with the coverage floor)', command: 'npm test', env: { CI: 'true' } },
@@ -75,6 +77,9 @@ const steps = [
         { name: 'browser suite (Chromium, OPFS)', run: requireChromium, command: 'npm exec nx -- run typedblite-runtime:test-browser' },
         { name: 'playground in Chromium', run: requireChromium, command: 'npm exec nx -- run playground:test-browser' },
         { name: 'VS Code e2e', command: () => e2eCommand() },
+        // The tarballs installed in an empty directory and used (tools/clean-room.mjs). It installs their
+        // dependencies from the configured registry, so it needs the network the first time.
+        { name: 'clean-room install', command: 'npm run clean-room' },
       ]),
 ];
 
@@ -115,6 +120,6 @@ console.log('\n=== gate summary');
 for (const { name, ok, seconds } of results) console.log(`  ${ok ? 'pass' : 'FAIL'}  ${name} (${seconds}s)`);
 const notRun = steps.slice(results.length).map((step) => step.name);
 if (notRun.length > 0) console.log(`  not run: ${notRun.join(', ')}`);
-if (quick) console.log('  (quick: the WASM, browser and e2e suites were skipped)');
+if (quick) console.log('  (quick: the WASM, browser, e2e and clean-room steps were skipped)');
 console.log(failed ? `\nGATE FAILED at: ${failed}` : '\nGATE PASSED');
 process.exit(failed ? 1 : 0);

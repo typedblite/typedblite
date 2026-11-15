@@ -6,8 +6,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@typedblite/language": "0.0.1",
-    "@typedblite/runtime": "0.0.1",
+    "@typedblite/language": "*",
+    "@typedblite/runtime": "*",
     "langium": "~4.4.2",
     "vscode-languageserver": "~10.1.0"
   },

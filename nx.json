@@ -13,6 +13,32 @@
     ],
     "sharedGlobals": []
   },
+  "release": {
+    "projects": [
+      "content-revision",
+      "typeqlite-language",
+      "typedblite-runtime",
+      "typedblite"
+    ],
+    "projectsRelationship": "fixed",
+    "releaseTag": {
+      "pattern": "v{version}"
+    },
+    "version": {
+      "currentVersionResolver": "disk",
+      "versionPrefix": "",
+      "preVersionCommand": "npm run build && npm run check-packages",
+      "git": {
+        "commit": true,
+        "commitMessage": "chore(release): v{version}",
+        "tag": false
+      }
+    },
+    "changelog": {
+      "workspaceChangelog": false,
+      "projectChangelogs": false
+    }
+  },
   "targetDefaults": {
     "@nx/js:swc": {
       "cache": true,
@@ -33,6 +59,11 @@
       "dependsOn": [
         "^build"
       ]
+    },
+    "nx-release-publish": {
+      "options": {
+        "registry": "https://registry.npmjs.org/"
+      }
     }
   }
 }

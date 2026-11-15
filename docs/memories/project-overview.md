@@ -16,7 +16,7 @@ TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) gr
 | `libs/runtime/` | `@typedblite/runtime` | interpreter, SQLite generator, change log |
 | `libs/content-revision/` | `@typedblite/content-revision` | revision identifiers |
 | `libs/conformance/` | `typedblite-conformance` | TypeDB behaviour spec vendored as Cucumber features |
-| `apps/cli/` | `typedblite-cli` | REPL and file runner |
+| `apps/cli/` | `typedblite` | The CLI: REPL and file runner |
 | `apps/vscode/` | `typeqlite` (private) | VS Code extension: the TypeQLite editor, a Langium language server (ADR-008) |
 | `apps/sync-demo/` | `typedblite-sync-demo` (private) | Offline-first sync demo: PWA, Electron and Android devices and a TypeDBLite hub (ADR-009) |
 

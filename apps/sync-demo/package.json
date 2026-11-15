@@ -6,7 +6,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@typedblite/runtime": "0.0.1"
+    "@typedblite/runtime": "*"
   },
   "devDependencies": {
     "@capacitor/android": "7.6.10",

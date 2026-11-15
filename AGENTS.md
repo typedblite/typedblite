@@ -16,7 +16,7 @@ flowchart LR
   libs --> runtime["runtime/<br/><b>@typedblite/runtime</b><br/>interpreter, storage, change log"]
   libs --> revision["content-revision/<br/><b>@typedblite/content-revision</b><br/>revision identifiers"]
   libs --> conformance["conformance/<br/><b>typedblite-conformance</b><br/>TypeDB behaviour spec and report card"]
-  apps --> cli["cli/<br/><b>typedblite-cli</b><br/>REPL and file runner"]
+  apps --> cli["cli/<br/><b>typedblite</b><br/>the CLI: REPL and file runner"]
   apps --> vscode["vscode/<br/><b>typeqlite</b> extension<br/>the TypeQLite editor: a Langium language server"]
 ```
 
@@ -67,7 +67,7 @@ Nx project names (not the npm package names):
 - `typedblite-runtime` — `@typedblite/runtime` (no `typecheck` target; `build` type-checks). Also `bench`, the load test: timings on real schemas and data, never part of `test` ([docs/development/performance.md](docs/development/performance.md))
 - `content-revision` — `@typedblite/content-revision`
 - `typedblite-conformance` — also has `report`
-- `typedblite` — the CLI, `typedblite-cli`
+- `typedblite` — the CLI, npm package `typedblite` (it was `typedblite-cli`; `npx typedblite` needs the unscoped name)
 - `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
 - `playground` — `typedblite-playground`, TypeQLite in a browser: the engine on WASM SQLite in a worker, and Monaco with the real language server over LSP in another; also has `test-browser` and `serve`
 - `sync-demo` — `typedblite-sync-demo`, the offline-first sync demo; also has `smoke`, `test-browser`, `serve`, `demo` and `android-setup`/`android-apk`/`android-emulator`
@@ -77,6 +77,28 @@ every project. 🔴 Never exclude a file to pass the floor unless it only runs i
 runner lacks (VS Code, a browser or worker, Electron, a live TypeDB, a separate process). Exclude it by
 name in the project's `vitest.config.ts`, saying where it is run instead ([Testing](docs/development/testing.md)).
 Test suites time out at 30 seconds per test.
+
+### Packaging
+
+Four packages are published to npm, at one version, by Nx release: `@typedblite/content-revision`,
+`@typedblite/language`, `@typedblite/runtime` and the CLI, `typedblite`. They are listed in
+`tools/publishable.mjs`, which must agree with `release.projects` in `nx.json`.
+[Releasing](docs/development/releasing.md) is the process; [Versions and compatibility](docs/guides/compatibility.md)
+is what a version promises.
+
+```bash
+npm run check-packages   # what `npm publish` would ship, read from `npm pack --dry-run` (after a build)
+npm run clean-room       # the tarballs installed in an empty directory and used (needs the registry)
+```
+
+- 🔴 A published package has a `files` allowlist. Without one npm falls back to `.gitignore`, which excludes
+  `out/`: the runtime once would have shipped its sources and tests and no JavaScript.
+- A private workspace package (conformance, the demos, the playground, the extension) depends on a published one
+  at `"*"`, never an exact version, so a release that bumps the published packages leaves it linked to the
+  workspace copy.
+- `@sqlite.org/sqlite-wasm` versions all carry a `-buildN` suffix, a semver prerelease, so a range such as
+  `^3.54.0` matches none of them. The runtime's optional peer range names the tested SQLite version's builds.
+- The registry for publishing is set on `nx-release-publish` in `nx.json`, not in a manifest.
 
 ---
 

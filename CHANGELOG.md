@@ -8,6 +8,14 @@ they are listed here.
 ## [Unreleased]
 
 ### Changed
+- The CLI's npm package is now **`typedblite`**, not `typedblite-cli`, so that `npx typedblite` runs it. The
+  command was already `typedblite`. Nothing had been published under either name.
+- Every published package now declares Node **22.16** in `engines`, as the repository does.
+  `@typedblite/language` said `>=20.10.0`, and `npm >=10.2.3`, neither of which anything tested.
+- The runtime's optional peer `@sqlite.org/sqlite-wasm` is now `>=3.54.1-build1 <3.54.2`, the version the
+  WASM suites run on. It was `^3.50.0`, which matches **no** published version: every one has a `-buildN`
+  suffix, which semver treats as a prerelease, so `npm install @typedblite/runtime @sqlite.org/sqlite-wasm`,
+  the runtime README's own command, failed with `ETARGET`. Found by the new clean-room test.
 - The minimum Node.js version is now **22.16**, not 22.12. Node 22.12 has no `node:sqlite`, and 22.13 to
   22.15 ship it without FTS5, which the engine requires. Checked: `node:sqlite` and FTS5 probed on
   22.12 to 22.21; the full gate run on 22.13.0 (fails: no FTS5) and 22.16.0 (passes).
@@ -16,6 +24,10 @@ they are listed here.
   the build and every test passed there on two complete runs.
 
 ### Fixed
+- `@typedblite/runtime` and `@typedblite/content-revision` would have been published **without their
+  JavaScript**. They had no `files` list, so npm fell back to `.gitignore`, which excludes `out/`: they would
+  have shipped their TypeScript sources, tests, bench and configs instead. Every published package now has a
+  `files` allowlist, its `LICENSE`, declaration maps, and `repository`, `bugs`, `homepage` and `keywords`.
 - The change-stream hub (`createChangeStreamHandler`, `serveChangeStream`) is hardened. It refuses a POST that
   is not `application/json` (415), which closes the door a web page had to write to a hub on `127.0.0.1`
   cross-origin with no CORS preflight; refuses a body over `maxBodyBytes`, default 64 MiB (413), before
@@ -43,6 +55,18 @@ they are listed here.
   made `npm ci` fail for everyone but the machine that committed it.
 
 ### Added
+- **Packaging and release.** A [compatibility policy](docs/guides/compatibility.md) for the first release and
+  after; Nx release, configured to version the four npm packages as one group; a release workflow that
+  publishes a tag with provenance (written while Actions is off, so it has never run); and
+  [Releasing](docs/development/releasing.md), the process. Two checks join the gate: `npm run check-packages`,
+  which reads what `npm publish` would ship and fails on a missing entry point, a test file, a missing LICENSE
+  and more, and `npm run clean-room`, which installs the tarballs in an empty directory and uses the CLI, the
+  runtime on `node:sqlite` and on WASM, the published types, and the browser entry. CI gains a clean-room job
+  on Linux, macOS and Windows.
+- `@typedblite/language` ships its TextMate grammar, as `@typedblite/language/typeqlite.tmLanguage.json`. Its
+  README already said it did, but the file was in neither `files` nor `exports`.
+- The VS Code extension has a changelog, keywords, a gallery banner, and `homepage` and `bugs` links, for its
+  marketplace pages.
 - The playground's editor is now **Monaco, with the real language server behind it over LSP**, in a worker: the
   server the VS Code extension runs. Errors are underlined as you type, with completion, hover, go to definition,
   references, rename, quick fixes, an outline, folding, formatting and names coloured by what they resolve to.
