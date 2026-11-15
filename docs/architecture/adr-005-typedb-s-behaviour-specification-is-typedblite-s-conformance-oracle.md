@@ -164,7 +164,7 @@ requires of CouchDB compatibility. A claim without a cited run is prose.
   not evidence of anything.
 - **Fetching the specification at test time.** Non-deterministic, network-dependent, and the score
   would change without a commit. The pin is the point.
-- **The tests shipped with `@downstream/typedb-wasm`.** They are that package's, not TypeDB's, and
+- **The tests shipped with the third-party TypeDB WASM build.** They are that package's, not TypeDB's, and
   ADR-002's context records that its source is unobtainable.
 - **A single total baseline.** Hides regressions — Decision 4.
 

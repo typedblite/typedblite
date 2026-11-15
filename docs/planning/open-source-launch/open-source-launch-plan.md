@@ -62,8 +62,8 @@ To go back: fix billing, `gh workflow enable` the three workflows, restore the D
   (#48), served by `npm run playground`.
 
 - **2026-11-15** (#49 to #58): **packaging** (#50: `files` lists, the CLI renamed `typedblite`, `check-packages`,
-  `clean-room`, Nx release, `release.yml`, the compatibility policy, Releasing); the production consumer and its
-  a downstream feature no longer named anywhere (#51, #58); **the API reviewed and its reference generated** (#52:
+  `clean-room`, Nx release, `release.yml`, the compatibility policy, Releasing); the production consumer and other private projects no longer
+  named anywhere (#51, #58); **the API reviewed and its reference generated** (#52:
   explicit exports pinned by a test, `check-api`, `docs:api`); Nx 24 (#53) and Vitest 5 (#54); **a pushed revision
   checked against its content** (#55, PL-6, ADR-003 amended and accepted); both extensions ready to publish (#56:
   `release-extension.yml`); and a draft of "When to use TypeDBLite, and when not" (#57).
@@ -81,7 +81,7 @@ Nothing has run on GitHub since #40, so CI has seen none of #41 to #58, and `rel
   past the extension's `engines.vscode ^1.91`, which `vsce` refuses to package; its `@swc/core` and `playwright-core`
   bumps can be taken separately. #32 (Capacitor 8) waits until the Android build can be run. #23 to #27 (Actions
   versions only) were closed, untestable while Actions is off; #28, #29 and #31 were superseded by #53 and #54.
-- **Git history still names the production consumer and its a downstream feature**, in old commit messages and file
+- **Git history still names the production consumer and other private projects**, in old commit messages and file
   contents. The tree does not. Rewriting history is the maintainer's decision, and must come before any release
   tag, a repository move, or going public.
 - **`apps/playground` and the API reference are built and not hosted.** `npm run playground` and `npm run docs:api`.

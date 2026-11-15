@@ -980,7 +980,7 @@ export class TypeDBLiteInterpreter {
   private persistKeyOwnerships = false;
 
   /**
-   * Whether a caller-held transaction is open on this handle (D7 of ADR-069, in the monorepo this engine came from).
+   * Whether a caller-held transaction is open on this handle.
    *
    * 🔴 While it is, `execute` must not issue its own `BEGIN`: SQLite rejects a nested one, so each
    * write pipeline takes a `SAVEPOINT` instead, and a failing pipeline rolls back to it without
@@ -3504,7 +3504,7 @@ export class TypeDBLiteInterpreter {
    * 🔴 Upward alone was wrong, and wrongly refused a valid query. `adr sub doc, owns adr-status`
    * makes `match $d isa doc, has adr-status $s;` legitimate: `isa doc` is satisfied by an `adr`, and
    * the `adr` owns the attribute. Checking only `doc` and its supertypes threw on it —
-   * downstream-monorepo's `downstream-store.schema.typeqlite` has several subtype-owned attributes, so that was live
+   * A documentation store's schema has several subtype-owned attributes, so that was live
    * for the corpus this engine targets, not hypothetical.
    *
    * - **Upward** (supertypes), because ownership declared on a parent is inherited: an `adr` owns
@@ -3698,7 +3698,7 @@ export class TypeDBLiteInterpreter {
         // `isa!` — the type alone, no subtypes (match.feature L899).
         where.push('t.type = ?');
       } else {
-        // Subtype closure, so `isa doc` also matches `adr` (downstream-store's `entity adr sub doc`).
+        // Subtype closure, so `isa doc` also matches `adr` (a documentation store's `entity adr sub doc`).
         where.push(`t.type IN ${SUBTYPES_OF}`);
       }
       params.push(isa.type);

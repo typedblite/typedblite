@@ -1,7 +1,7 @@
 /**
  * FTS5 against Nouveau, over the **real corpus**, not a fixture.
  *
- * `docker-compose.downstream-store.yaml` holds ~2,880 documents. Comparing against a handful of
+ * The external documentation store's index holds ~2,880 documents. Comparing against a handful of
  * hand-made records would prove the query syntax and nothing about recall on real prose, which is
  * where the two engines actually differ.
  *
@@ -61,7 +61,7 @@ describe(
   {
     skip:
       !available &&
-      'downstream-store corpus unavailable — start docker-compose.downstream-store.yaml and run downstream-store:sync',
+      'the external corpus is unavailable — start the documentation store\'s search index and sync it',
   },
   () => {
     let index: FullTextIndex;
@@ -187,7 +187,7 @@ describe(
       // is 'Accepted'). Measured against this corpus: Mango finds 81, Nouveau finds 0, and
       // `status:Proposed` finds exactly the 2 documents whose value happens to be lowercase.
       //
-      // This is a real defect in downstream-store's search, not a quirk of ours. FTS5 tokenizes the
+      // This is a real defect in that store's search, not a quirk of ours. FTS5 tokenizes the
       // column, so it matches regardless of case — better here, not merely equivalent.
       assert.equal(theirs, 0, 'if Nouveau starts finding these, the defect has been fixed upstream');
       assert.ok(exact.length > 50, `expected a substantial corpus, got ${exact.length}`);

@@ -3,5 +3,5 @@ commit: 7d35851bffeabd642b7288dea82eb63852f3c191
 commit-date: 2026-09-10T12:37:52Z
 vendored: 2026-09-11
 paths: query/language/*.feature, LICENSE
-surveyed-against: typedb/typedb:3.10.4 (the downstream-store stack)
+surveyed-against: typedb/typedb:3.10.4 (a local Docker stack)
 licence: MPL-2.0 — headers intact; these files are never edited by hand (TypeQLite Conformance Standard)

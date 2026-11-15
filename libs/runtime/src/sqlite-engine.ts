@@ -76,7 +76,7 @@ export class SqliteEngine {
   }
 
   /**
-   * Run `work` in one transaction (D7 of ADR-069, in the monorepo this engine came from):
+   * Run `work` in one transaction:
    * `BEGIN IMMEDIATE`, then `COMMIT` if it resolves or `ROLLBACK` if it throws, rethrowing the
    * same error. Inside `work`, this engine's own `execute` and `query` are in the transaction.
    *

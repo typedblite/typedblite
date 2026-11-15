@@ -21,7 +21,7 @@ repository's source:
 | ----- | -----: | ---------: | ----------------- |
 | `scm/ladder.db`, the workflow engine | 46,690 | 275,669 | `find()` is 16 queries; `saveStep()` is a delete, an insert and a history insert, 3 commits |
 | `observability.db` | 22,938 | 77,156 | A filtered listing: one base match, then one query per optional attribute |
-| `document-store.db` | 2,390 | 21,611 | Large text values and full-text search; 967 MB, most of it change log |
+| A document store | 2,390 | 21,611 | Large text values and full-text search; 967 MB, most of it change log |
 | `skills/graph/skills.db` | 4,099 | 14,325 | The only store with relations at volume (4,800 role players) |
 
 **Growth.** A workflow-engine store built from empty to 100,000 entities with `ladder.db`'s shape,

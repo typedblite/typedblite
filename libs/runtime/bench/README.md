@@ -35,7 +35,7 @@ included, even while another process writes. Then point `BENCH_STORES` at the co
 ```bash
 cd libs/runtime
 npx tsx --tsconfig bench/tsconfig.json bench/snapshot.ts <your-stores-dir> /tmp/stores \
-  scm/ladder.db observability/observability.db document-store/document-store.db skills/graph/skills.db
+  scm/ladder.db observability/observability.db documents/documents.db skills/graph/skills.db
 BENCH_STORES=/tmp/stores npm exec nx -- run typedblite-runtime:bench -- real-stores
 ```
 

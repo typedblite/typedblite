@@ -3,18 +3,18 @@
 // no longer exists: every suite runs under Vitest, with SWC supplying the `emitDecoratorMetadata`
 // esbuild cannot and Node's real resolution supplying `node:sqlite`. The *reasoning* is kept
 // because it is why the replacement had to satisfy both constraints at once, not because the
-// split it describes is still real. See ADR-028.
+// split it describes is still real.
 /**
  * 🔴 **The full-text index must be maintained by a local write, not only by replication.**
  *
  * `fullText.index` was reachable only from `projectWinnerOnce`, which only `applyRemote` calls. So
  * a store written locally and then searched returned **zero rows, for every query, with no error** —
  * exactly the "silently returns nothing" failure this engine replaced CouchDB and Nouveau to avoid,
- * and the one `downstream-store`'s capitalised status values already demonstrate.
+ * and the one a documentation store's capitalised status values already demonstrate.
  *
- * Nobody hit it because no consumer both wrote locally and searched. `graph-store` never searched;
+ * Nobody hit it because no consumer both wrote locally and searched. A graph store never searched;
  * `fts-parity.test.ts` drives `FullTextIndex` directly, bypassing the write path entirely.
- * `document-store` is the first to do both, and found it on its first search test.
+ * A document store is the first to do both, and found it on its first search test.
  *
  * 🔴 `tsx` with `node:test`, not Jest — `node:sqlite` is a builtin only under its prefixed name and
  * Jest strips the prefix. See `interpreter.test.ts`'s header.
@@ -28,7 +28,7 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
 const documentSchema = readFileSync(
-  join(SCHEMAS, 'document-store.schema.typeqlite'),
+  join(SCHEMAS, 'documents.schema.typeqlite'),
   'utf8',
 );
 

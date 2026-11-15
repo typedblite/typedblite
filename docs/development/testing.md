@@ -155,7 +155,7 @@ Run both after any change to the binding interface, `wasm.ts`, or `content-revis
 ## The full-text parity oracle
 
 `typedblite-runtime:test-oracle` compares full-text search with an external search index, the one
-the `downstream-store` project used. It needs that index running, so it is not part of the routine run.
+a documentation-store project used. It needs that index running, so it is not part of the routine run.
 
 🔴 **Nothing compares the change log's conflict semantics with CouchDB's any more.** A CouchDB
 revision-tree parity suite once lived in that configuration, and was removed in 2026-09. Treat

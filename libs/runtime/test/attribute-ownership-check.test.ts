@@ -61,7 +61,7 @@ describe('an attribute constraint is checked against ownership', () => {
 
   it('allows an attribute inherited from a supertype', () => {
     // 🔴 `isa doc` is answered by an `adr`, and ownership declared on the parent is inherited —
-    // downstream-store depends on exactly this. Checking only the named type would refuse a valid query.
+    // A real documentation store depends on exactly this. Checking only the named type would refuse a valid query.
     const engine = engineWith(
       [
         'define',
@@ -81,7 +81,7 @@ describe('an attribute constraint is checked against ownership', () => {
   // and the `adr` owns the attribute — so the query is valid and used to answer. Refusing only when
   // NOTHING in the hierarchy owns it is the conservative reading, and conservative is the right
   // bias: a false refusal breaks a working query, a missed one leaves the old silence.
-  // downstream-monorepo's downstream-store schema has several subtype-owned attributes, so this is not academic.
+  // A real documentation store's schema has several subtype-owned attributes, so this is not academic.
   it('allows an attribute a SUBTYPE owns, matched through the parent', () => {
     const engine = engineWith(
       [

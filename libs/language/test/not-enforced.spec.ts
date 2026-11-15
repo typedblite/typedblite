@@ -8,7 +8,7 @@ import { TypeQLiteValidationCode } from '../src/typeqlite-validation-codes.js';
  * 🔴 This file used to assert the opposite — `@card` and `@unique` were errors, on ADR-002 D7's
  * rule that unsupported TypeQLite never silently succeeds. That rule stands; what changed is the
  * shape of "not silently" (founder decision 2026-09-11, TypeDBLite Conformance Phase 01). Refusing
- * a valid TypeDB schema was the wrong side of it: `downstream-store`'s schema could not be applied at
+ * a valid TypeDB schema was the wrong side of it: a documentation store's schema could not be applied at
  * all, and every Background in the behaviour spec was refused before a single semantic could be
  * measured. So the diagnostic is below error severity, `define` applies the schema, and the
  * runtime forwards the diagnostic as a fact in its report — a reader sees *"`@card` is parsed and

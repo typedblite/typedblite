@@ -33,7 +33,7 @@ const WASM_LIMITS = [
   'test/write-lock-contention.test.ts',
   // WAL is a property of a real file; memdb and OPFS report another journal mode.
   'test/journal-mode.test.ts',
-  // Needs a live downstream-store Nouveau index (the on-demand oracle).
+  // Needs a live Nouveau index of an external documentation store (the on-demand oracle).
   'test/fts-parity.test.ts',
 ];
 

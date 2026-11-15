@@ -2,7 +2,7 @@
  * Full-text search over TypeDBLite, via SQLite's FTS5.
  *
  * Goal 6 of TypeDBLite Sync (in the monorepo this engine came from):
- * a hard requirement rather than an extra. `downstream-store` needs CouchDB for three things — storage,
+ * a hard requirement rather than an extra. A documentation store needed CouchDB for three things — storage,
  * replication and **search** — so replacing the first two would leave the stack up.
  *
  * 🔴 FTS5 is a compile-time option and its presence in a bundled SQLite is not guaranteed. It was
@@ -19,7 +19,7 @@ export interface SearchHit {
 }
 
 /**
- * The columns mirror what `downstream-store`'s Nouveau `_design/search` indexes, mapped onto TypeDBLite's
+ * The columns mirror what a documentation store's Nouveau `_design/search` indexes, mapped onto TypeDBLite's
  * generic model:
  *
  * - `doctype` — the entity's TypeQLite type, which is what `docType` means there.
@@ -178,7 +178,7 @@ export class FullTextIndex {
   /**
    * Search, using FTS5's own query syntax.
    *
-   * Column filters are written `doctype:adr`, matching the shape `downstream-store` already issues
+   * Column filters are written `doctype:adr`, matching the shape a documentation store already issues
    * against Nouveau. Prefix is `term*`. Lucene's fuzzy (`~`), boost (`^`) and range syntax have no
    * equivalent — a query using them is a caller error here, and that gap is recorded in the phase
    * summary rather than silently returning nothing.

@@ -6,7 +6,7 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
  * 🔴 `isa` on a relation must resolve through the subtype closure, exactly as it does on an entity.
  *
  * `candidates()` matches a type through a recursive CTE over `type_parent`, so `isa doc` also
- * matches `adr` — downstream-store depends on it. `relationBindings` filtered with an exact `t.type = ?`,
+ * matches `adr` — a documentation store depends on it. `relationBindings` filtered with an exact `t.type = ?`,
  * so naming a role list silently dropped every subtype instance: the same query answered rows
  * without `links (...)` and nothing with it, at exit code 0, and `noCandidates` did not fire
  * because the *entity* path applies the closure correctly.

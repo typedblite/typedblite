@@ -17,15 +17,22 @@ let root: string | undefined;
 afterEach(() => {
   if (root) rmSync(root, { recursive: true, force: true });
   root = undefined;
+  delete process.env['TYPEDBLITE_DEFECT_STORE'];
 });
+
+/** Where a test's defect store is, and point `TYPEDBLITE_DEFECT_STORE` at it, as a maintainer's shell would. */
+const storeAt = (dir: string): string => {
+  const path = join(dir, 'defects.db');
+  process.env['TYPEDBLITE_DEFECT_STORE'] = path;
+  return path;
+};
 
 const repository = (withStore: boolean): string => {
   root = mkdtempSync(join(tmpdir(), 'conformance-owners-'));
   mkdirSync(join(root, 'docs', 'architecture'), { recursive: true });
   writeFileSync(join(root, 'docs', 'architecture', 'adr-002-something.md'), '# ADR-002');
   if (withStore) {
-    mkdirSync(join(root, '.mvp', 'defects'), { recursive: true });
-    const store = new TypeDBLiteInterpreter(join(root, '.mvp', 'defects', 'defects.db'));
+    const store = new TypeDBLiteInterpreter(storeAt(root));
     store.define('define attribute defect-id, value string; entity defect, owns defect-id @key;');
     store.execute('insert $d isa defect, has defect-id "d-20260911-a-real-one";');
     store.close();
@@ -53,16 +60,14 @@ describe('owner resolution', () => {
     // Either used to throw before a single scenario ran. Both are the third outcome, with a caveat
     // that names this case rather than claiming there is no store.
     const emptyRoot = repository(false);
-    mkdirSync(join(emptyRoot, '.mvp', 'defects'), { recursive: true });
-    writeFileSync(join(emptyRoot, '.mvp', 'defects', 'defects.db'), '');
+    writeFileSync(storeAt(emptyRoot), '');
     const empty = ownerCheck(emptyRoot);
     assert.match(empty.caveat ?? '', /present and could not be read/);
     assert.equal(empty.resolves('d-20260911-never-opened'), true);
 
     rmSync(emptyRoot, { recursive: true, force: true });
     const schemalessRoot = repository(false);
-    mkdirSync(join(schemalessRoot, '.mvp', 'defects'), { recursive: true });
-    new TypeDBLiteInterpreter(join(schemalessRoot, '.mvp', 'defects', 'defects.db')).close();
+    new TypeDBLiteInterpreter(storeAt(schemalessRoot)).close();
     const schemaless = ownerCheck(schemalessRoot);
     assert.match(schemaless.caveat ?? '', /present and could not be read/);
     assert.equal(schemaless.resolves('d-20260911-never-opened'), true);
@@ -71,7 +76,7 @@ describe('owner resolution', () => {
   it('a store that cannot even be opened is the same third outcome, not a crash', () => {
     // A directory where the store file should be: SQLite refuses to open it at all.
     const unopenable = repository(false);
-    mkdirSync(join(unopenable, '.mvp', 'defects', 'defects.db'), { recursive: true });
+    mkdirSync(storeAt(unopenable), { recursive: true });
     const check = ownerCheck(unopenable);
     assert.match(check.caveat ?? '', /present and could not be read/);
     assert.equal(check.resolves('d-20260911-never-opened'), true);

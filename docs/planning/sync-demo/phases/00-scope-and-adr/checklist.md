@@ -23,7 +23,7 @@ phase: 00-scope-and-adr
       and sqlite-wasm 3.54.1-build1. Licences: sqlite-wasm and playwright-core are Apache-2.0;
       Electron and Capacitor are MIT. All are compatible with MPL-2.0
 - [x] Android toolchain on this machine: SDK platforms 34 and 35, the API 34 google_apis x86_64
-      image, AVD `pim-demo`, and JDK 21 at `~/Android/jdk/jdk-21.0.13+9`. 🔴 **The user is not in the
+      image, an existing AVD, and JDK 21 at `~/Android/jdk/jdk-21.0.13+9`. 🔴 **The user is not in the
       `kvm` group** (`/dev/kvm` is `root:kvm`, mode 660), so the emulator cannot boot without
       `sudo chmod 666 /dev/kvm`. This session can build and package the Android app, but cannot run
       it

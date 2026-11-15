@@ -3,7 +3,7 @@
 // no longer exists: every suite runs under Vitest, with SWC supplying the `emitDecoratorMetadata`
 // esbuild cannot and Node's real resolution supplying `node:sqlite`. The *reasoning* is kept
 // because it is why the replacement had to satisfy both constraints at once, not because the
-// split it describes is still real. See ADR-028.
+// split it describes is still real.
 /**
  * Phase 07 — the nine findings a `/code-review` pass over `dev...feat/typeqlite-sync` produced,
  * each as a test that fails against the code as it stood.
@@ -442,7 +442,7 @@ describe('Tier 2 — loss and corruption under load', () => {
 
 describe('Round two — findings the fixes themselves introduced', () => {
   // 🔴 A second `/code-review` over this phase's own diff. Four of its six findings were introduced
-  // by the first round's fixes, which is the reason ADR-016 D11 asks for the re-review at all:
+  // by the first round's fixes, which is the reason a re-review is asked for at all:
   // each round's fixes are themselves unreviewed code.
 
   it('🔴 an apply failure is reported terminal, because no reconnect is coming', async () => {

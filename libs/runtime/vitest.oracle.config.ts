@@ -4,7 +4,7 @@ import { swcDecoratorMetadata, testDefaults, workspaceAliases } from '../../vite
 
 /**
  * `fts-parity.test.ts`, run **on demand** rather than on every commit — it needs a live
- * `downstream-store` Nouveau index to compare against.
+ * Nouveau index of an external documentation store to compare against.
  *
  * 🔴 **`couchdb-oracle.test.ts` and its CouchDB/PouchDB differential-conflict oracle were removed
  * by PouchDB Dependency Removal Phase 00** (2026-09-15) along with every other PouchDB reference in

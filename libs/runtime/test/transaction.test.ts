@@ -1,6 +1,5 @@
 /**
- * The engine-level transaction (ADR-069, in the monorepo this engine came from,
- * D7): `BEGIN IMMEDIATE`, commit on success, roll back on a throw, and a savepoint for each write
+ * The engine-level transaction: `BEGIN IMMEDIATE`, commit on success, roll back on a throw, and a savepoint for each write
  * pipeline inside it, because SQLite rejects a nested `BEGIN`.
  *
  * Each case is a claim the ADR makes. The cross-process case spawns a real child: an in-process

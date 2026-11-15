@@ -189,7 +189,7 @@ describe('unsupported TypeQLite throws rather than silently succeeding', () => {
 });
 
 describe('correctness details the flows above do not reach', () => {
-  it('subtypes match their supertype — downstream-store\'s `entity adr sub doc`', () => {
+  it('subtypes match their supertype — a documentation store\'s `entity adr sub doc`', () => {
     const db = new TypeDBLiteInterpreter();
     db.define(
       'define attribute doc-id, value string; entity doc, owns doc-id @key; entity adr sub doc;',

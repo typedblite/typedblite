@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 
 /**
- * Boolean and datetime literals, end to end — ADR-038 Amendment 1(d).
+ * Boolean and datetime literals, end to end.
  *
  * 🔴 **The grammar accepting them is half the feature.** `literalText` in the interpreter and
  * `literal` in the generator each convert a literal node to storage text, and until this change

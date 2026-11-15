@@ -6,11 +6,12 @@ import { DatabaseSync } from 'node:sqlite';
  * A deviation's `owner` must resolve (TypeDBLite Conformance Standard): an ADR that exists in the
  * index, or a defect record. An owner that does not resolve makes the deviation a fail.
  *
- * ⚠️ Defect records live in `.mvp/defects/defects.db`, which is machine-local and gitignored. Where
- * the store is present a `d-` owner must be a record in it; where it is absent — CI — a `d-` owner
- * is accepted on its format alone, and the report says so. That is the third outcome named rather
+ * ⚠️ Defect records live in a TypeDBLite store outside this repository, named by the
+ * `TYPEDBLITE_DEFECT_STORE` environment variable (the path of its `.db` file). Where the variable is
+ * set and the store is present a `d-` owner must be a record in it; where it is not — CI — a `d-`
+ * owner is accepted on its format alone, and the report says so. That is the third outcome named rather
  * than hidden. The store is a TypeDBLite file, read here through its tables read-only rather than
- * by spawning the defects CLI from a test: `attribute` since ADR-006, `attr` in a store an older
+ * by spawning another tool from a test: `attribute` since ADR-006, `attr` in a store an older
  * engine wrote and no newer one has opened (a read-only reader cannot migrate it).
  */
 export interface OwnerCheck {
@@ -50,8 +51,8 @@ export const ownerCheck = (repositoryRoot: string): OwnerCheck => {
       .map((name) => /^adr-(\d{3})-/.exec(name)?.[1])
       .filter((n): n is string => n !== undefined),
   );
-  const storePath = join(repositoryRoot, '.mvp', 'defects', 'defects.db');
-  const present = existsSync(storePath);
+  const storePath = process.env['TYPEDBLITE_DEFECT_STORE'];
+  const present = storePath !== undefined && storePath !== '' && existsSync(storePath);
   const defects = present ? defectIds(storePath) : undefined;
   return {
     resolves: (owner) => {

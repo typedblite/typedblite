@@ -16,7 +16,7 @@ guarantee replacing an application-level check-then-create.
 
 Two things have since made the *product* choice uncomfortable while leaving that *reasoning* intact.
 
-**The dependency is an opaque binary with no obtainable source.** `@downstream/typedb-wasm` ships an
+**The dependency is an opaque binary with no obtainable source.** The third-party TypeDB WASM build ships an
 11.5 MB `typedb_wasm_bg.wasm` and no Rust source. Verified 2026-08-29: crates.io has neither
 `typedb-embedded` nor `typedb-wasm`, JSR reports `githubRepository: null`, GitHub code search
 returns 0 results, and `typedb/typedb`'s own workspace has no such member crate. It is a
@@ -109,7 +109,7 @@ Sorting is done in JavaScript. The consuming API is five methods: `define`, `exe
 9. ~~**A WASM fallback is deferred, not superseded.**~~ **Resolved 2026-08-29.** Phase 03 proved the
    SQLite adapter, so the fallback was retired the same day. Original text kept:
 
-   **A WASM fallback is deferred, not superseded.** The commitment to retain `@downstream/typedb-wasm`
+   **A WASM fallback is deferred, not superseded.** The commitment to retain the third-party TypeDB WASM build
    as a fallback stands until this feature's Phase 03 proves the SQLite adapter against the real
    consumer schemas. Retiring the fallback before the replacement is proven is how a project ends
    up with neither.

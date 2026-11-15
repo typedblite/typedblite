@@ -8,7 +8,7 @@ import { SqliteEngine } from '../src/sqlite-engine';
 /**
  * The adapter every repository in the workspace reaches the interpreter through.
  *
- * 🔴 It was measured only from *other* projects' suites — `document-store` and `graph-store`
+ * 🔴 It was measured only from *other* projects' suites — two downstream stores'
  * infrastructure both construct one — so nothing in its own package proved its surface. That is
  * the same attribution gap that made the contract suites look untested.
  */
