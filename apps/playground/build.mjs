@@ -16,13 +16,27 @@ const SRC = join(HERE, 'src');
 const BRAND = join(HERE, '../../docs/brand');
 const require = createRequire(import.meta.url);
 const WASM = join(dirname(require.resolve('@sqlite.org/sqlite-wasm/package.json')), 'dist/sqlite3.wasm');
+// Monaco's package root, found from its CommonJS entry (`<root>/min/vs/index.js`) so that a hoisted install
+// does not matter. Its `exports` map reaches `esm/vs/**` only.
+const MONACO = join(dirname(require.resolve('monaco-editor')), '../..');
 const minify = process.argv.includes('--minify');
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 const common = { bundle: true, platform: 'browser', format: 'esm', target: 'es2022', logLevel: 'warning', sourcemap: true, minify };
 await build({ ...common, entryPoints: [join(SRC, 'worker.ts')], outfile: join(OUT, 'worker.js') });
-await build({ ...common, entryPoints: [join(SRC, 'main.ts')], outfile: join(OUT, 'main.js') });
+await build({ ...common, entryPoints: [join(SRC, 'language-worker.ts')], outfile: join(OUT, 'language-worker.js') });
+// Monaco's own worker (word-based features, diffing), as the standalone editor asks for it.
+await build({ ...common, entryPoints: [join(MONACO, 'esm/vs/editor/editor.worker.js')], outfile: join(OUT, 'editor.worker.js') });
+// The page. Monaco's CSS comes out beside it as main.css, and its icon font is copied next to that.
+await build({
+  ...common,
+  entryPoints: [join(SRC, 'main.ts')],
+  outfile: join(OUT, 'main.js'),
+  alias: { 'monaco-lsp-client': join(MONACO, 'esm/external/monaco-lsp-client/out/index.js') },
+  loader: { '.ttf': 'file' },
+  assetNames: '[name]',
+});
 copyFileSync(WASM, join(OUT, 'sqlite3.wasm'));
 copyFileSync(join(SRC, 'index.html'), join(OUT, 'index.html'));
 copyFileSync(join(BRAND, 'typedblite-logo.svg'), join(OUT, 'logo.svg'));

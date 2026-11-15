@@ -18,7 +18,9 @@ export default defineConfig({
         ...defaults.coverage.exclude,
         // The page and its worker run only in a browser: `test-browser/playground.test.ts`, in Chromium.
         'src/main.ts',
+        'src/editor.ts',
         'src/worker.ts',
+        'src/language-worker.ts',
         'src/polyfills.ts',
         // The `serve` target's entry: it starts the static server, which is tested.
         'src/dev/serve.ts',

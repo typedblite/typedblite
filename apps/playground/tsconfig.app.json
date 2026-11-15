@@ -5,5 +5,5 @@
     "skipLibCheck": true, "declaration": false, "sourceMap": true,
     "types": ["node"], "rootDir": "src", "outDir": "out"
   },
-  "include": ["src/run.ts", "src/share.ts", "src/examples.ts", "src/runner-client.ts", "src/protocol.ts", "src/dev/**/*.ts"]
+  "include": ["src/run.ts", "src/share.ts", "src/examples.ts", "src/runner-client.ts", "src/protocol.ts", "src/language-server.ts", "src/highlighting.ts", "src/dev/**/*.ts"]
 }

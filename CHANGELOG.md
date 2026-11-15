@@ -43,6 +43,11 @@ they are listed here.
   made `npm ci` fail for everyone but the machine that committed it.
 
 ### Added
+- The playground's editor is now **Monaco, with the real language server behind it over LSP**, in a worker: the
+  server the VS Code extension runs. Errors are underlined as you type, with completion, hover, go to definition,
+  references, rename, quick fixes, an outline, folding, formatting and names coloured by what they resolve to.
+  `@typedblite/language` now exports `KEYWORD_SCOPES`, `grammarKeywords`, `typeqliteTextMate` and `TEXTMATE_OUT`
+  (the table the VS Code grammar is generated from), so the editor's keyword colours come from the same table.
 - **A browser playground**, `apps/playground`: write TypeQLite and run it in a browser with nothing to install.
   The engine is TypeDBLite on WASM SQLite in a Web Worker, each run starts from an empty in-memory database,
   and nothing leaves the page. Three examples, errors that name their line, results as tables or JSON, and a

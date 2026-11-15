@@ -6,6 +6,7 @@
 <title>TypeDBLite playground</title>
 <meta name="description" content="Try TypeQLite in your browser: TypeDBLite running on WASM SQLite, with nothing to install.">
 <link rel="icon" href="logo-icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="main.css">
 <style>
   :root {
     --bg: #f4f2ee; --panel: #ffffff; --ink: #15171c; --muted: #55575e; --line: #d9d5cc;
@@ -38,7 +39,7 @@
   @media (min-width: 900px) { .panes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
   .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
   .pane h2 { margin: 0 0 8px; font-size: 1rem; }
-  #editor { width: 100%; min-height: 420px; resize: vertical; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--code); color: var(--ink); font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 2; }
+  #editor { width: 100%; height: 420px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   #output { min-height: 420px; overflow-x: auto; }
   .step { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
   .step > header { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 12px; background: var(--code); font-size: .875rem; color: var(--muted); }
@@ -78,8 +79,8 @@
 
   <div class="panes">
     <section class="pane">
-      <h2><label for="editor">Program</label></h2>
-      <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      <h2 id="program-title">Program</h2>
+      <div id="editor" role="group" aria-labelledby="program-title"></div>
     </section>
     <section class="pane">
       <h2 id="output-title">Results</h2>
@@ -88,7 +89,7 @@
   </div>
 
   <footer>
-    <p>Press <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>Enter</kbd> to run. Each run starts from an empty database.</p>
+    <p>Press <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>Enter</kbd> to run. Each run starts from an empty database. In the editor, <kbd>Ctrl</kbd> + <kbd>Space</kbd> completes, <kbd>F2</kbd> renames, <kbd>F12</kbd> goes to a definition, and <kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>F</kbd> formats. <kbd>Esc</kbd> then <kbd>Tab</kbd> leaves the editor.</p>
     <p>A statement that follows a write or a query ends with <code>end;</code>. In TypeQL 3, a <code>match</code> after an <code>insert</code> is the next stage of the same pipeline, not a new query.</p>
     <p>Everything runs in your browser, in a worker, on WASM SQLite. Your program is not sent anywhere, and a shared link holds the whole program after the <code>#</code>.</p>
     <p>TypeDBLite is an independent open-source project, not affiliated with, sponsored by, or endorsed by TypeDB Ltd. It is built on <a href="https://typedb.com">TypeDB</a>, with thanks.</p>

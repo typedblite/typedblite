@@ -1,3 +1,4 @@
+import { createProgramEditor } from './editor.js';
 import { EXAMPLES } from './examples.js';
 import { Runner, type WorkerLike } from './runner-client.js';
 import type { ProgramError, RunResult, Step } from './run.js';
@@ -16,13 +17,16 @@ const el = <T extends HTMLElement>(id: string): T => {
   if (!found) throw new Error(`#${id} is missing from the page`);
   return found as T;
 };
-const editor = el<HTMLTextAreaElement>('editor');
 const output = el('output');
 const examples = el<HTMLSelectElement>('examples');
 const runButton = el<HTMLButtonElement>('run');
 const stopButton = el<HTMLButtonElement>('stop');
 const shareButton = el<HTMLButtonElement>('share');
 const status = el('status');
+
+/** Called from `runner.run` below; declared first so the editor's Run shortcut can reach it. */
+let runProgram: () => void = () => undefined;
+const program = createProgramEditor(el('editor'), { onRun: () => runProgram() });
 
 const runner = new Runner(() => new Worker(new URL('worker.js', document.baseURI), { type: 'module' }) as unknown as WorkerLike);
 
@@ -34,13 +38,6 @@ function h<K extends keyof HTMLElementTagNameMap>(tag: K, props: { class?: strin
   return node;
 }
 
-function goToLine(line: number): void {
-  const lines = editor.value.split('\n');
-  const start = lines.slice(0, line - 1).reduce((offset, text) => offset + text.length + 1, 0);
-  editor.focus();
-  editor.setSelectionRange(start, start + (lines[line - 1]?.length ?? 0));
-}
-
 function errorBox(error: ProgramError): HTMLElement {
   const box = h('p', { class: 'error', text: error.line === undefined ? error.message : `Line ${error.line}: ${error.message}` });
   box.setAttribute('role', 'alert');
@@ -48,7 +45,7 @@ function errorBox(error: ProgramError): HTMLElement {
     const line = error.line;
     const go = h('button', { text: 'Go to line' });
     go.type = 'button';
-    go.addEventListener('click', () => goToLine(line));
+    go.addEventListener('click', () => program.goToLine(line));
     box.append(go);
   }
   return box;
@@ -93,14 +90,14 @@ async function run(): Promise<void> {
   busy(true);
   status.textContent = 'Running…';
   const started = performance.now();
-  const result = await runner.run(editor.value);
+  const result = await runner.run(program.getValue());
   draw(result);
   busy(false);
   status.textContent = result.error || result.steps.some((step) => step.error) ? 'Stopped at an error.' : `Ran in ${Math.round(performance.now() - started)} ms.`;
 }
 
 async function share(): Promise<void> {
-  const hash = encodeShare(editor.value);
+  const hash = encodeShare(program.getValue());
   history.replaceState(null, '', hash);
   const long = location.href.length > LONG_LINK ? ' It is long: some tools cut long links.' : '';
   try {
@@ -111,8 +108,12 @@ async function share(): Promise<void> {
   }
 }
 
+/** True while the page puts a program in the editor itself, so that is not mistaken for the user typing. */
+let loading = false;
 function load(source: string, selected: string): void {
-  editor.value = source;
+  loading = true;
+  program.setValue(source);
+  loading = false;
   examples.value = selected;
 }
 
@@ -127,16 +128,21 @@ examples.addEventListener('change', () => {
     void run();
   }
 });
-editor.addEventListener('input', () => (examples.value = ''));
-editor.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-    event.preventDefault();
-    void run();
-  }
+program.onDidChange(() => {
+  if (!loading) examples.value = '';
 });
 runButton.addEventListener('click', () => void run());
 stopButton.addEventListener('click', () => runner.stop());
 shareButton.addEventListener('click', () => void share());
+
+runProgram = () => void run();
+
+/** For the browser test, which drives the page as a person does, but cannot type a long program quickly. */
+(window as unknown as { typedblitePlayground: object }).typedblitePlayground = {
+  getProgram: () => program.getValue(),
+  setProgram: (text: string) => program.setValue(text),
+  getSelectedText: () => program.getSelectedText(),
+};
 
 const shared = decodeShare(location.hash);
 if (shared !== undefined) {

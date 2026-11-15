@@ -441,8 +441,9 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       engine on WASM SQLite in a worker, three examples, errors that name their line, a shareable `#code=` link; 60
       unit tests and 11 in real Chromium, including that nothing leaves the page and that a program's text is never
       shown as markup. **Not done:** hosting (GitHub Pages needs Actions or a manual publish; build with
-      `node build.mjs --minify`), syntax highlighting (the plan suggested reusing the extension's grammar), and a
-      real-browser test of Stop.
+      `node build.mjs --minify`; about 2.1 MB gzipped on a first visit) and a real-browser test of Stop. **Updated
+      2026-11-15:** the editor is now Monaco with the real language server over LSP in a worker (the extension's
+      server), so highlighting, diagnostics, completion, hover, rename and formatting are the extension's.
 
 **Exit:** a first-timer test (below) succeeds without the maintainer's help.
 
