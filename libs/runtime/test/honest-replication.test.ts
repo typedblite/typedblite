@@ -2,7 +2,7 @@
  * ADR-009 D7: a spoke never reports itself in sync when it is not.
  *
  * 🔴 `fetchSince` returned an empty list for any non-OK answer but 401/403, so a spoke whose hub
- * answered 503 — a hub that is down behind a proxy — counted as caught up. Found by the downstream-app
+ * answered 503 — a hub that is down behind a proxy — counted as caught up. Found by a downstream
  * offline demo, whose "the hub goes down" step could not show an offline device without a workaround.
  * A stream cut before the hub's caught-up marker, and a hub that accepts and then says nothing, are
  * the same lie by other routes.

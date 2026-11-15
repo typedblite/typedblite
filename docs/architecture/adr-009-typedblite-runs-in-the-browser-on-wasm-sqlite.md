@@ -16,7 +16,7 @@
 TypeDBLite is offline-first. That only means something if the engine runs where the user is, and
 in a web app the user is in the browser. The `SqliteDatabase` interface was designed for this: a WASM
 build of SQLite, running synchronously in a Web Worker, satisfies it. A spike proved it.
-`libs/runtime/spike/wasm-sqlite.ts` ran the runtime suite on WASM SQLite. A demo in downstream-app
+`libs/runtime/spike/wasm-sqlite.ts` ran the runtime suite on WASM SQLite. A demo in a downstream application
 then ran the real interpreter on OPFS in Chromium, in Electron, and in Android's WebView, and synced
 it with a hub.
 
@@ -26,7 +26,7 @@ But the spike is not something a user can depend on:
 - **Bundling `@typedblite/runtime` for a browser pulls in `node:sqlite`, `node:http` and
   `node:crypto`.** The entry point re-exports the `node:sqlite` binding and the SSE hub, the
   interpreter imports `openNodeSqlite` as its default opener, and `@typedblite/content-revision`
-  hashes revisions with `node:crypto`. The downstream-app demo got around this with an esbuild alias
+  hashes revisions with `node:crypto`. That demo got around this with an esbuild alias
   of its own.
 - **Its test configuration does not start.** It imports a shared file from a path outside this
   repository.

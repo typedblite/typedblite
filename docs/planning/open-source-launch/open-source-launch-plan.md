@@ -90,9 +90,8 @@ Nothing has run on GitHub since, so CI has not seen the hub hardening (#45), the
    secret scanning with push protection, Dependabot alerts.
 4. **`CODE_OF_CONDUCT.md`:** Insights, Community Standards, Add (inserts the official Contributor Covenant text, which
    the tooling here cannot fetch).
-5. **Decisions still open:** the contribution model, DCO or CLA (4); whether `downstream-app` stays named in the docs
-   (5, S3); the launch window (7); capacity: who answers issues, and who is the second reviewer (8). Decided: Windows
-   (fixed and blocking), the coverage policy (decision 9: raise the tests, keep the floor), the Node minimum (22.16).
+5. **Decisions still open:** the contribution model, DCO or CLA (4); the launch window (7); capacity: who answers issues, and who is the second reviewer (8). Decided: the production consumer is not named
+   (5, S3); Windows (fixed and blocking), the coverage policy (decision 9: raise the tests, keep the floor), the Node minimum (22.16).
 6. **Host the playground** at `typedblite.dev/playground`: GitHub Pages needs Actions or a manual publish of
    `apps/playground/.build` (build with `node build.mjs --minify`), plus the domain's DNS.
 7. **Run `gitleaks detect`** over the history before the repository goes public.
@@ -228,7 +227,7 @@ confirm it and it needs someone to.
 | --- | --- | --- |
 | S1 | No `CODE_OF_CONDUCT.md`, issue templates, PR template, `CHANGELOG.md` | Add. Contributor Covenant 2.1; issue forms for *bug*, *TypeDB-divergence*, *feature (name the caller)* |
 | S2 | **Doc drift.** `docs/memories/project-overview.md` says revision parity is "proven against CouchDB 3.4.3 oracle"; `AGENTS.md` says that oracle was removed (2026-09) and nothing re-checks parity | Fix the overview. A public claim contradicted by the maintainers' own notes is exactly what an early reader finds |
-| S3 | Public docs reference **downstream-app** as "the engine's one production consumer" (performance doc and bench data) | Decide: keep as a named, linked case study (it's a real asset) or neutralise. Check that no private data ships in `performance-results/` or snapshots |
+| S3 | Public docs named the engine's one production consumer (performance doc and bench data) | **Decided 2026-11-15: neutralise.** Every reference to it by name was removed; the docs say "a production application" or "a downstream application". Check that no private data ships in `performance-results/` or snapshots |
 | S4 | README is long and opens with a thanks table | Restructure (see 5.3) |
 | S5 | `.claude/`, `AGENTS.md`, `.github/agents|prompts|skills` ship in the public tree | Fine to keep, and a plus for agent-assisted contributors. Confirm nothing in them is private (paths, tokens, internal URLs) |
 | S6 | Sync demo has Electron and Android toolchains: heavy for a newcomer | Keep it, but give a browser-only "run it in one command" path and a recorded GIF |
@@ -575,7 +574,7 @@ See [section 7](#7-launch-day-runbook).
 - Avoid superlatives. State the conformance number with its denominator.
 
 **First-comment template (post immediately after submitting):** who you are in one line; why you built
-it (the real consumer: downstream-app); what works; what doesn't; the conformance method; one specific
+it (a real production consumer, unnamed); what works; what doesn't; the conformance method; one specific
 question you want answered ("what would you need to try this on a real project?"); thanks to TypeDB.
 
 ## 7. Launch day runbook
@@ -687,8 +686,8 @@ These change the plan; the recommendations are what the plan assumes.
 3. **Is the repository already public?** *Resolved: it is private (maintainer, 2026-11-14).* Nothing in it is public
    yet. Clear the [parking lot](#parking-lot) before that changes.
 4. **Contribution model.** DCO (recommended) or CLA.
-5. **downstream-app as a named case study** (S3). It's the project's only production consumer and the
-   strongest answer to "who uses this?" *Recommendation: keep, link, and have its data reviewed.*
+5. **The production consumer as a named case study** (S3). *Decided 2026-11-15 by the maintainer: no. Every
+   reference to it by name is removed, and the docs call it "a production application".*
 6. **Minimum Node version** after the B5 check.
 7. **Launch window.** Early December versus January. *Recommendation: January 2027.*
 8. **Capacity.** Who answers issues in launch week, and who is the second reviewer?

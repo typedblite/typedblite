@@ -11,8 +11,8 @@ operationalises: []
 > feature, the first multi-phase work planned in this repository · **Applies to:** any effort
 > spanning more than one session or more than one implementation phase.
 >
-> Adapted from downstream-app's Multi-Phase Lifecycle Standard (2026-08-27), where this repository's
-> code was first built. It differs in three places, all of them for the same reason: downstream-app
+> Adapted from the Multi-Phase Lifecycle Standard (2026-08-27) of the project where this repository's
+> code was first built. It differs in three places, all of them for the same reason: that project
 > has things that do not exist here. That repository has a `dev` integration branch and a promotion
 > ladder, a branch register, and SCM operations that enforce the gate. This repository has `main`,
 > no register, and no tooling, so the gate is checked by hand.
@@ -109,7 +109,7 @@ A phase closes when:
   **The check, until something automates it:** a row claiming `Complete` must have a
   `phases/<NN>-*/summary.md`, and a row not claiming it must not.
 
-  **Why the item exists.** In downstream-app, an audit of ten feature documents found three whose
+  **Why the item exists.** In that project, an audit of ten feature documents found three whose
   tables had drifted. Two read *"Not started"* for every phase of a feature already complete and
   merged. One read *"In progress"* a day after the phase closed. Nobody had skipped a step: the step
   was not written down. The table is the forward plan that a later session reads first, and a

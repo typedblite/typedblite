@@ -52,24 +52,24 @@ describe('a local write keeps the full-text index current', () => {
     `);
 
   it('indexes an entity written locally, with no replication involved', () => {
-    add('downstream-app:local-1', 'a document about replication and convergence');
+    add('app:local-1', 'a document about replication and convergence');
 
     const hits = interpreter.changeLog.fullText.search('text:convergence');
 
     assert.equal(hits.length, 1);
     // Identity is `<type>/<key value>`, never `thing.iid` — canonical.ts.
-    assert.equal(hits[0]?.entityId, 'document/downstream-app:local-1');
+    assert.equal(hits[0]?.entityId, 'document/app:local-1');
   });
 
   it('indexes tags, so a tag search works without replication', () => {
-    add('downstream-app:local-2', 'body', 'governance');
+    add('app:local-2', 'body', 'governance');
 
     assert.equal(interpreter.changeLog.fullText.search('tags:governance').length, 1);
   });
 
   it('counts one row per entity, not one per write', () => {
-    add('downstream-app:local-3', 'first');
-    add('downstream-app:local-4', 'second');
+    add('app:local-3', 'first');
+    add('app:local-4', 'second');
 
     assert.equal(interpreter.changeLog.fullText.count(), 2);
   });
@@ -80,11 +80,11 @@ describe('a local write keeps the full-text index current', () => {
    * replication path; the local path now gives the same guarantee.
    */
   it('removes a locally deleted entity from the index', () => {
-    add('downstream-app:local-5', 'findable for now');
+    add('app:local-5', 'findable for now');
     assert.equal(interpreter.changeLog.fullText.search('text:findable').length, 1);
 
     interpreter.execute(`
-      match $d isa document, has doc-id "downstream-app:local-5";
+      match $d isa document, has doc-id "app:local-5";
       delete $d;
     `);
 

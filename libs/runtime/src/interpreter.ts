@@ -2702,7 +2702,7 @@ export class TypeDBLiteInterpreter {
     const whole = this.transactionChangedSchema;
     // ⚠️ Silent on a store that never recorded what a check reads — roles before `schema_relates`,
     // value types before `schema_value_type` — as the ownership check is before `schema_owns`: an
-    // empty record means "not recorded", never "relates nothing" (a 2026-10 downstream-app store).
+    // empty record means "not recorded", never "relates nothing" (a 2026-10 production store).
     const recorded = (table: string): boolean => this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) !== undefined;
     const rolesRecorded = recorded('schema_relates');
     const valueTypesRecorded = recorded('schema_value_type');
@@ -5540,7 +5540,7 @@ export class TypeDBLiteInterpreter {
     }
     // A schema that records no `plays` AND no roles predates the record; nothing to check against.
     // Roles with no `plays` left is a schema whose last `plays` was undefined — and then nothing can
-    // play them (undefine.feature L1251). Every downstream-app store with roles records its `plays`.
+    // play them (undefine.feature L1251). Every production store we have seen with roles records its `plays`.
     if (this.schema.plays.size === 0 && this.schema.roles.size === 0) return role;
     const playerType = this.typeOfThing(player);
     if (!this.typeFamily(playerType, 'inherited').some((t) => this.schema.plays.has(playsSubject(t, roleRef(declaring, role))))) {

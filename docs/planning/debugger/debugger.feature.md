@@ -132,7 +132,7 @@ diagnosis in `runQuery`.
 interface that receives plain data: a step kind, a range, the rows, and the scope. The runtime
 does not depend on `@vscode/debugadapter` and does not know about stack frames. This follows
 ADR-004's rule ("returned, never emitted") and keeps the runtime usable wherever it is used now.
-That includes downstream-app, which loads the runtime's `out/` folder.
+That includes a downstream application, which loads the runtime's `out/` folder.
 
 **4. A debug session runs against `:memory:` and never opens an existing database.** Decided by
 the founder on 2026-11-12. The adapter constructs the engine at `:memory:`, loads the workspace
@@ -213,8 +213,8 @@ packaged `.vsix`.
 
 - **A results grid, a live schema browser, or a graph view.** That is the database IDE that the
   editor feature also left out.
-- **Debugging against downstream-app's store.** That store lives in its own app. Attaching to it is
-  downstream-app's work, built on this feature's adapter.
+- **Debugging against a downstream application's store.** That store lives in its own app. Attaching to it is
+  that application's work, built on this feature's adapter.
 - **Changing a variable's value mid-run** (DAP `setVariable`). Under approach A it is impossible;
   under B it raises the question of what a changed binding means for the rows already produced.
 - **Data breakpoints**, for example "break when this attribute is written".
@@ -238,8 +238,8 @@ These are for the founder.
    Electron's Node, not yet verified), or as a separate Node process (`DebugAdapterExecutable`),
    which needs a `node` on the user's PATH.
 4. **Where the adapter lives:** a new `libs/debugger` that `apps/vscode` bundles, or inside
-   `apps/vscode`. A library can be tested without VS Code and reused by downstream-app.
-5. **Is the hook public API of `@typedblite/runtime`?** downstream-app loads the runtime's `out/`
+   `apps/vscode`. A library can be tested without VS Code and reused downstream.
+5. **Is the hook public API of `@typedblite/runtime`?** A downstream application loads the runtime's `out/`
    folder, so anything exported becomes something that project can depend on.
 
 ## How this gets proven

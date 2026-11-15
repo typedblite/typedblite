@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS has (
 CREATE UNIQUE INDEX IF NOT EXISTS has_unique_in_scope ON has(attribute, scope) WHERE scope IS NOT NULL;
 -- has(owner) and not (owner, type): an owner's ownerships are read in the order they were made
 -- (ORDER BY rowid), and only an index on owner alone yields that order without a sort. Measured on
--- the downstream-app stores, the sort cost ~10% of every query (2026-11-11).
+-- a production application's stores, the sort cost ~10% of every query (2026-11-11).
 CREATE INDEX IF NOT EXISTS has_owner ON has(owner);
 CREATE INDEX IF NOT EXISTS has_attribute ON has(attribute);
 

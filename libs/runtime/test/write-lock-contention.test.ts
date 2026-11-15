@@ -4,7 +4,7 @@
  * 🔴 `execute()` opened its transaction with a plain (deferred) `BEGIN`. A write pipeline reads
  * before it writes, so it held a read snapshot and then had to upgrade it; when another process had
  * committed in between, SQLite returned SQLITE_BUSY at once, and `busy_timeout` does not apply to
- * that upgrade. Two downstream-app processes sharing `.mvp/` lost ~30% of their writes this way
+ * that upgrade. Two processes of a production application sharing one store directory lost ~30% of their writes this way
  * (docs/development/performance.md). `BEGIN IMMEDIATE` takes the write lock first, so the wait is
  * an ordinary busy wait.
  *

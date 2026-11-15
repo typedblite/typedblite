@@ -12,7 +12,7 @@ branch: feat/sync-demo
 > **Status:** ✅ Complete, 2026-11-12 · **Written:** 2026-11-12 · **Branch:** `feat/sync-demo`, from
 > `main` · **Governed by:** [ADR-009](../../architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md)
 >
-> Request, 2026-11-12: *a sync demo like the one in `downstream-app`, with every dependency it needs
+> Request, 2026-11-12: *a sync demo like the one in the downstream application, with every dependency it needs
 > included, and without the Windows text-to-speech narration.*
 >
 > Decided by the founder, 2026-11-12, before this document was written:
@@ -43,9 +43,9 @@ lands locally first, and the stores converge through a hub when they can reach i
 - the hub goes down;
 - everything converges the moment the network returns.
 
-A demo like that already exists, in `downstream-app` on the branch
+A demo like that already exists, in a downstream application, on the branch
 `demo/typedblite-offline-sync-2026-11-12`. It cannot be reused here as it stands:
-- **It depends on downstream-app.** It needs that project's Docker stack (gateway, PIM API, pim-ui,
+- **It depends on that application.** It needs that project's Docker stack (gateway, PIM API, pim-ui,
   and a hub service), its kernel schema, its token flow, and its PIM repository's record format.
 - **It runs TypeDBLite through a spike.** It imports `libs/runtime/spike/wasm-sqlite.ts` from
   *this* repository by a relative path, and aliases `node-sqlite.ts` away in its own esbuild
@@ -57,7 +57,7 @@ client.** Along the way it turns the browser binding into something anyone can u
 
 ## The original, surveyed 2026-11-12
 
-`downstream-app/demo/offline-sync/`, at `c42c2a7b`. Load-bearing: re-read it before Phase 04.
+`demo/offline-sync/` in that repository, at `c42c2a7b`. Load-bearing: re-read it before Phase 04.
 
 | Part | What it does | Here |
 | ---- | ------------ | ---- |
@@ -73,14 +73,14 @@ client.** Along the way it turns the browser binding into something anyone can u
 | `scripts/tts.ts`, `tts/synthesize.ps1`, `.build/tts/*.wav` | Windows SAPI narration | 🔴 **Left out**, at the founder's request |
 | `scripts/reset.ts` | Fresh Docker volumes, device grants, and an optional seed | **Replaced** by deleting the hub's store file and the clients' stores |
 | `scripts/repro-*`, `*-check.ts` | One-off investigations from that night | **Left out.** What they found is in the table below |
-| Docker stack, gateway tokens, PIM API, pim-ui, kernel schema | downstream-app itself | 🔴 **Not needed.** TypeDBLite's own hub replaces all of it |
+| Docker stack, gateway tokens, PIM API, pim-ui, kernel schema | the downstream application itself | 🔴 **Not needed.** TypeDBLite's own hub replaces all of it |
 
 The defects found while building the original matter here:
 
 | # | Defect | Status in this repository, verified 2026-11-12 | Here |
 | - | ------ | ---------------------------------------------- | ---- |
 | 1 | `TypeDBLiteReplicator.fetchSince` treats any non-OK answer except 401/403 as "nothing to pull", so a spoke whose hub answers 5xx reports itself in sync | 🔴 **Still present**: `typedblite-replicator.ts` returns `[]` when `!response.ok` | **Fixed in Phase 03.** The "hub goes down" step depends on it |
-| 2 | No timeout on a sync against a hub that drops packets | downstream-app's `sync.now`. The replicator has none either | Phase 03 decides whether the replicator takes a timeout or a signal |
+| 2 | No timeout on a sync against a hub that drops packets | the downstream `sync.now`. The replicator has none either | Phase 03 decides whether the replicator takes a timeout or a signal |
 | 3 | A reopened store that skips `define` fails at the first write that reuses a key (`[CNT9]`) | A usability gap in the engine: it does not refuse or warn | The demo defines on every open. Phase 03 decides whether the engine should warn |
 | 4 | The runtime needs `Object.groupBy` (Chromium 117+) | Through Chevrotain, a dependency of Langium | Phase 01 |
 | 5 | A cache-first service worker served stale code | The demo's own | Network-first from the start |
@@ -90,7 +90,7 @@ The defects found while building the original matter here:
 | Thing | State |
 | ----- | ----- |
 | WASM binding | `libs/runtime/spike/wasm-sqlite.ts` (243 lines; ⚠️ moved to [`src/wasm.ts`](../../../libs/runtime/src/wasm.ts) in Phase 02): `initWasmSqlite({ sahPool, moduleOptions })` and `openWasmSqlite`, using SQLite's in-memory `memdb`, or OPFS through the SAH-pool VFS (worker-only, with no `SharedArrayBuffer` and so no COOP/COEP). It also has `wipeOpfsPool` and `poolInfo`. **Unsupported**: it is not exported, and has no tests of its own |
-| `@sqlite.org/sqlite-wasm` | **Not a dependency of this repository.** The spike has only ever resolved it from downstream-app's `node_modules` (3.54.1-build1 there) |
+| `@sqlite.org/sqlite-wasm` | **Not a dependency of this repository.** The spike has only ever resolved it from the downstream application's `node_modules` (3.54.1-build1 there) |
 | Browser test harness | `libs/runtime/spike/browser/`: about 2,300 lines of console, crash, failure, idempotency, tab and WAL runners, with a `node-crypto-shim.ts` |
 | WASM test config | [`vitest.wasm.config.ts`](../../../libs/runtime/vitest.wasm.config.ts) runs the runtime suite with `node-sqlite.ts` redirected to the WASM opener. 🔴 **It does not start**: it imports `vitest.shared` from `../../../../`, outside the repository. It cites `docs/analysis/typedblite-wasm-engine-spike.md`, which is not in this repository |
 | Node-only imports | [`node-sqlite.ts`](../../../libs/runtime/src/node-sqlite.ts) (`node:sqlite`), [`change-stream.ts`](../../../libs/runtime/src/change-stream.ts) (`node:http`), and [`content-revision/src/lib/revision.ts`](../../../libs/content-revision/src/lib/revision.ts) (`node:crypto`). 🔴 **The runtime's `index.ts` re-exports the first two, and `interpreter.ts` imports `openNodeSqlite` as its default opener**, so a browser bundle of `@typedblite/runtime` pulls in all three |
@@ -98,7 +98,7 @@ The defects found while building the original matter here:
 | Replication client | [`change-stream-client.ts`](../../../libs/runtime/src/change-stream-client.ts) is hand-rolled over `fetch`, and imports nothing from `node:`. It should run in a browser as it is (Phase 01 proves it) |
 | Hub | `serveChangeStream(log, options)` listens on `127.0.0.1` only. `createChangeStreamHandler` can be mounted in the demo's own server |
 | esbuild | Already a dev dependency (the VS Code extension uses it) |
-| Playwright | **Not a dependency here.** downstream-app used `playwright-core` 1.62.1 with a Chromium from `~/.cache/ms-playwright` |
+| Playwright | **Not a dependency here.** The downstream application used `playwright-core` 1.62.1 with a Chromium from `~/.cache/ms-playwright` |
 
 ## 🔴 The invariants every phase is bound by
 
@@ -176,7 +176,7 @@ or the emulator's reversed port. The demo needs no account, no cloud service and
 
 - **Narration.** The Windows SAPI text-to-speech is left out, at the founder's request. Captions
   carry the story.
-- **downstream-app's PIM**: its schema, its API, its token flow and its UI. The demo has its own task
+- **The downstream application's PIM**: its schema, its API, its token flow and its UI. The demo has its own task
   schema and talks only to its own hub.
 - **Authentication between spoke and hub**, beyond showing the replicator's `headers` hook with a
   static demo token. Per-record authorisation is ADR-003's open question, not this feature's.
@@ -287,5 +287,5 @@ Anything a phase defers is recorded here, not only in a commit message.
   retired, which ADR-009 revisits
 - [Replication and search](../../guides/replication-and-search.md)
 - [Multi-Phase Lifecycle Standard](../../standards/governance/multi-phase-lifecycle-standard.md)
-- The original: `downstream-app` branch `demo/typedblite-offline-sync-2026-11-12`, folder
+- The original: the downstream application's branch `demo/typedblite-offline-sync-2026-11-12`, folder
   `demo/offline-sync/` (outside this repository)

@@ -34,7 +34,7 @@ The repo is completely self-contained and self-referential:
 - No broken links to `../planning/` paths (from the original parent monorepo — those docs no longer exist here)
 - No "sibling repo" or "parent monorepo" language (this IS the repo)
 - No `libs/core/*` paths (old monorepo layout; correct paths are `libs/*` and `apps/*`)
-- No `@downstream/*` package names in comments (removed with the parent monorepo)
+- No package names from the parent monorepo in comments (removed when the engine moved out)
 - No build artifacts (`.d.ts` files) in `src/` directories — gitignored under `libs/**/src/**/*.d.ts`
 - **Appropriate exceptions**: explicit references to upstream TypeDB/TypeQL projects (`typedb.com`, `typedb/typedb-behaviour`, `typedb/typedb` on GitHub)
 

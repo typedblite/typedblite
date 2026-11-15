@@ -57,7 +57,7 @@ const TAG_ATTRIBUTE = /(^|-)tags?$/;
  * the store: 1.8 ms at 15,000 entities, 19 ms at 150,000 (docs/development/performance.md). The
  * key table maps each entity to its FTS rowid, so a write reads and deletes by rowid.
  *
- * ⚠️ **An older engine writing the same file does not maintain the key table.** downstream-app loads
+ * ⚠️ **An older engine writing the same file does not maintain the key table.** A downstream application loads
  * this checkout's build, and its processes restart one at a time, so a store can see both. Such an
  * engine deletes by scan and inserts without a rowid, which FTS5 assigns as the largest rowid + 1 —
  * so a row it wrote is always the NEWEST until something is written above it, and anything written

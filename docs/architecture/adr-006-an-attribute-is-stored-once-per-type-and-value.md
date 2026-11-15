@@ -21,7 +21,7 @@ constrained-by: [adr-003]
 
 > ✅ **Accepted 2026-11-11 by the founder.** It was held at Proposed until the migration had run
 > against real file-backed stores and the performance check had passed. Both were measured before
-> acceptance: identical answers on 18 migrated downstream-app stores, and an engine faster than the
+> acceptance: identical answers on 18 migrated production stores, and an engine faster than the
 > one it replaced. The card rose from 1,306 to 1,439 of 1,756.
 
 ---
@@ -271,7 +271,7 @@ them apart. The conformance card is the check for all three.
 
 ## Measurements (2026-11-11, implementation on `feat/attribute-instances`)
 
-**Migration on real stores.** 18 TypeDBLite stores from the downstream-app workspace were copied
+**Migration on real stores.** 18 TypeDBLite stores from a downstream application's workspace were copied
 through SQLite's backup API, with the originals opened read-only. Each copy was queried by the old
 engine and by the new engine after migrating it. Per thing type, the queries listed every ownership
 (`match $x isa! T, has $a;`) and looked up one string value per owned attribute type. **Every
