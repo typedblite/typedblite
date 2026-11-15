@@ -1,0 +1,27 @@
+# The people side of a project tracker: people, teams, and who belongs to which.
+#
+# Written for TypeDBLite's own tests. `membership` is the shape the replication tests need: a relation with
+# its own `@key`, so it has an identity two stores agree on, and with an attribute of its own.
+define
+
+entity person,
+    owns person-id @key,
+    owns person-kind;
+
+entity team,
+    owns team-id @key;
+
+relation membership,
+    relates member,
+    relates team,
+    owns membership-key @key,
+    owns role-name;
+
+person plays membership:member;
+team plays membership:team;
+
+attribute person-id, value string;
+attribute person-kind, value string;
+attribute team-id, value string;
+attribute membership-key, value string;
+attribute role-name, value string;

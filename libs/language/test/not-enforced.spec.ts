@@ -68,11 +68,11 @@ describe('annotations that parse but are not enforced are reported, not refused'
   it.each([
     [
       '@key',
-      'define entity skill, owns skill-id @key; attribute skill-id, value string;',
+      'define entity project, owns project-id @key; attribute project-id, value string;',
     ],
     [
       '@unique',
-      'define attribute email, value string; entity principal, owns email @unique;',
+      'define attribute email, value string; entity person, owns email @unique;',
     ],
     ['@abstract', 'define entity abstract-type @abstract;'],
   ])(

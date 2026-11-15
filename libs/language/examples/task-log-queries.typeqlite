@@ -1,0 +1,15 @@
+match $i isa iteration, has iteration-id "wf-1";
+delete $i;
+end;
+insert $i isa iteration, has iteration-id "wf-1";
+end;
+match $r isa log-entry, has log-key "wf-1::step::field";
+delete $r;
+end;
+insert $r isa log-entry, has log-key "k", has log-field "f", has log-value "v";
+end;
+match
+  $r isa log-entry, has log-key "k";
+  $i isa iteration, has iteration-id "wf-1";
+  $st isa task, has task-id "s-1";
+insert (record: $r, iteration: $i, task: $st) isa task-log;

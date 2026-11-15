@@ -14,7 +14,7 @@ const [, , dbPath, mode] = process.argv;
 const engine = new SqliteEngine(dbPath);
 
 const insert = (id: string) =>
-  `insert $s isa skill, has skill-id "${id}", has skill-name "${id}";`;
+  `insert $s isa project, has project-id "${id}", has project-name "${id}";`;
 
 await engine.transaction(async () => {
   await engine.execute(insert('state-1'));

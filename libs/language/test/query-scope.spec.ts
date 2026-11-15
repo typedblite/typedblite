@@ -5,8 +5,8 @@ import { TypeQLiteValidationCode } from '../src/typeqlite-validation-codes.js';
 /**
  * 🔴 Why query-level names are NOT cross-references.
  *
- * Repositories parse a query as a standalone string — `this.db.query(\`match $s isa skill ...\`)`.
- * There is no schema document in scope, so a cross-reference from `isa skill` to the `EntityDef`
+ * Repositories parse a query as a standalone string — `this.db.query(\`match $s isa project ...\`)`.
+ * There is no schema document in scope, so a cross-reference from `isa project` to the `EntityDef`
  * would be unresolvable in the ordinary case and every real query would carry a spurious error.
  *
  * The schema check belongs to the interpreter, against the schema it has actually loaded — layer
@@ -16,7 +16,7 @@ import { TypeQLiteValidationCode } from '../src/typeqlite-validation-codes.js';
 describe('a query validates standalone, without a schema in scope', () => {
   it('accepts a query naming types no loaded document declares', async () => {
     const diagnostics = await validate(
-      'match $s isa skill, has skill-id "start-session", has skill-name $n;\nselect $n;',
+      'match $s isa project, has project-id "website-relaunch", has project-name $n;\nselect $n;',
     );
     expect(diagnostics.map((d) => d.message)).toEqual([]);
   });

@@ -21,10 +21,10 @@ describe('reserved TypeQLite keywords are rejected as identifiers', () => {
   });
 
   it('leaves the deliberate workarounds alone', async () => {
-    // `skill-name` and `step-kind` exist precisely because `name` and `kind` were unavailable.
+    // `project-name` and `task-kind` exist precisely because `name` and `kind` were unavailable.
     expect(
       await messages(
-        'define attribute skill-name, value string; entity skill, owns skill-name;',
+        'define attribute project-name, value string; entity project, owns project-name;',
       ),
     ).toBe('');
   });
@@ -34,24 +34,24 @@ describe('a type is not defined twice', () => {
   // The same label as the same kind is one type stated twice — additive, a no-op where it repeats, as on
   // TypeDB (define.feature L2529). A second KIND is a second type, and refused (below).
   it('accepts the same entity stated twice', async () => {
-    expect(await messages('define entity skill; entity skill;')).toBe('');
+    expect(await messages('define entity project; entity project;')).toBe('');
   });
 
   it('rejects an entity and a relation sharing a name', async () => {
-    // The real trap, recorded in skills.schema.typeqlite: TypeDB labels are unique across ALL types,
-    // so `relation skill-step` beside `entity skill-step` fails with
-    // `[SVL2] Label 'skill-step' should be unique, but is already used by 'entity'`.
+    // The real trap, recorded in tracker.schema.typeqlite: TypeDB labels are unique across ALL types,
+    // so `relation task` beside `entity task` fails with
+    // `[SVL2] Label 'task' should be unique, but is already used by 'entity'`.
     expect(
       await messages(
-        'define entity skill-step; relation skill-step, relates x;',
+        'define entity task; relation task, relates x;',
       ),
-    ).toMatch(/skill-step/);
+    ).toMatch(/task/);
   });
 
   it('accepts distinct names', async () => {
     expect(
       await messages(
-        'define entity skill-step; relation skill-composition, relates owner;',
+        'define entity task; relation project-task, relates owner;',
       ),
     ).toBe('');
   });
@@ -80,15 +80,15 @@ describe('a type does not own the same attribute twice', () => {
   it('rejects a duplicated `owns`', async () => {
     expect(
       await messages(
-        'define attribute skill-id, value string; entity skill, owns skill-id @key, owns skill-id;',
+        'define attribute project-id, value string; entity project, owns project-id @key, owns project-id;',
       ),
-    ).toMatch(/skill-id/);
+    ).toMatch(/project-id/);
   });
 
   it('accepts distinct owns', async () => {
     expect(
       await messages(
-        'define attribute skill-id, value string; attribute skill-name, value string; entity skill, owns skill-id @key, owns skill-name;',
+        'define attribute project-id, value string; attribute project-name, value string; entity project, owns project-id @key, owns project-name;',
       ),
     ).toBe('');
   });

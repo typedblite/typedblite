@@ -22,7 +22,7 @@ import {
  * Scoping for TypeQLite: role references, and the order in which one workspace's schema is searched.
  *
  * 🔴 A role name is only meaningful **inside its relation**. `membership:member` and
- * `skill-composition:owner` both declare roles, and two relations may each relate a role called
+ * `project-task:owner` both declare roles, and two relations may each relate a role called
  * `member` without collision. Resolving `role` in the global scope would be wrong twice over: it
  * would accept `membership:owner` (a role that exists, but not on that relation), and it would make
  * two identical role names ambiguous.

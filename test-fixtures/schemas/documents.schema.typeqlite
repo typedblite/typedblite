@@ -1,41 +1,23 @@
-# A document store's schema.
+# Documents attached to a project: the schema the full-text search tests use.
 #
-# 🔴 **No relations, and that is a replication decision rather than a modelling preference.**
-# A TypeQLite relation with no `@key` falls back to a rowid identity and cannot replicate: identity in
-# the change log is the `@key` value, and `thing.iid` is `last_insert_rowid()`, so two
-# nodes both call their first row 1. All four relations in the skills schema are affected by this.
-# A facet has no natural key — `(document, name, value)` would have to be synthesised into a string
-# to key on, at which point it is an attribute wearing a relation's costume. So it stays an
-# attribute.
+# Written for TypeDBLite's own tests. It has no relations: a relation with no `@key` has no identity two
+# stores agree on, so it does not replicate, and these documents must.
 #
-# 🔴 `doc-tag` is named to match `FullTextIndex`'s `/(^|-)tags?$/`, which is what makes tags
-# searchable without a second index. Renaming it is a re-index, not a rename.
-
+# One attribute name matters to search: the full-text index puts an attribute named `tag`, or ending in
+# `-tag`, into its `tags` column, and every attribute's value into `text` (`full-text.ts`). Renaming `doc-tag`
+# changes what a `tags:` filter finds.
+#
+# `doc-facet` and `doc-tag` are owned without `@card`, and a document holds several of each.
 define
 
-# @personal-data: none
 attribute doc-id, value string;
-# @personal-data: none
 attribute doc-title, value string;
-# @personal-data: none
 attribute doc-kind, value string;
-# @personal-data: none
 attribute doc-path, value string;
-# @personal-data: none today — this corpus is this repository's own documentation. ⚠️ Revisit if a document type ever carries prose about a person; the body is retained per revision
 attribute doc-body, value string;
-# `name:value`, normalised lower-case at ingest. Repeated: zero or more per document.
-# @personal-data: none
 attribute doc-facet, value string;
-# @personal-data: none
 attribute doc-tag, value string;
 
-# One entity type for every kind of document. A phase checklist owns five attributes and no facets;
-# an ADR owns five and six. Neither is special-cased, which is the whole decision.
-#
-# 🔴 `@key` compiles to `UNIQUE INDEX ON attr(value) WHERE type = 'doc-id'` — uniqueness is per
-# *attribute type*, across every entity owning it, not per entity type. So `doc-id` may never be
-# reused as an ordinary reference on another entity; a graph store's schema carries the same warning
-# and pays it with a separate `owning-graph-id`.
 entity document,
     owns doc-id @key,
     owns doc-title,

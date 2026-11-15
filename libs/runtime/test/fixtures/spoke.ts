@@ -9,16 +9,16 @@
  */
 import { TypeDBLiteInterpreter } from '../../src/interpreter.js';
 import { replicateOnce } from '../../src/replicator.js';
-import { readKeyedSkillsSchema } from './keyed-skills-schema.js';
+import { readKeyedTrackerSchema } from './keyed-tracker-schema.js';
 
 const [, , spokePath, hubPath, schemaPath, prefix, countText] = process.argv;
-const schema = readKeyedSkillsSchema(schemaPath);
+const schema = readKeyedTrackerSchema(schemaPath);
 
 const spoke = new TypeDBLiteInterpreter(spokePath);
 spoke.define(schema);
 for (let i = 0; i < Number(countText); i += 1) {
   spoke.execute(
-    `insert $s isa skill, has skill-id "${prefix}-${i}", has skill-name "${prefix}";`,
+    `insert $s isa project, has project-id "${prefix}-${i}", has project-name "${prefix}";`,
   );
 }
 

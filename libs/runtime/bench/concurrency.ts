@@ -1,7 +1,7 @@
 /**
- * Several processes on one store file — the shape a production application runs in (two of its processes
- * share one store directory). Writers run the workflow engine's `saveStep()` on disjoint partitions of the steps,
- * so every failure is the engine's and none is a logical conflict; readers run `find()`-style reads.
+ * Several processes on one store file, as an application with more than one process runs. Writers update
+ * disjoint partitions of the tickets, so every failure is the engine's and none is a logical conflict;
+ * readers read a sprint with its tickets.
  *
  * The parent spawns each worker as `node --import tsx concurrency.ts worker …`.
  */
@@ -44,7 +44,7 @@ export async function run(source: string, work: string, seconds: number): Promis
     const worst = (rs: WorkerReport[], k: 'p50' | 'p99' | 'max'): number => Math.max(0, ...rs.map((r) => r[k]));
     const row: Row = {
       configuration: `${writers}W+${readers}R`,
-      saveStepsPerSecond: sum(of('writer'), 'ops') / seconds,
+      updatesPerSecond: sum(of('writer'), 'ops') / seconds,
       writerP50: worst(of('writer'), 'p50'),
       writerP99: worst(of('writer'), 'p99'),
       writerErrors: sum(of('writer'), 'errors'),
@@ -53,7 +53,7 @@ export async function run(source: string, work: string, seconds: number): Promis
       readerErrors: sum(of('reader'), 'errors'),
     };
     rows.push(row);
-    console.log(`  ${String(row['configuration']).padEnd(6)} saveStep/s ${(row['saveStepsPerSecond'] as number).toFixed(0).padStart(4)}  writer p50 ${(row['writerP50'] as number).toFixed(1).padStart(6)}  p99 ${(row['writerP99'] as number).toFixed(0).padStart(5)} ms  errors ${String(row['writerErrors']).padStart(5)}   reads/s ${(row['readsPerSecond'] as number).toFixed(0).padStart(5)}  reader p99 ${(row['readerP99'] as number).toFixed(1)} ms  errors ${row['readerErrors']}`);
+    console.log(`  ${String(row['configuration']).padEnd(6)} updates/s ${(row['updatesPerSecond'] as number).toFixed(0).padStart(4)}  writer p50 ${(row['writerP50'] as number).toFixed(1).padStart(6)}  p99 ${(row['writerP99'] as number).toFixed(0).padStart(5)} ms  errors ${String(row['writerErrors']).padStart(5)}   reads/s ${(row['readsPerSecond'] as number).toFixed(0).padStart(5)}  reader p99 ${(row['readerP99'] as number).toFixed(1)} ms  errors ${row['readerErrors']}`);
     for (const r of reports) if (r.errors > 0) console.log(`    ${r.role}: ${JSON.stringify(r.messages)}`);
   }
   table('concurrency', rows);
@@ -79,23 +79,23 @@ function workerMain([file, role, index, of, seconds]: string[]): void {
   const latencies: number[] = [];
   const messages: Record<string, number> = {};
   let errors = 0;
-  const steps = sampleValues(file, `SELECT value FROM attribute WHERE type = 'workflow-step-id' ORDER BY value`, 1_000_000).filter((_, i) => i % Number(of) === Number(index));
-  const workflows = sampleValues(file, `SELECT value FROM attribute WHERE type = 'workflow-id'`, 500);
+  const steps = sampleValues(file, `SELECT value FROM attribute WHERE type = 'ticket-id' ORDER BY value`, 1_000_000).filter((_, i) => i % Number(of) === Number(index));
+  const sprints = sampleValues(file, `SELECT value FROM attribute WHERE type = 'sprint-id'`, 500);
   const end = performance.now() + Number(seconds) * 1000;
   for (let i = 0; performance.now() < end; i++) {
     const start = performance.now();
     try {
       if (role === 'writer') {
         const step = steps[i % steps.length] ?? '';
-        const [workflow, name = 'x'] = step.split('::') as [string, string?];
-        db.execute(`match $s isa workflow-step-record, has workflow-step-id ${str(step)}; delete $s;`);
-        db.execute(`insert $s isa workflow-step-record, has workflow-step-id ${str(step)}, has workflow-step-workflow ${str(workflow)}, has workflow-step-name ${str(name)}, has workflow-step-status "completed";`);
-        db.execute(`insert $h isa workflow-history-entry, has workflow-history-id ${str(`${workflow}::c${index}-${i}`)}, has workflow-history-workflow ${str(workflow)}, has workflow-history-step ${str(name)}, has workflow-history-from "a", has workflow-history-to "b", has workflow-history-at 2026-11-12T10:00:00;`);
+        const [sprint, name = 'x'] = step.split('::') as [string, string?];
+        db.execute(`match $s isa ticket, has ticket-id ${str(step)}; delete $s;`);
+        db.execute(`insert $s isa ticket, has ticket-id ${str(step)}, has ticket-sprint ${str(sprint)}, has ticket-name ${str(name)}, has ticket-status "completed";`);
+        db.execute(`insert $h isa ticket-event, has ticket-event-id ${str(`${sprint}::c${index}-${i}`)}, has ticket-event-sprint ${str(sprint)}, has ticket-event-ticket ${str(name)}, has ticket-event-from "a", has ticket-event-to "b", has ticket-event-at 2026-11-12T10:00:00;`);
       } else {
-        const workflow = workflows[i % workflows.length] ?? '';
-        db.query(`match $w isa workflow, has workflow-id ${str(workflow)}, has workflow-input $input; select $input;`);
-        for (const c of ['workflow-step-name', 'workflow-step-status']) {
-          db.query(`match $x isa workflow-step-record, has workflow-step-id $id, has workflow-step-workflow ${str(workflow)}, has ${c} $value; select $id, $value;`);
+        const sprint = sprints[i % sprints.length] ?? '';
+        db.query(`match $w isa sprint, has sprint-id ${str(sprint)}, has sprint-goal $input; select $input;`);
+        for (const c of ['ticket-name', 'ticket-status']) {
+          db.query(`match $x isa ticket, has ticket-id $id, has ticket-sprint ${str(sprint)}, has ${c} $value; select $id, $value;`);
         }
       }
       latencies.push(performance.now() - start);

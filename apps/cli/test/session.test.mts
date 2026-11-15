@@ -11,9 +11,9 @@ describe('splitting TypeQLite into statements', () => {
   it('keeps a match/insert pipeline together', () => {
     const source = [
       'match',
-      '  $s isa skill, has skill-id "start-session";',
-      '  $st isa skill-step, has step-id "s-1";',
-      'insert (owner: $s, step: $st) isa skill-composition;',
+      '  $s isa project, has project-id "website-relaunch";',
+      '  $st isa task, has task-id "s-1";',
+      'insert (owner: $s, task: $st) isa project-task;',
     ].join('\n');
     assert.equal(splitStatements(source).length, 1);
   });
@@ -21,7 +21,7 @@ describe('splitting TypeQLite into statements', () => {
   it('keeps match/delete together', () => {
     assert.equal(
       splitStatements(
-        'match $i isa invocation, has workflow-id "wf-1";\ndelete $i;',
+        'match $i isa iteration, has iteration-id "wf-1";\ndelete $i;',
       ).length,
       1,
     );
@@ -48,21 +48,21 @@ describe('splitting TypeQLite into statements', () => {
 
   it('separates two independent inserts', () => {
     assert.equal(
-      splitStatements('insert $a isa skill;\ninsert $b isa skill;').length,
+      splitStatements('insert $a isa project;\ninsert $b isa project;').length,
       2,
     );
   });
 
   it('drops comment lines', () => {
-    assert.deepEqual(splitStatements('# a note\ninsert $a isa skill;'), [
-      'insert $a isa skill;',
+    assert.deepEqual(splitStatements('# a note\ninsert $a isa project;'), [
+      'insert $a isa project;',
     ]);
   });
 });
 
 describe('a TypeQLite session', () => {
   const schema =
-    'define attribute skill-id, value string; attribute skill-name, value string; entity skill, owns skill-id @key, owns skill-name;';
+    'define attribute project-id, value string; attribute project-name, value string; entity project, owns project-id @key, owns project-name;';
 
   it('applies a schema, writes, and reads back', async () => {
     const session = new TypeDBLiteSession();
@@ -73,22 +73,22 @@ describe('a TypeQLite session', () => {
     assert.equal(session.hasSchema, true);
     assert.deepEqual(
       await session.run(
-        'insert $s isa skill, has skill-id "start-session", has skill-name "Start Session";',
+        'insert $s isa project, has project-id "website-relaunch", has project-name "Website relaunch";',
       ),
       { kind: 'ok', statement: 'write' },
     );
     const read = await session.run(
-      'match $s isa skill, has skill-id "start-session", has skill-name $n;\nselect $n;',
+      'match $s isa project, has project-id "website-relaunch", has project-name $n;\nselect $n;',
     );
-    assert.deepEqual(read, { kind: 'rows', rows: [{ n: 'Start Session' }] });
+    assert.deepEqual(read, { kind: 'rows', rows: [{ n: 'Website relaunch' }] });
     await session.close();
   });
 
   it('a write keyword inside a single-quoted string does not make a read a write', async () => {
     const session = new TypeDBLiteSession();
     await session.run(schema);
-    await session.run("insert $s isa skill, has skill-id 'k', has skill-name 'please insert this';");
-    const read = await session.run("match $s isa skill, has skill-name 'please insert this', has skill-id $id; select $id;");
+    await session.run("insert $s isa project, has project-id 'k', has project-name 'please insert this';");
+    const read = await session.run("match $s isa project, has project-name 'please insert this', has project-id $id; select $id;");
     assert.deepEqual(read, { kind: 'rows', rows: [{ id: 'k' }] });
     await session.close();
   });
@@ -103,7 +103,7 @@ describe('a TypeQLite session', () => {
     assert.match((outcome as { message: string }).message, /nonexistent-type/);
     // The session is still usable afterwards — that is the whole point.
     assert.deepEqual(
-      await session.run('insert $s isa skill, has skill-id "after-the-error";'),
+      await session.run('insert $s isa project, has project-id "after-the-error";'),
       { kind: 'ok', statement: 'write' },
     );
     await session.close();
@@ -128,15 +128,15 @@ describe('a file-backed database', () => {
     );
     const first = new TypeDBLiteSession(path);
     await first.run(
-      'define attribute skill-id, value string; entity skill, owns skill-id @key;',
+      'define attribute project-id, value string; entity project, owns project-id @key;',
     );
-    await first.run('insert $s isa skill, has skill-id "survives";');
+    await first.run('insert $s isa project, has project-id "survives";');
     await first.close();
 
     const second = new TypeDBLiteSession(path);
     assert.equal(second.hasSchema, true, 'the reopened database knows its schema');
     assert.deepEqual(
-      await second.run('match $s isa skill, has skill-id $id;\nselect $id;'),
+      await second.run('match $s isa project, has project-id $id;\nselect $id;'),
       { kind: 'rows', rows: [{ id: 'survives' }] },
     );
     await second.close();

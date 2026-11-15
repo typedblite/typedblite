@@ -20,8 +20,8 @@ const read = (path: string) => readFileSync(path, 'utf8');
 
 describe('production TypeQLite parses', () => {
   it.each([
-    ['iam.schema.typeqlite', join(SCHEMAS, 'iam.schema.typeqlite')],
-    ['skills.schema.typeqlite', join(SCHEMAS, 'skills.schema.typeqlite')],
+    ['people.schema.typeqlite', join(SCHEMAS, 'people.schema.typeqlite')],
+    ['tracker.schema.typeqlite', join(SCHEMAS, 'tracker.schema.typeqlite')],
   ])('%s parses', (_name, path) => {
     const result = parse(read(path));
     expect(result.lexerErrors).toHaveLength(0);
@@ -34,8 +34,8 @@ describe('production TypeQLite parses', () => {
   });
 
   it.each([
-    ['real-queries.typeqlite', 13],
-    ['projection-target.typeqlite', 5],
+    ['tracker-queries.typeqlite', 13],
+    ['task-log-queries.typeqlite', 5],
   ])('%s parses as %i pipelines', (file, pipelines) => {
     const result = parse(read(join(EXAMPLES, file)));
     expect(result.lexerErrors).toHaveLength(0);
@@ -47,14 +47,14 @@ describe('production TypeQLite parses', () => {
   // rejected it. Kept as its own case so a regression names itself.
   it('accepts `delete $i;` — deleting the thing, not detaching an attribute', () => {
     const result = parse(
-      'match $i isa invocation, has workflow-id "wf-1";\ndelete $i;',
+      'match $i isa iteration, has iteration-id "wf-1";\ndelete $i;',
     );
     expect(result.parserErrors).toHaveLength(0);
   });
 
   it('still accepts `delete $old of $p;` — detaching an attribute', () => {
     const result = parse(
-      'match $p isa principal, has principal-type $old;\ndelete $old of $p;',
+      'match $p isa person, has person-kind $old;\ndelete $old of $p;',
     );
     expect(result.parserErrors).toHaveLength(0);
   });
@@ -62,8 +62,8 @@ describe('production TypeQLite parses', () => {
   // Stronger than parsing: the schemas this repository owns must also validate cleanly, or the
   // not-implemented checks (ADR-002 D7) have been written too aggressively.
   it.each([
-    ['iam.schema.typeqlite', join(SCHEMAS, 'iam.schema.typeqlite')],
-    ['skills.schema.typeqlite', join(SCHEMAS, 'skills.schema.typeqlite')],
+    ['people.schema.typeqlite', join(SCHEMAS, 'people.schema.typeqlite')],
+    ['tracker.schema.typeqlite', join(SCHEMAS, 'tracker.schema.typeqlite')],
   ])('%s validates with no diagnostics', async (_name, path) => {
     const diagnostics = await validate(read(path));
     expect(diagnostics.map((d) => d.message)).toEqual([]);

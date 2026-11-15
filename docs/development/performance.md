@@ -89,7 +89,7 @@ states. The messages are unchanged. Guarded by `empty-answer-cost.test.ts`.
 
 ### 5. One broad `has` value made a selective match slow
 
-`$s isa skill, has skill-id "x", has revision "r1"` built one `t.iid IN (owners of the value)`
+`$s isa skill, has project-id "x", has revision "r1"` built one `t.iid IN (owners of the value)`
 subquery per literal, and SQLite materialises each. When one value is owned by thousands of things
 and another by one, the broad one set the cost: 5.0 ms against 0.017 ms for the same answer
 computed from the selective subquery, with the other checked per candidate by `EXISTS`.
@@ -102,9 +102,9 @@ Guarded by `literal-selectivity.test.ts`, which asserts which value drives.
 
 ### 6. A two-hop path enumerated everything when its middle had no type
 
-`(dependent: $a, prerequisite: $b) isa step-dependency; (dependent: $b, prerequisite: $c) isa
-step-dependency; $c has step-id $y;` with `$a` pinned answered one row in 1.3 s on a 21,000-step
-graph. Adding `$b isa skill-step` answered it in about 1 ms. `$b` has no constraint of its own, so it
+`(dependent: $a, prerequisite: $b) isa task-dependency; (dependent: $b, prerequisite: $c) isa
+task-dependency; $c has task-id $y;` with `$a` pinned answered one row in 1.3 s on a 21,000-step
+graph. Adding `$b isa task` answered it in about 1 ms. `$b` has no constraint of its own, so it
 was bound only when the relations bound, after `$c`. And `relationSeed` needed every other player
 of a relation bound, so `$c` got no seed and was enumerated whole: 21,000 candidates and 42,000
 statements.
@@ -183,8 +183,8 @@ under [Still open](#still-open): the empty-optional read (counting the type, now
 | docs: re-ingest (remove + add) — 2 commits |  | 15.7 | 4.82 | 5.31 | 3.0× |
 | docs: compact() the change log |  | 2686 | 2707 | 2670 | 1.0× |
 | docs: vacuum() |  | 279 | 267 | 248 | 1.1× |
-| skills: steps via skill-composition | 6 | 1.41 | 0.81 | 0.82 | 1.7× |
-| skills: sub-workflow children | 0 | 4.57 | 2.07 | 2.20 | 2.1× |
+| skills: steps via project-task | 6 | 1.41 | 0.81 | 0.82 | 1.7× |
+| skills: subproject children | 0 | 4.57 | 2.07 | 2.20 | 2.1× |
 | skills: step dependencies | 1 | 2.21 | 0.96 | 0.99 | 2.2× |
 | skills: every dependency edge | 167 | 73.7 | 15.4 | 16.5 | 4.5× |
 
@@ -192,25 +192,25 @@ under [Still open](#still-open): the empty-optional read (counting the type, now
 
 | Operation | Rows | original p50 | fixes-1-4 p50 | fixes-1-6 p50 | original → fixes-1-6 (p50) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 200: steps via skill-composition | 7 | 1.54 | 0.77 | 0.81 | 1.9× |
+| 200: steps via project-task | 7 | 1.54 | 0.77 | 0.81 | 1.9× |
 | 200: step dependencies (2 relations) | 6 | 2.18 | 0.99 | 1.05 | 2.1× |
-| 200: sub-workflow children (2 relations) | 0 | 4.63 | 1.99 | 2.08 | 2.2× |
+| 200: subproject children (2 relations) | 0 | 4.63 | 1.99 | 2.08 | 2.2× |
 | 200: output fields (multi-valued) | 14 | 1.33 | 0.66 | 0.70 | 1.9× |
 | 200: a key and a broad value | 1 | 0.74 | — | 0.23 | 3.2× |
 | 200: every dependency edge | 1200 | 190 | 56.0 | 58.5 | 3.3× |
 | 200: 2-hop, untyped middle | 1 | 84.2 | 25.3 | 0.58 | 144.6× |
 | 200: 2-hop, typed middle | 1 | 1.11 | 0.73 | 0.75 | 1.5× |
-| 1000: steps via skill-composition | 7 | 1.59 | 0.78 | 0.82 | 1.9× |
+| 1000: steps via project-task | 7 | 1.59 | 0.78 | 0.82 | 1.9× |
 | 1000: step dependencies (2 relations) | 6 | 2.19 | 1.01 | 1.02 | 2.1× |
-| 1000: sub-workflow children (2 relations) | 0 | 17.2 | 6.35 | 6.54 | 2.6× |
+| 1000: subproject children (2 relations) | 0 | 17.2 | 6.35 | 6.54 | 2.6× |
 | 1000: output fields (multi-valued) | 14 | 1.32 | 0.65 | 0.71 | 1.9× |
 | 1000: a key and a broad value | 1 | 2.52 | — | 0.24 | 10.4× |
 | 1000: every dependency edge | 6000 | 923 | 291 | 292 | 3.2× |
 | 1000: 2-hop, untyped middle | 1 | 443 | 123 | 0.49 | 897.7× |
 | 1000: 2-hop, typed middle | 1 | 1.04 | 0.68 | 0.68 | 1.5× |
-| 3000: steps via skill-composition | 7 | 1.57 | 0.78 | 0.77 | 2.0× |
+| 3000: steps via project-task | 7 | 1.57 | 0.78 | 0.77 | 2.0× |
 | 3000: step dependencies (2 relations) | 6 | 2.17 | 0.98 | 1.02 | 2.1× |
-| 3000: sub-workflow children (2 relations) | 1 | 1.67 | 0.77 | 0.81 | 2.1× |
+| 3000: subproject children (2 relations) | 1 | 1.67 | 0.77 | 0.81 | 2.1× |
 | 3000: output fields (multi-valued) | 14 | 1.34 | 0.65 | 0.70 | 1.9× |
 | 3000: a key and a broad value | 1 | 7.44 | — | 0.23 | 32.2× |
 | 3000: every dependency edge | 18000 | 2848 | 849 | 851 | 3.3× |

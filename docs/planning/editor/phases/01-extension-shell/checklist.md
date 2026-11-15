@@ -43,7 +43,7 @@ On `main` at `20649bc`, `nx run-many -t typecheck` failed in two places:
 - [x] `src/language-server/main.ts`: `createTypeQLiteServices` over `NodeFileSystem` (row 8)
 - [x] `esbuild.mjs`: two CommonJS entries, `vscode` external, sourcemaps unless minified (row 4)
 - [x] `language-configuration.json`: `#` comments, brackets, auto-closing quotes (row 2), and a
-      `wordPattern` that keeps `skill-id` and `$x` whole on a double-click
+      `wordPattern` that keeps `project-id` and `$x` whole on a double-click
 - [x] The TextMate grammar copied from `libs/language/syntaxes/` by `sync-grammar`, and gitignored (row 3)
 - [x] `.vscodeignore`, and `vsce.dependencies: false` (row 10)
 - [x] 🔴 The manifest's extensions, language id, activation event and grammar scope are checked against

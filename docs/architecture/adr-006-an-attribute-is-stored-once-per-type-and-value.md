@@ -279,7 +279,7 @@ answer was identical on all 18 stores**: about 225,000 ownerships and 232 lookup
 0.6 s on the largest store (275,594 ownerships).
 
 One query failed with "Maximum call stack size exceeded" on both engines alike: `scm/ladder`'s
-`workflow-history-entry`, at 194,244 ownerships. That is an existing limit on very large answers,
+`ticket-event`, at 194,244 ownerships. That is an existing limit on very large answers,
 not part of this change.
 
 **Performance.** The old engine's build was compared with this one's, both compiled, on the four

@@ -127,7 +127,7 @@ describe('an attribute constraint is checked against ownership', () => {
   // 🔴 The attach form bypassed the guard. `insert $n has edge-id "e";` against a bound `$n` reaches
   // `runInsert` with no `isa`, so `constraint.type` is undefined and `checkOwns` returned early —
   // the row was written, and every later read naming it was refused as "can never match". A store
-  // shared across branches showed the class live: 363 `skill-step` rows the schema did not own.
+  // shared across branches showed the class live: 363 `task` rows the schema did not own.
   it('refuses the attach form of insert too, and writes nothing', () => {
     const path = filePath();
     const engine = new TypeDBLiteInterpreter(path);

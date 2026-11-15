@@ -70,8 +70,8 @@ export function grammarKeywords(grammar: Grammar): string[] {
  * {@link KEYWORD_SCOPES} or the table names one the keywords lack.
  *
  * 🔴 **A name's characters bound every word match, not `\b`.** `-` is part of a TypeQLite name
- * (`skill-id`, `$start-date`), so `\b` would colour the `value` in a label `value-type` and the `-`
- * in `skill-id` as an operator. Each word match is fenced by lookarounds on `[\w-]`, and on `$`, `@`
+ * (`project-id`, `$start-date`), so `\b` would colour the `value` in a label `value-type` and the `-`
+ * in `project-id` as an operator. Each word match is fenced by lookarounds on `[\w-]`, and on `$`, `@`
  * and `.` before it, so a variable or a `$p.value` path is never read as a keyword. The regexes have
  * to run in both Oniguruma (VS Code) and JavaScript (the preview's tokenizer), so they keep to
  * syntax both share.

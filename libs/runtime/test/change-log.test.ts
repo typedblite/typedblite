@@ -24,13 +24,13 @@ import { isReplicable } from '../src/canonical.js';
 import { generationOf } from '../src/revision.js';
 
 const skillsSchema = `define
-  entity skill,
-    owns skill-id @key,
-    owns skill-name,
-    owns skill-description;
-  attribute skill-id, value string;
-  attribute skill-name, value string;
-  attribute skill-description, value string;`;
+  entity project,
+    owns project-id @key,
+    owns project-name,
+    owns project-summary;
+  attribute project-id, value string;
+  attribute project-name, value string;
+  attribute project-summary, value string;`;
 
 describe('change_log storage guarantees', () => {
   it('🔴 AUTOINCREMENT burns a seq rather than reusing it', () => {
@@ -81,14 +81,14 @@ describe('the interpreter logs what it writes', () => {
     db.define(skillsSchema);
   });
 
-  const insertSkill = (id: string, title = 'Start Session') =>
-    db.execute(`insert $s isa skill, has skill-id "${id}", has skill-name "${title}";`);
+  const insertSkill = (id: string, title = 'Website relaunch') =>
+    db.execute(`insert $s isa project, has project-id "${id}", has project-name "${title}";`);
 
   it('records a creation as generation 1, identified by its @key and not by iid', () => {
     insertSkill('s-1');
     const changes = db.changeLog.since(0);
     assert.equal(changes.length, 1);
-    assert.equal(changes[0].entityId, 'skill/s-1');
+    assert.equal(changes[0].entityId, 'project/s-1');
     assert.equal(generationOf(changes[0].rev), 1);
     assert.equal(changes[0].parentRev, null);
     assert.equal(changes[0].deleted, false);
@@ -97,10 +97,10 @@ describe('the interpreter logs what it writes', () => {
 
   it('🔴 identity does not depend on insertion order across databases', () => {
     // thing.iid is last_insert_rowid(): both databases call their first entity 1. If identity used
-    // it, replication would merge unrelated skills.
+    // it, replication would merge unrelated projects.
     const other = new TypeDBLiteInterpreter();
     other.define(skillsSchema);
-    other.execute('insert $s isa skill, has skill-id "s-9", has skill-name "Other";');
+    other.execute('insert $s isa project, has project-id "s-9", has project-name "Other";');
     insertSkill('s-1');
     assert.notEqual(
       db.changeLog.since(0)[0].entityId,
@@ -112,7 +112,7 @@ describe('the interpreter logs what it writes', () => {
     insertSkill('s-1');
     const first = db.changeLog.since(0)[0];
     db.execute(
-      'match $s isa skill, has skill-id "s-1"; insert $s has skill-description "added";',
+      'match $s isa project, has project-id "s-1"; insert $s has project-summary "added";',
     );
     const changes = db.changeLog.since(0);
     const latest = changes[changes.length - 1];
@@ -126,7 +126,7 @@ describe('the interpreter logs what it writes', () => {
     insertSkill('s-1');
     const before = db.changeLog.since(0).length;
     db.execute(
-      'match $s isa skill, has skill-id "nonexistent"; insert $s has skill-description "x";',
+      'match $s isa project, has project-id "nonexistent"; insert $s has project-summary "x";',
     );
     assert.equal(db.changeLog.since(0).length, before);
   });
@@ -141,19 +141,19 @@ describe('the interpreter logs what it writes', () => {
 
   it('logs each pipeline of a multi-pipeline execute separately', () => {
     db.execute(
-      'insert $a isa skill, has skill-id "s-1", has skill-name "A";' +
-        'insert $b isa skill, has skill-id "s-2", has skill-name "B";',
+      'insert $a isa project, has project-id "s-1", has project-name "A";' +
+        'insert $b isa project, has project-id "s-2", has project-name "B";',
     );
     const ids = db.changeLog.since(0).map((c) => c.entityId).sort();
-    assert.deepEqual(ids, ['skill/s-1', 'skill/s-2']);
+    assert.deepEqual(ids, ['project/s-1', 'project/s-2']);
   });
 
   it('records a delete as a tombstone, not as an absence', () => {
     insertSkill('s-1');
-    db.execute('match $s isa skill, has skill-id "s-1"; delete $s;');
+    db.execute('match $s isa project, has project-id "s-1"; delete $s;');
     const changes = db.changeLog.since(0);
     const last = changes[changes.length - 1];
-    assert.equal(last.entityId, 'skill/s-1');
+    assert.equal(last.entityId, 'project/s-1');
     assert.equal(last.deleted, true);
     assert.equal(generationOf(last.rev), 2, 'a tombstone is a revision, with a parent');
   });
@@ -177,7 +177,7 @@ describe('the log survives a reopen', () => {
 
     const first = new TypeDBLiteInterpreter(path);
     first.define(skillsSchema);
-    first.execute('insert $s isa skill, has skill-id "s-1", has skill-name "A";');
+    first.execute('insert $s isa project, has project-id "s-1", has project-name "A";');
     const before = first.changeLog.since(0);
     first.close();
 
@@ -189,10 +189,10 @@ describe('the log survives a reopen', () => {
     // falls back to a node-local id. loadSchema restores types and attributes only, which is why
     // key_attribute is persisted separately.
     second.execute(
-      'match $s isa skill, has skill-id "s-1"; insert $s has skill-description "second process";',
+      'match $s isa project, has project-id "s-1"; insert $s has project-summary "second process";',
     );
     const latest = second.changeLog.since(0).slice(-1)[0];
-    assert.equal(latest.entityId, 'skill/s-1');
+    assert.equal(latest.entityId, 'project/s-1');
     assert.equal(latest.parentRev, before[before.length - 1].rev);
     second.close();
   });

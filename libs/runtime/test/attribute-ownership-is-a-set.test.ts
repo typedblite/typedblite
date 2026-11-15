@@ -81,8 +81,8 @@ describe('attribute ownership is a set', () => {
     );
   });
 
-  // 🔴 The guard. Two DIFFERENT values of one attribute are two ownerships — a Skill step owning
-  // two `output-field`s is the live case, and collapsing those would lose data.
+  // 🔴 The guard. Two DIFFERENT values of one attribute are two ownerships — a task owning
+  // two `log-field`s is the live case, and collapsing those would lose data.
   it('still keeps two different values of the same attribute', () => {
     engine.execute('match $s isa node, has node-id "a"; insert $s has tag "T";');
     engine.execute('match $s isa node, has node-id "a"; insert $s has tag "U";');

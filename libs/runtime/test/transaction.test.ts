@@ -17,17 +17,17 @@ import { SqliteEngine } from '../src/sqlite-engine';
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 
 const schema = `define
-  entity skill,
-    owns skill-id @key,
-    owns skill-name;
-  attribute skill-id, value string;
-  attribute skill-name, value string;`;
+  entity project,
+    owns project-id @key,
+    owns project-name;
+  attribute project-id, value string;
+  attribute project-name, value string;`;
 
 const insert = (id: string) =>
-  `insert $s isa skill, has skill-id "${id}", has skill-name "${id}";`;
+  `insert $s isa project, has project-id "${id}", has project-name "${id}";`;
 
 const ids = async (engine: SqliteEngine): Promise<string[]> => {
-  const { rows } = await engine.query('match $s isa skill, has skill-id $i; select $i;');
+  const { rows } = await engine.query('match $s isa project, has project-id $i; select $i;');
   return rows
     .map((row) => {
       const value = row['i'] as { asString?: () => string } | string;

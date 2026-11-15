@@ -1,0 +1,58 @@
+# A sprint board: a sprint, its tickets, and each ticket's history.
+#
+# Written for TypeDBLite's own tests and its load test. It has no relations on purpose: a ticket names its
+# sprint by id, in an attribute, which is the shape of a store that is written often and read by key. That is
+# what the growth benchmark measures.
+define
+
+attribute sprint-id, value string;
+attribute sprint-goal, value string;
+attribute sprint-ticket-order, value string;
+
+attribute ticket-id, value string;
+attribute ticket-sprint, value string;
+attribute ticket-name, value string;
+attribute ticket-status, value string;
+attribute ticket-notes, value string;
+attribute ticket-evidence, value string;
+attribute ticket-blockers, value string;
+attribute ticket-lane, value string;
+attribute ticket-waits-on-lane, value string;
+
+entity ticket,
+    owns ticket-id @key,
+    owns ticket-sprint,
+    owns ticket-name,
+    owns ticket-status,
+    owns ticket-notes,
+    owns ticket-evidence,
+    owns ticket-blockers,
+    owns ticket-lane,
+    owns ticket-waits-on-lane;
+
+attribute ticket-event-id, value string;
+attribute ticket-event-sprint, value string;
+attribute ticket-event-ticket, value string;
+attribute ticket-event-from, value string;
+attribute ticket-event-to, value string;
+attribute ticket-event-at, value datetime;
+attribute ticket-event-correlation, value string;
+attribute ticket-event-lane, value string;
+attribute ticket-event-waits-on-lane, value string;
+
+# One row per status change, never updated.
+entity ticket-event,
+    owns ticket-event-id @key,
+    owns ticket-event-sprint,
+    owns ticket-event-ticket,
+    owns ticket-event-from,
+    owns ticket-event-to,
+    owns ticket-event-at,
+    owns ticket-event-correlation,
+    owns ticket-event-lane,
+    owns ticket-event-waits-on-lane;
+
+entity sprint,
+    owns sprint-id @key,
+    owns sprint-goal,
+    owns sprint-ticket-order;

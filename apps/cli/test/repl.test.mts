@@ -32,19 +32,19 @@ function repl(lines: readonly string[]): Promise<string> {
 }
 
 const SCHEMA =
-  'define attribute skill-id, value string; attribute skill-name, value string; entity skill, owns skill-id @key, owns skill-name;';
+  'define attribute project-id, value string; attribute project-name, value string; entity project, owns project-id @key, owns project-name;';
 
 describe('the REPL', () => {
   it('applies a schema, writes and reads back', async () => {
     const output = await repl([
       SCHEMA,
-      'insert $s isa skill, has skill-id "start-session", has skill-name "Start Session";',
-      'match $s isa skill, has skill-id "start-session", has skill-name $n;',
+      'insert $s isa project, has project-id "website-relaunch", has project-name "Website relaunch";',
+      'match $s isa project, has project-id "website-relaunch", has project-name $n;',
       'select $n;',
       '.exit',
     ]);
     assert.match(output, /schema applied/);
-    assert.match(output, /n=Start Session/);
+    assert.match(output, /n=Website relaunch/);
     assert.match(output, /\(1 row\)/);
   });
 
@@ -58,8 +58,8 @@ describe('the REPL', () => {
   it('waits for the rest of a pipeline instead of running a bare match', async () => {
     const output = await repl([
       SCHEMA,
-      'insert $s isa skill, has skill-id "s", has skill-name "n";',
-      'match $s isa skill, has skill-id "s", has skill-name $n;',
+      'insert $s isa project, has project-id "s", has project-name "n";',
+      'match $s isa project, has project-id "s", has project-name $n;',
       'select $n;',
       '.exit',
     ]);
@@ -75,8 +75,8 @@ describe('the REPL', () => {
     const output = await repl([
       SCHEMA,
       'insert $x isa nonexistent-type;',
-      'insert $s isa skill, has skill-id "after", has skill-name "n";',
-      'match $s isa skill, has skill-id "after", has skill-name $n;',
+      'insert $s isa project, has project-id "after", has project-name "n";',
+      'match $s isa project, has project-id "after", has project-name $n;',
       'select $n;',
       '.exit',
     ]);

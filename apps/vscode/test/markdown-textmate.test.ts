@@ -54,8 +54,8 @@ describe('the TextMate layer, on the grammar the editor uses', () => {
   });
 
   it('reads a hyphen as part of a name, never as a keyword boundary or an operator', () => {
-    // `value-type` is a label, not `value`; `skill-id` has no operator in it; `$start-date` is one variable.
-    expect(tokens('$x isa value-type, has skill-id $start-date;')).toEqual([
+    // `value-type` is a label, not `value`; `project-id` has no operator in it; `$start-date` is one variable.
+    expect(tokens('$x isa value-type, has project-id $start-date;')).toEqual([
       ['$x', VARIABLE],
       ['isa', KEYWORD],
       ['has', KEYWORD],

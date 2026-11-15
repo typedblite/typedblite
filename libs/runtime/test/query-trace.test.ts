@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 
 /**
- * The query trace (F-skill-define-performance): a per-`query()` account of the work the engine
+ * The query trace: a per-`query()` account of the work the engine
  * did, so a regression test can assert COUNTS rather than a wall-clock time. Off by default, and
  * `lastQueryTrace()` answers `undefined` then — a disabled trace must not look like a zero one.
  */

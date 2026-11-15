@@ -8,10 +8,10 @@ const EXAMPLES = join(PACKAGE, 'examples');
 const read = (path: string) => readFileSync(path, 'utf8');
 
 const CORPUS: Array<[string, string]> = [
-  ['iam.schema.typeqlite', join(SCHEMAS, 'iam.schema.typeqlite')],
-  ['skills.schema.typeqlite', join(SCHEMAS, 'skills.schema.typeqlite')],
-  ['real-queries.typeqlite', join(EXAMPLES, 'real-queries.typeqlite')],
-  ['projection-target.typeqlite', join(EXAMPLES, 'projection-target.typeqlite')],
+  ['people.schema.typeqlite', join(SCHEMAS, 'people.schema.typeqlite')],
+  ['tracker.schema.typeqlite', join(SCHEMAS, 'tracker.schema.typeqlite')],
+  ['tracker-queries.typeqlite', join(EXAMPLES, 'tracker-queries.typeqlite')],
+  ['task-log-queries.typeqlite', join(EXAMPLES, 'task-log-queries.typeqlite')],
 ];
 
 describe('the formatter normalises', () => {
@@ -26,46 +26,46 @@ describe('the formatter normalises', () => {
   it('reflows a mangled schema into house style', async () => {
     const mangled = [
       'define',
-      'entity   principal ,   owns principal-id   @key ,owns principal-type ;',
-      'attribute   principal-id ,  value string ;',
-      'attribute principal-type,value string;',
+      'entity   person ,   owns person-id   @key ,owns person-kind ;',
+      'attribute   person-id ,  value string ;',
+      'attribute person-kind,value string;',
     ].join('\n');
 
     expect(await format(mangled)).toBe(
       [
         'define',
         '',
-        'entity principal,',
-        '    owns principal-id @key,',
-        '    owns principal-type;',
+        'entity person,',
+        '    owns person-id @key,',
+        '    owns person-kind;',
         '',
-        'attribute principal-id, value string;',
-        'attribute principal-type, value string;',
+        'attribute person-id, value string;',
+        'attribute person-kind, value string;',
       ].join('\n'),
     );
   });
 
   it('keeps a single-pattern stage inline and breaks a multi-pattern one', async () => {
     const mangled = [
-      'match   $s isa skill , has skill-id "x" ;select   $s ;',
-      'match $a isa skill, has skill-id "a"; $b isa skill-step, has step-id "b"; insert (owner: $a, step: $b) isa skill-composition;',
+      'match   $s isa project , has project-id "x" ;select   $s ;',
+      'match $a isa project, has project-id "a"; $b isa task, has task-id "b"; insert (owner: $a, task: $b) isa project-task;',
     ].join('\n');
 
     expect(await format(mangled)).toBe(
       [
-        'match $s isa skill, has skill-id "x";',
+        'match $s isa project, has project-id "x";',
         'select $s;',
         'match',
-        '    $a isa skill, has skill-id "a";',
-        '    $b isa skill-step, has step-id "b";',
-        'insert (owner: $a, step: $b) isa skill-composition;',
+        '    $a isa project, has project-id "a";',
+        '    $b isa task, has task-id "b";',
+        'insert (owner: $a, task: $b) isa project-task;',
       ].join('\n'),
     );
   });
 
   it('never spaces a role reference', async () => {
     const formatted = await format(
-      'define\nentity principal, plays membership : member ;',
+      'define\nentity person, plays membership : member ;',
     );
     expect(formatted).toContain('plays membership:member;');
   });

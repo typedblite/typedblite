@@ -8,8 +8,8 @@ const read = (path: string) => readFileSync(path, 'utf8');
 
 const SCHEMA = [
   'define',
-  'attribute skill-id, value string;',
-  'entity skill, owns skill-id @key;',
+  'attribute project-id, value string;',
+  'entity project, owns project-id @key;',
 ].join('\n');
 
 describe('declarations are classified', () => {
@@ -17,25 +17,25 @@ describe('declarations are classified', () => {
     const tokens = await semanticTokens(SCHEMA);
     expect(tokens).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: 'type', text: 'skill' }),
-        expect.objectContaining({ type: 'property', text: 'skill-id' }),
+        expect.objectContaining({ type: 'type', text: 'project' }),
+        expect.objectContaining({ type: 'property', text: 'project-id' }),
       ]),
     );
     // The declaration modifier is set on the definition, so a declaration and a reference to it
     // are distinguishable even though both are the same token type.
     const declared = tokens.filter((t) => t.modifiers !== 0).map((t) => t.text);
-    expect(declared).toContain('skill');
-    expect(declared).toContain('skill-id');
+    expect(declared).toContain('project');
+    expect(declared).toContain('project-id');
   });
 
   it('classifies variables, role players and literals in a query', async () => {
     const tokens = await semanticTokens(
-      'match $s isa skill, has skill-id "abc"; select $s;',
+      'match $s isa project, has project-id "abc"; select $s;',
     );
     const byText = new Map(tokens.map((t) => [t.text, t.type]));
     expect(byText.get('$s')).toBe('variable');
-    expect(byText.get('skill')).toBe('type');
-    expect(byText.get('skill-id')).toBe('property');
+    expect(byText.get('project')).toBe('type');
+    expect(byText.get('project-id')).toBe('property');
     expect(byText.get('"abc"')).toBe('string');
   });
 });
@@ -43,7 +43,7 @@ describe('declarations are classified', () => {
 /**
  * 🔴 The assertion this phase exists for.
  *
- * A TextMate grammar colours `skill-id` and `nope-id` identically — it is a regex, and neither is
+ * A TextMate grammar colours `project-id` and `nope-id` identically — it is a regex, and neither is
  * a keyword. The scope provider knows one resolves and the other does not, and until now that
  * knowledge was thrown away at exactly the point it would be most useful.
  */
@@ -51,14 +51,14 @@ describe('resolution is what decides the colour', () => {
   const withReference = (attribute: string) =>
     [
       'define',
-      'attribute skill-id, value string;',
-      `entity skill, owns ${attribute};`,
+      'attribute project-id, value string;',
+      `entity project, owns ${attribute};`,
     ].join('\n');
 
   it('emits a token for a reference that resolved', async () => {
-    const tokens = await semanticTokens(withReference('skill-id'));
+    const tokens = await semanticTokens(withReference('project-id'));
     // Two occurrences: the declaration and the `owns` reference.
-    expect(tokens.filter((t) => t.text === 'skill-id')).toHaveLength(2);
+    expect(tokens.filter((t) => t.text === 'project-id')).toHaveLength(2);
   });
 
   it('emits NO token for a reference that did not resolve', async () => {
@@ -67,7 +67,7 @@ describe('resolution is what decides the colour', () => {
   });
 
   it('differs between the two, which is what an editor renders differently', async () => {
-    const resolved = await semanticTokens(withReference('skill-id'));
+    const resolved = await semanticTokens(withReference('project-id'));
     const unresolved = await semanticTokens(withReference('nope-id'));
     // Same structure, same length of source, one fewer token — the difference is resolution and
     // nothing else.
@@ -76,7 +76,7 @@ describe('resolution is what decides the colour', () => {
 
   it('does not colour an unresolved role reference either', async () => {
     const tokens = await semanticTokens(
-      ['define', 'entity principal, plays nothing:nowhere;'].join('\n'),
+      ['define', 'entity person, plays nothing:nowhere;'].join('\n'),
     );
     expect(tokens.filter((t) => t.text === 'nothing')).toHaveLength(0);
     expect(tokens.filter((t) => t.text === 'nowhere')).toHaveLength(0);
@@ -86,14 +86,14 @@ describe('resolution is what decides the colour', () => {
 describe('the production schemas are fully classified', () => {
   it.each([
     [
-      'iam.schema.typeqlite',
-      join(SCHEMAS, 'iam.schema.typeqlite'),
-      ['principal', 'organization', 'membership'],
+      'people.schema.typeqlite',
+      join(SCHEMAS, 'people.schema.typeqlite'),
+      ['person', 'team', 'membership'],
     ],
     [
-      'skills.schema.typeqlite',
-      join(SCHEMAS, 'skills.schema.typeqlite'),
-      ['skill', 'skill-step', 'step-dependency'],
+      'tracker.schema.typeqlite',
+      join(SCHEMAS, 'tracker.schema.typeqlite'),
+      ['project', 'task', 'task-dependency'],
     ],
   ])('%s declares %s as types', async (_name, path, expected) => {
     const tokens = await semanticTokens(read(path));

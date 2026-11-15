@@ -7,13 +7,13 @@
  */
 import { TypeDBLiteInterpreter } from '../../src/interpreter.js';
 import { ChangeStreamClient } from '../../src/change-stream-client.js';
-import { readKeyedSkillsSchema } from './keyed-skills-schema.js';
+import { readKeyedTrackerSchema } from './keyed-tracker-schema.js';
 
 const [, , dbPath, schemaPath, hubUrl, prefix, expectText] = process.argv;
 const expect = Number(expectText);
 
 const spoke = new TypeDBLiteInterpreter(dbPath);
-spoke.define(readKeyedSkillsSchema(schemaPath));
+spoke.define(readKeyedTrackerSchema(schemaPath));
 
 const client = new ChangeStreamClient(hubUrl, { retryMs: 50 });
 const seen = new Set<string>();
@@ -30,7 +30,7 @@ const subscription = client.subscribe({
   },
 });
 
-spoke.execute(`insert $s isa skill, has skill-id "${prefix}" , has skill-name "${prefix}";`);
+spoke.execute(`insert $s isa project, has project-id "${prefix}" , has project-name "${prefix}";`);
 await client.push(spoke.changeLog.since(0));
 
 const deadline = Date.now() + 8000;

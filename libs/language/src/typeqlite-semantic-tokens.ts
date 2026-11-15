@@ -102,7 +102,7 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
 
     // ── Queries ─────────────────────────────────────────────────────────────
     //
-    // Labels (`isa skill`, `has name`, a role) are plain `ID`s, coloured by `labelTokens` above.
+    // Labels (`isa project`, `has name`, a role) are plain `ID`s, coloured by `labelTokens` above.
     // What is left here is variables and literals.
     if (isHasProperty(node)) {
       if (node.valueVariable) {
@@ -149,7 +149,7 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
   }
 
   /**
-   * Labels that are plain `ID`s (ADR-008 D5): `isa skill`, `has name`, a role, a re-open's label.
+   * Labels that are plain `ID`s (ADR-008 D5): `isa project`, `has name`, a role, a re-open's label.
    *
    * 🔴 The same rule as a cross-reference, once the workspace has a schema: a label is coloured only
    * when it resolves, and by what it resolves to. A workspace with no schema cannot tell a known label

@@ -40,8 +40,8 @@ const DOCUMENTS = {
   ].join('\n'),
   'file:///workspace/messy.typeqlite': [
     'define',
-    'entity   skill ,   owns skill-id   @key ;',
-    'attribute   skill-id ,  value string ;',
+    'entity   project ,   owns project-id   @key ;',
+    'attribute   project-id ,  value string ;',
     '',
   ].join('\n'),
   // A schema split across two files (ADR-008 D3). `missing-attr` is defined nowhere, so exactly one
@@ -51,8 +51,8 @@ const DOCUMENTS = {
     'define entity employee, owns employee-name, owns missing-attr;\n',
   'file:///workspace/resolution.typeqlite': [
     'define',
-    'attribute skill-id, value string;',
-    'entity skill, owns skill-id, owns nope-id;',
+    'attribute project-id, value string;',
+    'entity project, owns project-id, owns nope-id;',
     '',
   ].join('\n'),
 };
@@ -155,9 +155,9 @@ describe('the bundled language server', () => {
       tokens.push({ line, character, type: legend[data[i + 3]!]! });
     }
     const on = (character: number) => tokens.find((t) => t.line === 2 && t.character === character);
-    // `entity skill, owns skill-id, owns nope-id;`: skill-id at 19, nope-id at 34.
-    expect(on(19)?.type).toBe('property');
-    expect(on(34)).toBeUndefined();
+    // `entity project, owns project-id, owns nope-id;`: project-id at 21, nope-id at 38.
+    expect(on(21)?.type).toBe('property');
+    expect(on(38)).toBeUndefined();
     expect(published.get('file:///workspace/resolution.typeqlite')!.map((d) => d.message)).toEqual([
       "Could not resolve reference to AttributeDef named 'nope-id'.",
     ]);

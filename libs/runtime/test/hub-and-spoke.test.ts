@@ -14,11 +14,11 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 import { replicateOnce } from '../src/replicator.js';
-import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
+import { readKeyedTrackerSchema } from './fixtures/keyed-tracker-schema.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
-const SCHEMA = join(SCHEMAS, 'skills.schema.typeqlite');
+const SCHEMA = join(SCHEMAS, 'tracker.schema.typeqlite');
 
 const runSpoke = (args: string[]) =>
   new Promise<{ code: number | null; stderr: string }>((resolve) => {
@@ -39,7 +39,7 @@ describe('hub and spokes converge', () => {
     const hubPath = join(dir, 'hub.db');
 
     const setup = new TypeDBLiteInterpreter(hubPath);
-    setup.define(readKeyedSkillsSchema(SCHEMA));
+    setup.define(readKeyedTrackerSchema(SCHEMA));
     setup.close();
 
     const spokes = ['alpha', 'beta', 'gamma'];
@@ -62,7 +62,7 @@ describe('hub and spokes converge', () => {
 
     const hub = new TypeDBLiteInterpreter(hubPath);
     const ids = hub
-      .query('match $s isa skill, has skill-id $id; select $id;')
+      .query('match $s isa project, has project-id $id; select $id;')
       .rows.map((row) => row['id']?.asString())
       .sort();
 
@@ -84,7 +84,7 @@ describe('hub and spokes converge', () => {
   it('a spoke that pulls afterwards sees every other spoke’s work', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'typedblite-hub2-'));
     const hubPath = join(dir, 'hub.db');
-    const schema = readKeyedSkillsSchema(SCHEMA);
+    const schema = readKeyedTrackerSchema(SCHEMA);
 
     const setup = new TypeDBLiteInterpreter(hubPath);
     setup.define(schema);
@@ -104,7 +104,7 @@ describe('hub and spokes converge', () => {
     const outcome = replicateOnce(late.changeLog, hub.changeLog, { direction: 'pull' });
 
     const ids = late
-      .query('match $s isa skill, has skill-id $id; select $id;')
+      .query('match $s isa project, has project-id $id; select $id;')
       .rows.map((row) => row['id']?.asString())
       .sort();
 

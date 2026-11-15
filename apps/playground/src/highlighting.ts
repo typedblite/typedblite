@@ -37,7 +37,7 @@ export const TOKEN = {
 const escape = (symbol: string): string => symbol.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 /**
- * The Monarch tokenizer. `-` is part of a name (`skill-id`, `$start-date`), so a word is read whole and
+ * The Monarch tokenizer. `-` is part of a name (`project-id`, `$start-date`), so a word is read whole and
  * only then looked up: the `value` inside `value-type` is a name, not a keyword.
  */
 export const MONARCH = {

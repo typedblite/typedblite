@@ -8,7 +8,7 @@ const [, , dbPath] = process.argv;
 const engine = new SqliteEngine(dbPath);
 
 await engine.transaction(async () => {
-  await engine.execute('insert $s isa skill, has skill-id "held", has skill-name "held";');
+  await engine.execute('insert $s isa project, has project-id "held", has project-name "held";');
   process.stdout.write('holding\n');
   await new Promise((resolve) => setTimeout(resolve, 800));
 });

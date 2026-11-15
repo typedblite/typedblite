@@ -16,12 +16,12 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 import { serveChangeStream } from '../src/change-stream.js';
 import { ChangeStreamClient } from '../src/change-stream-client.js';
 import type { ChangeRecord } from '../src/change-log.js';
-import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
+import { readKeyedTrackerSchema } from './fixtures/keyed-tracker-schema.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
-const SCHEMA_PATH = join(SCHEMAS, 'skills.schema.typeqlite');
-const schema = readKeyedSkillsSchema(SCHEMA_PATH);
+const SCHEMA_PATH = join(SCHEMAS, 'tracker.schema.typeqlite');
+const schema = readKeyedTrackerSchema(SCHEMA_PATH);
 
 const node = () => {
   const db = new TypeDBLiteInterpreter(':memory:');
@@ -30,7 +30,7 @@ const node = () => {
 };
 
 const addSkill = (db: TypeDBLiteInterpreter, id: string) =>
-  db.execute(`insert $s isa skill, has skill-id "${id}", has skill-name "n";`);
+  db.execute(`insert $s isa project, has project-id "${id}", has project-name "n";`);
 
 /** Wait for a condition, or fail with what was actually seen rather than a bare timeout. */
 async function eventually(
@@ -61,7 +61,7 @@ describe('live delivery', () => {
     addSkill(hub, 's-1');
 
     await eventually(
-      () => received.some((r) => r.entityId === 'skill/s-1'),
+      () => received.some((r) => r.entityId === 'project/s-1'),
       () => `received ${JSON.stringify(received.map((r) => r.entityId))}`,
     );
 
@@ -89,7 +89,7 @@ describe('live delivery', () => {
     // Still live: a change after pausing must still arrive.
     addSkill(hub, 's-2');
     await eventually(
-      () => received.some((r) => r.entityId === 'skill/s-2'),
+      () => received.some((r) => r.entityId === 'project/s-2'),
       () => `received ${JSON.stringify(received.map((r) => r.entityId))}`,
     );
 
@@ -115,13 +115,13 @@ describe('resume', () => {
 
     addSkill(hub, 'new-1');
     await eventually(
-      () => received.some((r) => r.entityId === 'skill/new-1'),
+      () => received.some((r) => r.entityId === 'project/new-1'),
       () => `received ${JSON.stringify(received.map((r) => r.entityId))}`,
     );
 
     assert.deepEqual(
       received.map((r) => r.entityId),
-      ['skill/new-1'],
+      ['project/new-1'],
       'resuming from a cursor must not replay history',
     );
 
@@ -153,14 +153,14 @@ describe('resume', () => {
     await reopened.port;
 
     await eventually(
-      () => received.some((r) => r.entityId === 'skill/s-2'),
+      () => received.some((r) => r.entityId === 'project/s-2'),
       () => `received ${JSON.stringify(received.map((r) => r.entityId))}`,
       6000,
     );
 
     const ids = received.map((r) => r.entityId);
     assert.equal(new Set(ids).size, ids.length, 'a reconnect must not duplicate');
-    assert.deepEqual(ids, ['skill/s-1', 'skill/s-2'], 'and must not skip');
+    assert.deepEqual(ids, ['project/s-1', 'project/s-2'], 'and must not skip');
 
     await subscription.cancel();
     await reopened.close();
@@ -213,11 +213,11 @@ describe('the safety-net poll', () => {
 
     // A separate connection to the same file — the "CLI" the hub never hears about.
     const bypasser = new TypeDBLiteInterpreter(path);
-    bypasser.execute('insert $s isa skill, has skill-id "by-pass", has skill-name "n";');
+    bypasser.execute('insert $s isa project, has project-id "by-pass", has project-name "n";');
     bypasser.close();
 
     await eventually(
-      () => received.some((r) => r.entityId === 'skill/by-pass'),
+      () => received.some((r) => r.entityId === 'project/by-pass'),
       () => `received ${JSON.stringify(received.map((r) => r.entityId))}`,
     );
 
@@ -269,7 +269,7 @@ describe('two live spokes, separate processes', () => {
       const seen = JSON.parse(result.stdout) as string[];
       assert.deepEqual(
         seen,
-        ['skill/alpha', 'skill/beta'],
+        ['project/alpha', 'project/beta'],
         `spoke ${spokes[index]} saw ${result.stdout}`,
       );
     }
