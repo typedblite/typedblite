@@ -2,234 +2,11 @@
   "label": "original",
   "commit": "65e68b6",
   "date": "2026-11-13T04:29:38.691Z",
-  "machine": "linux 6.6.87.2-microsoft-standard-WSL2, Intel(R) Core(TM) Ultra 9 275HX ×24, Node v24.19.0",
+  "machine": "linux 6.6.87.2-microsoft-standard-WSL2, Intel(R) Core(TM) Ultra 9 275HX \u00d724, Node v24.19.0",
   "measurements": [
     {
-      "suite": "real-stores",
-      "name": "ladder: open",
-      "n": 1,
-      "p50": 8.291545999999926,
-      "p95": 8.291545999999926,
-      "max": 8.291545999999926,
-      "mean": 8.291545999999926
-    },
-    {
-      "suite": "real-stores",
-      "name": "ladder: workflow by key",
-      "n": 100,
-      "p50": 0.5050310000001446,
-      "p95": 0.9911809999999832,
-      "max": 53.83678499999996,
-      "mean": 1.1271293399999933,
-      "rows": 1
-    },
-    {
-      "suite": "real-stores",
-      "name": "ladder: step column (present)",
-      "n": 100,
-      "p50": 0.8829299999999876,
-      "p95": 1.389065999999957,
-      "max": 3.945643999999902,
-      "mean": 0.9530223299999989,
-      "rows": 6.68
-    },
-    {
-      "suite": "real-stores",
-      "name": "ladder: history column (mostly absent)",
-      "n": 100,
-      "p50": 9.051899999999932,
-      "p95": 12.017413000000033,
-      "max": 14.55645699999991,
-      "mean": 9.148463270000004,
-      "rows": 0
-    },
-    {
-      "suite": "real-stores",
-      "name": "ladder: find() — 16 queries",
-      "n": 40,
-      "p50": 46.7139159999997,
-      "p95": 56.565008000000034,
-      "max": 93.8013719999999,
-      "mean": 47.94048980000002,
-      "rows": 113.15
-    },
-    {
-      "suite": "real-stores",
-      "name": "ladder: list every workflow id",
-      "n": 5,
-      "p50": 46.296972000000096,
-      "p95": 47.490526999999474,
-      "max": 47.490526999999474,
-      "mean": 45.81796299999996,
-      "rows": 1601
-    },
-    {
-      "suite": "real-stores",
-      "name": "ladder: saveStep() — 3 commits",
-      "n": 150,
-      "p50": 17.173601999999846,
-      "p95": 24.209595999999692,
-      "max": 32.47331099999974,
-      "mean": 18.15701317333335
-    },
-    {
-      "suite": "real-stores",
-      "name": "ladder: 100 inserts in one transaction",
-      "n": 3,
-      "p50": 374.9527879999996,
-      "p95": 412.5029850000001,
-      "max": 412.5029850000001,
-      "mean": 385.88376566666676
-    },
-    {
-      "suite": "real-stores",
-      "name": "obs: getObservation(id) — 5 queries",
-      "n": 100,
-      "p50": 10.850985999999466,
-      "p95": 12.8910160000014,
-      "max": 16.60140499999943,
-      "mean": 11.048286940000107,
-      "rows": 1.06
-    },
-    {
-      "suite": "real-stores",
-      "name": "obs: list(operation) — 5 queries, ~170 rows",
-      "n": 3,
-      "p50": 16.833968999999342,
-      "p95": 19.403411999999662,
-      "max": 19.403411999999662,
-      "mean": 17.68426499999987,
-      "rows": 172
-    },
-    {
-      "suite": "real-stores",
-      "name": "obs: list(kind) — 5 queries, ~7,000 rows",
-      "n": 3,
-      "p50": 1105.8883559999995,
-      "p95": 1201.267769,
-      "max": 1201.267769,
-      "mean": 1117.8288693333332,
-      "rows": 7032
-    },
-    {
-      "suite": "real-stores",
-      "name": "obs: event by key",
-      "n": 100,
-      "p50": 0.33481899999969755,
-      "p95": 0.5637090000000171,
-      "max": 35.436297999998715,
-      "mean": 0.7067044700000952,
-      "rows": 1
-    },
-    {
-      "suite": "real-stores",
-      "name": "obs: append payload + index — 2 commits",
-      "n": 200,
-      "p50": 14.808435000000827,
-      "p95": 19.051707000000533,
-      "max": 34.73592500000086,
-      "mean": 15.274591215000054
-    },
-    {
-      "suite": "real-stores",
-      "name": "docs: get(id) — 3 queries",
-      "n": 100,
-      "p50": 2.181294000001799,
-      "p95": 2.530857999998261,
-      "max": 5.404032000002189,
-      "mean": 1.926001269999979,
-      "rows": 4.98
-    },
-    {
-      "suite": "real-stores",
-      "name": "docs: list every document",
-      "n": 3,
-      "p50": 212.17042299999957,
-      "p95": 249.59767600000123,
-      "max": 249.59767600000123,
-      "mean": 220.87226100000044,
-      "rows": 2390
-    },
-    {
-      "suite": "real-stores",
-      "name": "docs: full-text search, limit 150",
-      "n": 8,
-      "p50": 1.0605890000006184,
-      "p95": 1.6180219999987457,
-      "max": 1.6180219999987457,
-      "mean": 1.0696406250003747,
-      "rows": 139.625
-    },
-    {
-      "suite": "real-stores",
-      "name": "docs: re-ingest (remove + add) — 2 commits",
-      "n": 60,
-      "p50": 15.70567999999912,
-      "p95": 27.935840999998618,
-      "max": 79.54888899999787,
-      "mean": 18.113122816666387
-    },
-    {
-      "suite": "real-stores",
-      "name": "docs: compact() the change log",
-      "n": 1,
-      "p50": 2686.150006,
-      "p95": 2686.150006,
-      "max": 2686.150006,
-      "mean": 2686.150006
-    },
-    {
-      "suite": "real-stores",
-      "name": "docs: vacuum()",
-      "n": 1,
-      "p50": 278.7296150000002,
-      "p95": 278.7296150000002,
-      "max": 278.7296150000002,
-      "mean": 278.7296150000002
-    },
-    {
-      "suite": "real-stores",
-      "name": "skills: steps via skill-composition",
-      "n": 80,
-      "p50": 1.406531000000541,
-      "p95": 2.437333000001672,
-      "max": 6.3625040000006265,
-      "mean": 1.567372987500221,
-      "rows": 6.1625
-    },
-    {
-      "suite": "real-stores",
-      "name": "skills: sub-workflow children",
-      "n": 80,
-      "p50": 4.568669000000227,
-      "p95": 6.722885999999562,
-      "max": 10.043138000000909,
-      "mean": 4.700748775000056,
-      "rows": 0.2875
-    },
-    {
-      "suite": "real-stores",
-      "name": "skills: step dependencies",
-      "n": 80,
-      "p50": 2.211510000000999,
-      "p95": 6.995845000001282,
-      "max": 10.638860999999451,
-      "mean": 3.477672550000034,
-      "rows": 0.85
-    },
-    {
-      "suite": "real-stores",
-      "name": "skills: every dependency edge",
-      "n": 3,
-      "p50": 73.67748399999982,
-      "p95": 77.23281399999905,
-      "max": 77.23281399999905,
-      "mean": 74.32665266666663,
-      "rows": 167
-    },
-    {
       "suite": "relations",
-      "name": "200: steps via skill-composition",
+      "name": "200: tasks via project-task",
       "n": 60,
       "p50": 1.5436939999926835,
       "p95": 1.7771590000484139,
@@ -239,7 +16,7 @@
     },
     {
       "suite": "relations",
-      "name": "200: step dependencies (2 relations)",
+      "name": "200: task dependencies (2 relations)",
       "n": 60,
       "p50": 2.1778230000054464,
       "p95": 2.335158000001684,
@@ -249,7 +26,7 @@
     },
     {
       "suite": "relations",
-      "name": "200: sub-workflow children (2 relations)",
+      "name": "200: subproject children (2 relations)",
       "n": 60,
       "p50": 4.6252230000682175,
       "p95": 8.424208000069484,
@@ -259,7 +36,7 @@
     },
     {
       "suite": "relations",
-      "name": "200: output fields (multi-valued)",
+      "name": "200: log fields (multi-valued)",
       "n": 60,
       "p50": 1.328739000018686,
       "p95": 1.4846810000017285,
@@ -309,7 +86,7 @@
     },
     {
       "suite": "relations",
-      "name": "1000: steps via skill-composition",
+      "name": "1000: tasks via project-task",
       "n": 60,
       "p50": 1.591018999926746,
       "p95": 1.9009069999447092,
@@ -319,7 +96,7 @@
     },
     {
       "suite": "relations",
-      "name": "1000: step dependencies (2 relations)",
+      "name": "1000: task dependencies (2 relations)",
       "n": 60,
       "p50": 2.1894360000733286,
       "p95": 2.625218000030145,
@@ -329,7 +106,7 @@
     },
     {
       "suite": "relations",
-      "name": "1000: sub-workflow children (2 relations)",
+      "name": "1000: subproject children (2 relations)",
       "n": 60,
       "p50": 17.17170599999372,
       "p95": 19.172423999989405,
@@ -339,7 +116,7 @@
     },
     {
       "suite": "relations",
-      "name": "1000: output fields (multi-valued)",
+      "name": "1000: log fields (multi-valued)",
       "n": 60,
       "p50": 1.3161379999946803,
       "p95": 1.5135899999877438,
@@ -389,7 +166,7 @@
     },
     {
       "suite": "relations",
-      "name": "3000: steps via skill-composition",
+      "name": "3000: tasks via project-task",
       "n": 60,
       "p50": 1.5697099999524653,
       "p95": 2.1409960000310093,
@@ -399,7 +176,7 @@
     },
     {
       "suite": "relations",
-      "name": "3000: step dependencies (2 relations)",
+      "name": "3000: task dependencies (2 relations)",
       "n": 60,
       "p50": 2.1677059999201447,
       "p95": 2.5884779999032617,
@@ -409,7 +186,7 @@
     },
     {
       "suite": "relations",
-      "name": "3000: sub-workflow children (2 relations)",
+      "name": "3000: subproject children (2 relations)",
       "n": 60,
       "p50": 1.6681860000826418,
       "p95": 2.175834000110626,
@@ -419,7 +196,7 @@
     },
     {
       "suite": "relations",
-      "name": "3000: output fields (multi-valued)",
+      "name": "3000: log fields (multi-valued)",
       "n": 60,
       "p50": 1.3363750001881272,
       "p95": 1.4989889999851584,
@@ -477,7 +254,7 @@
         "column": 2.343134799999825,
         "emptyOptional": 3.4300105000002077,
         "listAll": 19.988103499999852,
-        "saveStep": 11.241146099999606
+        "ticketUpdate": 11.241146099999606
       },
       {
         "entities": 40320,
@@ -486,7 +263,7 @@
         "column": 1.4626222499995492,
         "emptyOptional": 7.289792299998226,
         "listAll": 42.776578499993775,
-        "saveStep": 19.019426499999827
+        "ticketUpdate": 19.019426499999827
       },
       {
         "entities": 60480,
@@ -495,7 +272,7 @@
         "column": 1.3899390999984462,
         "emptyOptional": 13.145839400001568,
         "listAll": 62.18904850000399,
-        "saveStep": 23.76621499999892
+        "ticketUpdate": 23.76621499999892
       },
       {
         "entities": 80640,
@@ -504,7 +281,7 @@
         "column": 1.3375638999976218,
         "emptyOptional": 14.07969639999792,
         "listAll": 80.96854899998289,
-        "saveStep": 27.773707799997645
+        "ticketUpdate": 27.773707799997645
       },
       {
         "entities": 100800,
@@ -513,83 +290,32 @@
         "column": 1.3031449999951292,
         "emptyOptional": 20.568073799996636,
         "listAll": 105.3439279999584,
-        "saveStep": 34.684825199993796
+        "ticketUpdate": 34.684825199993796
       }
     ],
     "relations-generation": [
       {
-        "skills": 200,
-        "steps": 1400,
+        "projects": 200,
+        "tasks": 1400,
         "writes": 2939,
         "seconds": 5.760590925000026,
         "msPerWrite": 1.9600513525008594
       },
       {
-        "skills": 1000,
-        "steps": 7000,
+        "projects": 1000,
+        "tasks": 7000,
         "writes": 14699,
         "seconds": 46.96418522899994,
         "msPerWrite": 3.1950598835975192
       },
       {
-        "skills": 3000,
-        "steps": 21000,
+        "projects": 3000,
+        "tasks": 21000,
         "writes": 44099,
         "seconds": 300.219941772,
         "msPerWrite": 6.807862803510285
       }
-    ],
-    "concurrency": [
-      {
-        "configuration": "1W+0R",
-        "saveStepsPerSecond": 55.3,
-        "writerP50": 17.169941999999992,
-        "writerP99": 27.414456000000428,
-        "writerErrors": 0,
-        "readsPerSecond": 0,
-        "readerP99": 0,
-        "readerErrors": 0
-      },
-      {
-        "configuration": "2W+0R",
-        "saveStepsPerSecond": 54,
-        "writerP50": 17.743169000000307,
-        "writerP99": 1563.995831,
-        "writerErrors": 606,
-        "readsPerSecond": 0,
-        "readerP99": 0,
-        "readerErrors": 0
-      },
-      {
-        "configuration": "4W+0R",
-        "saveStepsPerSecond": 51.6,
-        "writerP50": 19.847526000000016,
-        "writerP99": 1960.5612580000015,
-        "writerErrors": 658,
-        "readsPerSecond": 0,
-        "readerP99": 0,
-        "readerErrors": 0
-      },
-      {
-        "configuration": "2W+2R",
-        "saveStepsPerSecond": 45.9,
-        "writerP50": 20.88665800000001,
-        "writerP99": 955.6474600000001,
-        "writerErrors": 383,
-        "readsPerSecond": 1150.9,
-        "readerP99": 6.911742000000231,
-        "readerErrors": 0
-      },
-      {
-        "configuration": "4W+4R",
-        "saveStepsPerSecond": 38.7,
-        "writerP50": 46.464563,
-        "writerP99": 5905.40411,
-        "writerErrors": 782,
-        "readsPerSecond": 1924.5,
-        "readerP99": 8.890368000000308,
-        "readerErrors": 0
-      }
     ]
-  }
+  },
+  "note": "Measured 2026-11-12 on generated data of the same shape and sizes as 2026-11-15-generated-data.json: only the names differ (the data was generated for the previous schemas, and is renamed here to match). Measurements of the private stores the same run also took, and its contention table, which ran on one of them, are removed."
 }

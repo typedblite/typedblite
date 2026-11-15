@@ -7,14 +7,14 @@ const messages = async (text: string) =>
 describe('schema names resolve', () => {
   it('rejects `owns` naming an attribute that is not declared', async () => {
     expect(
-      await messages('define entity skill, owns nonexistent-attribute;'),
+      await messages('define entity project, owns nonexistent-attribute;'),
     ).toMatch(/nonexistent-attribute/);
   });
 
   it('accepts `owns` naming a declared attribute', async () => {
     expect(
       await messages(
-        'define attribute skill-id, value string; entity skill, owns skill-id @key;',
+        'define attribute project-id, value string; entity project, owns project-id @key;',
       ),
     ).toBe('');
   });
@@ -22,7 +22,7 @@ describe('schema names resolve', () => {
   it('rejects `plays` naming a relation that does not exist', async () => {
     expect(
       await messages(
-        'define entity principal, plays nonexistent-relation:member;',
+        'define entity person, plays nonexistent-relation:member;',
       ),
     ).toMatch(/nonexistent-relation/);
   });
@@ -30,7 +30,7 @@ describe('schema names resolve', () => {
   it('rejects `plays` naming a role its relation does not relate', async () => {
     expect(
       await messages(
-        'define relation membership, relates member; entity principal, plays membership:not-a-role;',
+        'define relation membership, relates member; entity person, plays membership:not-a-role;',
       ),
     ).toMatch(/not-a-role/);
   });
@@ -54,7 +54,7 @@ describe('schema names resolve', () => {
   it('accepts `plays` naming a role the relation does relate', async () => {
     expect(
       await messages(
-        'define relation membership, relates member; entity principal, plays membership:member;',
+        'define relation membership, relates member; entity person, plays membership:member;',
       ),
     ).toBe('');
   });

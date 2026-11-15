@@ -1,0 +1,56 @@
+# Example statements over the project tracker (`test-fixtures/schemas/tracker.schema.typeqlite` and
+# `people.schema.typeqlite`), in the shapes an application's repositories issue. The language tests parse and
+# format this file.
+#
+# Projects and tasks.
+insert $s isa project, has project-id "website-relaunch", has project-name "Website relaunch", has project-summary "Move the public site to the new design";
+end;
+insert $st isa task, has task-id "wr-audit-pages", has ordinal 1, has task-kind "review", has log-field "notes";
+end;
+match
+  $s isa project, has project-id "website-relaunch";
+  $st isa task, has task-id "wr-audit-pages";
+insert (owner: $s, task: $st) isa project-task;
+end;
+match
+  $st isa task, has task-id "wr-plan-migration";
+  $child isa project, has project-id "content-migration";
+insert (parent-task: $st, child-project: $child) isa subproject;
+end;
+match
+  $d isa task, has task-id "cm-export-pages";
+  $p isa task, has task-id "wr-plan-migration";
+insert (dependent: $d, prerequisite: $p) isa task-dependency;
+end;
+match
+  $d isa task, has task-id "cm-export-pages";
+  $p isa task, has task-id "wr-plan-migration";
+  $r isa task-dependency (dependent: $d, prerequisite: $p);
+  $d has task-id $found;
+select $found;
+end;
+match $s isa project, has project-id "website-relaunch", has project-name $n, has project-summary $d;
+select $n, $d;
+end;
+match
+  $s isa project, has project-id "website-relaunch";
+  $st isa task, has task-id $id, has ordinal $o, has task-kind $k;
+  (owner: $s, task: $st) isa project-task;
+select $id, $o, $k;
+# People, teams and memberships.
+end;
+match $p isa person, has person-id "p-1";
+      $p has person-id $id, has person-kind $type;
+select $id, $type;
+end;
+match $p isa person, has person-id "p-1", has person-kind $old;
+delete $old of $p;
+end;
+insert $p isa person, has person-id "p-1", has person-kind "member";
+end;
+put $o isa team, has team-id "team-1";
+end;
+match
+  $p isa person, has person-id "p-1";
+  $o isa team, has team-id "team-1";
+insert $m isa membership, links (member: $p, team: $o), has membership-key "p-1::team-1", has role-name "owner";

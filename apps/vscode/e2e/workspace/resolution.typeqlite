@@ -1,3 +1,3 @@
 define
-attribute skill-id, value string;
-entity skill, owns skill-id, owns nope-id;
+attribute project-id, value string;
+entity project, owns project-id, owns nope-id;

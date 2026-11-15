@@ -56,14 +56,14 @@ import {
 /**
  * TypeQLite formatting.
  *
- * 🔴 **The house style is derived from the production schemas, not invented.** `iam.schema.typeqlite`
- * and `skills.schema.typeqlite` were hand-aligned for a year before anything formatted them, and a
+ * 🔴 **The house style is derived from the production schemas, not invented.** `people.schema.typeqlite`
+ * and `tracker.schema.typeqlite` were hand-aligned for a year before anything formatted them, and a
  * formatter that reflowed them into some other shape would produce a diff nobody asked for and
  * would be turned off. So: `define` alone on its line, one trait per line indented, a blank line
  * between block definitions, consecutive one-liners kept tight.
  *
  * 🔴 **Single-pattern stages stay inline; multi-pattern stages break.** Both shapes appear verbatim
- * in `examples/real-queries.typeqlite`, which was itself copied out of the repositories. Encoding the
+ * in `examples/tracker-queries.typeqlite`. Encoding the
  * rule on pattern *count* reproduces both deterministically, where `Formatting.fit()` would only
  * preserve whichever the author happened to type.
  */
@@ -101,7 +101,7 @@ export class TypeQLiteFormatter extends AbstractFormatter {
    * placement only when a node carries no prepend formatting (`formatter.js`:
    * `if (!prependFormatting && node.hidden)`), so prepending to a definition lands the whitespace
    * *after* its leading comment — which put a blank line between every comment block in
-   * `skills.schema.typeqlite` and the definition it documents.
+   * `tracker.schema.typeqlite` and the definition it documents.
    *
    * Appending to the previous item instead was tried and is worse: it preserves existing spacing
    * but never inserts any, so the formatter silently stops normalising vertical space. That
@@ -139,7 +139,7 @@ export class TypeQLiteFormatter extends AbstractFormatter {
       // A blank line around anything that spans lines, and wherever the KIND of definition
       // changes; consecutive one-liners of the same kind stay tight.
       //
-      // 🔴 The kind clause was added after formatting `iam.schema.typeqlite` by hand and reading the
+      // 🔴 The kind clause was added after formatting `people.schema.typeqlite` by hand and reading the
       // result: without it the blank line between the `plays` declarations and the `attribute`
       // declarations disappeared, silently merging two groups the author had separated. Idempotence
       // and AST preservation both still held — which is exactly why the checklist requires a human
@@ -297,7 +297,7 @@ export class TypeQLiteFormatter extends AbstractFormatter {
 
   /**
    * One item stays on the keyword's line; several break one-per-line, indented. Both shapes are
-   * verbatim from `examples/real-queries.typeqlite`.
+   * verbatim from `examples/tracker-queries.typeqlite`.
    */
   private layoutItems(node: AstNode, items: readonly AstNode[]): void {
     const f = this.getNodeFormatter(node);
@@ -318,7 +318,7 @@ const isBlock = (node: AstNode): boolean => isEntityDef(node) || isRelationDef(n
  * 🔴 `allowMore` is not a nicety, and both halves of it were found by formatting the production
  * schemas and diffing:
  *
- * - **Authored grouping survives.** `skills.schema.typeqlite` separates two runs of `attribute`
+ * - **Authored grouping survives.** `tracker.schema.typeqlite` separates two runs of `attribute`
  *   declarations with a blank line. Forcing exactly one newline between same-kind definitions
  *   deleted it, merging two groups the author had deliberately kept apart.
  * - **A comment does not gain a blank line.** Langium applies a prepended formatting to a
@@ -332,7 +332,7 @@ const isBlock = (node: AstNode): boolean => isEntityDef(node) || isRelationDef(n
  * Langium falls back to its own hidden-node placement only when a node has no prepend formatting
  * (`formatter.js`: `if (!prependFormatting && node.hidden)`), so a prepend on a definition lands
  * *after* its leading comment — which inserted a blank line between every comment block in
- * `skills.schema.typeqlite` and the definition it documents. Appending to the previous definition
+ * `tracker.schema.typeqlite` and the definition it documents. Appending to the previous definition
  * targets the gap before the comment, which is the gap that was meant.
  */
 const separator = (blank: boolean) =>

@@ -338,9 +338,9 @@ export class TypeQLiteValidator {
 
   /**
    * TypeDB labels are unique across **all** types, not per kind. Recorded the hard way in
-   * `skills.schema.typeqlite`: a relation named `skill-step` beside the entity of that name fails
-   * with `[SVL2] Label 'skill-step' should be unique, but is already used by 'entity'`, which is
-   * why the relation is called `skill-composition`.
+   * `tracker.schema.typeqlite`: a relation named `task` beside the entity of that name fails
+   * with `[SVL2] Label 'task' should be unique, but is already used by 'entity'`, which is
+   * why the relation is called `project-task`.
    */
   checkLabelsAreUnique(node: DefineClause, accept: ValidationAcceptor): void {
     const seen = new Map<string, string>();
@@ -439,8 +439,8 @@ export class TypeQLiteValidator {
  *
  * 🔴 These PARSE here — the grammar has no reason to reject `attribute label`. The error surfaces
  * only against a real TypeDB, as `[DEX31] The reserved keyword "label" cannot be used as an
- * identifier`, which is how it cost time twice and why both schema headers record it. `skill-name`
- * and `step-kind` exist because `name` and `kind` were unavailable.
+ * identifier`, which is how it cost time twice and why both schema headers record it. `project-name`
+ * and `task-kind` exist because `name` and `kind` were unavailable.
  */
 /**
  * What TypeDB 3.10.4 refuses as an identifier with `[DEX31]` — each word probed on the live server
@@ -450,7 +450,7 @@ export class TypeQLiteValidator {
  * 🔴 The list was hand-written before that and over-reserved by twelve: `name`, `label`, `kind`,
  * `type`, `value`, `sort`, `limit`, `offset`, `require`, `distinct`, `select`, `reduce` are all
  * accepted by the server. `name` alone refused every Background in TypeDB's own behaviour spec,
- * and the Skills schema renamed `name` to `skill-name` to dodge a refusal TypeDB never makes.
+ * and a real schema renamed `name` to `project-name` to dodge a refusal TypeDB never makes.
  * `d-20260911-the-validator-reserves-ten-identifiers-typedb`.
  */
 const RESERVED = new Set([
@@ -464,7 +464,7 @@ export const isReservedKeyword = (word: string): boolean => RESERVED.has(word);
 /** The `[DEX31]` refusal, worded once for the validator and for the engine's parse step. */
 export const reservedKeywordMessage = (word: string): string =>
   `'${word}' is a reserved TypeQLite keyword and cannot be used as an ` +
-  'identifier — TypeDB refuses it with [DEX31]. Qualify it: `skill-id`, `step-kind`.';
+  'identifier — TypeDB refuses it with [DEX31]. Qualify it: `project-id`, `task-kind`.';
 
 const article = (subject: AnnotationSubject): string => (/^[aeiou]/.test(subject) ? 'an' : 'a');
 
@@ -481,7 +481,7 @@ function* labelled(clause: DefineClause) {
  * What a `match` binds, read from the AST alone.
  *
  * 🔴 Mirrors `constraintsOf`'s merging: two patterns naming the same variable are one thing, which
- * is what makes `$p has principal-type $old;` after `$p isa principal, ...` a projection of the
+ * is what makes `$p has person-kind $old;` after `$p isa person, ...` a projection of the
  * thing the first pattern found rather than a second, unconstrained one.
  *
  * An anonymous relation pattern binds no variable of its own and is deliberately absent from

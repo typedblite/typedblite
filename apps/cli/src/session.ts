@@ -94,7 +94,7 @@ function render(row: Record<string, unknown>): Record<string, string> {
 /**
  * Split a source into statements a session can run one at a time.
  *
- * 🔴 A pipeline may span lines and semicolons: `match $s isa skill, has skill-id "x";` followed by
+ * 🔴 A pipeline may span lines and semicolons: `match $s isa project, has project-id "x";` followed by
  * `insert …;` is **one** pipeline, and it is the normal shape in every repository. So splitting on
  * `;` alone would tear every `match … insert` in the codebase in half.
  *

@@ -55,7 +55,7 @@ function prepareEnvironment(): void {
       { open: "'", close: "'", notIn: ['string'] },
     ],
     surroundingPairs: [{ open: '{', close: '}' }, { open: '(', close: ')' }, { open: '[', close: ']' }, { open: '"', close: '"' }, { open: "'", close: "'" }],
-    // A name holds hyphens (`skill-id`), and a variable starts with `$`, so a "word" is both.
+    // A name holds hyphens (`project-id`), and a variable starts with `$`, so a "word" is both.
     wordPattern: /\$?[A-Za-z_\u0080-￿][\w\-\u0080-￿]*/,
   });
   for (const scheme of ['light', 'dark'] as const) {

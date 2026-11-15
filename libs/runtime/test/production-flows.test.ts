@@ -15,60 +15,60 @@ import { TypeDBLiteInterpreter, type TypeDBLiteValue } from '../src/interpreter.
 
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
 const read = (name: string) => readFileSync(join(SCHEMAS, name), 'utf8');
-const skillsSchema = read('skills.schema.typeqlite');
-const iamSchema = read('iam.schema.typeqlite');
+const skillsSchema = read('tracker.schema.typeqlite');
+const iamSchema = read('people.schema.typeqlite');
 
 const value = (row: Record<string, TypeDBLiteValue>, name: string) =>
   row[name]?.asString() ?? null;
 
-describe('IAM flows', () => {
+describe('people and team flows', () => {
   let db: TypeDBLiteInterpreter;
   beforeEach(() => {
     db = new TypeDBLiteInterpreter();
     db.define(iamSchema);
   });
 
-  // `put $o isa organization, has org-id "x";` — match-or-insert. Running it twice must leave ONE
-  // organization, or the @key would have been violated and the repository would see a spurious
+  // `put $o isa team, has team-id "x";` — match-or-insert. Running it twice must leave ONE
+  // team, or the @key would have been violated and the repository would see a spurious
   // duplicate error on an operation whose whole point is idempotence.
   it('put is idempotent', () => {
-    db.execute('put $o isa organization, has org-id "org-1";');
+    db.execute('put $o isa team, has team-id "org-1";');
     assert.doesNotThrow(() =>
-      db.execute('put $o isa organization, has org-id "org-1";'),
+      db.execute('put $o isa team, has team-id "org-1";'),
     );
     const { rows } = db.query(
-      'match $o isa organization, has org-id $id;\nselect $id;',
+      'match $o isa team, has team-id $id;\nselect $id;',
     );
     assert.equal(rows.length, 1);
   });
 
   // The update shape: detach the old attribute, then insert the new one. Two separate pipelines,
-  // exactly as `typedblite-principal.repository.ts` issues them.
+  // exactly as a real repository issues them.
   it('updates an attribute by delete-then-insert, leaving one value', () => {
     db.execute(
-      'insert $p isa principal, has principal-id "u-1", has principal-type "user";',
+      'insert $p isa person, has person-id "u-1", has person-kind "user";',
     );
     db.execute(
-      'match $p isa principal, has principal-id "u-1", has principal-type $old;\ndelete $old of $p;',
+      'match $p isa person, has person-id "u-1", has person-kind $old;\ndelete $old of $p;',
     );
     db.execute(
-      'match $p isa principal, has principal-id "u-1";\ninsert $p has principal-type "admin";',
+      'match $p isa person, has person-id "u-1";\ninsert $p has person-kind "admin";',
     );
     const { rows } = db.query(
-      'match $p isa principal, has principal-id "u-1", has principal-type $type;\nselect $type;',
+      'match $p isa person, has person-id "u-1", has person-kind $type;\nselect $type;',
     );
-    assert.equal(rows.length, 1, 'exactly one principal-type must remain');
+    assert.equal(rows.length, 1, 'exactly one person-kind must remain');
     assert.equal(value(rows[0], 'type'), 'admin');
   });
 
   // `links` with two roles, plus attributes on the relation itself.
   it('inserts a membership relation with links and its own attributes', () => {
     db.execute(
-      'insert $p isa principal, has principal-id "u-1", has principal-type "user";',
+      'insert $p isa person, has person-id "u-1", has person-kind "user";',
     );
-    db.execute('put $o isa organization, has org-id "org-1";');
+    db.execute('put $o isa team, has team-id "org-1";');
     db.execute(
-      'match\n  $p isa principal, has principal-id "u-1";\n  $o isa organization, has org-id "org-1";\ninsert $m isa membership, links (member: $p, org: $o), has membership-key "u-1::org-1", has role-name "owner";',
+      'match\n  $p isa person, has person-id "u-1";\n  $o isa team, has team-id "org-1";\ninsert $m isa membership, links (member: $p, team: $o), has membership-key "u-1::org-1", has role-name "owner";',
     );
     const { rows } = db.query(
       'match $m isa membership, has membership-key "u-1::org-1", has role-name $role;\nselect $role;',
@@ -78,43 +78,43 @@ describe('IAM flows', () => {
   });
 });
 
-describe('Skills projection flows', () => {
+describe('task-log projection flows', () => {
   let db: TypeDBLiteInterpreter;
   beforeEach(() => {
     db = new TypeDBLiteInterpreter();
     db.define(skillsSchema);
   });
 
-  // 🔴 `skills-projection-target.ts`'s idempotency: delete then insert, re-run on every
+  // 🔴 a projection's idempotency: delete then insert, re-run on every
   // redelivered change. A change is redelivered whenever the process stops between `persist` and
   // the checkpoint — the SAFE side of that ordering, so this is the normal path, not the edge.
-  it('delete-then-insert an invocation is idempotent across replays', () => {
+  it('delete-then-insert an iteration is idempotent across replays', () => {
     for (let replay = 0; replay < 3; replay++) {
       db.execute(
-        'match $i isa invocation, has workflow-id "wf-1";\ndelete $i;',
+        'match $i isa iteration, has iteration-id "wf-1";\ndelete $i;',
       );
-      db.execute('insert $i isa invocation, has workflow-id "wf-1";');
+      db.execute('insert $i isa iteration, has iteration-id "wf-1";');
     }
     const { rows } = db.query(
-      'match $i isa invocation, has workflow-id $id;\nselect $id;',
+      'match $i isa iteration, has iteration-id $id;\nselect $id;',
     );
-    assert.equal(rows.length, 1, 'three replays must leave one invocation');
+    assert.equal(rows.length, 1, 'three replays must leave one iteration');
   });
 
   // The three-role relation, which nothing had exercised.
   it('inserts a three-role relation and traverses it', () => {
-    db.execute('insert $i isa invocation, has workflow-id "wf-1";');
+    db.execute('insert $i isa iteration, has iteration-id "wf-1";');
     db.execute(
-      'insert $st isa skill-step, has step-id "s-1", has ordinal 1, has step-kind "operation";',
+      'insert $st isa task, has task-id "s-1", has ordinal 1, has task-kind "operation";',
     );
     db.execute(
-      'insert $r isa output-record, has output-key "wf-1::s-1::f", has output-field "f", has output-value "v";',
+      'insert $r isa log-entry, has log-key "wf-1::s-1::f", has log-field "f", has log-value "v";',
     );
     db.execute(
-      'match\n  $r isa output-record, has output-key "wf-1::s-1::f";\n  $i isa invocation, has workflow-id "wf-1";\n  $st isa skill-step, has step-id "s-1";\ninsert (record: $r, invocation: $i, step: $st) isa step-output;',
+      'match\n  $r isa log-entry, has log-key "wf-1::s-1::f";\n  $i isa iteration, has iteration-id "wf-1";\n  $st isa task, has task-id "s-1";\ninsert (record: $r, iteration: $i, task: $st) isa task-log;',
     );
     const { rows } = db.query(
-      'match\n  $i isa invocation, has workflow-id "wf-1";\n  $st isa skill-step, has step-id "s-1";\n  $r isa output-record, has output-key $k, has output-value $v;\n  (record: $r, invocation: $i, step: $st) isa step-output;\nselect $k, $v;',
+      'match\n  $i isa iteration, has iteration-id "wf-1";\n  $st isa task, has task-id "s-1";\n  $r isa log-entry, has log-key $k, has log-value $v;\n  (record: $r, iteration: $i, task: $st) isa task-log;\nselect $k, $v;',
     );
     assert.equal(rows.length, 1);
     assert.equal(value(rows[0], 'v'), 'v');
@@ -123,46 +123,46 @@ describe('Skills projection flows', () => {
   // Deleting a thing that still plays a role: TypeDB removes the relation with it. Without that,
   // the role_player foreign key refuses the delete and the replay above breaks on its second pass.
   it('deleting a thing removes the relations it played a role in', () => {
-    db.execute('insert $i isa invocation, has workflow-id "wf-1";');
+    db.execute('insert $i isa iteration, has iteration-id "wf-1";');
     db.execute(
-      'insert $st isa skill-step, has step-id "s-1", has ordinal 1, has step-kind "operation";',
+      'insert $st isa task, has task-id "s-1", has ordinal 1, has task-kind "operation";',
     );
     db.execute(
-      'insert $r isa output-record, has output-key "k", has output-field "f", has output-value "v";',
+      'insert $r isa log-entry, has log-key "k", has log-field "f", has log-value "v";',
     );
     db.execute(
-      'match\n  $r isa output-record, has output-key "k";\n  $i isa invocation, has workflow-id "wf-1";\n  $st isa skill-step, has step-id "s-1";\ninsert (record: $r, invocation: $i, step: $st) isa step-output;',
+      'match\n  $r isa log-entry, has log-key "k";\n  $i isa iteration, has iteration-id "wf-1";\n  $st isa task, has task-id "s-1";\ninsert (record: $r, iteration: $i, task: $st) isa task-log;',
     );
     assert.doesNotThrow(() =>
-      db.execute('match $i isa invocation, has workflow-id "wf-1";\ndelete $i;'),
+      db.execute('match $i isa iteration, has iteration-id "wf-1";\ndelete $i;'),
     );
     const { rows } = db.query(
-      'match $i isa invocation, has workflow-id $id;\nselect $id;',
+      'match $i isa iteration, has iteration-id $id;\nselect $id;',
     );
     assert.equal(rows.length, 0);
   });
 
   // A match with two independently-bound variables joined by a relation must not produce a
-  // cross-product — the wrong step would come back attached to the wrong skill.
+  // cross-product — the wrong step would come back attached to the wrong project.
   it('a relation constrains which combination of bindings survives', () => {
-    for (const [skill, step] of [
-      ['start-session', 'ss-1'],
-      ['start-mvp-iteration', 'mvp-1'],
+    for (const [project, step] of [
+      ['website-relaunch', 'ss-1'],
+      ['content-migration', 'mvp-1'],
     ]) {
       db.execute(
-        `insert $s isa skill, has skill-id "${skill}", has skill-name "n", has skill-description "d";`,
+        `insert $s isa project, has project-id "${project}", has project-name "n", has project-summary "d";`,
       );
       db.execute(
-        `insert $st isa skill-step, has step-id "${step}", has ordinal 1, has step-kind "operation";`,
+        `insert $st isa task, has task-id "${step}", has ordinal 1, has task-kind "operation";`,
       );
       db.execute(
-        `match\n  $s isa skill, has skill-id "${skill}";\n  $st isa skill-step, has step-id "${step}";\ninsert (owner: $s, step: $st) isa skill-composition;`,
+        `match\n  $s isa project, has project-id "${project}";\n  $st isa task, has task-id "${step}";\ninsert (owner: $s, task: $st) isa project-task;`,
       );
     }
     const { rows } = db.query(
-      'match\n  $s isa skill, has skill-id "start-session";\n  $st isa skill-step, has step-id $id;\n  (owner: $s, step: $st) isa skill-composition;\nselect $id;',
+      'match\n  $s isa project, has project-id "website-relaunch";\n  $st isa task, has task-id $id;\n  (owner: $s, task: $st) isa project-task;\nselect $id;',
     );
-    assert.equal(rows.length, 1, 'only the step composed into that skill');
+    assert.equal(rows.length, 1, 'only the step composed into that project');
     assert.equal(value(rows[0], 'id'), 'ss-1');
   });
 });
@@ -182,7 +182,7 @@ describe('unsupported TypeQLite throws rather than silently succeeding', () => {
     const db = new TypeDBLiteInterpreter();
     assert.doesNotThrow(() =>
       db.define(
-        'define attribute skill-id, value string; entity skill, owns skill-id @key;',
+        'define attribute project-id, value string; entity project, owns project-id @key;',
       ),
     );
   });
@@ -205,10 +205,10 @@ describe('correctness details the flows above do not reach', () => {
     const db = new TypeDBLiteInterpreter();
     db.define(skillsSchema);
     db.execute(
-      'insert $s isa skill, has skill-id "s", has skill-name "n", has skill-description "d";',
+      'insert $s isa project, has project-id "s", has project-name "n", has project-summary "d";',
     );
     const { rows } = db.query(
-      'match $s isa skill, has skill-id "s", has skill-name $n;\nselect $n;',
+      'match $s isa project, has project-id "s", has project-name $n;\nselect $n;',
     );
     assert.equal(rows[0]['nonexistent'], undefined);
   });
@@ -226,16 +226,16 @@ describe('correctness details the flows above do not reach', () => {
     const db = new TypeDBLiteInterpreter();
     db.define(iamSchema);
     db.execute(
-      'insert $p isa principal, has principal-id "u-1", has principal-type "user";',
+      'insert $p isa person, has person-id "u-1", has person-kind "user";',
     );
     assert.throws(() =>
       db.execute(
-        'insert $p isa principal, has principal-id "u-1", has principal-type "user";',
+        'insert $p isa person, has person-id "u-1", has person-kind "user";',
       ),
     );
     const { rows } = db.query(
-      'match $p isa principal, has principal-type $t;\nselect $t;',
+      'match $p isa person, has person-kind $t;\nselect $t;',
     );
-    assert.equal(rows.length, 1, 'the failed insert must not have left a partial principal');
+    assert.equal(rows.length, 1, 'the failed insert must not have left a partial person');
   });
 });

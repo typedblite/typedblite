@@ -127,7 +127,7 @@ Sorting is done in JavaScript. The consuming API is five methods: `define`, `exe
 
 - 🔴 **`@key` semantics are not identical, and the difference is real.** The generator emits a
   unique index on the attribute *type*, making a value globally unique. TypeDB's `@key` is unique
-  *per owning type* and also mandatory. Today these coincide — `step-id`'s own comment says it is
+  *per owning type* and also mandatory. Today these coincide — `task-id`'s own comment says it is
   deliberately globally unique — but a schema where two entity types own the same attribute type
   would expose the gap. Closing it needs the owner's type on the `attr` row.
 - 🔴 **Deletion semantics differ.** `role_player.rel` cascades, `role_player.player` does not, so

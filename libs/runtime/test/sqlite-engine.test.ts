@@ -16,7 +16,7 @@ describe('SqliteEngine', () => {
   // A real schema from the workspace, as the sibling suites use — a hand-written one would be a
   // second dialect to keep in step with the parser.
   const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
-  const schema = readFileSync(join(SCHEMAS, 'skills.schema.typeqlite'), 'utf8');
+  const schema = readFileSync(join(SCHEMAS, 'tracker.schema.typeqlite'), 'utf8');
 
   it('starts with no schema, and reports one after define', async () => {
     const engine = new SqliteEngine();
@@ -37,9 +37,9 @@ describe('SqliteEngine', () => {
     await engine.define(schema);
 
     await engine.execute(
-      'insert $s isa skill, has skill-id "s-1", has skill-name "One", has skill-description "d";',
+      'insert $s isa project, has project-id "s-1", has project-name "One", has project-summary "d";',
     );
-    const { rows } = await engine.query('match $s isa skill, has skill-id $i; select $i;');
+    const { rows } = await engine.query('match $s isa project, has project-id $i; select $i;');
 
     expect(rows).toHaveLength(1);
   });
@@ -54,7 +54,7 @@ describe('SqliteEngine', () => {
     await engine.define(schema);
 
     const report = await engine.execute(
-      'insert $s isa skill, has skill-id "s-2", has skill-name "Two", has skill-description "d";',
+      'insert $s isa project, has project-id "s-2", has project-name "Two", has project-summary "d";',
     );
 
     expect(report).toBeDefined();

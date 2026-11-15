@@ -237,7 +237,7 @@ export class TypeDBLiteValue {
    * 🔴 Throws rather than coercing, matching the driver. `rowString` cannot read a numeric
    * attribute because `asString()` throws there; `rowNumber` tries `asInteger` first and falls
    * through to `asDouble`. Coercing here would make `rowNumber` return a number for a genuinely
-   * non-numeric attribute and quietly break that distinction — found by the Skills schema's
+   * non-numeric attribute and quietly break that distinction — found by a real schema's
    * `ordinal`.
    */
   asInteger(): number {
@@ -346,7 +346,7 @@ const SUBTYPES_OF =
 
 /**
  * What the engine did for ONE `query()` call — counts, never times, so a regression test can
- * assert that a join is not a cartesian product (the Skills-catalog performance defect: one
+ * assert that a join is not a cartesian product (a real performance defect: one
  * `subSkillsIn` call evaluated ~211,000 combinations and took 32 s).
  *
  * Off by default and then costs nothing: no proxy wraps the database and every hook is a single
@@ -365,6 +365,8 @@ export interface QueryTrace {
   /** `candidates()` lookups, and the rows they returned. */
   candidatesCalls: number;
   candidateRows: number;
+  /** Rows the relation lookups read (`findRelationsCalls`): role-player combinations, before they are bound. */
+  relationRows: number;
   /** SQLite statements prepared and executed (`all`/`get`/`run`/`exec`) during the query. */
   statementsPrepared: number;
   statementsExecuted: number;
@@ -395,6 +397,7 @@ const newTrace = (): QueryTrace => ({
   findRelationsCalls: 0,
   candidatesCalls: 0,
   candidateRows: 0,
+  relationRows: 0,
   statementsPrepared: 0,
   statementsExecuted: 0,
 });
@@ -477,7 +480,7 @@ interface ThingConstraint {
   range?: Range;
   /** `$x iid 0x…` — the one concept with that iid (`iid.ts`); a thing's narrows the candidates. */
   iids?: string[];
-  /** `has skill-id "x"` — narrows the candidates. */
+  /** `has project-id "x"` — narrows the candidates. */
   literals: Array<{
     attribute: string;
     value: string;
@@ -489,7 +492,7 @@ interface ThingConstraint {
      */
     alternatives?: Array<{ type: string; value: string }>;
   }>;
-  /** `has skill-name $n` — projected into the result. `has $a` names no attribute type: any. */
+  /** `has project-name $n` — projected into the result. `has $a` names no attribute type: any. */
   bindings: Array<{ attribute?: string; variable: string; range?: Range }>;
   /**
    * `$n isa name "John"` — an ATTRIBUTE instance (ADR-006), not a thing. The constraint's own
@@ -507,7 +510,7 @@ interface ThingConstraint {
     readonly valueVariable?: string;
     readonly range?: Range;
   };
-  /** `$r isa step-dependency (dependent: $d, ...)` — the relation's own role players. */
+  /** `$r isa task-dependency (dependent: $d, ...)` — the relation's own role players. */
   roles: Array<{
     /** `(employee: $p)` names it; `($p)` leaves it to the schema — any role in a match. */
     role?: string;
@@ -1624,7 +1627,7 @@ export class TypeDBLiteInterpreter {
               (other) => other.variable !== constraint.variable && other.roles.some((role) => role.player === constraint.variable),
             );
             if (boundByOuterRelation) continue;
-            if (this.relationBindings({ ...constraint, isas: resolveIsas(constraint.isas, {}) }, {}).length !== 0) continue;
+            if (this.relationBindings({ ...constraint, isas: resolveIsas(constraint.isas, {}) }, {}, true).length !== 0) continue;
             this.diagnostics.fact(
               DiagnosticCode.noCandidates,
               `\`${constraint.isas.filter((isa) => isa.type !== undefined).map((isa) => `isa${isa.exact ? '!' : ''} ${isa.type}`).join(', ')}\` matched ${this.candidateCount(constraint)} candidate(s) before ` +
@@ -3215,12 +3218,12 @@ export class TypeDBLiteInterpreter {
       //
       // `TypeDBLitePrincipalRepository.findById` writes exactly this:
       //
-      //     match $p isa principal, has principal-id "s";
-      //           $p has principal-id $id, has principal-type $type;
+      //     match $p isa person, has person-id "s";
+      //           $p has person-id $id, has person-kind $type;
       //
       // Two patterns, one `$p`. Treating them as separate constraints let the second — which has
-      // no `isa` and no literal, so it matches every principal — overwrite the first, and
-      // `findById('s')` returned whichever principal came first. Merging by variable is what makes
+      // no `isa` and no literal, so it matches every person — overwrite the first, and
+      // `findById('s')` returned whichever person came first. Merging by variable is what makes
       // the second pattern a projection of the thing the first one found.
       const existing = constraints.find((c) => c.variable === constraint.variable);
       if (existing) {
@@ -3236,7 +3239,7 @@ export class TypeDBLiteInterpreter {
     }
     // 🔴 After merging, not during. `constraintsOf` folds every pattern naming a variable into one
     // constraint, and the `isa` may arrive in a later pattern than the `has` — checking mid-walk
-    // would accuse `$p has principal-type "user";` of naming an unowned attribute purely because
+    // would accuse `$p has person-kind "user";` of naming an unowned attribute purely because
     // its type had not been seen yet.
     for (const constraint of constraints) this.checkOwns(constraint, statement);
     if (statement === 'match') for (const constraint of constraints) this.checkRelationRoles(constraint, constraints);
@@ -3708,7 +3711,7 @@ export class TypeDBLiteInterpreter {
     // in the schema and nowhere else.
     //
     // 🔴 **One literal drives; the rest are probed.** Each literal used to be its own `t.iid IN
-    // (owners of the value)`, and SQLite materialises every such list — so `has skill-id "x", has
+    // (owners of the value)`, and SQLite materialises every such list — so `has project-id "x", has
     // revision "r1"` read every owner of `r1` (thousands) to intersect with the one owner of `x`:
     // 5 ms where 0.017 ms suffices (docs/development/performance.md, finding 5). SQLite cannot tell
     // which list is short without `ANALYZE` statistics, so `literalOrder` asks: a count of each
@@ -3795,7 +3798,7 @@ export class TypeDBLiteInterpreter {
    * `relation-join-planning-differential.test.ts` holds the two to the same answers.
    *
    * Still no cost model: the order is the query's order, and a variable no relation reaches is
-   * enumerated whole. The Skills catalog's `subSkillsIn` was 211,000 combinations and 32 s before
+   * enumerated whole. A real nested-project query was 211,000 combinations and 32 s before
    * this; it is 59 combinations now (`relation-join-planning.test.ts` asserts the counts).
    */
   /**
@@ -3885,8 +3888,8 @@ export class TypeDBLiteInterpreter {
     // type variables), so it can run the moment they are bound instead of after every thing
     // variable is. The combinations it drops are exactly the ones the final filter would drop --
     // a filter keeps order, and the binding order of the thing variables is unchanged -- so the
-    // rows are the same rows in the same order. Without this, `$st isa skill-step; $child isa
-    // skill; $r isa sub-workflow (parent-step: $st, child-skill: $child)` was 1,209 x 175
+    // rows are the same rows in the same order. Without this, `$st isa task; $child isa
+    // project; $r isa subproject (parent-task: $st, child-project: $child)` was 1,209 x 175
     // combinations, each its own SQL statement, to find nine rows.
     const filtered = new Set<ThingConstraint>();
     const pushDownRelations = (): void => {
@@ -3935,7 +3938,7 @@ export class TypeDBLiteInterpreter {
     }
 
     // 🔴 One combination per attribute VALUE, not per owner. An attribute may hold several values
-    // — a Skill step owning two `output-field`s is the live case — and TypeQLite yields a row for
+    // — a task owning two `log-field`s is the live case — and TypeQLite yields a row for
     // each. Until Phase 06 `project()` expanded them; a `let` reads them, so the combination
     // carries them. A variable two patterns bind (`$x has name $n; $y has name $n`) joins on
     // the value.
@@ -4477,6 +4480,9 @@ export class TypeDBLiteInterpreter {
   private relationBindings(
     relation: ThingConstraint,
     combination: Record<string, Binding>,
+    // Only whether there is ANY way: stop at the first row instead of reading them all. For the callers
+    // that ask `.length > 0`, where a relation type with many instances would otherwise be read whole.
+    existenceOnly = false,
   ): Array<Record<string, Binding>> {
     if (this.trace) this.trace.findRelationsCalls++;
     const params: Array<string | number> = [];
@@ -4606,16 +4612,20 @@ export class TypeDBLiteInterpreter {
       // `($r: $x)` — the role each slot plays, and the relation's type to name its declaring relation.
       ...(roleVariables ? ['t.type AS relationType', ...relation.roles.map((_, index) => `rp${index}.role AS r${index}`)] : []),
     ].join(', ');
-    const rows = this.db
-      .prepare(
-        `SELECT DISTINCT ${columns} FROM thing t ${joins}` +
-          `${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`,
-      )
-      .all(...params) as Array<Record<string, number>>;
-
     // (Phase 05) `$r isa $t (employee: $x)` with `$t` unbound — every relation this found rebinds
     // it, one row per candidate type, as `bindTypeVariables` does for an entity.
     const unbound = relation.isas.filter((isa) => isa.typeVariable !== undefined && isa.type === undefined);
+
+    // 🔴 One row answers "is there any?" only when every row found yields a binding. A role variable
+    // or an unbound type variable can still reject a row below, so those read every row as before.
+    const firstRowDecides = existenceOnly && !roleVariables && unbound.length === 0;
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT ${columns} FROM thing t ${joins}` +
+          `${where.length ? ` WHERE ${where.join(' AND ')}` : ''}${firstRowDecides ? ' LIMIT 1' : ''}`,
+      )
+      .all(...params) as Array<Record<string, number>>;
+    if (this.trace) this.trace.relationRows += rows.length;
 
     return rows.flatMap((row) => {
       const next: Record<string, Binding> = { ...combination };
@@ -4634,7 +4644,7 @@ export class TypeDBLiteInterpreter {
         if (already !== undefined && already !== label) return [];
         next[role.roleVariable] = label;
       }
-      // A named relation variable binds too, so `$r isa step-dependency (...)` is usable later.
+      // A named relation variable binds too, so `$r isa task-dependency (...)` is usable later.
       // The anonymous form has no name anybody wrote, so nothing should be able to select it — and
       // `iid` is not in the row for it either, which is what keeps the answer from doubling.
       if (!named) return [next];
@@ -4649,7 +4659,7 @@ export class TypeDBLiteInterpreter {
     combination: Record<string, Binding>,
   ): boolean {
     if (this.trace) this.trace.relationHoldsCalls++;
-    return this.relationBindings(relation, combination).length > 0;
+    return this.relationBindings(relation, combination, true).length > 0;
   }
 
   // ── projection ────────────────────────────────────────────────────────────
@@ -5314,7 +5324,7 @@ export class TypeDBLiteInterpreter {
         this.insertRoles(relation, constraint.roles, bindings);
       }
 
-      // `$p has principal-type "user"` with no `isa` — attach to the already-bound thing.
+      // `$p has person-kind "user"` with no `isa` — attach to the already-bound thing.
       const owner = bindings.get(constraint?.variable ?? '')?.[0];
       if (owner === undefined) return;
       // 🔴 The check above saw no `isa`, so it saw no type and returned early — this form wrote
@@ -5714,7 +5724,7 @@ export class TypeDBLiteInterpreter {
     // 🔴 A deleted thing leaves every relation it played in — and a relation is deleted with it only
     // when that leaves it with no player at all (delete.feature L408: deleting Alex keeps Alex's
     // friendship with Bob, which TypeDB 3.10.4 confirms). It used to delete every such relation
-    // outright; `skills-projection-target.ts`'s delete-then-insert of an invocation relied on that
+    // outright; a projection's delete-then-insert of an iteration relied on that
     // when its relation had the deleted thing as its ONLY player, which is still what happens.
     const playedIn = (this.db.prepare('SELECT DISTINCT rel FROM role_player WHERE player = ? AND rel <> ?').all(iid, iid) as Array<{ rel: number }>).map((row) => Number(row.rel));
     const own = this.changeLog.identify(iid);

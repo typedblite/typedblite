@@ -10,10 +10,10 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 import { replicateOnce } from '../src/replicator.js';
-import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
+import { readKeyedTrackerSchema } from './fixtures/keyed-tracker-schema.js';
 
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
-const schema = readKeyedSkillsSchema(join(SCHEMAS, 'skills.schema.typeqlite'));
+const schema = readKeyedTrackerSchema(join(SCHEMAS, 'tracker.schema.typeqlite'));
 
 const node = () => {
   const db = new TypeDBLiteInterpreter(':memory:');
@@ -22,11 +22,11 @@ const node = () => {
 };
 
 const addSkill = (db: TypeDBLiteInterpreter, id: string, name: string) =>
-  db.execute(`insert $s isa skill, has skill-id "${id}", has skill-name "${name}";`);
+  db.execute(`insert $s isa project, has project-id "${id}", has project-name "${name}";`);
 
 const skillNames = (db: TypeDBLiteInterpreter) =>
   db
-    .query('match $s isa skill, has skill-id $id; select $id;')
+    .query('match $s isa project, has project-id $id; select $id;')
     .rows.map((row) => row['id']?.asString())
     .sort();
 
@@ -88,7 +88,7 @@ describe('a replicated revision becomes queryable, not just recorded', () => {
 
     // The point: `match` sees it, not only `stateOf`.
     const rows = local.query(
-      'match $s isa skill, has skill-id "r-1", has skill-name $n; select $n;',
+      'match $s isa project, has project-id "r-1", has project-name $n; select $n;',
     ).rows;
     assert.equal(rows[0]?.['n']?.asString(), 'Remote');
     local.close();
@@ -122,7 +122,7 @@ describe('a replicated revision becomes queryable, not just recorded', () => {
     replicateOnce(local.changeLog, remote.changeLog, { direction: 'pull' });
     assert.deepEqual(skillNames(local), ['r-1']);
 
-    remote.execute('match $s isa skill, has skill-id "r-1"; delete $s;');
+    remote.execute('match $s isa project, has project-id "r-1"; delete $s;');
     replicateOnce(local.changeLog, remote.changeLog, { direction: 'pull' });
 
     assert.deepEqual(skillNames(local), [], 'a replicated delete must delete');
@@ -135,7 +135,7 @@ describe('a replicated revision becomes queryable, not just recorded', () => {
     const remote = node();
     addSkill(local, 's-1', 'A');
     replicateOnce(local.changeLog, remote.changeLog, { direction: 'duplex' });
-    local.execute('match $s isa skill, has skill-id "s-1"; delete $s;');
+    local.execute('match $s isa project, has project-id "s-1"; delete $s;');
     replicateOnce(local.changeLog, remote.changeLog, { direction: 'duplex' });
     replicateOnce(local.changeLog, remote.changeLog, { direction: 'duplex' });
 
@@ -154,17 +154,17 @@ describe('conflicts survive replication rather than being resolved by it', () =>
     replicateOnce(local.changeLog, remote.changeLog, { direction: 'duplex' });
 
     // Now both edit the same entity without seeing each other.
-    local.execute('match $s isa skill, has skill-id "s-1"; insert $s has skill-description "mine";');
+    local.execute('match $s isa project, has project-id "s-1"; insert $s has project-summary "mine";');
     remote.execute(
-      'match $s isa skill, has skill-id "s-1"; insert $s has skill-description "theirs";',
+      'match $s isa project, has project-id "s-1"; insert $s has project-summary "theirs";',
     );
 
     const outcome = replicateOnce(local.changeLog, remote.changeLog, { direction: 'duplex' });
 
     assert.equal(outcome.conflicts, 1, 'the losing revision must be reported');
     assert.equal(
-      local.changeLog.winnerOf('skill/s-1')?.rev,
-      remote.changeLog.winnerOf('skill/s-1')?.rev,
+      local.changeLog.winnerOf('project/s-1')?.rev,
+      remote.changeLog.winnerOf('project/s-1')?.rev,
       'both sides must agree on the winner',
     );
     local.close();

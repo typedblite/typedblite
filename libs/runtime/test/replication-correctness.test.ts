@@ -35,7 +35,7 @@
  * cursor by hand, so it never exercised the reporting it existed to prove.
  *
  * 🔴 **Five others pass against the unfixed code, and are labelled rather than quietly counted.**
- * Three state a premise or a mechanism (`the skills schema really does have keyless relations`,
+ * Three state a premise or a mechanism (`the tracker schema really does have keyless relations`,
  * `two nodes give the same logical relation the same id`, `a keyless relation is never sent over
  * the wire`); two guard a choice made *by* the fix and so have nothing to fail against yet
  * (`composes with an outer transaction`, `a re-projection cycle terminates`). Counting those among
@@ -55,7 +55,7 @@ import { isReplicable } from '../src/canonical.js';
 import { serveChangeStream } from '../src/change-stream.js';
 import { ChangeStreamClient } from '../src/change-stream-client.js';
 import { TypeDBLiteReplicator } from '../src/typedblite-replicator.js';
-import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
+import { readKeyedTrackerSchema } from './fixtures/keyed-tracker-schema.js';
 import { computeRevision } from '../src/revision.js';
 import type { EntityState } from '../src/canonical.js';
 
@@ -68,13 +68,13 @@ const remote = <R extends { entityId: string; parentRev: string | null; deleted:
 });
 
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
-const SCHEMA = readKeyedSkillsSchema(join(SCHEMAS, 'skills.schema.typeqlite'));
+const SCHEMA = readKeyedTrackerSchema(join(SCHEMAS, 'tracker.schema.typeqlite'));
 /**
  * 🔴 `membership` is this repository's only relation that carries `@key`, and therefore the only
- * one that replicates at all once a keyless id is refused. Every relation in the skills schema is
+ * one that replicates at all once a keyless id is refused. Every relation in the tracker schema is
  * keyless — see the first case in Tier 1 — so the deferred-edge case can only be reached here.
  */
-const IAM_SCHEMA = readFileSync(join(SCHEMAS, 'iam.schema.typeqlite'), 'utf8');
+const IAM_SCHEMA = readFileSync(join(SCHEMAS, 'people.schema.typeqlite'), 'utf8');
 
 const freshIam = () => {
   const db = new TypeDBLiteInterpreter(':memory:');
@@ -92,21 +92,21 @@ const fresh = () => {
   return db;
 };
 
-/** A `skill` and two `skill-step`s, joined by the keyless `skill-composition` relation. */
+/** A `project` and two `task`s, joined by the keyless `project-task` relation. */
 const withComposition = (db: TypeDBLiteInterpreter) => {
-  db.execute('insert $s isa skill, has skill-id "s-1", has skill-name "A";');
-  db.execute('insert $t isa skill-step, has step-id "step-1", has ordinal 1;');
+  db.execute('insert $s isa project, has project-id "s-1", has project-name "A";');
+  db.execute('insert $t isa task, has task-id "step-1", has ordinal 1;');
   db.execute(
-    'match $s isa skill, has skill-id "s-1"; $t isa skill-step, has step-id "step-1";' +
-      'insert (owner: $s, step: $t) isa skill-composition;',
+    'match $s isa project, has project-id "s-1"; $t isa task, has task-id "step-1";' +
+      'insert (owner: $s, task: $t) isa project-task;',
   );
 };
 
 describe('Tier 1 — identity, which the feature claimed and did not enforce', () => {
-  it('🔴 the skills schema really does have keyless relations, so this is not hypothetical', () => {
+  it('🔴 the tracker schema really does have keyless relations, so this is not hypothetical', () => {
     // The premise of every case below. If a future schema change gave these relations a @key the
     // findings would be unreachable and these tests would be testing nothing — so assert it.
-    const keyless = ['skill-composition', 'sub-workflow', 'step-dependency', 'step-output'];
+    const keyless = ['project-task', 'subproject', 'task-dependency', 'task-log'];
     for (const relation of keyless) {
       const block = SCHEMA.slice(SCHEMA.indexOf(`relation ${relation},`));
       const body = block.slice(0, block.indexOf(';'));
@@ -121,7 +121,7 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
     // 🔴 The reachable half of the identity finding, and the one that mattered.
     //
     // A keyless *relation* takes its own id from `last_insert_rowid()` — measured here, the
-    // `skill-composition` above is `local:skill-composition/3`. Its role players are keyed and
+    // `project-task` above is `local:project-task/3`. Its role players are keyed and
     // encode correctly, so nothing about the record looks wrong; the id itself is the corruption.
     // It was logged, pushed and applied like any other, so two nodes' unrelated relations merged
     // under one id, and because `localIid` cannot resolve a `local:` id, every arriving revision
@@ -131,7 +131,7 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
 
     const relations = db.changeLog
       .since(0)
-      .filter((c) => c.state?.type === 'skill-composition');
+      .filter((c) => c.state?.type === 'project-task');
     assert.ok(relations.length > 0, 'precondition: the relation is logged locally');
     for (const record of relations) {
       assert.ok(
@@ -164,7 +164,7 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
     const landed = hubDb.changeLog.since(0, 10_000).map((c) => c.entityId).sort();
     assert.deepEqual(
       landed,
-      ['skill-step/step-1', 'skill/s-1'],
+      ['project/s-1', 'task/step-1'],
       'the keyed entities must arrive and the local-only relation must not',
     );
 
@@ -180,15 +180,15 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
     withComposition(a);
 
     const b = fresh();
-    b.execute('insert $s isa skill, has skill-id "s-99", has skill-name "Z";');
-    b.execute('insert $t isa skill-step, has step-id "step-99", has ordinal 9;');
+    b.execute('insert $s isa project, has project-id "s-99", has project-name "Z";');
+    b.execute('insert $t isa task, has task-id "step-99", has ordinal 9;');
     b.execute(
-      'match $s isa skill, has skill-id "s-99"; $t isa skill-step, has step-id "step-99";' +
-        'insert (owner: $s, step: $t) isa skill-composition;',
+      'match $s isa project, has project-id "s-99"; $t isa task, has task-id "step-99";' +
+        'insert (owner: $s, task: $t) isa project-task;',
     );
 
     const idOf = (db: TypeDBLiteInterpreter) =>
-      db.changeLog.since(0).find((c) => c.state?.type === 'skill-composition')?.entityId;
+      db.changeLog.since(0).find((c) => c.state?.type === 'project-task')?.entityId;
 
     assert.equal(
       idOf(a),
@@ -213,17 +213,17 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
     const raw = handleOf(db);
 
     const keyless = raw
-      .prepare("SELECT iid FROM thing WHERE type = 'skill-composition' LIMIT 1")
+      .prepare("SELECT iid FROM thing WHERE type = 'project-task' LIMIT 1")
       .get() as { iid: number } | undefined;
     assert.ok(keyless, 'precondition: a keyless thing exists');
 
-    raw.exec("INSERT INTO thing(type) VALUES ('sub-workflow')");
+    raw.exec("INSERT INTO thing(type) VALUES ('subproject')");
     const host = Number(
       (raw.prepare('SELECT last_insert_rowid() AS iid').get() as { iid: number }).iid,
     );
     raw
       .prepare('INSERT INTO role_player(rel, role, player) VALUES (?, ?, ?)')
-      .run(host, 'parent-step', Number(keyless.iid));
+      .run(host, 'parent-task', Number(keyless.iid));
 
     const identity = db.changeLog.identify(host);
     assert.ok(identity, 'the host relation still resolves');
@@ -239,11 +239,11 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
     const db = fresh();
     const before = db.changeLog.since(0).length;
     const accepted = db.changeLog.applyRemote({
-      entityId: 'local:skill-composition/1',
+      entityId: 'local:project-task/1',
       rev: '1-abc',
       parentRev: null,
       deleted: false,
-      state: { type: 'skill-composition', attributes: [], roles: [] },
+      state: { type: 'project-task', attributes: [], roles: [] },
     });
     assert.equal(accepted, false, 'a local: id names a rowid on another node — refuse it');
     assert.equal(
@@ -269,12 +269,12 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
     assert.throws(
       () =>
         log.applyRemote(remote({
-          entityId: 'skill/s-remote',
+          entityId: 'project/s-remote',
           parentRev: null,
           deleted: false,
           state: {
-            type: 'skill',
-            attributes: [{ type: 'skill-id', value: 's-remote' }],
+            type: 'project',
+            attributes: [{ type: 'project-id', value: 's-remote' }],
             roles: [],
           },
         })),
@@ -283,7 +283,7 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
 
     (log as unknown as { projectWinner: (id: string) => void }).projectWinner = original;
     assert.equal(
-      log.since(0).filter((c) => c.entityId === 'skill/s-remote').length,
+      log.since(0).filter((c) => c.entityId === 'project/s-remote').length,
       0,
       'the change-log row must roll back with the projection, or the entity is stranded forever',
     );
@@ -291,12 +291,12 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
     // And having rolled back, a redelivery still works — which is the point.
     assert.equal(
       log.applyRemote(remote({
-        entityId: 'skill/s-remote',
+        entityId: 'project/s-remote',
         parentRev: null,
         deleted: false,
         state: {
-          type: 'skill',
-          attributes: [{ type: 'skill-id', value: 's-remote' }],
+          type: 'project',
+          attributes: [{ type: 'project-id', value: 's-remote' }],
           roles: [],
         },
       })),
@@ -315,19 +315,19 @@ describe('Tier 1 — identity, which the feature claimed and did not enforce', (
     raw.exec('BEGIN');
     assert.doesNotThrow(() =>
       db.changeLog.applyRemote(remote({
-        entityId: 'skill/s-inner',
+        entityId: 'project/s-inner',
         parentRev: null,
         deleted: false,
         state: {
-          type: 'skill',
-          attributes: [{ type: 'skill-id', value: 's-inner' }],
+          type: 'project',
+          attributes: [{ type: 'project-id', value: 's-inner' }],
           roles: [],
         },
       })),
     );
     raw.exec('COMMIT');
     assert.equal(
-      db.changeLog.since(0).filter((c) => c.entityId === 'skill/s-inner').length,
+      db.changeLog.since(0).filter((c) => c.entityId === 'project/s-inner').length,
       1,
       'and the row must survive the outer commit',
     );
@@ -348,7 +348,7 @@ describe('Tier 2 — loss and corruption under load', () => {
     const total = 620; // > the 500 default, deliberately
     for (let i = 0; i < total; i += 1) {
       spoke.execute(
-        `insert $s isa skill, has skill-id "s-${i}", has skill-name "N${i}";`,
+        `insert $s isa project, has project-id "s-${i}", has project-name "N${i}";`,
       );
     }
     assert.ok(spoke.changeLog.since(0, 10_000).length >= total);
@@ -386,7 +386,7 @@ describe('Tier 2 — loss and corruption under load', () => {
     const name = '🔴 Café — Ünicode ✅ '.repeat(4000);
     const spoke = fresh();
     spoke.execute(
-      `insert $s isa skill, has skill-id "s-utf8", has skill-name "${name}";`,
+      `insert $s isa project, has project-id "s-utf8", has project-name "${name}";`,
     );
 
     const client = new ChangeStreamClient(`http://127.0.0.1:${port}`);
@@ -395,9 +395,9 @@ describe('Tier 2 — loss and corruption under load', () => {
 
     const landed = hubDb.changeLog
       .since(0)
-      .find((c) => c.entityId === 'skill/s-utf8');
+      .find((c) => c.entityId === 'project/s-utf8');
     assert.ok(landed, 'the revision must have landed');
-    const value = landed.state?.attributes.find((a) => a.type === 'skill-name')?.value;
+    const value = landed.state?.attributes.find((a) => a.type === 'project-name')?.value;
     assert.equal(value, name, 'and its text must survive byte-identical');
     assert.ok(!value?.includes('�'), 'no replacement characters');
 
@@ -412,8 +412,8 @@ describe('Tier 2 — loss and corruption under load', () => {
     // dropped data.
     const hubDb = new TypeDBLiteInterpreter(':memory:');
     hubDb.define(SCHEMA);
-    hubDb.execute('insert $s isa skill, has skill-id "s-1", has skill-name "A";');
-    hubDb.execute('insert $s isa skill, has skill-id "s-2", has skill-name "B";');
+    hubDb.execute('insert $s isa project, has project-id "s-1", has project-name "A";');
+    hubDb.execute('insert $s isa project, has project-id "s-2", has project-name "B";');
     const hub = serveChangeStream(hubDb.changeLog, { pollMs: 20 });
     const port = await hub.port;
 
@@ -451,7 +451,7 @@ describe('Round two — findings the fixes themselves introduced', () => {
     // session that has already stopped.
     const hubDb = new TypeDBLiteInterpreter(':memory:');
     hubDb.define(SCHEMA);
-    hubDb.execute('insert $s isa skill, has skill-id "s-1", has skill-name "A";');
+    hubDb.execute('insert $s isa project, has project-id "s-1", has project-name "A";');
     const hub = serveChangeStream(hubDb.changeLog, { pollMs: 20 });
     const port = await hub.port;
 
@@ -491,7 +491,7 @@ describe('Round two — findings the fixes themselves introduced', () => {
 
     const spoke = fresh();
     for (let i = 0; i < 1200; i += 1) {
-      spoke.execute(`insert $s isa skill, has skill-id "s-${i}", has skill-name "N";`);
+      spoke.execute(`insert $s isa project, has project-id "s-${i}", has project-name "N";`);
     }
 
     const replicator = new TypeDBLiteReplicator(spoke.changeLog, `http://127.0.0.1:${port}`, 20);
@@ -547,22 +547,22 @@ describe('Round two — findings the fixes themselves introduced', () => {
         type: 'membership',
         attributes: [{ type: 'membership-key', value: 'p-9::o-9' }],
         roles: [
-          { role: 'member', player: 'principal/p-9' },
-          { role: 'org', player: 'organization/o-9' },
+          { role: 'member', player: 'person/p-9' },
+          { role: 'team', player: 'team/o-9' },
         ],
       },
     }));
 
     // Both players arrive by ordinary local writes, never by replication.
     target.execute(
-      'insert $p isa principal, has principal-id "p-9", has principal-type "user";',
+      'insert $p isa person, has person-id "p-9", has person-kind "user";',
     );
-    target.execute('insert $o isa organization, has org-id "o-9";');
+    target.execute('insert $o isa team, has team-id "o-9";');
 
     const rows = target.query(
-      'match\n  $p isa principal, has principal-id $pid;\n' +
-        '  $o isa organization, has org-id "o-9";\n' +
-        '  $m isa membership, links (member: $p, org: $o);\nselect $pid;',
+      'match\n  $p isa person, has person-id $pid;\n' +
+        '  $o isa team, has team-id "o-9";\n' +
+        '  $m isa membership, links (member: $p, team: $o);\nselect $pid;',
     ).rows;
     assert.equal(rows.length, 1, 'a locally written player must draw the edges waiting on it');
     assert.equal(rows[0]['pid'].asString(), 'p-9');
@@ -579,7 +579,7 @@ describe('Round two — findings the fixes themselves introduced', () => {
 
     const spoke = fresh();
     for (let i = 0; i < 3000; i += 1) {
-      spoke.execute(`insert $s isa skill, has skill-id "s-${i}", has skill-name "N";`);
+      spoke.execute(`insert $s isa project, has project-id "s-${i}", has project-name "N";`);
     }
 
     const replicator = new TypeDBLiteReplicator(spoke.changeLog, `http://127.0.0.1:${port}`, 10);
@@ -617,7 +617,7 @@ describe('Tier 3 — contract and liveness', () => {
     const hubDb = new TypeDBLiteInterpreter(':memory:');
     hubDb.define(SCHEMA);
     for (let i = 0; i < 3; i += 1) {
-      hubDb.execute(`insert $s isa skill, has skill-id "s-${i}", has skill-name "N";`);
+      hubDb.execute(`insert $s isa project, has project-id "s-${i}", has project-name "N";`);
     }
     const hub = serveChangeStream(hubDb.changeLog, { pollMs: 20 });
     const port = await hub.port;
@@ -652,12 +652,12 @@ describe('Tier 3 — contract and liveness', () => {
     // the worst order on purpose: the relation first, both its players afterwards.
     const source = freshIam();
     source.execute(
-      'insert $p isa principal, has principal-id "p-1", has principal-type "user";',
+      'insert $p isa person, has person-id "p-1", has person-kind "user";',
     );
-    source.execute('insert $o isa organization, has org-id "o-1";');
+    source.execute('insert $o isa team, has team-id "o-1";');
     source.execute(
-      'match $p isa principal, has principal-id "p-1"; $o isa organization, has org-id "o-1";' +
-        'insert $m isa membership, links (member: $p, org: $o),' +
+      'match $p isa person, has person-id "p-1"; $o isa team, has team-id "o-1";' +
+        'insert $m isa membership, links (member: $p, team: $o),' +
         ' has membership-key "p-1::o-1", has role-name "admin";',
     );
 
@@ -686,9 +686,9 @@ describe('Tier 3 — contract and liveness', () => {
     }
 
     const rows = target.query(
-      'match\n  $p isa principal, has principal-id $pid;\n' +
-        '  $o isa organization, has org-id "o-1";\n' +
-        '  $m isa membership, links (member: $p, org: $o);\nselect $pid;',
+      'match\n  $p isa person, has person-id $pid;\n' +
+        '  $o isa team, has team-id "o-1";\n' +
+        '  $m isa membership, links (member: $p, team: $o);\nselect $pid;',
     ).rows;
     assert.equal(
       rows.length,
@@ -751,7 +751,7 @@ describe('Tier 3 — contract and liveness', () => {
 
     const session = replicator.replicateContinuously({ direction: 'push' });
     for (let i = 0; i < 40; i += 1) {
-      spoke.execute(`insert $s isa skill, has skill-id "s-${i}", has skill-name "N";`);
+      spoke.execute(`insert $s isa project, has project-id "s-${i}", has project-name "N";`);
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
     await new Promise((resolve) => setTimeout(resolve, 400));

@@ -2,7 +2,7 @@
 //
 // Deliberately NOT reusing the parent monorepo's scripting-language terminals.langium: that file is built around
 // PascalCase/HYPHENATED_NAME identifiers for a modelling language written by humans in prose
-// style. TypeQLite identifiers are lowercase-hyphenated (`skill-id`, `membership-key`), variables
+// style. TypeQLite identifiers are lowercase-hyphenated (`project-id`, `membership-key`), variables
 // are `$`-prefixed, and comments are `#` — three incompatible lexical decisions.
 
 // A `$`-prefixed query variable: $s, $st, $child — and `$0_leading_digit_allowed`, which
@@ -11,7 +11,7 @@
 // is the anonymous variable, and a leading underscore is otherwise refused (match.feature L5561, L5591).
 terminal VAR returns string: /\$(?:_(?![A-Za-z0-9_\-\u0080-\uFFFF])|[A-Za-z0-9\u0080-\uFFFF][A-Za-z0-9_\-\u0080-\uFFFF]*)/;
 
-// Type and attribute labels. Hyphens are part of the token, which is why `skill-id` lexes as one
+// Type and attribute labels. Hyphens are part of the token, which is why `project-id` lexes as one
 // identifier rather than a subtraction. ⚠️ Since Phase 06 TypeQLite HAS arithmetic here, so `$a-1`
 // is one variable (VAR admits the hyphen too) and `$a - 1` is a subtraction — the space decides,
 // as it does in TypeDB. The numeric terminals below carry NO sign for the same reason: `10-1`

@@ -278,8 +278,8 @@ engine and by the new engine after migrating it. Per thing type, the queries lis
 answer was identical on all 18 stores**: about 225,000 ownerships and 232 lookups. Migration took
 0.6 s on the largest store (275,594 ownerships).
 
-One query failed with "Maximum call stack size exceeded" on both engines alike: `scm/ladder`'s
-`workflow-history-entry`, at 194,244 ownerships. That is an existing limit on very large answers,
+One query failed with "Maximum call stack size exceeded" on both engines alike: a workflow store's
+history type, at 194,244 ownerships. That is an existing limit on very large answers,
 not part of this change.
 
 **Performance.** The old engine's build was compared with this one's, both compiled, on the four
@@ -287,10 +287,10 @@ largest stores, taking the median of five alternating runs:
 
 | Store | Listing ownerships | Lookups by value |
 | --- | --- | --- |
-| `scm/ladder` | −7% | −82% |
-| `observability` | −2% | −41% |
+| a workflow store | −7% | −82% |
+| an observability store | −2% | −41% |
 | a document store | −7% | −77% |
-| `skills/graph` | −11% | −51% |
+| a definition graph | −11% | −51% |
 
 The first implementation was slower: +8% to +10% on listings and +14% to +57% on lookups. It
 indexed `has(owner, type)`, which forced a sort per owner, and it found owners of a value by probing

@@ -19,10 +19,10 @@ import { serveChangeStream } from '../src/change-stream.js';
 import { replicateOnce } from '../src/replicator.js';
 import { computeRevision } from '../src/revision.js';
 import { DiagnosticCode, diagnosticOf } from '../src/diagnostics.js';
-import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
+import { readKeyedTrackerSchema } from './fixtures/keyed-tracker-schema.js';
 
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
-const schema = readKeyedSkillsSchema(join(SCHEMAS, 'skills.schema.typeqlite'));
+const schema = readKeyedTrackerSchema(join(SCHEMAS, 'tracker.schema.typeqlite'));
 
 const open: TypeDBLiteInterpreter[] = [];
 const closers: (() => Promise<void>)[] = [];
@@ -38,12 +38,12 @@ function store(): TypeDBLiteInterpreter {
   return db;
 }
 
-/** A store holding one skill, edited once: two revisions of `skill/s-1`. */
+/** A store holding one project, edited once: two revisions of `project/s-1`. */
 function source(): { db: TypeDBLiteInterpreter; records: readonly ChangeRecord[] } {
   const db = store();
-  db.execute('insert $s isa skill, has skill-id "s-1", has skill-name "first";');
-  db.execute('match $s isa skill, has skill-id "s-1"; insert $s has skill-description "edited";');
-  return { db, records: db.changeLog.since(0).filter((record) => record.entityId === 'skill/s-1') };
+  db.execute('insert $s isa project, has project-id "s-1", has project-name "first";');
+  db.execute('match $s isa project, has project-id "s-1"; insert $s has project-summary "edited";');
+  return { db, records: db.changeLog.since(0).filter((record) => record.entityId === 'project/s-1') };
 }
 
 /** What `applyRemote` takes, from a record `since()` returned. */
@@ -64,23 +64,23 @@ function refusedWith(work: () => unknown, pattern: RegExp): void {
 describe('what a store accepts from a peer', () => {
   it('accepts what another store sends: edits, a delete, and a tombstone', () => {
     const { db: a } = source();
-    a.execute('match $s isa skill, has skill-id "s-1"; delete $s;');
+    a.execute('match $s isa project, has project-id "s-1"; delete $s;');
     const b = store();
     const outcome = replicateOnce(b.changeLog, a.changeLog, { direction: 'pull' });
     assert.ok(outcome.applied >= 3, 'both revisions and the tombstone');
-    assert.equal(b.changeLog.winnerOf('skill/s-1')?.deleted, true);
-    assert.equal(b.changeLog.winnerOf('skill/s-1')?.rev, a.changeLog.winnerOf('skill/s-1')?.rev);
+    assert.equal(b.changeLog.winnerOf('project/s-1')?.deleted, true);
+    assert.equal(b.changeLog.winnerOf('project/s-1')?.rev, a.changeLog.winnerOf('project/s-1')?.rev);
   });
 
   it('accepts the leaves of a compacted store, whose parents no longer exist anywhere', () => {
     const { db: a } = source();
     a.changeLog.compact();
-    const leaf = a.changeLog.since(0).filter((record) => record.entityId === 'skill/s-1');
+    const leaf = a.changeLog.since(0).filter((record) => record.entityId === 'project/s-1');
     assert.equal(leaf.length, 1, 'compaction kept only the leaf');
     assert.notEqual(leaf[0]?.parentRev, null, 'which names a parent that is gone');
     const b = store();
     replicateOnce(b.changeLog, a.changeLog, { direction: 'pull' });
-    assert.equal(b.changeLog.winnerOf('skill/s-1')?.rev, leaf[0]?.rev);
+    assert.equal(b.changeLog.winnerOf('project/s-1')?.rev, leaf[0]?.rev);
   });
 });
 
@@ -89,8 +89,8 @@ describe('what it refuses, leaving the store as it was', () => {
     const { records } = source();
     const b = store();
     const forged = { ...pushed(records[0]!), rev: '999999-deadbeef' };
-    refusedWith(() => b.changeLog.applyRemote(forged), /skill\/s-1: revision 999999-deadbeef is not derived from its content, which gives 1-/);
-    assert.equal(b.changeLog.winnerOf('skill/s-1'), undefined, 'nothing was stored');
+    refusedWith(() => b.changeLog.applyRemote(forged), /project\/s-1: revision 999999-deadbeef is not derived from its content, which gives 1-/);
+    assert.equal(b.changeLog.winnerOf('project/s-1'), undefined, 'nothing was stored');
   });
 
   it('refuses a held revision sent with different content, the one that would split two stores for good', () => {
@@ -99,7 +99,7 @@ describe('what it refuses, leaving the store as it was', () => {
     const original = pushed(records[0]!);
     const tampered = {
       ...original,
-      state: { ...original.state!, attributes: original.state!.attributes.map((a) => (a.type === 'skill-name' ? { ...a, value: 'not what was written' } : a)) },
+      state: { ...original.state!, attributes: original.state!.attributes.map((a) => (a.type === 'project-name' ? { ...a, value: 'not what was written' } : a)) },
     };
     refusedWith(() => b.changeLog.applyRemote(tampered), /is not derived from its content/);
     assert.equal(b.changeLog.applyRemote(original), true, 'and the real one is still accepted');
@@ -112,13 +112,13 @@ describe('what it refuses, leaving the store as it was', () => {
     const edit = pushed(records[1]!);
     refusedWith(() => b.changeLog.applyRemote({ ...edit, parentRev: null }), /is not derived from its content/);
     refusedWith(() => b.changeLog.applyRemote({ ...edit, deleted: true }), /is not derived from its content/);
-    assert.equal(b.changeLog.leavesOf('skill/s-1').length, 1, 'only the first revision is held');
+    assert.equal(b.changeLog.leavesOf('project/s-1').length, 1, 'only the first revision is held');
   });
 
   it('refuses a live revision with no state: nothing to check, and nothing to project', () => {
     const b = store();
     const rev = computeRevision({ deleted: false });
-    refusedWith(() => b.changeLog.applyRemote({ entityId: 'skill/s-9', rev, parentRev: null, deleted: false }), /live revision .* carries no state/);
+    refusedWith(() => b.changeLog.applyRemote({ entityId: 'project/s-9', rev, parentRev: null, deleted: false }), /live revision .* carries no state/);
   });
 
   it('refuses a malformed parent revision', () => {
@@ -132,11 +132,11 @@ describe('what it refuses, leaving the store as it was', () => {
 
   it('refuses a batch with one bad record as a whole', () => {
     const { db: a, records } = source();
-    a.execute('insert $s isa skill, has skill-id "s-2", has skill-name "other";');
-    const good = pushed(a.changeLog.since(0).find((record) => record.entityId === 'skill/s-2')!);
+    a.execute('insert $s isa project, has project-id "s-2", has project-name "other";');
+    const good = pushed(a.changeLog.since(0).find((record) => record.entityId === 'project/s-2')!);
     const b = store();
     refusedWith(() => b.changeLog.applyRemoteBatch([good, { ...pushed(records[0]!), rev: '1-deadbeef' }]), /is not derived from its content/);
-    assert.equal(b.changeLog.winnerOf('skill/s-2'), undefined, 'the good record went with it');
+    assert.equal(b.changeLog.winnerOf('project/s-2'), undefined, 'the good record went with it');
   });
 
   it('refuses on a pull too, and says which record', () => {
@@ -144,7 +144,7 @@ describe('what it refuses, leaving the store as it was', () => {
     const forged = { ...records[0]!, rev: '7-deadbeef' };
     const hostile = { since: (cursor = 0) => (cursor === 0 ? [forged] : []), applyRemote: () => false };
     const b = store();
-    refusedWith(() => replicateOnce(b.changeLog, hostile, { direction: 'pull' }), /skill\/s-1: revision 7-deadbeef/);
+    refusedWith(() => replicateOnce(b.changeLog, hostile, { direction: 'pull' }), /project\/s-1: revision 7-deadbeef/);
   });
 });
 
@@ -160,7 +160,7 @@ describe('the hub', () => {
     assert.equal(response.status, 400);
     const text = await response.text();
     assert.match(text, /change 1 is refused: revision 2-deadbeef is not derived from its content/);
-    assert.equal(hubDb.changeLog.winnerOf('skill/s-1'), undefined, 'the good first change was not applied either');
+    assert.equal(hubDb.changeLog.winnerOf('project/s-1'), undefined, 'the good first change was not applied either');
   });
 });
 
@@ -169,11 +169,11 @@ describe('the limit, stated so it is not overclaimed', () => {
     const { records } = source();
     const b = store();
     b.changeLog.applyRemote(pushed(records[0]!));
-    const state = { type: 'skill', attributes: [{ type: 'skill-id', value: 's-1' }, { type: 'skill-name', value: 'mine' }], roles: [] };
+    const state = { type: 'project', attributes: [{ type: 'project-id', value: 's-1' }, { type: 'project-name', value: 'mine' }], roles: [] };
     const parentRev = '999998-0123456789abcdef0123456789abcdef';
     const rev = computeRevision({ state, parent: parentRev });
     assert.equal(revisionProblem({ rev, parentRev, deleted: false, state }), undefined);
-    assert.equal(b.changeLog.applyRemote({ entityId: 'skill/s-1', rev, parentRev, deleted: false, state }), true);
-    assert.equal(b.changeLog.winnerOf('skill/s-1')?.rev, rev, 'it wins by its generation: only authentication stops this');
+    assert.equal(b.changeLog.applyRemote({ entityId: 'project/s-1', rev, parentRev, deleted: false, state }), true);
+    assert.equal(b.changeLog.winnerOf('project/s-1')?.rev, rev, 'it wins by its generation: only authentication stops this');
   });
 });

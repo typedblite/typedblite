@@ -11,8 +11,8 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
  * `resolveMatch`, which keeps `combinations[0]`, for anything that is not a `DeleteStage`.
  *
  * ⚠️ **Verified latent before it was fixed, not assumed.** All twelve `match`-then-write statements
- * in this repository bind on a `@key` — `entity-id`, `doc-id`, `node-id`, `workflow-id`,
- * `output-key`, `register-branch`, `step-id` — so every match is a single row and every caller was
+ * in this repository bind on a `@key` — `entity-id`, `doc-id`, `node-id`, `sprint-id`,
+ * `log-key`, `register-branch`, `task-id` — so every match is a single row and every caller was
  * safe **by accident**. The delete half was equally latent right up until the defect gate's claim
  * store became the first caller to write over a non-key attribute.
  *

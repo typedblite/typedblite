@@ -15,10 +15,10 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
 import { serveChangeStream, type ChangeStreamOptions } from '../src/change-stream.js';
 import { TypeDBLiteReplicator } from '../src/typedblite-replicator.js';
 import { computeRevision } from '../src/revision.js';
-import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
+import { readKeyedTrackerSchema } from './fixtures/keyed-tracker-schema.js';
 
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
-const schema = readKeyedSkillsSchema(join(SCHEMAS, 'skills.schema.typeqlite'));
+const schema = readKeyedTrackerSchema(join(SCHEMAS, 'tracker.schema.typeqlite'));
 const node = () => {
   const db = new TypeDBLiteInterpreter(':memory:');
   db.define(schema);
@@ -169,8 +169,8 @@ describe('a real spoke through the defaults', () => {
   it('still syncs, in both directions', async () => {
     const { db: hubDb, url } = await hub();
     const spoke = node();
-    spoke.execute('insert $s isa skill, has skill-id "from-spoke", has skill-name "n";');
-    hubDb.execute('insert $s isa skill, has skill-id "from-hub", has skill-name "n";');
+    spoke.execute('insert $s isa project, has project-id "from-spoke", has project-name "n";');
+    hubDb.execute('insert $s isa project, has project-id "from-hub", has project-name "n";');
     const replicator = new TypeDBLiteReplicator(spoke.changeLog, url.replace(/\/changes$/, ''), 100);
     await replicator.replicateOnce({ direction: 'duplex', timeoutMs: 8_000 });
     expect(held(hubDb)).toEqual(held(spoke));

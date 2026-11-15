@@ -126,9 +126,9 @@ const cases: Record<string, () => Promise<void>> = {
       decoded.push({ line, character, type: legend.tokenTypes[tokens.data[i + 3]!]! });
     }
     const on = (at: number) => decoded.find((t) => t.line === 2 && t.character === at);
-    // `entity skill, owns skill-id, owns nope-id;`: skill-id at 19, nope-id at 34.
-    assert.equal(on(19)?.type, 'property');
-    assert.equal(on(34), undefined);
+    // `entity project, owns project-id, owns nope-id;`: project-id at 21, nope-id at 38.
+    assert.equal(on(21)?.type, 'property');
+    assert.equal(on(38), undefined);
   },
 
   async 'go to definition crosses files'() {

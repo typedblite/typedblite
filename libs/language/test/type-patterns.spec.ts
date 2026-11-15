@@ -39,11 +39,11 @@ describe('type patterns', () => {
   it('still parses the thing forms every repository writes', () => {
     expect(
       parses(
-        'match $p isa principal, has principal-id "s"; $p has principal-id $id, has principal-type $type;',
+        'match $p isa person, has person-id "s"; $p has person-id $id, has person-kind $type;',
       ),
     ).toBe(true);
     expect(
-      parses('match $r isa step-dependency (dependent: $d, prerequisite: $p);'),
+      parses('match $r isa task-dependency (dependent: $d, prerequisite: $p);'),
     ).toBe(true);
   });
 });

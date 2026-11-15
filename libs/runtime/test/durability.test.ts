@@ -14,12 +14,12 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { TypeDBLiteInterpreter } from '../src/interpreter.js';
-import { readKeyedSkillsSchema } from './fixtures/keyed-skills-schema.js';
+import { readKeyedTrackerSchema } from './fixtures/keyed-tracker-schema.js';
 import { notKilledOnPurpose } from './fixtures/kill-self.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const SCHEMAS = fileURLToPath(new URL('../../../test-fixtures/schemas/', import.meta.url));
-const SCHEMA = join(SCHEMAS, 'skills.schema.typeqlite');
+const SCHEMA = join(SCHEMAS, 'tracker.schema.typeqlite');
 
 const runChild = (fixture: string, args: string[]) =>
   spawnSync(
@@ -61,17 +61,17 @@ describe('a crash cannot separate a write from its log row', () => {
 
     // The committed write before the crash survives.
     assert.ok(
-      changes.some((c) => c.entityId === 'skill/before-crash'),
+      changes.some((c) => c.entityId === 'project/before-crash'),
       'a write that committed before the crash must survive',
     );
     // The uncommitted one leaves nothing — neither half of it.
     assert.equal(
-      changes.some((c) => c.entityId === 'skill/crashed'),
+      changes.some((c) => c.entityId === 'project/crashed'),
       false,
       'an uncommitted log row must not survive',
     );
     const orphans = reopened.query(
-      'match $s isa skill, has skill-id $id; select $id;',
+      'match $s isa project, has project-id $id; select $id;',
     );
     assert.equal(
       orphans.rows.length,
@@ -88,7 +88,7 @@ describe('seq order is commit order across processes', () => {
 
     // Define the schema once up front so the children race on writes, not on DDL.
     const setup = new TypeDBLiteInterpreter(path);
-    setup.define(readKeyedSkillsSchema(SCHEMA));
+    setup.define(readKeyedTrackerSchema(SCHEMA));
     setup.close();
 
     const perWriter = 8;
@@ -126,7 +126,7 @@ describe('seq order is commit order across processes', () => {
 
     // Each writer's entities are all present, so no process lost a write to contention.
     for (const prefix of writers) {
-      const mine = changes.filter((c) => c.entityId.startsWith(`skill/${prefix}-`));
+      const mine = changes.filter((c) => c.entityId.startsWith(`project/${prefix}-`));
       assert.equal(mine.length, perWriter, `${prefix} lost writes`);
     }
     reader.close();
@@ -135,9 +135,9 @@ describe('seq order is commit order across processes', () => {
   it('a follower reading seq > cursor sees every change exactly once', () => {
     const path = tempDb('cursor');
     const db = new TypeDBLiteInterpreter(path);
-    db.define(readKeyedSkillsSchema(SCHEMA));
+    db.define(readKeyedTrackerSchema(SCHEMA));
     for (let i = 0; i < 10; i += 1) {
-      db.execute(`insert $s isa skill, has skill-id "s-${i}", has skill-name "n";`);
+      db.execute(`insert $s isa project, has project-id "s-${i}", has project-name "n";`);
     }
 
     // Drain in small batches, exactly as a replication follower would.

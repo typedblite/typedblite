@@ -1,0 +1,92 @@
+# A project tracker: projects, their tasks, and what links them.
+#
+# Written for TypeDBLite's own tests. It is here to exercise the engine, so it has one of each shape the
+# tests need: keyed entities, a relation between two entity types, a relation between two things of the same
+# type, a relation with three roles, and attributes of every common value type.
+#
+# A project has versions: `project-key` is `"<project-id>::<revision>"`, so two versions of one project are two
+# things, and `project-id` names the project across them. A task belongs to one version of a project, so
+# `task-key` is composed the same way. The replication tests need an identity that survives across stores, and
+# add `@key` on `project-id` and `task-id` themselves (`keyed-tracker-schema.ts`).
+define
+
+entity project,
+    owns project-key @key,
+    owns project-id,
+    owns project-name,
+    owns project-summary,
+    owns revision,
+    plays project-task:owner;
+
+entity task,
+    owns task-key @key,
+    owns task-id,
+    owns project-id,
+    owns revision,
+    owns ordinal,
+    owns task-kind,
+    owns log-field,
+    owns estimate-hours,
+    owns story-points,
+    owns done,
+    owns task-label,
+    plays project-task:task,
+    plays subproject:parent-task,
+    plays task-dependency:dependent,
+    plays task-dependency:prerequisite;
+
+# Which tasks a project holds.
+relation project-task,
+    relates owner,
+    relates task;
+
+# A task that is carried out by a whole project of its own.
+relation subproject,
+    relates parent-task,
+    relates child-project;
+
+project plays subproject:child-project;
+
+# A task that cannot start until another is done. Both players are tasks, in any project, so this relation
+# cannot be held inside one project's record: a dependency on a task that does not exist cannot be inserted.
+relation task-dependency,
+    relates dependent,
+    relates prerequisite;
+
+# Work logged against a task during an iteration: a relation with three roles.
+entity iteration,
+    owns iteration-id @key,
+    plays task-log:iteration;
+
+entity log-entry,
+    owns log-key @key,
+    owns log-field,
+    owns log-value,
+    plays task-log:record;
+
+relation task-log,
+    relates record,
+    relates iteration,
+    relates task;
+
+task plays task-log:task;
+
+attribute iteration-id, value string;
+attribute log-key, value string;
+attribute log-field, value string;
+attribute log-value, value string;
+
+attribute project-key, value string;
+attribute project-id, value string;
+attribute project-name, value string;
+attribute project-summary, value string;
+attribute revision, value string;
+
+attribute task-key, value string;
+attribute task-id, value string;
+attribute ordinal, value integer;
+attribute task-kind, value string;
+attribute estimate-hours, value double;
+attribute story-points, value integer;
+attribute done, value boolean;
+attribute task-label, value string;

@@ -55,11 +55,11 @@ describe('defining specialisations', () => {
   });
 
   it('adds a specialisation to a plain role, refuses a different one, and redefines it — L619, L630', () => {
-    engine.define('define relation step-parentship sub parentship, relates step;');
-    assert.equal(refusal('define step-parentship relates step as parent;'), undefined);
-    assert.match(refusal('define step-parentship relates step as child;') ?? '', /different 'step-parentship relates step as parent' is already defined/);
-    assert.equal(refusal('redefine step-parentship relates step as child;'), undefined);
-    assert.match(refusal('redefine step-parentship relates step as child;') ?? '', /already defined/);
+    engine.define('define relation step-parentship sub parentship, relates task;');
+    assert.equal(refusal('define step-parentship relates task as parent;'), undefined);
+    assert.match(refusal('define step-parentship relates task as child;') ?? '', /different 'step-parentship relates task as parent' is already defined/);
+    assert.equal(refusal('redefine step-parentship relates task as child;'), undefined);
+    assert.match(refusal('redefine step-parentship relates task as child;') ?? '', /already defined/);
   });
 
   it('undefines a specialisation only as it is defined — L631', () => {

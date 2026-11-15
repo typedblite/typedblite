@@ -68,11 +68,12 @@ The full list, with the reason for each non-passing scenario, is in [CONFORMANCE
 
 ## Performance and scale
 
-From the [load test](../development/performance.md#still-open), run on real stores of 2,390 to 46,690 things:
+From the [load test](../development/performance.md#still-open), run on generated data of up to 100,000
+entities and 21,000 tasks:
 
 - **One writer at a time.** SQLite allows one writer, so write throughput does not grow with more processes.
-  With four writers the 99th-percentile wait for the lock was 1.8 s, and 2.5 s with four readers alongside,
-  under the 5 s `busy_timeout` but not far under it.
+  With four writers the 99th-percentile wait for the lock was 0.9 to 1.4 s, and up to 2.5 s with four readers
+  alongside, under the 5 s `busy_timeout` but not far under it.
 - **The planner has no cost model.** Thing variables are enumerated in the order they are written, and a
   variable no relation or literal reaches is enumerated whole.
 - **Read paths run one SQL statement per row per binding.** A statement is cheap, but the count adds up.

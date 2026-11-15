@@ -6,7 +6,7 @@ import './terminals';
 // TypeDB's own behaviour specification needs to get past its Backgrounds.
 //
 // Scope was measured, not guessed (2026-08-29): every TypeQLite string in
-// the IAM and Skills infrastructure of its first production application, and
+// two parts of its first production application, and
 // a documentation store's schema. What is here is what those use. What TypeDB has and
 // this does not — rules/inference, aggregation, negation, `sort`/`limit`/`offset`, expressions,
 // structs — is absent because no caller writes it, not because it was too hard. Adding a
@@ -43,7 +43,7 @@ StructDef:
 StructField:
     name=ID 'value' valueType=ValueType (optional?='?')? annotations+=Annotation*;
 
-// `entity skill, owns skill-id @key, plays skill-composition:owner;`
+// `entity project, owns project-id @key, plays project-task:owner;`
 // `entity adr sub doc;`                     <- a documentation store's subtyping
 // `entity person plays employment:employee, owns name @card(0..);`  <- the spec's form
 // `entity abstract-type @abstract;`
@@ -74,7 +74,7 @@ fragment EntityHead:
     'sub' superType=[EntityDef:ID] subAnnotations+=Annotation*
     | 'value' valueType=ValueType valueAnnotations+=Annotation*;
 
-// `relation membership, relates member, relates org, owns membership-key @key;`
+// `relation membership, relates member, relates team, owns membership-key @key;`
 RelationDef:
     'relation' name=ID annotations+=Annotation* (','? RelationHead)*
     (','? traits+=Trait (',' (traits+=Trait | RelationHead))*)? ';';
@@ -83,7 +83,7 @@ fragment RelationHead:
     'sub' superType=[RelationDef:ID] subAnnotations+=Annotation*
     | 'value' valueType=ValueType valueAnnotations+=Annotation*;
 
-// `attribute principal-id, value string;`
+// `attribute person-id, value string;`
 // `attribute age @independent, value integer;`          <- annotation on the type
 // `attribute email value string @regex("^.*@.*$");`      <- annotation on the VALUE TYPE
 // `attribute empty-sub-data @abstract, sub empty-data;`  <- annotation before `sub`
@@ -96,7 +96,7 @@ AttributeDef:
         | (','? 'value' valueType=ValueType valueAnnotations+=Annotation*) (','? 'sub' superType=[AttributeDef:ID] subAnnotations+=Annotation*)?
     )? ';';
 
-// `principal plays membership:member;` — a re-open of an already-defined type, with no kind
+// `person plays membership:member;` — a re-open of an already-defined type, with no kind
 // keyword. The spec re-opens with a whole trait list: `person plays employment:employee, owns
 // name @card(0..), owns ref @key;` (`given.feature`), so this is EntityDef's tail on an existing
 // name — and the generator and interpreter treat its traits exactly as they treat a definition's.
@@ -231,8 +231,8 @@ Annotation:
     | DistinctAnnotation | CascadeAnnotation | RegexAnnotation | ValuesAnnotation | RangeAnnotation
     | DocAnnotation | MetaAnnotation;
 
-// The whole point of both schemas — see the header comments in iam.schema.typeqlite and
-// skills.schema.typeqlite. Generates a UNIQUE index.
+// The whole point of both schemas — see the header comments in people.schema.typeqlite and
+// tracker.schema.typeqlite. Generates a UNIQUE index.
 KeyAnnotation:
     {infer KeyAnnotation} '@key';
 
@@ -302,7 +302,7 @@ ValueType returns string:
 // caller with several independent queries runs them one at a time (the CLI splits its input).
 //
 // `end;` closes a pipeline explicitly — TypeQL's terminator, which is how one document holds several
-// queries (`examples/real-queries.typeqlite`).
+// queries (`examples/tracker-queries.typeqlite`).
 Pipeline:
     (functions+=FunctionDefinition)* stages+=LeadStage stages+=Stage* (fetch=FetchStage | returnStage=ReturnStage)? (end?='end' ';')?;
 
@@ -384,18 +384,18 @@ MatchStage:
 InsertStage:
     'insert' patterns+=Pattern+;
 
-// `put $o isa organization, has org-id "x";` — match-or-insert, in one statement.
+// `put $o isa team, has team-id "x";` — match-or-insert, in one statement.
 PutStage:
     'put' patterns+=Pattern+;
 
 // Two shapes, both real:
 //   `delete $old of $p;`  detaches an attribute from its owner — how update is implemented.
-//   `delete $i;`          deletes the thing itself — `skills-projection-target.ts`'s
+//   `delete $i;`          deletes the thing itself — a projection's
 //                         delete-then-insert idempotency, re-applied on every redelivered change.
 //
 // 🔴 The second was MISSED by the first scope survey and found by Phase 00's verification step,
 // which re-derived the surface from every `.execute`/`.query` call site instead of re-reading the
-// earlier summary. `skills-projection-target.ts` was not in that survey at all.
+// earlier summary. a projection was not in that survey at all.
 DeleteStage:
     'delete' deletions+=Deletion+;
 
@@ -597,9 +597,9 @@ ScopedLabel returns string:
 FunctionName returns string:
     (ValueType | 'label' | 'iid') ('::' ValueType)*;
 
-// `$s isa skill, has skill-id "x", has skill-name $n;`
-// `$r isa step-dependency (dependent: $d, prerequisite: $p);`
-// `$p has principal-type $old;`                       <- no isa; constrains an existing binding
+// `$s isa project, has project-id "x", has project-name $n;`
+// `$r isa task-dependency (dependent: $d, prerequisite: $p);`
+// `$p has person-kind $old;`                       <- no isa; constrains an existing binding
 // `$x sub person; $x owns name; $x label dog;`         <- a TYPE variable (Phase 05): the same head,
 //                                                         told apart by its properties
 ThingPattern:
@@ -619,7 +619,7 @@ KindPattern:
 KindLabelPattern:
     kind=Kind label=ID ';';
 
-// `(owner: $s, step: $st) isa skill-composition;` — an unbound relation, never referred to again.
+// `(owner: $s, task: $st) isa project-task;` — an unbound relation, never referred to again.
 // `(employee: $x);` — with no `isa`, a relation of any type (negation.feature L608).
 // `employment (employee: $p, employer: $e);` — the type before the players (fetch.feature L882).
 // Either form may own attributes: `(friend: $x) isa friendship, has ref 0;` (delete.feature L221).

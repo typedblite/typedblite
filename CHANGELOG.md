@@ -8,6 +8,11 @@ they are listed here.
 ## [Unreleased]
 
 ### Changed
+- The test fixtures are original: a project tracker (`tracker`, `people`, `sprint`, `documents`) replaces the schemas
+  and example queries adapted from a downstream application, and the load test's `real-stores` suite is removed.
+  The `growth`, `relations` and `concurrency` suites generate their own data, so the load test runs from this
+  repository alone. The performance guide is rewritten on that data, and the old results files are renamed to
+  match (their measurements of the private stores are removed).
 - **Breaking for a hand-written client:** a store now checks a revision from a peer against its content, instead
   of storing the `rev` it is given (ADR-003, amended 2026-11-15). A revision must equal `computeRevision` of its
   state, parent and deleted flag, and a live one must carry its state. Otherwise `ChangeLog.applyRemote` throws with
@@ -49,6 +54,10 @@ they are listed here.
   the build and every test passed there on two complete runs.
 
 ### Fixed
+- An empty answer that joins through a relation no longer reads every relation of the type to explain itself.
+  A project's sub-projects took 0.8 ms when it had one and 21 ms (3,000 projects) when it had none, because the
+  explanation, and `relationHolds`, read all rows to learn whether there were any. They now stop at the first.
+  Found by the load test on the new generated data. `QueryTrace` gains `relationRows`.
 - The extensions' `package` and `e2e` targets named `0.0.1` in their commands, so the first version bump would have
   broken both. `vsce` now names each package from its manifest, and `e2e --packaged` finds them the same way.
   The e2e runner also found a companion's id by splitting its path on `/`, which fails on Windows.
