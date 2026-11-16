@@ -1,15 +1,15 @@
 /**
- * In `astro dev`, serves the two pieces that are built elsewhere and only assembled into `dist/` by
- * scripts/assemble.mjs: the playground at /playground/ and the API reference at /api/. Without this the
- * dev server answers 404 for both, and so for every sidebar link to them. `website:dev` builds them first.
- * Nothing is copied: the folders are read in place. It applies to the dev server only.
+ * In `astro dev`, serves the playground's scripts, workers and `.wasm`, which its own build makes and
+ * scripts/assemble.mjs puts beside the page in `dist/`. The page at /playground/ is Astro's
+ * (src/pages/playground.astro). Without this the dev server answers 404 for the playground's assets.
+ * `website:dev` builds the playground first. Nothing is copied: the folder is read in place. Dev server only.
  */
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('../../../..', import.meta.url)));
-const MOUNTS = { '/playground': join(ROOT, 'apps/playground/.build'), '/api': join(ROOT, 'dist/api') };
+const MOUNTS = { '/playground': join(ROOT, 'apps/playground/.build') };
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',

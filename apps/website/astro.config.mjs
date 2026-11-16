@@ -1,6 +1,8 @@
 // @ts-check
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
+import starlightTypeDoc, { typeDocSidebarGroup } from 'starlight-typedoc';
+import { fileURLToPath } from 'node:url';
 import { mountBuilt } from './src/integrations/mount-built.mjs';
 import { typeqliteSemanticTokens } from './src/plugins/typeqlite-semantic.mjs';
 import { readFileSync } from 'node:fs';
@@ -25,6 +27,23 @@ export default defineConfig({
       logo: { light: './src/assets/brand/typedblite-logo.svg', dark: './src/assets/brand/typedblite-logo-dark.svg', alt: 'TypeDBLite', replacesTitle: true },
       favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/typedblite/typedblite' }],
+      // The API reference: TypeDoc's output as Markdown pages (typedoc-plugin-markdown), so it is in the same layout, search
+      // and theme as every other page. It reads the repository's own typedoc.json (entry points, validation, warnings as
+      // errors), the one `npm run check-api` runs, so there is a single configuration. The pages are written to
+      // src/content/docs/api/ on every build and are git-ignored.
+      plugins: [
+        starlightTypeDoc({
+          output: 'api',
+          typeDoc: {
+            options: fileURLToPath(new URL('../../typedoc.json', import.meta.url)),
+            plugin: [fileURLToPath(new URL('./src/plugins/typedoc-site.mjs', import.meta.url))],
+            // /api/ and /api/typedblite/runtime/ are the overview pages, not .../readme/.
+            entryFileName: 'index',
+          },
+          sidebar: { label: 'API reference', collapsed: true },
+          errorOnEmptyDocumentation: true,
+        }),
+      ],
       customCss: ['./src/styles/site.css'],
       components: { Head: './src/components/Head.astro', Footer: './src/components/Footer.astro' },
       editLink: { baseUrl: 'https://github.com/typedblite/typedblite/edit/main/' },
@@ -60,7 +79,7 @@ export default defineConfig({
         {
           label: 'Reference',
           items: [
-            { label: 'API reference', link: '/api/', attrs: { target: '_self' } },
+            typeDocSidebarGroup,
             { slug: 'guide/known-limitations' },
             { slug: 'guide/conformance' },
             { label: 'Packages', collapsed: true, items: [{ autogenerate: { directory: 'packages' } }] },

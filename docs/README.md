@@ -39,7 +39,7 @@ Choose your starting point by what you want to do.
 ## Package references
 
 The API reference is generated from the source: `npm run docs:api` writes it to `dist/api`. The website
-hosts it at `/api/` (see [The website](development/website.md)); it is not live yet.
+builds the same reference as pages of the site at `/api/` (see [The website](development/website.md)); it is not live yet.
 
 | Package | README |
 | ------- | ------ |

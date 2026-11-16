@@ -8,7 +8,6 @@
     "libs/content-revision/src/index.ts"
   ],
   "tsconfig": "tsconfig.typedoc.json",
-  "out": "dist/api",
   "readme": "none",
   "excludePrivate": true,
   "excludeInternal": true,
