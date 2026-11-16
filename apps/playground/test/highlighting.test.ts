@@ -66,6 +66,16 @@ describe('the themes', () => {
     for (const semantic of ['type', 'property', 'parameter', 'variable']) expect(tokens).toContain(semantic);
   });
 
+  it.each([
+    ['light', '0000FF'],
+    ['dark', '569CD6'],
+  ] as const)("%s: colours an annotation as VS Code's themes colour the keyword scope the grammar gives it", (scheme, keyword) => {
+    // `@key` is `keyword.annotations.typeqlite` in the TextMate grammar, so a VS Code theme gives it its `keyword`
+    // colour. The playground, the extension and the site must show the same.
+    const rule = themeRules(scheme).find((r) => r.token === 'keyword.annotations');
+    expect(rule?.foreground).toBe(keyword);
+  });
+
   it('keeps the editor surface in step with the page: both schemes set a background and a foreground', () => {
     for (const scheme of ['light', 'dark'] as const) {
       expect(SURFACE[scheme]['editor.background']).toMatch(/^#[0-9a-f]{6}$/);

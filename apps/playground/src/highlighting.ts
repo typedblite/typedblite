@@ -97,11 +97,11 @@ export interface ThemeRule {
  */
 const palette = {
   light: {
-    control: 'AF00DB', storage: '0000FF', operatorWord: '0000FF', constant: '0000FF', annotation: '795E26',
+    control: 'AF00DB', storage: '0000FF', operatorWord: '0000FF', constant: '0000FF', escape: '795E26',
     variable: '001080', string: 'A31515', number: '098658', comment: '008000', operator: '000000', type: '267F99',
   },
   dark: {
-    control: 'C586C0', storage: '569CD6', operatorWord: '569CD6', constant: '569CD6', annotation: 'DCDCAA',
+    control: 'C586C0', storage: '569CD6', operatorWord: '569CD6', constant: '569CD6', escape: 'DCDCAA',
     variable: '9CDCFE', string: 'CE9178', number: 'B5CEA8', comment: '6A9955', operator: 'D4D4D4', type: '4EC9B0',
   },
 } as const;
@@ -114,12 +114,14 @@ export function themeRules(scheme: 'light' | 'dark'): ThemeRule[] {
     { token: 'storage.modifier', foreground: c.storage },
     { token: 'keyword.operator.words', foreground: c.operatorWord },
     { token: 'constant.language', foreground: c.constant },
-    { token: 'keyword.annotations', foreground: c.annotation },
+    // An annotation is a keyword to VS Code's themes: the grammar scopes it `keyword.annotations.typeqlite`, and
+    // Dark Modern and Light Modern colour `keyword` as `storage`. The editor and the site show the same.
+    { token: 'keyword.annotations', foreground: c.storage },
     { token: 'keyword.operator', foreground: c.operator },
     { token: 'variable.parameter', foreground: c.variable },
     { token: 'string', foreground: c.string },
     { token: 'constant.numeric', foreground: c.number },
-    { token: 'constant.character.escape', foreground: c.annotation },
+    { token: 'constant.character.escape', foreground: c.escape },
     { token: 'comment', foreground: c.comment },
     // The language server's semantic tokens, by their LSP type.
     { token: 'type', foreground: c.type },
