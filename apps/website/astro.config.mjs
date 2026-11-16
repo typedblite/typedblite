@@ -1,6 +1,7 @@
 // @ts-check
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
+import { mountBuilt } from './src/integrations/mount-built.mjs';
 import { readFileSync } from 'node:fs';
 
 // The editor's own TypeQLite grammar (copied here by scripts/sync-content.mjs), so a fence on the site is
@@ -13,8 +14,9 @@ const typeql = {
 
 export default defineConfig({
   site: 'https://typedblite.dev',
-  trailingSlash: 'always',
+  trailingSlash: 'ignore',
   integrations: [
+    mountBuilt(),
     starlight({
       title: 'TypeDBLite',
       description:

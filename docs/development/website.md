@@ -34,7 +34,7 @@ in the reader's theme.
 ## Commands
 
 ```bash
-npm exec nx -- run website:dev          # astro dev with live reload (the playground and API are not served)
+npm exec nx -- run website:dev          # astro dev with live reload; builds the playground and the API first and serves them at /playground/ and /api/
 npm exec nx -- run website:build-site   # the whole site into apps/website/dist
 npm exec nx -- run website:check        # build it, then follow every internal link in dist/
 npm run site                            # build, then serve dist/ on http://localhost:4321
