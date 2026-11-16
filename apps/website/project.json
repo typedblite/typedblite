@@ -33,7 +33,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "dependsOn": ["build-site"],
-      "options": { "command": "astro preview", "cwd": "apps/website" }
+      "options": { "command": "astro preview --force", "cwd": "apps/website" }
     }
   }
 }
