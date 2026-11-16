@@ -1,0 +1,50 @@
+---
+/**
+ * The playground, inside the site's shell: Starlight's header, search, theme switch and sidebar around it.
+ * The page's markup is the playground's own fragment (`apps/playground/src/app.html`, put in `.build/` by the
+ * playground's build); its scripts, workers and `.wasm` are the playground's build output, copied beside this
+ * page by `scripts/assemble.mjs` (in `astro dev`, `src/integrations/mount-built.mjs` serves them in place).
+ * Only the colours are the site's: the playground reads `--pg-*` custom properties, mapped to Starlight's below.
+ */
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import app from '../../../playground/.build/app.html?raw';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Playground',
+    description: 'Try TypeQLite in your browser: TypeDBLite running on WASM SQLite, with nothing to install.',
+    tableOfContents: false,
+    editUrl: 'https://github.com/typedblite/typedblite/edit/main/apps/playground/src/app.html',
+    head: [
+      { tag: 'link', attrs: { rel: 'stylesheet', href: '/playground/main.css' } },
+      { tag: 'link', attrs: { rel: 'stylesheet', href: '/playground/app.css' } },
+    ],
+  }}
+>
+  <p>Write TypeQLite and run it here, with nothing to install: the engine runs on WASM SQLite in a worker, and the editor is served by the same language server as the VS Code extension.</p>
+  <div class="not-content playground" set:html={app} />
+  <script is:inline type="module" src="/playground/main.js"></script>
+</StarlightPage>
+
+<style is:global>
+  /* The playground wants more room than a page of prose. */
+  :root {
+    --sl-content-width: 100rem;
+  }
+  .playground .pg {
+    --pg-ink: var(--sl-color-text);
+    --pg-muted: var(--sl-color-gray-3);
+    --pg-line: var(--sl-color-hairline);
+    --pg-panel: var(--sl-color-bg);
+    --pg-code: var(--sl-color-gray-6);
+    --pg-accent: var(--sl-color-text-accent);
+    --pg-accent-ink: var(--sl-color-text-invert);
+    --pg-error: var(--sl-color-red);
+    --pg-error-bg: var(--sl-color-red-low);
+    font-family: var(--sl-font-system);
+  }
+  .playground {
+    margin-top: 1.5rem;
+  }
+</style>

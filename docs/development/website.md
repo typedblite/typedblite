@@ -30,6 +30,17 @@ Also generated, from other places: the brand files (`docs/brand/`) and the favic
 colours code fences, which is the VS Code extension's own (`apps/vscode/syntaxes/typeqlite.tmLanguage.json`). ```` ```mermaid ```` fences are drawn in the browser,
 in the reader's theme.
 
+## The playground is a page of the site
+
+`/playground/` is an Astro page (`src/pages/playground.astro`) inside Starlight's layout: its header, search, theme
+switch and sidebar. The playground supplies the markup (`apps/playground/src/app.html`, a fragment that its build also
+puts into the standalone `index.html`), its styles (`app.css`, scoped to `.pg`, reading only `--pg-*` custom
+properties) and its scripts, workers and `.wasm`; the page maps `--pg-*` onto Starlight's colours. The editor follows
+Starlight's `data-theme` and takes its background from the page. `scripts/check-playground.mjs` (part of `website:check`)
+opens the built page in Chromium and checks that the shell is there, the first example runs and draws, nothing fails to
+load, and the editor follows the theme. The playground's scripts find their workers beside themselves
+(`import.meta.url`), so the page may be at any URL.
+
 ## How a TypeQLite fence is coloured
 
 As in the editor, in two layers. Shiki colours it with the TextMate grammar, in VS Code's own Dark+ and Light+ themes

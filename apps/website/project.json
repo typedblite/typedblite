@@ -24,7 +24,7 @@
     "check": {
       "executor": "nx:run-commands",
       "dependsOn": ["build-site"],
-      "options": { "commands": ["node scripts/check-site.mjs", "node scripts/check-highlighting.mjs"], "parallel": false, "cwd": "apps/website" }
+      "options": { "commands": ["node scripts/check-site.mjs", "node scripts/check-highlighting.mjs", "node scripts/check-playground.mjs"], "parallel": false, "cwd": "apps/website" }
     },
     "dev": {
       "executor": "nx:run-commands",

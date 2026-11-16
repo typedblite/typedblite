@@ -7,6 +7,7 @@ import * as monaco from 'monaco-editor/editor/editor.api.js';
 import { MonacoLspClient, createTransportToWorker } from 'monaco-lsp-client';
 
 import { LANGUAGE_ID, MONARCH, SURFACE, themeRules } from './highlighting.js';
+import { currentScheme, onSchemeChange, resolveColour, type Scheme } from './scheme.js';
 
 /**
  * The program editor: Monaco, with TypeQLite served by the real language server over LSP.
@@ -40,7 +41,7 @@ function prepareEnvironment(): void {
   if (environmentReady) return;
   environmentReady = true;
   (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
-    getWorker: () => new Worker(new URL('editor.worker.js', document.baseURI), { type: 'module' }),
+    getWorker: () => new Worker(new URL('editor.worker.js', import.meta.url), { type: 'module' }),
   };
   monaco.languages.register({ id: LANGUAGE_ID, extensions: ['.typeqlite', '.tql'], aliases: ['TypeQLite'] });
   monaco.languages.setMonarchTokensProvider(LANGUAGE_ID, MONARCH as unknown as monaco.languages.IMonarchLanguage);
@@ -58,24 +59,31 @@ function prepareEnvironment(): void {
     // A name holds hyphens (`project-id`), and a variable starts with `$`, so a "word" is both.
     wordPattern: /\$?[A-Za-z_\u0080-￿][\w\-\u0080-￿]*/,
   });
-  for (const scheme of ['light', 'dark'] as const) {
-    monaco.editor.defineTheme(`typeqlite-${scheme}`, {
-      base: scheme === 'dark' ? 'vs-dark' : 'vs',
-      inherit: true,
-      rules: themeRules(scheme).map((rule) => ({ ...rule, foreground: rule.foreground })),
-      colors: { ...SURFACE[scheme] },
-    });
-  }
+}
+
+/**
+ * (Re)defines the editor's theme for a scheme. Its surface is the host page's own: `--pg-code` for the
+ * background and `--pg-ink` for the text, read from the page, so the editor sits in whatever page hosts it.
+ * `SURFACE` is only the fallback for a browser that gives no value.
+ */
+function applyTheme(container: HTMLElement, scheme: Scheme): void {
+  monaco.editor.defineTheme(`typeqlite-${scheme}`, {
+    base: scheme === 'dark' ? 'vs-dark' : 'vs',
+    inherit: true,
+    rules: themeRules(scheme).map((rule) => ({ ...rule, foreground: rule.foreground })),
+    colors: {
+      'editor.background': resolveColour(container, '--pg-code') ?? SURFACE[scheme]['editor.background'],
+      'editor.foreground': resolveColour(container, '--pg-ink') ?? SURFACE[scheme]['editor.foreground'],
+    },
+  });
+  monaco.editor.setTheme(`typeqlite-${scheme}`);
 }
 
 export function createProgramEditor(container: HTMLElement, options: { onRun: () => void }): ProgramEditor {
   prepareEnvironment();
-
-  const dark = window.matchMedia('(prefers-color-scheme: dark)');
   const model = monaco.editor.createModel('', LANGUAGE_ID, monaco.Uri.parse(PROGRAM_URI));
   const editor = monaco.editor.create(container, {
     model,
-    theme: dark.matches ? 'typeqlite-dark' : 'typeqlite-light',
     ariaLabel: 'Program',
     automaticLayout: true,
     minimap: { enabled: false },
@@ -87,7 +95,8 @@ export function createProgramEditor(container: HTMLElement, options: { onRun: ()
     'semanticHighlighting.enabled': true,
     padding: { top: 8, bottom: 8 },
   });
-  dark.addEventListener('change', (event) => monaco.editor.setTheme(event.matches ? 'typeqlite-dark' : 'typeqlite-light'));
+  applyTheme(container, currentScheme());
+  onSchemeChange((scheme) => applyTheme(container, scheme));
   editor.addAction({
     id: 'typedblite.run',
     label: 'Run program',
@@ -97,7 +106,7 @@ export function createProgramEditor(container: HTMLElement, options: { onRun: ()
 
   // The language server, in its own worker. The client attaches its providers to Monaco, and syncs the
   // model to the server, so there is nothing more to wire.
-  new MonacoLspClient(createTransportToWorker(new Worker(new URL('language-worker.js', document.baseURI), { type: 'module' })));
+  new MonacoLspClient(createTransportToWorker(new Worker(new URL('language-worker.js', import.meta.url), { type: 'module' })));
 
   return {
     getValue: () => model.getValue(),

@@ -2,10 +2,11 @@
  * The playground build: the page and its worker, bundled by esbuild for the browser, with SQLite's
  * `.wasm`, the static shell and the logo, into `.build/`. The bundler's `browser` condition selects
  * `@typedblite/runtime`'s browser entry (ADR-009 D3); nothing is aliased. Every URL in the page is
- * relative, so `.build/` can be served from any path.
+ * relative, so `.build/` can be served from any path, and the scripts find the workers and the `.wasm` beside
+ * themselves (`import.meta.url`), so the page that loads them may be at a different URL.
  */
 import { build } from 'esbuild';
-import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,7 +39,12 @@ await build({
   assetNames: '[name]',
 });
 copyFileSync(WASM, join(OUT, 'sqlite3.wasm'));
-copyFileSync(join(SRC, 'index.html'), join(OUT, 'index.html'));
+// The page's markup is a fragment shared by two pages: the standalone one (index.html, which this puts it in) and
+// the website's, which wraps it in Starlight's layout (apps/website/src/pages/playground.astro reads app.html).
+const app = readFileSync(join(SRC, 'app.html'), 'utf8');
+writeFileSync(join(OUT, 'app.html'), app);
+writeFileSync(join(OUT, 'index.html'), readFileSync(join(SRC, 'index.html'), 'utf8').replace('<!--@APP-->', app));
+copyFileSync(join(SRC, 'app.css'), join(OUT, 'app.css'));
 copyFileSync(join(BRAND, 'typedblite-logo.svg'), join(OUT, 'logo.svg'));
 copyFileSync(join(BRAND, 'typedblite-logo-dark.svg'), join(OUT, 'logo-dark.svg'));
 copyFileSync(join(BRAND, 'typedblite-icon.svg'), join(OUT, 'logo-icon.svg'));

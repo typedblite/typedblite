@@ -38,6 +38,8 @@ export function mountBuilt() {
             response.writeHead(301, { location: `${mount}/${url.search}` }).end();
             return;
           }
+          // The playground's page is Astro's (src/pages/playground.astro); only its scripts and assets are served here.
+          if (mount === '/playground' && (url.pathname.endsWith('/') || url.pathname === '/playground/index.html')) return next();
           const base = MOUNTS[mount];
           let file = normalize(join(base, decodeURIComponent(url.pathname.slice(mount.length))));
           if (file !== base && !file.startsWith(base + sep)) return next(); // no `..` out of the folder

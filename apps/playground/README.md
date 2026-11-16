@@ -42,7 +42,7 @@ says so in its footer.
 | `src/language-server.ts` | `serve(connection)`: `startLanguageServer` over `createTypeQLiteServices`, the extension's server |
 | `src/language-worker.ts` | That server in a worker, over `vscode-languageserver/browser` |
 | `src/highlighting.ts` | The base colouring a tokenizer can do from text (keywords, strings, comments), built from the language package's `KEYWORD_SCOPES`, and the light and dark themes |
-| `src/main.ts`, `src/index.html` | The page. Everything drawn from a program's output goes in through `textContent` |
+| `src/main.ts`, `src/app.html`, `src/app.css`, `src/index.html` | The page. `app.html` is the markup and `app.css` the styles (scoped to `.pg`, colours from `--pg-*` custom properties): `index.html` is the standalone page around them, and the website's `/playground/` is a Starlight page around the same two files. `scheme.ts` follows the host page's `data-theme`. Everything drawn from a program's output goes in through `textContent` |
 | `src/examples.ts` | Three examples, each run by a test |
 | `build.mjs` | esbuild bundles the page and worker into `.build/`, with `sqlite3.wasm`. Every URL is relative |
 
@@ -75,7 +75,7 @@ off. `test/language-server.test.ts` runs the server alone over the real protocol
 
 ## Not done
 
-- **Hosting.** `.build/` is static files and can be served from any path, but nothing publishes it yet.
+- **Hosting.** `.build/` is static files and can be served from any path. The website (`apps/website`) hosts the playground at `/playground/`, in its own layout, and has not been published yet.
   Build it with `node build.mjs --minify`: a first visit is about 2.1 MB gzipped (Monaco is 1.1 MB of it, the
   run worker 0.3 MB, the SQLite engine 0.4 MB, the language server 0.2 MB).
 - **A real-browser test of Stop.** The timeout and stop logic is tested with a fake worker, because a query that
