@@ -176,24 +176,42 @@ export class TypeQLiteValidator {
           : 'type';
     this.checkAnnotationList(node.annotations, kind, accept);
     this.checkAnnotationList(node.subAnnotations, 'sub', accept);
-    this.checkAnnotationList(node.valueAnnotations, 'value type', accept, node.valueType);
+    // An entity or a relation collects its `sub` and `value` clauses in lists (the grammar lets them sit
+    // among the traits, so one can be written twice). A second one is refused, not silently dropped.
+    if (isEntityDef(node) || isRelationDef(node)) {
+      for (const [list, word, code] of [
+        [node.superTypes, 'sub', TypeQLiteValidationCode.repeatedClause],
+        [node.valueTypes, 'value', TypeQLiteValidationCode.repeatedClause],
+      ] as const) {
+        if (list.length > 1) {
+          accept('error', `'${node.name}' has more than one '${word}' clause. A type has at most one.`, {
+            node,
+            property: word === 'sub' ? 'superTypes' : 'valueTypes',
+            index: 1,
+            code,
+          });
+        }
+      }
+    }
+    const valueType = isEntityDef(node) || isRelationDef(node) ? node.valueTypes[0] : node.valueType;
+    this.checkAnnotationList(node.valueAnnotations, 'value type', accept, valueType);
 
-    if (node.valueType === undefined) return;
+    if (valueType === undefined) return;
     if (isEntityDef(node) || isRelationDef(node)) {
       // Parses because TypeQLite's type-constraint grammar is kind-agnostic; refused here because a
       // thing type has no value (`define.feature` L392, `; fails`).
       accept(
         'error',
         `${isEntityDef(node) ? 'An entity' : 'A relation'} type has no value type: ` +
-          `'${node.name} value ${node.valueType}' cannot be defined. Only an attribute has a value.`,
-        { node, property: 'valueType', code: TypeQLiteValidationCode.valueTypeOnThing },
+          `'${node.name} value ${valueType}' cannot be defined. Only an attribute has a value.`,
+        { node, property: 'valueTypes', index: 0, code: TypeQLiteValidationCode.valueTypeOnThing },
       );
       return;
     }
-    if (!VALUE_TYPES.has(node.valueType)) {
+    if (!VALUE_TYPES.has(valueType)) {
       accept(
         'error',
-        `'${node.valueType}' is not a value type. TypeDB 3 has: ` +
+        `'${valueType}' is not a value type. TypeDB 3 has: ` +
           `${[...VALUE_TYPES].filter((v) => v !== 'long').join(', ')}.`,
         { node, property: 'valueType', code: TypeQLiteValidationCode.unknownValueType },
       );

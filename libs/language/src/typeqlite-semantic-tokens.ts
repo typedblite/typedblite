@@ -64,7 +64,9 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
         type: SemanticTokenTypes.type,
         modifier: SemanticTokenModifiers.declaration,
       });
-      this.reference(node, 'superType', SemanticTokenTypes.type, acceptor);
+      node.superTypes.forEach((superType, index) => {
+        if (superType.ref) acceptor({ node, property: 'superTypes', index, type: SemanticTokenTypes.type });
+      });
       return;
     }
     if (isAttributeDef(node)) {

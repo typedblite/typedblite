@@ -8,6 +8,11 @@ they are listed here.
 ## [Unreleased]
 
 ### Changed
+- **`@typedblite/language`: `EntityDef` and `RelationDef` hold their `sub` and `value` clauses in lists** (`superTypes`, `valueTypes`),
+  not in `superType` and `valueType`. The grammar lets those clauses sit among a type's traits, so one could be written
+  twice, and the second overwrote the first without a word (Langium warned of it on every build). A second `sub` or
+  `value` on one entity or relation is now refused with `typedblite.repeated-clause`; TypeDB refuses it too (`DEX13`,
+  checked on 3.10.4). `AttributeDef` and the re-open and redefine nodes are unchanged.
 - The test fixtures are original: a project tracker (`tracker`, `people`, `sprint`, `documents`) replaces the schemas
   and example queries adapted from a downstream application, and the load test's `real-stores` suite is removed.
   The `growth`, `relations` and `concurrency` suites generate their own data, so the load test runs from this

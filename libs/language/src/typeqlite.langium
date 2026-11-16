@@ -71,8 +71,8 @@ EntityDef:
     (','? traits+=Trait (',' (traits+=Trait | EntityHead))*)? ';';
 
 fragment EntityHead:
-    'sub' superType=[EntityDef:ID] subAnnotations+=Annotation*
-    | 'value' valueType=ValueType valueAnnotations+=Annotation*;
+    'sub' superTypes+=[EntityDef:ID] subAnnotations+=Annotation*
+    | 'value' valueTypes+=ValueType valueAnnotations+=Annotation*;
 
 // `relation membership, relates member, relates team, owns membership-key @key;`
 RelationDef:
@@ -80,8 +80,8 @@ RelationDef:
     (','? traits+=Trait (',' (traits+=Trait | RelationHead))*)? ';';
 
 fragment RelationHead:
-    'sub' superType=[RelationDef:ID] subAnnotations+=Annotation*
-    | 'value' valueType=ValueType valueAnnotations+=Annotation*;
+    'sub' superTypes+=[RelationDef:ID] subAnnotations+=Annotation*
+    | 'value' valueTypes+=ValueType valueAnnotations+=Annotation*;
 
 // `attribute person-id, value string;`
 // `attribute age @independent, value integer;`          <- annotation on the type

@@ -28,7 +28,7 @@ import {
   type TypeQLiteFile,
   type TypeDefinition,
 } from '@typedblite/language';
-import { isTypeDefinition } from './type-definitions.js';
+import { declaredParentOf, declaredValueTypeOf, isTypeDefinition } from './type-definitions.js';
 import type { Range } from 'vscode-languageserver';
 import { DiagnosticCode, rangeOf, type DiagnosticCodeValue } from './diagnostics.js';
 import { ownsSubject, relatesSubject, typeSubject } from './schema-subjects.js';
@@ -135,12 +135,13 @@ export function checkSchemaRules(
       checkNoCycle(definition, name, before, refuse);
       checkAnnotationsForKind(definition, name, proposed, data, refuse);
       checkAbstractUnderConcrete(definition, name, file, proposed, refuse);
-      const declaredParent = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
+      const declaredParent = declaredParentOf(definition);
       if (isAttributeDef(definition) || (isTypeExtensionDef(definition) && proposed.attributes.has(name))) {
         checkAttributeValueType(definition, name, declaredParent, before, proposed, refuse);
       }
       if (declaredParent !== undefined) soFar.parents.set(name, declaredParent);
-      if (definition.valueType !== undefined) soFar.valueTypes.set(name, definition.valueType);
+      const valueType = declaredValueTypeOf(definition);
+      if (valueType !== undefined) soFar.valueTypes.set(name, valueType);
       if (isAttributeDef(definition)) continue;
       if (isTypeExtensionDef(definition)) {
         if (!proposed.attributes.has(name) && definition.valueType !== undefined) {
@@ -204,7 +205,8 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
       if (isEntityDef(definition) || isRelationDef(definition)) {
         types.add(name);
         if (isRelationDef(definition)) relations.add(name);
-        if (definition.superType) parents.set(name, definition.superType.$refText);
+        const parent = declaredParentOf(definition);
+        if (parent) parents.set(name, parent);
       }
       if (isAttributeDef(definition)) {
         attributes.add(name);
@@ -314,7 +316,7 @@ function checkKindUnchanged(definition: TypeDefinition, name: string, applied: S
  * a; c sub b;` in one statement is the switch it is.
  */
 function checkSupertypeUnchanged(definition: TypeDefinition, name: string, facts: SchemaFacts, refuse: Refuse): void {
-  const declared = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
+  const declared = declaredParentOf(definition);
   const before = facts.parents.get(name);
   if (declared === undefined || before === undefined || declared === before) return;
   refuse(
@@ -332,7 +334,7 @@ function checkSupertypeUnchanged(definition: TypeDefinition, name: string, facts
  * for a relation type (review, round 1).
  */
 function checkSupertypeKind(definition: TypeDefinition, name: string, proposed: SchemaFacts, refuse: Refuse): void {
-  const declared = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
+  const declared = declaredParentOf(definition);
   if (declared === undefined) return;
   const childKind = isEntityDef(definition)
     ? 'entity'
@@ -357,7 +359,7 @@ function checkSupertypeKind(definition: TypeDefinition, name: string, proposed: 
  * definition, so the one that closes the loop is the one named.
  */
 function checkNoCycle(definition: TypeDefinition, name: string, facts: SchemaFacts, refuse: Refuse): void {
-  const declared = isTypeExtensionDef(definition) ? definition.superType : definition.superType?.$refText;
+  const declared = declaredParentOf(definition);
   if (declared === undefined) return;
   if (declared !== name && !ancestorsOf(declared, facts).includes(name)) return;
   refuse(
