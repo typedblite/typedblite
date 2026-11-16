@@ -27,7 +27,7 @@
     },
     "dev": {
       "executor": "nx:run-commands",
-      "dependsOn": ["prepare"],
+      "dependsOn": ["prepare", "api", "playground:build"],
       "options": { "command": "astro dev", "cwd": "apps/website" }
     },
     "serve": {
