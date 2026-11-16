@@ -7,6 +7,7 @@
   "targets": {
     "prepare": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "options": { "command": "node scripts/sync-content.mjs", "cwd": "apps/website" }
     },
     "api": {
@@ -23,7 +24,7 @@
     "check": {
       "executor": "nx:run-commands",
       "dependsOn": ["build-site"],
-      "options": { "command": "node scripts/check-site.mjs", "cwd": "apps/website" }
+      "options": { "commands": ["node scripts/check-site.mjs", "node scripts/check-highlighting.mjs"], "parallel": false, "cwd": "apps/website" }
     },
     "dev": {
       "executor": "nx:run-commands",

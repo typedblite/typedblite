@@ -2,6 +2,7 @@
 import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 import { mountBuilt } from './src/integrations/mount-built.mjs';
+import { typeqliteSemanticTokens } from './src/plugins/typeqlite-semantic.mjs';
 import { readFileSync } from 'node:fs';
 
 // The editor's own TypeQLite grammar (copied here by scripts/sync-content.mjs), so a fence on the site is
@@ -27,7 +28,17 @@ export default defineConfig({
       customCss: ['./src/styles/site.css'],
       components: { Head: './src/components/Head.astro', Footer: './src/components/Footer.astro' },
       editLink: { baseUrl: 'https://github.com/typedblite/typedblite/edit/main/' },
-      expressiveCode: { shiki: { langs: [/** @type {any} */ (typeql)] } },
+      // The themes are VS Code's own Dark+ and Light+, the ones the editor and the playground use, so a fence is
+      // coloured as it is there. The plugin lays the language server's semantic tokens over the grammar's.
+      expressiveCode: {
+        themes: ['dark-plus', 'light-plus'],
+        useStarlightUiThemeColors: true,
+        // Expressive Code darkens or lightens a syntax colour that is under 5.5:1 against the background. Off, the
+        // colours are the themes' own, the ones the editor shows.
+        minSyntaxHighlightingColorContrast: 0,
+        plugins: [typeqliteSemanticTokens()],
+        shiki: { langs: [/** @type {any} */ (typeql)] },
+      },
       sidebar: [
         {
           label: 'Start here',
