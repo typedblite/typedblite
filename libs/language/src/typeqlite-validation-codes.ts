@@ -28,6 +28,8 @@ export const TypeQLiteValidationCode = {
   annotationArguments: 'typedblite.annotation-arguments',
   /** `entity cream value double` — a thing type has no value. */
   valueTypeOnThing: 'typedblite.value-type-on-thing',
+  /** `entity a sub b, sub c` — a second `sub` or `value` clause on one type. */
+  repeatedClause: 'typedblite.repeated-clause',
   /** `value rgba` — a name that is not a value type. */
   unknownValueType: 'typedblite.unknown-value-type',
   duplicateOwns: 'typedblite.duplicate-owns',

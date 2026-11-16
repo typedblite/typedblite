@@ -17,7 +17,7 @@ import {
   type FunctionDefinition,
   type StructDef,
 } from '@typedblite/language';
-import { isTypeDefinition } from './type-definitions.js';
+import { declaredParentOf, isTypeDefinition } from './type-definitions.js';
 import {
   recordCategory,
   recordText,
@@ -264,9 +264,7 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
         // `person sub parent;` and `name value integer;` — a re-open may assign either, and the
         // interpreter has already refused the ones TypeDB refuses. A re-open's parent is a plain
         // name; a definition's is a cross-reference.
-        const superType = isTypeExtensionDef(definition)
-          ? definition.superType
-          : definition.superType?.$refText;
+        const superType = declaredParentOf(definition);
         if (superType) subtypes.push([name, superType]);
         if (isTypeExtensionDef(definition) && definition.valueType) {
           valueTypes.push([name, definition.valueType]);

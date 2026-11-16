@@ -81,7 +81,7 @@ import {
   type UndefineClause,
   type TypeDefinition,
 } from '@typedblite/language';
-import { isTypeDefinition } from './type-definitions.js';
+import { declaredParentOf, isTypeDefinition } from './type-definitions.js';
 import type { Range } from 'vscode-languageserver';
 import {
   attachDiagnostic,
@@ -1223,9 +1223,7 @@ export class TypeDBLiteInterpreter {
           // *other* branch of that early return.
           // A definition's parent is a cross-reference; a re-open's is a plain name. Both are the
           // type's parent once applied.
-          const superType = isTypeExtensionDef(definition)
-            ? definition.superType
-            : definition.superType?.$refText;
+          const superType = declaredParentOf(definition);
           if (superType) this.schema.parents.set(name, superType);
           if (isTypeExtensionDef(definition) && definition.valueType) {
             this.schema.valueTypes.set(name, definition.valueType);
@@ -3011,7 +3009,7 @@ export class TypeDBLiteInterpreter {
             this.diagnostics.error(DiagnosticCode.unknownType, message, rangeOf(definition)),
           );
         }
-        const parent = definition.superType?.$refText;
+        const parent = declaredParentOf(definition);
         if (parent === undefined) continue;
         const known = isAttributeDef(definition) ? attributes : types;
         if (known.has(parent)) continue;

@@ -177,7 +177,7 @@ export class TypeQLiteLabels {
     const relations = this.definitionsOf(name, [RelationDef.$type]).filter(isRelationDef);
     return relations.concat(
       relations.flatMap((relation) => {
-        const parent = relation.superType?.$refText;
+        const parent = relation.superTypes[0]?.$refText;
         return parent ? this.relationChain(parent, seen) : [];
       }),
     );
