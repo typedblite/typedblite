@@ -38,6 +38,8 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
+      # website:check opens the playground in Chromium.
+      - run: npx playwright-core install --with-deps chromium
       # website:check builds everything the site contains, then fails on any broken internal link.
       - run: npm exec nx -- run website:check
       - uses: actions/upload-pages-artifact@v3

@@ -1,0 +1,42 @@
+/*
+ * The playground's own styles, shared by the two pages that host it: the standalone page (index.html,
+ * which defines the colours below) and the website's (apps/website/src/pages/playground.astro, which maps
+ * them onto Starlight's). Everything is scoped to `.pg`, so it cannot reach the page around it, and it
+ * reads colours only from these custom properties:
+ *
+ *   --pg-ink --pg-muted --pg-line --pg-panel --pg-code --pg-accent --pg-accent-ink --pg-error --pg-error-bg
+ */
+.pg { color: var(--pg-ink); font: 16px/1.5 system-ui, sans-serif; container-type: inline-size; container-name: pg; }
+.pg * { box-sizing: border-box; }
+.pg-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pg-toolbar label { font-weight: 600; }
+.pg select, .pg button { font: inherit; min-height: 44px; padding: 0 16px; border: 1px solid var(--pg-line); border-radius: 8px; background: var(--pg-panel); color: var(--pg-ink); }
+.pg button { cursor: pointer; }
+.pg button.primary { background: var(--pg-accent); border-color: var(--pg-accent); color: var(--pg-accent-ink); font-weight: 600; }
+.pg button:disabled { opacity: .55; cursor: not-allowed; }
+.pg :focus-visible { outline: 3px solid var(--pg-accent); outline-offset: 2px; }
+.pg a { color: var(--pg-accent); }
+.pg #status { color: var(--pg-muted); margin-left: auto; }
+.pg-panes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@container pg (min-width: 52rem) { .pg-panes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.pg-pane { background: var(--pg-panel); border: 1px solid var(--pg-line); border-radius: 12px; padding: 12px; min-width: 0; }
+.pg-pane h2 { margin: 0 0 8px; padding: 0; border: 0; font-size: 1rem; line-height: 1.5; }
+.pg #editor { width: 100%; height: 420px; border: 1px solid var(--pg-line); border-radius: 8px; overflow: hidden; }
+.pg #output { min-height: 420px; overflow-x: auto; }
+.pg .step { border: 1px solid var(--pg-line); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+.pg .step > header { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 12px; background: var(--pg-code); font-size: .875rem; color: var(--pg-muted); }
+.pg .step > header strong { color: var(--pg-ink); }
+.pg .step .body { padding: 8px 12px; overflow-x: auto; }
+.pg .step.has-error { border-color: var(--pg-error); }
+.pg table { border-collapse: collapse; width: 100%; margin: 0; font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.pg th, .pg td { text-align: left; padding: 4px 12px 4px 0; border: 0; border-bottom: 1px solid var(--pg-line); background: none; vertical-align: top; }
+.pg th { color: var(--pg-muted); font-weight: 600; }
+.pg pre.documents { margin: 0 0 8px; padding: 8px; background: var(--pg-code); border-radius: 6px; overflow-x: auto; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.pg ul.notes { margin: 8px 0 0; padding-left: 20px; color: var(--pg-muted); font-size: .875rem; }
+.pg .error { margin: 0; padding: 8px 12px; background: var(--pg-error-bg); color: var(--pg-error); border-radius: 6px; font-weight: 500; }
+.pg .error button { min-height: 32px; margin-left: 8px; padding: 0 8px; }
+.pg .omitted { color: var(--pg-muted); font-size: .875rem; margin: 8px 0 0; }
+.pg .empty { color: var(--pg-muted); }
+.pg-notes { margin-top: 16px; color: var(--pg-muted); font-size: .875rem; }
+.pg-notes p { margin: 4px 0; }
+.pg code { font: .9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--pg-code); padding: 1px 4px; border-radius: 4px; }

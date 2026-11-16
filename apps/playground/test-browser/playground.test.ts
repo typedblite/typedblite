@@ -185,10 +185,31 @@ describe('the playground in Chromium', () => {
     const page = await open();
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme });
-      const [link, accent] = await page.evaluate(() => [getComputedStyle(document.querySelector('footer a')!).color, getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()]);
+      const [link, accent] = await page.evaluate(() => [getComputedStyle(document.querySelector('footer a')!).color, getComputedStyle(document.documentElement).getPropertyValue('--pg-accent').trim()]);
       const hex = (rgb: string) => '#' + (rgb.match(/\d+/g) ?? []).slice(0, 3).map((n) => Number(n).toString(16).padStart(2, '0')).join('');
       expect(hex(link!)).toBe(accent);
     }
+  });
+
+  it("follows a host page's data-theme over the system's scheme, and takes the editor's colours from the page", async () => {
+    // The website hosts the playground in Starlight, which sets `data-theme` on <html> whatever the system says.
+    const page = await open();
+    await page.emulateMedia({ colorScheme: 'light' });
+    const surface = () => page.evaluate(() => ({
+      dark: document.querySelector('.monaco-editor')!.classList.contains('vs-dark'),
+      background: getComputedStyle(document.querySelector('.monaco-editor-background')!).backgroundColor,
+    }));
+    expect((await surface()).dark).toBe(false);
+    await page.evaluate(() => {
+      document.documentElement.dataset['theme'] = 'dark';
+      document.documentElement.style.setProperty('--pg-code', '#102030');
+    });
+    await page.waitForFunction(() => document.querySelector('.monaco-editor')!.classList.contains('vs-dark'));
+    expect((await surface()).background).toBe('rgb(16, 32, 48)');
+    await page.evaluate(() => {
+      document.documentElement.dataset['theme'] = 'light';
+    });
+    await page.waitForFunction(() => !document.querySelector('.monaco-editor')!.classList.contains('vs-dark'));
   });
 
   it('switches between its light and dark logos with the browser theme', async () => {

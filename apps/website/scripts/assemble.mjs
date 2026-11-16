@@ -1,6 +1,6 @@
 /**
- * Puts the other two built pieces into the site: the playground at /playground/ and the API reference at
- * /api/. The playground's page uses relative URLs throughout, so it works from any path. Both must be built
+ * Puts the other two built pieces into the site: the playground's scripts, workers and `.wasm` beside the page
+ * Astro builds at /playground/, and the API reference at /api/. Both must be built
  * first (website:build depends on them).
  */
 import { cpSync, existsSync, writeFileSync } from 'node:fs';
@@ -21,7 +21,10 @@ for (const [from, to, how] of parts) {
     console.error(`assemble: ${from}/index.html is missing. Build it first: ${how}`);
     process.exit(1);
   }
-  cpSync(source, join(DIST, to), { recursive: true });
+  // The playground's own index.html is for its standalone page: the site has its own page at /playground/,
+  // built by Astro around the playground's markup (src/pages/playground.astro), which must not be overwritten.
+  const keep = (file) => !(to === 'playground' && file === join(source, 'index.html'));
+  cpSync(source, join(DIST, to), { recursive: true, filter: keep });
 }
 // GitHub Pages serves the custom domain from this file, and `.nojekyll` stops it processing the files.
 writeFileSync(join(DIST, 'CNAME'), 'typedblite.dev\n');

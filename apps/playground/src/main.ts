@@ -28,7 +28,7 @@ const status = el('status');
 let runProgram: () => void = () => undefined;
 const program = createProgramEditor(el('editor'), { onRun: () => runProgram() });
 
-const runner = new Runner(() => new Worker(new URL('worker.js', document.baseURI), { type: 'module' }) as unknown as WorkerLike);
+const runner = new Runner(() => new Worker(new URL('worker.js', import.meta.url), { type: 'module' }) as unknown as WorkerLike);
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, props: { class?: string; text?: string } = {}, ...children: Node[]): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
