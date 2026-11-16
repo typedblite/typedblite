@@ -161,6 +161,10 @@ function copyBrand() {
   copyFileSync(join(ROOT, 'apps/vscode/syntaxes/typeqlite.tmLanguage.json'), join(SITE, 'src/generated/typeqlite.tmLanguage.json'));
 }
 
+// Astro caches each page's rendered HTML, keyed by its Markdown and not by the highlighting plugin or the themes,
+// so a change to either would leave stale colours in the pages. Start every build from an empty cache.
+rmSync(join(SITE, 'node_modules/.astro'), { recursive: true, force: true });
+rmSync(join(SITE, '.astro'), { recursive: true, force: true });
 for (const section of GENERATED_SECTIONS) rmSync(join(DOCS, section), { recursive: true, force: true });
 for (const row of table) generate(row);
 copyBrand();

@@ -7,7 +7,10 @@
   "description": "The typedblite.dev site: the guides, the API reference, the tour and the playground, as static files.",
   "devDependencies": {
     "@astrojs/starlight": "^0.43.1",
+    "@typedblite/language": "*",
     "astro": "^7.4.12",
+    "astro-expressive-code": "^0.44.3",
+    "langium": "~4.4.2",
     "mermaid": "^12.3.0",
     "sharp": "^0.35.5"
   }

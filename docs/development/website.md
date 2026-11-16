@@ -27,9 +27,22 @@ links to an unpublished document is dropped. To publish another document, add a 
 `astro.config.mjs` if it is not in an auto-generated group).
 
 Also generated, from other places: the brand files (`docs/brand/`) and the favicon, and the TypeQLite grammar that
-colours code fences, which is the VS Code extension's own (`apps/vscode/syntaxes/typeqlite.tmLanguage.json`), so a
-`typeql` fence looks on the site as it does in the editor. ```` ```mermaid ```` fences are drawn in the browser,
+colours code fences, which is the VS Code extension's own (`apps/vscode/syntaxes/typeqlite.tmLanguage.json`). ```` ```mermaid ```` fences are drawn in the browser,
 in the reader's theme.
+
+## How a TypeQLite fence is coloured
+
+As in the editor, in two layers. Shiki colours it with the TextMate grammar, in VS Code's own Dark+ and Light+ themes
+(`minSyntaxHighlightingColorContrast: 0`, so the colours are the themes' and Expressive Code does not adjust them).
+Over that, `src/plugins/typeqlite-semantic.mjs` runs **the language server's semantic token provider** (the
+`TypeQLiteSemanticTokenProvider` the extension and the playground run) on each fence at build time, and colours each
+token by what the theme gives the scope VS Code falls back to for its type. A name that resolves to a type, an attribute
+or a variable gets that colour, and one that does not resolve keeps the grammar's, as in the editor.
+
+A fence is highlighted **on its own**, with no schema around it. So a query in one fence does not know the types a
+`define` in an earlier fence declared, and its names keep the grammar's colour. Put the schema in the same fence to
+get them coloured. `scripts/check-highlighting.mjs` (part of `website:check`) checks the tokens, that fences
+highlighted at once do not mix (the provider keeps state), and that the colours are the playground's.
 
 ## Commands
 
