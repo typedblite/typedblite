@@ -538,7 +538,8 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       `typedblite.dev` for the landing page and docs, `/playground` for the playground, `/api` for the TypeDoc
       reference. **Built, not published (2026-11-15): `apps/website`** (Astro Starlight; every page generated from the
       repository's Markdown; `website:check` follows every internal link; [The website](../../development/website.md)).
-      `site.yml` deploys it and has never run. Left: public repository or Pages-capable plan, Pages source, DNS and
+      The playground is a page inside the site's Starlight layout, and the API reference is generated as pages of it
+      (`starlight-typedoc`), so the whole site has one shell. `site.yml` deploys it and has never run. Left: public repository or Pages-capable plan, Pages source, DNS and
       HTTPS, and removing the "not on npm yet" notices at launch.
 - [ ] Mail on the domain: a `security@` and a `hello@` alias (forwarding is enough) so `SECURITY.md` and
       the press kit don't depend on a personal address. Add SPF/DKIM/DMARC if the aliases will send.

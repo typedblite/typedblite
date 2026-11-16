@@ -10,14 +10,9 @@
       "dependsOn": ["^build"],
       "options": { "command": "node scripts/sync-content.mjs", "cwd": "apps/website" }
     },
-    "api": {
-      "executor": "nx:run-commands",
-      "options": { "command": "typedoc", "cwd": "." },
-      "outputs": ["{workspaceRoot}/dist/api"]
-    },
     "build-site": {
       "executor": "nx:run-commands",
-      "dependsOn": ["prepare", "api", "playground:build"],
+      "dependsOn": ["prepare", "playground:build"],
       "options": { "commands": ["astro build", "node scripts/assemble.mjs"], "parallel": false, "cwd": "apps/website" },
       "outputs": ["{projectRoot}/dist"]
     },
@@ -28,7 +23,7 @@
     },
     "dev": {
       "executor": "nx:run-commands",
-      "dependsOn": ["prepare", "api", "playground:build"],
+      "dependsOn": ["prepare", "playground:build"],
       "options": { "command": "astro dev", "cwd": "apps/website" }
     },
     "serve": {

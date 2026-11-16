@@ -21,7 +21,7 @@
     "clean-room": "node tools/clean-room.mjs",
     "tour": "node tools/tour.mjs",
     "check-api": "node tools/check-api.mjs",
-    "docs:api": "typedoc"
+    "docs:api": "typedoc --out dist/api"
   },
   "devDependencies": {
     "@nx/js": "24.0.6",
