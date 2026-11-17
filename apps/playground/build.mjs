@@ -20,6 +20,7 @@ const WASM = join(dirname(require.resolve('@sqlite.org/sqlite-wasm/package.json'
 // Monaco's package root, found from its CommonJS entry (`<root>/min/vs/index.js`) so that a hoisted install
 // does not matter. Its `exports` map reaches `esm/vs/**` only.
 const MONACO = join(dirname(require.resolve('monaco-editor')), '../..');
+const NUNITO = join(dirname(require.resolve('@fontsource-variable/nunito/package.json')), 'files/nunito-latin-wght-normal.woff2');
 const minify = process.argv.includes('--minify');
 
 rmSync(OUT, { recursive: true, force: true });
@@ -39,6 +40,8 @@ await build({
   assetNames: '[name]',
 });
 copyFileSync(WASM, join(OUT, 'sqlite3.wasm'));
+// The standalone page's heading font (the website's page has its own copy), subset to Latin.
+copyFileSync(NUNITO, join(OUT, 'nunito.woff2'));
 // The page's markup is a fragment shared by two pages: the standalone one (index.html, which this puts it in) and
 // the website's, which wraps it in Starlight's layout (apps/website/src/pages/playground.astro reads app.html).
 const app = readFileSync(join(SRC, 'app.html'), 'utf8');
