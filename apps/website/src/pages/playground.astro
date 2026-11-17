@@ -8,6 +8,7 @@
  */
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
 import app from '../../../playground/.build/app.html?raw';
+import { REPO_PUBLIC, REPO_URL } from '../../scripts/content-map.mjs';
 ---
 
 <StarlightPage
@@ -15,7 +16,7 @@ import app from '../../../playground/.build/app.html?raw';
     title: 'Playground',
     description: 'Try TypeQLite in your browser: TypeDBLite running on WASM SQLite, with nothing to install.',
     tableOfContents: false,
-    editUrl: 'https://github.com/typedblite/typedblite/edit/main/apps/playground/src/app.html',
+    editUrl: REPO_PUBLIC ? `${REPO_URL}/edit/main/apps/playground/src/app.html` : false,
     head: [
       { tag: 'link', attrs: { rel: 'stylesheet', href: '/playground/main.css' } },
       { tag: 'link', attrs: { rel: 'stylesheet', href: '/playground/app.css' } },

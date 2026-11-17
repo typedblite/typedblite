@@ -10,7 +10,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ADR_DIR, ADR_ROUTE, BRANCH, PAGES, REPO_URL, UNPUBLISHED } from './content-map.mjs';
+import { ADR_DIR, ADR_ROUTE, BRANCH, PAGES, REPO_PUBLIC, REPO_URL, UNPUBLISHED } from './content-map.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SITE = resolve(HERE, '..');
@@ -90,7 +90,7 @@ function rewriteLinks(markdown, source) {
       if (/^\s*[-*] /.test(line)) return null;
       line = line.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (all, text, t) => (unpublished(t) ? text : all));
     }
-    return line
+    return unlinkRepo(line
       .split(/(`[^`]*`)/)
       .map((part) => {
         if (part.startsWith('`')) return part;
@@ -99,8 +99,15 @@ function rewriteLinks(markdown, source) {
           .replace(/^(\s*\[[^\]]+\]:\s*)(\S+)/, (_, a, target) => `${a}${rewriteTarget(target, source)}`)
           .replace(/(<(?:a|img|source)\s[^>]*?(?:href|src|srcset)=")([^"]+)(")/g, (_, a, target, c) => `${a}${rewriteTarget(target, source)}${c}`);
       })
-      .join('');
+      .join(''));
   });
+}
+
+/** While the repository is private, a link to it becomes its text: `[the file](https://github.com/…)` -> `the file`. */
+function unlinkRepo(line) {
+  if (REPO_PUBLIC) return line;
+  const link = new RegExp(`\\[((?:[^\\]\\[]|\`[^\`]*\`)*)\\]\\(${REPO_URL.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}[^)\\s]*(?:\\s+"[^"]*")?\\)`, 'g');
+  return line.replace(link, '$1');
 }
 
 const yaml = (s) => JSON.stringify(s);
@@ -135,7 +142,7 @@ function generate(row) {
     '---',
     `title: ${yaml(row.label && row.route.startsWith('decisions/') ? `${row.label}: ${title.replace(/^ADR-\d+:\s*/, '')}` : title)}`,
     `description: ${yaml(describe(body))}`,
-    `editUrl: ${yaml(`${REPO_URL}/edit/${BRANCH}/${row.source}`)}`,
+    `editUrl: ${REPO_PUBLIC ? yaml(`${REPO_URL}/edit/${BRANCH}/${row.source}`) : 'false'}`,
     ...(row.label ? [`sidebar:\n  label: ${yaml(row.label)}`] : []),
     '---',
     '',

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { mountBuilt } from './src/integrations/mount-built.mjs';
 import { typeqliteSemanticTokens } from './src/plugins/typeqlite-semantic.mjs';
 import { readFileSync } from 'node:fs';
+import { REPO_PUBLIC, REPO_URL } from './scripts/content-map.mjs';
 
 // The editor's own TypeQLite grammar (copied here by scripts/sync-content.mjs), so a fence on the site is
 // coloured the way it is in VS Code. `typeql` is what the guides write; the other names are aliases.
@@ -26,7 +27,8 @@ export default defineConfig({
         "TypeDB's data model and the TypeQL query language in your own process: a TypeScript engine over SQLite. No server, no native binary.",
       logo: { light: './src/assets/brand/typedblite-logo.svg', dark: './src/assets/brand/typedblite-logo-dark.svg', alt: 'TypeDBLite', replacesTitle: true },
       favicon: '/favicon.svg',
-      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/typedblite/typedblite' }],
+      // Both GitHub links wait for the repository to be public (REPO_PUBLIC, scripts/content-map.mjs).
+      social: REPO_PUBLIC ? [{ icon: 'github', label: 'GitHub', href: REPO_URL }] : [],
       // The API reference: TypeDoc's output as Markdown pages (typedoc-plugin-markdown), so it is in the same layout, search
       // and theme as every other page. It reads the repository's own typedoc.json (entry points, validation, warnings as
       // errors), the one `npm run check-api` runs, so there is a single configuration. The pages are written to
@@ -54,7 +56,7 @@ export default defineConfig({
       ],
       customCss: ['./src/styles/site.css'],
       components: { Head: './src/components/Head.astro', Footer: './src/components/Footer.astro' },
-      editLink: { baseUrl: 'https://github.com/typedblite/typedblite/edit/main/' },
+      ...(REPO_PUBLIC ? { editLink: { baseUrl: `${REPO_URL}/edit/main/` } } : {}),
       // The themes are VS Code's own Dark+ and Light+, the ones the editor and the playground use, so a fence is
       // coloured as it is there. The plugin lays the language server's semantic tokens over the grammar's.
       expressiveCode: {
