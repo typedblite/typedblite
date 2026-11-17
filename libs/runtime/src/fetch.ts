@@ -36,6 +36,7 @@ import type { Binding } from './type-patterns.js';
  * ownership is `@card(0..1)`; `@key` is exactly one.
  */
 
+/** A JSON value: null, a boolean, a number, a string, or an array or object of them. A `fetch` answers with one per result. */
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 /** What a `fetch` may read, from the query and the schema alone. */

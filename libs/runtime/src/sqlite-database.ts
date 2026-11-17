@@ -14,7 +14,7 @@ export interface SqliteRunResult {
 }
 
 /**
- * The overloads mirror `node:sqlite`'s: positional parameters, or one named-parameter object
+ * A prepared statement. The overloads mirror `node:sqlite`'s: positional parameters, or one named-parameter object
  * (optionally followed by positional ones).
  */
 export interface SqliteStatement {

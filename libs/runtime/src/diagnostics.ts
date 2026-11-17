@@ -14,6 +14,7 @@ import { TypeQLiteValidationCode } from '@typedblite/language';
  * *attached* to the thrown error, never substituted for it. See `attachDiagnostic`.
  */
 
+/** The `source` of every diagnostic the engine produces. */
 export const DIAGNOSTIC_SOURCE = 'typedblite';
 
 /**
