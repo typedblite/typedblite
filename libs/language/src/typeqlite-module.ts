@@ -36,7 +36,11 @@ import {
   TypeQLiteReferencesProvider,
 } from './typeqlite-label-providers.js';
 
-/** Language-specific services — the seam ADR-002 Decision 7's middle layer lives in. */
+/**
+ * Language-specific services — the seam ADR-002 Decision 7's middle layer lives in.
+ *
+ * @category Setup
+ */
 export interface TypeQLiteAddedServices {
   /** The validator whose checks `registerValidationChecks` registers. */
   validation: {
@@ -48,13 +52,19 @@ export interface TypeQLiteAddedServices {
   };
 }
 
-/** Langium's services for a language, with TypeQLite's added: its validator and its label resolver. */
+/**
+ * Langium's services for a language, with TypeQLite's added: its validator and its label resolver.
+ *
+ * @category Setup
+ */
 export type TypeQLiteServices = LangiumServices & TypeQLiteAddedServices;
 
 /**
  * The services TypeQLite writes itself, which replace or add to Langium's defaults: the formatter, semantic tokens,
  * outline, hover, definition, references, completion, rename and code actions, the label resolver, the scope
  * provider and computation, and the validator and registry.
+ *
+ * @category Setup
  */
 export const TypeQLiteModule: Module<
   TypeQLiteServices,
@@ -95,7 +105,11 @@ export const TypeQLiteModule: Module<
   },
 };
 
-/** Services shared across languages: here, only what kind of symbol each definition is. */
+/**
+ * Services shared across languages: here, only what kind of symbol each definition is.
+ *
+ * @category Setup
+ */
 export const TypeQLiteSharedModule: Module<LangiumSharedServices, PartialLangiumSharedServices> = {
   lsp: {
     NodeKindProvider: () => new TypeQLiteNodeKindProvider(),
@@ -112,6 +126,7 @@ export const TypeQLiteSharedModule: Module<LangiumSharedServices, PartialLangium
  * @param context The file system and, for a language server, the connection. Use `EmptyFileSystem` from Langium
  * where there is no disk.
  * @returns `shared`, the services of the workspace, and `TypeQLite`, those of the language.
+ * @category Setup
  */
 export function createTypeQLiteServices(context: DefaultSharedModuleContext): {
   shared: LangiumSharedServices;

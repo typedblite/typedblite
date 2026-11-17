@@ -18,6 +18,8 @@ import type { TypeQLiteServices } from './typeqlite-module.js';
  * 🔴 LSP 3.18 (`vscode-languageserver` 10) widened `Diagnostic.message` to `string | MarkupContent`.
  * Every TypeQLite check reports a string, and the runtime's execution reports (ADR-004) carry
  * strings, so this API keeps saying so instead of passing the widening on to every caller.
+ *
+ * @category Validation
  */
 export type SyncDiagnostic = Omit<Diagnostic, 'message'> & { message: string };
 
@@ -36,6 +38,8 @@ export type SyncDiagnostic = Omit<Diagnostic, 'message'> & { message: string };
  * however the rule was written. That is right for the language server, which awaits them, and it is
  * what stops a synchronous engine using the registry at all: the promise is the wrapper's, not the
  * rule's, and there is no way to drain a microtask synchronously.
+ *
+ * @category Validation
  */
 export class SyncValidationRegistry extends ValidationRegistry {
   /**
@@ -83,6 +87,8 @@ export class SyncValidationRegistry extends ValidationRegistry {
  * ⚠️ **A check that returns a promise is refused, not awaited.** Silently ignoring one would mean a
  * rule that appears registered and never runs — the shape ADR-002 D7 exists to prevent. If a rule
  * ever needs to be async, this function is what says so.
+ *
+ * @category Validation
  */
 export function validateSync(
   services: TypeQLiteServices,

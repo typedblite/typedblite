@@ -81,7 +81,16 @@ standalone HTML reference to `dist/api`, which the site does not use. `src/plugi
 that points a doc comment's link to an architecture decision record at its page (`/decisions/…`) rather than at a copy of
 the file, and stops those copies being made. The overview pages are `/api/` and `/api/typedblite/<package>/`
 (`entryFileName: 'index'`), each listing its members in a table with a one-line description from the doc comment
-(`indexFormat: 'table'`; `npm run check-api` fails when a name has no doc comment, so none is blank). A maintainer's `🔴` or `⚠️` note on an exported name sits under `@privateRemarks`, which TypeDoc leaves out of these pages. The pages for the generated syntax tree say once that they are generated from the grammar. The overview's title is set with
+(`indexFormat: 'table'`; `npm run check-api` fails when a name has no doc comment, so none is blank). A maintainer's `🔴` or `⚠️` note on an exported name sits under `@privateRemarks`, which TypeDoc leaves out of these pages. The pages for the generated syntax tree say once that they are generated from the grammar. Each package's page is grouped by what the names are for, not by kind: a name's `@category` tag puts it in a section
+(Engine, Replication, Validation, …), and the package's `@module` comment describes each section with
+`@categoryDescription` and carries the overview prose and an example. A re-export takes the category of what it re-exports, and the
+generated syntax tree is put in "Syntax tree" by `tools/typedoc-categories.mjs` (loaded from `typedoc.json` and, because the
+site's `plugin` option may replace that list, from `astro.config.mjs` too), since `langium generate` rewrites the files a tag
+would live in. TypeDoc checks every `@categoryDescription` against every group, so `categorizeByGroup` stays `false`; with it on, each
+description warns for each kind that lacks the category, and warnings are errors. A name without a category in a package that uses them
+lands in "Other", so tag a new export. A class or interface page opens with a
+"Member summary" (a table per group: constructors, properties, accessors, methods, each member's first sentence, linked to its
+heading), which `typedoc-site.mjs` builds from the page TypeDoc rendered, so the sentence is the doc comment's. The overview's title is set with
 `name: 'API reference'` and its introduction is added by the plugin. Because the TypeDoc run reads the packages' sources and the generated AST, `website:prepare`
 builds the libraries first.
 

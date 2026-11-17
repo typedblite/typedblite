@@ -46,10 +46,16 @@ import {
 /**
  * What a label position expects to name. `type` is any thing type. A role carries the label of its
  * relation when the surrounding pattern says which relation it is.
+ *
+ * @category Language features
  */
 export type LabelKind = 'type' | 'entity' | 'relation' | 'attribute' | 'role';
 
-/** A position in a document where TypeQLite names a type or a role with a plain `ID`. */
+/**
+ * A position in a document where TypeQLite names a type or a role with a plain `ID`.
+ *
+ * @category Language features
+ */
 export interface LabelSite {
   /** The label as written. */
   readonly name: string;
@@ -76,7 +82,11 @@ const TARGETS: Record<Exclude<LabelKind, 'role'>, readonly string[]> = {
   attribute: [AttributeDef.$type],
 };
 
-/** The Langium services, with TypeQLite's label resolver: what the label-aware providers are constructed with. */
+/**
+ * The Langium services, with TypeQLite's label resolver: what the label-aware providers are constructed with.
+ *
+ * @category Language features
+ */
 export type TypeQLiteLabelServices = LangiumServices & { labels: { Labels: TypeQLiteLabels } };
 
 /**
@@ -88,6 +98,8 @@ export type TypeQLiteLabelServices = LangiumServices & { labels: { Labels: TypeQ
  * 🔴 They stay plain `ID`s on purpose. The runtime reads them as strings in hundreds of places, and a
  * query has no schema in scope when it runs. So they are resolved here, in the editor, through the
  * workspace index (ADR-008 D3), and nothing here is a validation check (ADR-008 D2).
+ *
+ * @category Language features
  */
 export class TypeQLiteLabels {
   private readonly index: IndexManager;
@@ -209,6 +221,8 @@ export class TypeQLiteLabels {
  * @privateRemarks
  *
  * 🔴 Keep it in step with `sitesOf` below; `labels.spec.ts` checks that every entry still names a real rule and property.
+ *
+ * @category Language features
  */
 export const LABEL_POSITIONS: Readonly<Record<string, LabelKind>> = {
   'IsaProperty.type': 'type',

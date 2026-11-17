@@ -7,7 +7,11 @@
  * data corruption rather than like a bug in this file.
  */
 
-/** One attribute of a thing. Values are TEXT in storage, so the encoding does not type them. */
+/**
+ * One attribute of a thing. Values are TEXT in storage, so the encoding does not type them.
+ *
+ * @category Canonical form
+ */
 export interface CanonicalAttribute {
   /** The attribute type's label. */
   readonly type: string;
@@ -15,7 +19,11 @@ export interface CanonicalAttribute {
   readonly value: string;
 }
 
-/** One role a thing plays, naming the *entity id* of the player — never a local `iid`. */
+/**
+ * One role a thing plays, naming the *entity id* of the player — never a local `iid`.
+ *
+ * @category Canonical form
+ */
 export interface CanonicalRole {
   /** The role's label. */
   readonly role: string;
@@ -26,6 +34,8 @@ export interface CanonicalRole {
 /**
  * Everything about a thing that a revision covers: its type, its attributes and the roles it plays. What
  * {@link canonical} encodes and {@link computeRevision} hashes.
+ *
+ * @category Canonical form
  */
 export interface EntityState {
   /** The thing's type label. */
@@ -72,6 +82,8 @@ function sortedRoles(roles: readonly CanonicalRole[]): readonly string[] {
  * An attribute that is absent and one that is present with an empty value encode differently: the
  * first contributes nothing, the second contributes a field of length zero. That distinction is
  * deliberate — they are different states and must not share a revision.
+ *
+ * @category Canonical form
  */
 export function canonical(state: EntityState): string {
   const attributes = sortedAttributes(state.attributes);

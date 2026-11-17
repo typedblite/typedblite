@@ -2,6 +2,17 @@
  * The SQLite binding on the official WASM build, for a browser, a Web Worker, Electron or a Capacitor WebView
  * (ADR-009). Call {@link initWasmSqlite} once, then pass {@link openWasmSqlite} as `openDatabase`.
  *
+ * ```ts
+ * import { TypeDBLiteInterpreter } from '@typedblite/runtime';
+ * import { initWasmSqlite, openWasmSqlite } from '@typedblite/runtime/wasm';
+ *
+ * await initWasmSqlite();
+ * const db = new TypeDBLiteInterpreter(':memory:', undefined, { openDatabase: openWasmSqlite });
+ * ```
+ *
+ * @categoryDescription SQLite binding
+ * Starting SQLite's WASM build and opening a database with it, in memory or persisted to the Origin Private File System.
+ *
  * @module @typedblite/runtime/wasm
  */
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
@@ -44,7 +55,11 @@ type Oo1Db = InstanceType<Sqlite3['oo1']['DB']>;
 let sqlite3: Sqlite3 | undefined;
 const keepers = new Map<string, Oo1Db>();
 
-/** How {@link initWasmSqlite} starts SQLite. */
+/**
+ * How {@link initWasmSqlite} starts SQLite.
+ *
+ * @category SQLite binding
+ */
 export interface WasmSqliteOptions {
   /** Emscripten module options, for example `locateFile` when the `.wasm` is served from a URL. */
   readonly moduleOptions?: Record<string, unknown>;
@@ -76,6 +91,7 @@ let pool: PoolUtil | undefined;
  *
  * @param options Where to find the `.wasm`, and whether to persist to the Origin Private File System.
  * @returns The initialised `@sqlite.org/sqlite-wasm` module.
+ * @category SQLite binding
  */
 export async function initWasmSqlite(
   options: WasmSqliteOptions = {},
@@ -101,14 +117,22 @@ export async function initWasmSqlite(
   return sqlite3;
 }
 
-/** What the SAH pool holds: for diagnosing a database that is not where it was left. */
+/**
+ * What the SAH pool holds: for diagnosing a database that is not where it was left.
+ *
+ * @category SQLite binding
+ */
 export function poolInfo(): { files: string[]; capacity: number } | undefined {
   return pool === undefined
     ? undefined
     : { files: pool.getFileNames(), capacity: pool.getCapacity() };
 }
 
-/** Remove every database file in the SAH pool (for a clean run). */
+/**
+ * Remove every database file in the SAH pool (for a clean run).
+ *
+ * @category SQLite binding
+ */
 export async function wipeOpfsPool(): Promise<void> {
   await pool?.wipeFiles();
 }
@@ -232,7 +256,11 @@ class WasmDatabase implements SqliteDatabase {
   }
 }
 
-/** A synchronous opener. Throws if `initWasmSqlite()` has not completed. */
+/**
+ * A synchronous opener. Throws if `initWasmSqlite()` has not completed.
+ *
+ * @category SQLite binding
+ */
 export const openWasmSqlite: SqliteOpener = (
   location: string,
 ): SqliteDatabase => {

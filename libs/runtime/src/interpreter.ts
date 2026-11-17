@@ -121,7 +121,11 @@ import { ChangeLog, type EntityIdentity } from './change-log.js';
 
 const { TypeQLite } = createTypeQLiteServices(EmptyFileSystem);
 
-/** What a row cell can be — the driver's `Concept` kinds TypeDBLite answers with. */
+/**
+ * What a row cell can be — the driver's `Concept` kinds TypeDBLite answers with.
+ *
+ * @category Engine
+ */
 export type ConceptKind = 'entity' | 'relation' | 'attribute' | 'value' | 'type';
 
 /**
@@ -147,6 +151,8 @@ export type ConceptKind = 'entity' | 'relation' | 'attribute' | 'value' | 'type'
  * - a **value**: a value type and a value (an expression's or a reducer's result);
  * - a **type** (Phase 05): a schema type by its label — `person`, or a role type as
  *   `employment:employee` — what `match $x sub person;` answers. No iid, no value.
+ *
+ * @category Engine
  */
 export class TypeDBLiteValue {
   private constructor(
@@ -294,7 +300,11 @@ export class TypeDBLiteValue {
   }
 }
 
-/** The schema applied to a database, as sorted lists: what `schemaSnapshot()` returns. */
+/**
+ * The schema applied to a database, as sorted lists: what `schemaSnapshot()` returns.
+ *
+ * @category Engine
+ */
 export interface TypeDBLiteSchemaSnapshot {
   /** The entity and relation types, which are the things that can have instances. */
   readonly types: readonly string[];
@@ -392,6 +402,8 @@ const SUBTYPES_OF =
  * Off by default and then costs nothing: no proxy wraps the database and every hook is a single
  * `undefined` check. Enabled by the `trace` constructor option or `TYPEDBLITE_TRACE=1`, and read
  * with `lastQueryTrace()` — nothing is printed.
+ *
+ * @category Engine
  */
 export interface QueryTrace {
   /** Output size of each stage of `combinations()`, in the order the stages ran. */
@@ -414,7 +426,11 @@ export interface QueryTrace {
   statementsExecuted: number;
 }
 
-/** How an interpreter opens its database and runs queries: the third argument of its constructor. */
+/**
+ * How an interpreter opens its database and runs queries: the third argument of its constructor.
+ *
+ * @category Engine
+ */
 export interface TypeDBLiteOptions {
   /** Record a `QueryTrace` per `query()`; defaults to `TYPEDBLITE_TRACE` being set to a truthy value. */
   trace?: boolean;
@@ -569,10 +585,16 @@ interface ThingConstraint {
 /**
  * The rows a `given` stage receives (given.feature): one record per row, keyed by variable name
  * without its `$`. `null` is an absent value — admitted only for a variable declared optional (`?`).
+ *
+ * @category Engine
  */
 export type GivenRows = ReadonlyArray<Readonly<Record<string, TypeDBLiteValue | null>>>;
 
-/** What `execute()` reports: its diagnostics, and what its last write pipeline answers. */
+/**
+ * What `execute()` reports: its diagnostics, and what its last write pipeline answers.
+ *
+ * @category Engine
+ */
 export interface WriteReport extends ExecutionReport {
   /** The rows the last write pipeline answers, when it ends in `select` or similar. */
   readonly rows: ReadonlyArray<Record<string, TypeDBLiteValue>>;
@@ -627,6 +649,8 @@ interface StreamScope {
  * Deliberately an **interpreter, not a SQL generator**: bindings are resolved by executing, so a
  * failing statement can say which one it was and a constraint violation knows which attribute it
  * was writing. That last point is not a nicety — see `translateConstraintError`.
+ *
+ * @category Engine
  */
 export class TypeDBLiteInterpreter {
   private readonly db: SqliteDatabase;

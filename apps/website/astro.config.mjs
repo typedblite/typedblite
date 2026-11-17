@@ -36,7 +36,11 @@ export default defineConfig({
           output: 'api',
           typeDoc: {
             options: fileURLToPath(new URL('../../typedoc.json', import.meta.url)),
-            plugin: [fileURLToPath(new URL('./src/plugins/typedoc-site.mjs', import.meta.url))],
+            // The categories plugin is in typedoc.json too; a `plugin` given here may replace that list, and loading it twice is harmless.
+            plugin: [
+              fileURLToPath(new URL('../../tools/typedoc-categories.mjs', import.meta.url)),
+              fileURLToPath(new URL('./src/plugins/typedoc-site.mjs', import.meta.url)),
+            ],
             // /api/ and /api/typedblite/runtime/ are the overview pages, not .../readme/.
             entryFileName: 'index',
             // A table of Name and Description, not a bare list, for the overview and for each package's members.

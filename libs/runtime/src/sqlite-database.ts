@@ -1,13 +1,29 @@
-/** A value bound to a statement parameter, or read back from a column. */
+/**
+ * A value bound to a statement parameter, or read back from a column.
+ *
+ * @category SQLite binding
+ */
 export type SqliteParameter = string | number | bigint | null | Uint8Array;
 
-/** A row as SQLite returns it: column name to value. */
+/**
+ * A row as SQLite returns it: column name to value.
+ *
+ * @category SQLite binding
+ */
 export type SqliteRow = Record<string, unknown>;
 
-/** Named parameters, keyed WITHOUT the `:`/`@`/`$` prefix. */
+/**
+ * Named parameters, keyed WITHOUT the `:`/`@`/`$` prefix.
+ *
+ * @category SQLite binding
+ */
 export type SqliteNamedParameters = Record<string, SqliteParameter>;
 
-/** What `run` reports. Only `changes` is read — see `SqliteStatement.run`. */
+/**
+ * What `run` reports. Only `changes` is read — see `SqliteStatement.run`.
+ *
+ * @category SQLite binding
+ */
 export interface SqliteRunResult {
   /** Rows inserted, updated or deleted. `node:sqlite` returns a `number` (a `bigint` only when asked). */
   readonly changes: number | bigint;
@@ -16,6 +32,8 @@ export interface SqliteRunResult {
 /**
  * A prepared statement. The overloads mirror `node:sqlite`'s: positional parameters, or one named-parameter object
  * (optionally followed by positional ones).
+ *
+ * @category SQLite binding
  */
 export interface SqliteStatement {
   /** The first row, or `undefined` when there is none. */
@@ -56,6 +74,8 @@ export interface SqliteStatement {
  * - **`run()` reports `changes`** exactly — see `SqliteStatement.run`.
  * - **`exec` runs more than one statement** when given more than one (schema DDL does).
  * - **The pragmas the constructor sets** (`busy_timeout`, `case_sensitive_like`, `journal_mode`) must be accepted. A binding with no WAL (an in-memory or single-connection OPFS database) may report a different journal mode, which the engine already tolerates; it must not throw.
+ *
+ * @category SQLite binding
  */
 export interface SqliteDatabase {
   /** Runs one or more statements that return nothing, such as schema DDL. */
@@ -71,5 +91,9 @@ export interface SqliteDatabase {
   readonly isTransaction?: boolean;
 }
 
-/** Opens a database at `location` (`:memory:` or a path the binding understands). */
+/**
+ * Opens a database at `location` (`:memory:` or a path the binding understands).
+ *
+ * @category SQLite binding
+ */
 export type SqliteOpener = (location: string) => SqliteDatabase;

@@ -1,6 +1,10 @@
 import { TypeDBLiteInterpreter, type TypeDBLiteOptions, type TypeDBLiteSchemaSnapshot } from './interpreter.js';
 
-/** One result row, shaped the way `rowString` and `rowNumber` read it. */
+/**
+ * One result row, shaped the way `rowString` and `rowNumber` read it.
+ *
+ * @category Engine
+ */
 export interface EngineRow {
   readonly [variable: string]: unknown;
 }
@@ -19,6 +23,8 @@ export interface EngineRow {
  * direct dependency either way would work and would quietly make SQLite *the* engine, which
  * Decision 1 exists to prevent — this is the default adapter, and a TypeDB server over the network
  * is another.
+ *
+ * @category Engine
  */
 export class SqliteEngine {
   private readonly interpreter: TypeDBLiteInterpreter;

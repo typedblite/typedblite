@@ -8,6 +8,8 @@ they are listed here.
 ## [Unreleased]
 
 ### Changed
+- **The API reference's package pages are grouped by purpose and open with an overview.** Each package page lists its names under sections such as Engine, Replication and Validation, each with a description, instead of one alphabetical table per kind; the language package's generated syntax tree has a section of its own. The runtime, language, content-revision and WASM pages gained an introduction with a short example, and link the guides.
+- **Each class and interface page in the API reference opens with a member summary**: a table per group (constructors, properties, accessors, methods) with each member's first sentence, linked to its detail below.
 - **The API reference shows no maintainer notes, and describes the generated syntax tree's properties.** Notes marked `🔴` or `⚠️` on an exported name moved under `@privateRemarks`, which TypeDoc leaves out, and a few comments were reworded where the note was the only description. The properties of the generated node types (`EntityDef.name`, `OwnsTrait.ordered`, …) are described from their types and, for a flag, from the keyword the grammar writes. `check-api` fails on a `🔴` or `⚠️` note that would show.
 - **Every name in the API has a doc comment**, and so has every member a class or interface declares itself, so the API
   reference describes everything it lists. `npm run check-api` now fails when one is missing. The generated syntax tree

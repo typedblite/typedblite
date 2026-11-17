@@ -11,6 +11,14 @@
   "readme": "none",
   "excludePrivate": true,
   "excludeInternal": true,
+  "plugin": ["./tools/typedoc-categories.mjs"],
+  "categorizeByGroup": false,
+  "categoryOrder": [
+    "Engine", "Diagnostics", "Change log", "Full-text search", "Replication", "Change stream", "SQLite binding",
+    "Canonical form", "Revisions",
+    "Setup", "Syntax tree", "Validation", "Language features", "Annotations", "Highlighting",
+    "*"
+  ],
   "validation": {
     "notExported": true,
     "invalidLink": true,

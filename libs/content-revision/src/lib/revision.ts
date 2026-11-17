@@ -15,12 +15,20 @@
 import { canonical, type EntityState } from './canonical.js';
 import { sha256Hex } from './sha256.js';
 
-/** `generation-digest`, e.g. `2-9f86d081884c7d659a2feaa0c55ad015`. */
+/**
+ * `generation-digest`, e.g. `2-9f86d081884c7d659a2feaa0c55ad015`.
+ *
+ * @category Revisions
+ */
 export type Revision = string;
 
 const DIGEST_LENGTH = 32;
 
-/** What {@link computeRevision} derives a revision from. */
+/**
+ * What {@link computeRevision} derives a revision from.
+ *
+ * @category Revisions
+ */
 export interface RevisionInput {
   /** Absent for a tombstone, which has no state. */
   readonly state?: EntityState;
@@ -34,6 +42,7 @@ export interface RevisionInput {
  * The generation of a revision: the number before the dash, 1 for an entity's first revision.
  *
  * @throws if `rev` is not `<generation>-<digest>`.
+ * @category Revisions
  */
 export function generationOf(rev: Revision): number {
   const generation = Number(rev.slice(0, rev.indexOf('-')));
@@ -43,7 +52,11 @@ export function generationOf(rev: Revision): number {
   return generation;
 }
 
-/** The digest of a revision: everything after the first dash. */
+/**
+ * The digest of a revision: everything after the first dash.
+ *
+ * @category Revisions
+ */
 export function digestOf(rev: Revision): string {
   return rev.slice(rev.indexOf('-') + 1);
 }
@@ -59,6 +72,8 @@ export function digestOf(rev: Revision): string {
  * Concatenating with a printable separator would let a crafted attribute value shift the boundary
  * between state and parent, so two different revisions hash alike. `\0` cannot appear in a
  * revision, and the state's own encoding is unforgeable.
+ *
+ * @category Revisions
  */
 export function computeRevision(input: RevisionInput): Revision {
   const generation = input.parent ? generationOf(input.parent) + 1 : 1;
@@ -69,7 +84,11 @@ export function computeRevision(input: RevisionInput): Revision {
   return `${generation}-${digest}`;
 }
 
-/** A leaf of an entity's revision tree: a revision nothing has superseded, live or deleted. */
+/**
+ * A leaf of an entity's revision tree: a revision nothing has superseded, live or deleted.
+ *
+ * @category Revisions
+ */
 export interface Leaf {
   /** The leaf's revision. */
   readonly rev: Revision;
@@ -85,6 +104,8 @@ export interface Leaf {
  * Deliberately consults nothing else — not insertion order, not arrival order, not a clock. Those
  * are exactly what differ between nodes, and a rule reading any of them picks a different winner on
  * each, which is divergence rather than a conflict.
+ *
+ * @category Revisions
  */
 export function winner(leaves: readonly Leaf[]): Leaf | undefined {
   if (leaves.length === 0) return undefined;
@@ -100,7 +121,11 @@ export function winner(leaves: readonly Leaf[]): Leaf | undefined {
   });
 }
 
-/** Every leaf that is not the winner — the equivalent of CouchDB's `_conflicts`. */
+/**
+ * Every leaf that is not the winner — the equivalent of CouchDB's `_conflicts`.
+ *
+ * @category Revisions
+ */
 export function conflicts(leaves: readonly Leaf[]): readonly Leaf[] {
   const won = winner(leaves);
   return won ? leaves.filter((leaf) => leaf.rev !== won.rev) : [];
@@ -121,6 +146,8 @@ export function conflicts(leaves: readonly Leaf[]): readonly Leaf[] {
  * ⚠️ **Every version is treated as live** (`deleted: false`) — a domain that ever needs to exclude a
  * tombstoned version from "latest" is a different question this function does not yet answer, not
  * a bug in it.
+ *
+ * @category Revisions
  */
 export function latestOf<T extends { readonly revision: Revision }>(
   versions: readonly T[],

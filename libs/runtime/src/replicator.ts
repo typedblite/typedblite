@@ -8,7 +8,11 @@
  */
 import type { ChangeRecord } from './change-log.js';
 
-/** Which way a replication moves changes: `push` sends the local ones, `pull` takes the remote ones, `duplex` does both. */
+/**
+ * Which way a replication moves changes: `push` sends the local ones, `pull` takes the remote ones, `duplex` does both.
+ *
+ * @category Replication
+ */
 export type SyncDirection = 'push' | 'pull' | 'duplex';
 
 /**
@@ -19,6 +23,8 @@ export type SyncDirection = 'push' | 'pull' | 'duplex';
  * have pulled and how far we have pushed — and one string cannot carry both without encoding a
  * record inside it, which is an opaque token pretending not to be one. Prior art's
  * `SyncResult { checkpointToken: string }` is exactly that shape, and it is why it was rejected.
+ *
+ * @category Replication
  */
 export interface SyncCursor {
   /** How far the local store has pulled: the last `seq` of the remote's log it applied. */
@@ -27,7 +33,11 @@ export interface SyncCursor {
   readonly push?: number;
 }
 
-/** What one replication did. */
+/**
+ * What one replication did.
+ *
+ * @category Replication
+ */
 export interface SyncOutcome {
   /** Where each direction got to: keep it and pass it as `from` to resume. */
   readonly cursor: SyncCursor;
@@ -37,7 +47,11 @@ export interface SyncOutcome {
   readonly conflicts: number;
 }
 
-/** What replication needs of a store. `ChangeLog` satisfies it structurally. */
+/**
+ * What replication needs of a store. `ChangeLog` satisfies it structurally.
+ *
+ * @category Replication
+ */
 export interface ReplicationEndpoint {
   /** The changes after `cursor` (default 0), at most `limit`, in order. */
   since(cursor?: number, limit?: number): readonly ChangeRecord[];
@@ -53,7 +67,11 @@ export interface ReplicationEndpoint {
   conflictsOf(entityId: string): readonly { rev: string; deleted: boolean }[];
 }
 
-/** How {@link replicateOnce} replicates. */
+/**
+ * How {@link replicateOnce} replicates.
+ *
+ * @category Replication
+ */
 export interface ReplicateOptions {
   /** Which way to move changes. */
   readonly direction: SyncDirection;
@@ -104,6 +122,8 @@ function drain(
  * Idempotent: applying a revision twice is absorbed by `UNIQUE (entity_id, rev)`, so a run that is
  * interrupted after applying but before its caller stores the cursor repeats work rather than
  * losing or duplicating it.
+ *
+ * @category Replication
  */
 export function replicateOnce(
   local: ReplicationEndpoint,

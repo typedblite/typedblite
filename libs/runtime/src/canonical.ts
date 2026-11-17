@@ -29,6 +29,8 @@ export { canonical } from '@typedblite/content-revision';
  * value, which is what makes two nodes agree they are describing the same entity — and which the
  * schema already enforces as unique via a partial `UNIQUE INDEX ON has(attribute) WHERE type = <key>`:
  * one key attribute instance, owned once (ADR-006).
+ *
+ * @category Change log
  */
 export function entityId(
   type: string,
@@ -39,7 +41,11 @@ export function entityId(
   return `${type}/${keyAttribute.value}`;
 }
 
-/** Whether an entity id names something two nodes could agree on. */
+/**
+ * Whether an entity id names something two nodes could agree on.
+ *
+ * @category Change log
+ */
 export function isReplicable(id: string): boolean {
   return !id.startsWith('local:');
 }

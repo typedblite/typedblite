@@ -40,6 +40,8 @@ import {
  * (`undefine.feature`). Those `relates` live under the extension, not the `RelationDef`. Since
  * ADR-008 D3 they are gathered from the whole workspace, through the index, not only from the
  * relation's own document.
+ *
+ * @category Language features
  */
 export class TypeQLiteScopeProvider extends DefaultScopeProvider {
   private readonly documents: LangiumDocuments;

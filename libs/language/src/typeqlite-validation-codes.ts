@@ -11,6 +11,8 @@
  * `typedblite.card-not-implemented` — for one rule, `@card`. A consumer branching on the code would
  * have handled one and silently missed the other, and the codes are documented as *"stable
  * identifiers a consumer can branch on"*.
+ *
+ * @category Validation
  */
 export const TypeQLiteValidationCode = {
   /**
@@ -46,6 +48,10 @@ export const TypeQLiteValidationCode = {
   unknownLabel: 'typedblite.unknown-label',
 } as const;
 
-/** A diagnostic code of a validation rule: one of the values of {@link TypeQLiteValidationCode}. */
+/**
+ * A diagnostic code of a validation rule: one of the values of {@link TypeQLiteValidationCode}.
+ *
+ * @category Validation
+ */
 export type TypeQLiteValidationCodeValue =
   (typeof TypeQLiteValidationCode)[keyof typeof TypeQLiteValidationCode];
