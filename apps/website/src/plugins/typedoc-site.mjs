@@ -65,8 +65,8 @@ function describeMember(lines, start) {
   return firstSentence(paragraph.join(' ')).replace(/\|/g, '\\|');
 }
 
-/** A table of each group's members, linked to their headings, to put above the first group; `undefined` where there is nothing to list. */
-function memberSummary(contents) {
+/** A table of each group's members (a constructor is shown as `new ClassName()`), linked to their headings, to put above the first group; `undefined` where there is nothing to list. */
+function memberSummary(contents, className) {
   const lines = contents.split('\n');
   const slug = slugger();
   const headings = [];
@@ -89,7 +89,7 @@ function memberSummary(contents) {
       '',
       '| Name | Description |',
       '| ------ | ------ |',
-      ...group.members.map((member) => `| [${member.text}](#${member.id}) | ${describeMember(lines, member.line)} |`),
+      ...group.members.map((member) => `| [${member.text === 'Constructor' ? `new ${className}()` : member.text}](#${member.id}) | ${describeMember(lines, member.line)} |`),
     ].join('\n'),
   );
   return { line: listed[0].line, text: `## Member summary\n\n${tables.join('\n\n')}\n` };
@@ -106,7 +106,7 @@ export function load(app) {
       .replace(GENERATED_SOURCE, () => (said++ === 0 ? `Generated from [the TypeQLite grammar](${GRAMMAR_URL}).` : ''));
     // A class or an interface: what it has, before the detail of each.
     if (/(^|\/)(classes|interfaces)\/[^/]+\.md$/.test(page.url) && page.contents) {
-      const summary = memberSummary(page.contents);
+      const summary = memberSummary(page.contents, page.model?.name ?? 'Constructor');
       if (summary) {
         const lines = page.contents.split('\n');
         lines.splice(summary.line, 0, summary.text);
