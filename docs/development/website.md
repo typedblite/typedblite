@@ -124,4 +124,6 @@ cd apps/website && npx cf@latest deploy ./dist
 The site was first planned for GitHub Pages; that workflow (`site.yml`) never ran and has been removed, along with the
 `CNAME` and `.nojekyll` files the build used to write for it. The domain is set by `cloudflare.config.ts`.
 
-Before launch, read the landing page's "Pre-release" notice and the guides' "not on npm yet" notes, and remove them.
+At the first release (the packages on npm, and the repository public), read the landing page's "Pre-release" notice, the
+README's "Not on npm" bullet and the guides' "not on npm yet" notes, and remove them. Until then they are true: the
+landing page and the README also say the repository is not public yet.
