@@ -50,6 +50,11 @@ The wordmark is set in [Nunito](https://fonts.google.com/specimen/Nunito) (SIL O
 "TypeDB" in SemiBold (600), "Lite" in Regular (400) and signal orange, tracked at −0.02em. In the
 logo files, text 64 units high sits beside a 112-unit mark with a 24-unit gap.
 
+Headings, on the website and the playground, are set in Nunito too. Body text is set in
+[Inter](https://fonts.google.com/specimen/Inter) (SIL Open Font Licence). It is a neutral sans that
+contrasts with Nunito's rounded forms and stays readable at small sizes. Both fonts are self-hosted
+(Fontsource), so no page asks a third party for them. Code stays in the reader's monospace font.
+
 ## Using the logo
 
 - Leave clear space around the logo at least as wide as one node of the mark.
