@@ -57,12 +57,21 @@ function describeMember(lines, start) {
   for (let i = start + 1; i < lines.length && !/^#{1,3} /.test(lines[i]); i++) {
     const line = lines[i];
     if (/^```/.test(line)) fenced = !fenced;
+    // A member with no description reaches its parameters: that is not one. A signature's heading comes before its description.
+    if (!fenced && /^#{4,6} /.test(line) && !/^#{4,6} (Call|Get|Set|Construct) Signature$/.test(line)) break;
     const meta = fenced || /^(>|#|\*\*\*|Defined in:|Inherited from:|Overrides:|Implementation of:|Implementations:)/.test(line);
     if (paragraph.length > 0 && (line.trim() === '' || meta)) break;
     if (paragraph.length === 0 && (line.trim() === '' || meta)) continue;
     paragraph.push(line.trim());
   }
-  return firstSentence(paragraph.join(' ')).replace(/\|/g, '\\|');
+  const sentence = firstSentence(paragraph.join(' ')).replace(/\|/g, '\\|');
+  if (sentence !== '') return sentence;
+  // A member a dependency's class declares, which has no description: say whose it is.
+  for (let i = start + 1; i < lines.length && !/^#{1,3} /.test(lines[i]); i++) {
+    const inherited = lines[i].match(/^Defined in: node\\?_modules\/((?:@[^/]+\/)?[^/]+)\//);
+    if (inherited) return `Inherited from \`${inherited[1]}\`.`;
+  }
+  return '';
 }
 
 /** A table of each group's members (a constructor is shown as `new ClassName()`), linked to their headings, to put above the first group; `undefined` where there is nothing to list. */
@@ -89,7 +98,7 @@ function memberSummary(contents, className) {
       '',
       '| Name | Description |',
       '| ------ | ------ |',
-      ...group.members.map((member) => `| [${member.text === 'Constructor' ? `new ${className}()` : member.text}](#${member.id}) | ${describeMember(lines, member.line)} |`),
+      ...group.members.map((member) => `| [${member.text === 'Constructor' ? `new ${className}()` : member.text}](#${member.id}) | ${describeMember(lines, member.line) || (member.text === 'Constructor' ? `Creates a ${className}.` : '')} |`),
     ].join('\n'),
   );
   return { line: listed[0].line, text: `## Member summary\n\n${tables.join('\n\n')}\n` };

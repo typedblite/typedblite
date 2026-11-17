@@ -442,7 +442,7 @@ export interface TypeDBLiteOptions {
    */
   planJoins?: boolean;
   /**
-   * How to open the database. Defaults to `node:sqlite`. Pass another binding (a WASM SQLite in a
+   * The function that opens the SQLite connection, `node:sqlite` by default. Pass another binding (a WASM SQLite in a
    * worker) to run the interpreter where Node's built-ins do not exist; see `sqlite-database.ts` for
    * what a binding must honour.
    */
@@ -677,7 +677,7 @@ export class TypeDBLiteInterpreter {
   private readonly planningFunctions = new Set<FunctionDefinition>();
 
   /**
-   * The change log (ADR-003 D1). Its rows are written inside `execute`'s existing transaction, so a
+   * The change log, which records every committed write as a revision (ADR-003 D1). Its rows are written inside `execute`'s existing transaction, so a
    * write and its log entry commit or roll back together — never a commit followed by a publish
    * that a crash can lose.
    */
@@ -1206,7 +1206,7 @@ export class TypeDBLiteInterpreter {
     this.schema.roles.set(relation, roles);
   }
 
-  /** Apply a schema. Re-applying is normal — a projector replays, and `IF NOT EXISTS` carries it. */
+  /** Apply a schema: its `define`, `redefine` and `undefine` clauses, checked against the data already stored. Re-applying is normal — a projector replays, and `IF NOT EXISTS` carries it. */
   define(text: string): ExecutionReport {
     useSchemaFunctions(this.schemaFunctionDefinitions);
     // Inside a caller's transaction the schema change is a savepoint within it (applySchemaDdl,
@@ -2838,7 +2838,7 @@ export class TypeDBLiteInterpreter {
     }
   }
 
-  /** Never throws: a rollback that fails after the engine already ended the transaction is moot. */
+  /** Roll back the transaction `beginTransaction` opened. Never throws: a rollback that fails after the engine already ended the transaction is moot. */
   rollbackTransaction(): void {
     try {
       this.db.exec('ROLLBACK');

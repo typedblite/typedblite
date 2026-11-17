@@ -24,7 +24,7 @@ export interface ChangeStreamHandlers {
   onChange(record: ChangeRecord): void;
   /** Caught up — nothing further for now. Not a terminal state. */
   onPaused?(): void;
-  /** Receiving. */
+  /** Receiving changes from the hub. */
   onActive?(): void;
   /**
    * `'transport'` is the connection; `'apply'` is `onChange` itself throwing.
@@ -127,7 +127,7 @@ export class ChangeStreamClient {
     return (await this.options.headers?.()) ?? {};
   }
 
-  /** Push revisions to the hub. The other half of duplex — SSE has no back-channel. */
+  /** Push revisions to the hub, and resolve to how many it applied. The other half of duplex — SSE has no back-channel. */
   public async push(records: readonly ChangeRecord[], signal?: AbortSignal): Promise<number> {
     const response = await fetch(`${this.url}/changes`, {
       signal,
@@ -144,7 +144,7 @@ export class ChangeStreamClient {
   }
 
   /**
-   * Subscribe. Reconnects on a dropped connection, resuming from `Last-Event-ID`.
+   * Subscribe to the hub's change stream, handing each change to `handlers`. Reconnects on a dropped connection, resuming from `Last-Event-ID`.
    *
    * @privateRemarks
    * 🔴 Being caught up is `paused`, never terminal. Prior art's coordinator returned early once it
