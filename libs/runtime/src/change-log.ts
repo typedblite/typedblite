@@ -110,9 +110,9 @@ export interface CompactionOptions {
 export interface CompactionReport {
   /** Things with history in the log. */
   readonly entities: number;
-  /** Revisions in the log before. */
+  /** The number of revisions in the log before compaction. */
   readonly revisionsBefore: number;
-  /** Revisions in the log after. */
+  /** The number of revisions in the log after compaction. */
   readonly revisionsAfter: number;
   /** Revisions removed: `revisionsBefore - revisionsAfter`. */
   readonly removed: number;
@@ -356,7 +356,7 @@ export class ChangeLog {
   }
 
   /**
-   * Record a write. Idempotent by construction: a revision is derived from its state and parent, so
+   * Record a write to the thing with this local `iid`, as a revision of its current state. Idempotent by construction: a revision is derived from its state and parent, so
    * re-recording an unchanged entity computes the same `rev` and the `UNIQUE (entity_id, rev)`
    * constraint absorbs it. That matters because one TypeQLite insert touches a thing, then each of its
    * attributes, then each of its roles — the same entity is "touched" several times per pipeline.
@@ -406,7 +406,7 @@ export class ChangeLog {
   }
 
   /**
-   * Record a tombstone. Takes an identity captured **before** the delete ran, because afterwards
+   * Record that a thing was deleted, as a tombstone revision. Takes an identity captured **before** the delete ran, because afterwards
    * there is nothing left to read.
    */
   public recordTombstone(identity: EntityIdentity): void {

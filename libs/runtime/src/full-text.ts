@@ -20,7 +20,7 @@ import type { EntityState } from './canonical.js';
 export interface SearchHit {
   /** The thing that matched, as `entityId` spells it. */
   readonly entityId: string;
-  /** BM25 score. Lower is better, matching SQLite's convention. */
+  /** How well it matched, as a BM25 score. Lower is better, matching SQLite's convention. */
   readonly rank: number;
 }
 

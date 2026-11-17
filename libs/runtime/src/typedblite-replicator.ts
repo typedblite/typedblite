@@ -69,7 +69,7 @@ export interface ReplicationEvents {
  * @category Replication
  */
 export interface ReplicationSession {
-  /** Where it is now. */
+  /** Where the replication is now, as a {@link SyncStatus}. */
   readonly status: SyncStatus;
   /** Stops it: the subscription and the pushing. */
   cancel(): Promise<void>;
