@@ -6,6 +6,8 @@
  * already a page, so this points each such link at it (`/decisions/adr-003-…/`; a guide, likewise, at `/guide/<name>/`) and stops the copies being made: Starlight
  * would treat them as pages of their own and refuse them for lack of a title.
  */
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { MarkdownPageEvent, MarkdownRendererEvent } from 'typedoc-plugin-markdown';
 import { REPO_PUBLIC, REPO_URL } from '../../scripts/content-map.mjs';
 
@@ -105,6 +107,39 @@ function memberSummary(contents, className) {
   return { line: listed[0].line, text: `## Member summary\n\n${tables.join('\n\n')}\n` };
 }
 
+
+const CATEGORIES = { classes: 'Classes', interfaces: 'Interfaces', functions: 'Functions', variables: 'Variables', 'type-aliases': 'Type Aliases' };
+const CATEGORY_PAGE = /^(.+)\/(classes|interfaces|functions|variables|type-aliases)\/([^/]+)\.md$/;
+// The pages of the current run, by the folder of the package or module they belong to, then by category: what each category's listing is made of.
+const listed = new Map();
+
+/** What a declaration's page opens with, in a sentence: the page without its front matter and the "generated from" note, which is not a description. */
+function describePage(contents) {
+  const lines = contents.replace(/^---\n[\s\S]*?\n---\n/, '\n').split('\n').filter((line) => !/^Generated from /.test(line));
+  return describeMember(lines, 0);
+}
+
+/** The `index.md` of one category's folder: every declaration in it, with its description, as the package's own page lists its categories. */
+function categoryPage(dir, category, entries) {
+  const where = `\`${dir}\``;
+  const rows = entries
+    .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }))
+    .map((e) => `| [${e.name}](/api/${dir.replace(/@/g, '')}/${category}/${e.file.toLowerCase()}/) | ${e.description} |`);
+  return `---
+editUrl: false
+next: false
+prev: false
+title: "${dir}: ${CATEGORIES[category]}"
+---
+
+${CATEGORIES[category]} that ${where} exports.
+
+| Name | Description |
+| ------ | ------ |
+${rows.join('\n')}
+`;
+}
+
 /** @param {import('typedoc').Application} app */
 export function load(app) {
   app.renderer.on(MarkdownPageEvent.END, (page) => {
@@ -128,12 +163,27 @@ export function load(app) {
         page.contents = lines.join('\n');
       }
     }
+    const category = page.contents && page.url.match(CATEGORY_PAGE);
+    if (category) {
+      const [, dir, kind, file] = category;
+      const key = `${dir}\n${kind}`;
+      if (!listed.has(key)) listed.set(key, []);
+      listed.get(key).push({ name: page.model?.name ?? file, file, description: describePage(page.contents) });
+    }
     // The overview page has nothing above its table of modules, so say what this is and where to start.
     if (page.url === 'index.md') page.contents = page.contents?.replace(/^## Modules$/m, `${OVERVIEW}\n\n## Modules`);
   });
   // typedoc-plugin-markdown copies the media right after this event, from the project's file registry, and
   // offers no switch. Leave the registry with nothing to copy.
   app.renderer.on(MarkdownRendererEvent.END, (event) => {
+    // A folder of classes, of functions…, has no page of its own from TypeDoc: write the listing the sidebar's group label links to.
+    for (const [key, entries] of listed) {
+      const [dir, kind] = key.split('\n');
+      const folder = join(event.outputDirectory, dir, kind);
+      mkdirSync(folder, { recursive: true });
+      writeFileSync(join(folder, 'index.md'), categoryPage(dir, kind, entries));
+    }
+    listed.clear();
     event.project.files.getNameToAbsoluteMap = () => new Map();
   });
 }
