@@ -49,6 +49,10 @@ export function digestOf(rev: Revision): string {
 }
 
 /**
+ * Derives a revision from an entity's state, its parent and whether it deletes it. The generation is the parent's plus one
+ * (1 for the first revision), and the digest is a hash of the content, so the same edit on the same parent gives the same
+ * revision on every node.
+ *
  * 🔴 The separator is `\0`, and the parts are length-prefixed by `canonical` already.
  *
  * Concatenating with a printable separator would let a crafted attribute value shift the boundary

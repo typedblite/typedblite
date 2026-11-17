@@ -1,7 +1,8 @@
 import { AstUtils, GrammarAST, GrammarUtils, stream, type Grammar } from 'langium';
 
 /**
- * The TypeQLite TextMate grammar: what an editor colours before, and underneath, the semantic tokens.
+ * The TextMate scope of each keyword of TypeQLite, by scope: what an editor colours before, and underneath, the semantic
+ * tokens.
  *
  * 🔴 **The keywords come from the Langium grammar; only their scopes are written here.** Langium's
  * own generator gives every keyword one scope, `keyword.control`, so a theme draws `define`,

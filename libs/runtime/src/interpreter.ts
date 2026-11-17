@@ -404,6 +404,7 @@ export interface QueryTrace {
   statementsExecuted: number;
 }
 
+/** How an interpreter opens its database and runs queries: the third argument of its constructor. */
 export interface TypeDBLiteOptions {
   /** Record a `QueryTrace` per `query()`; defaults to `TYPEDBLITE_TRACE` being set to a truthy value. */
   trace?: boolean;
@@ -556,13 +557,6 @@ interface ThingConstraint {
 }
 
 /**
- * Executes TypeQLite against SQLite.
- *
- * Deliberately an **interpreter, not a SQL generator**: bindings are resolved by executing, so a
- * failing statement can say which one it was and a constraint violation knows which attribute it
- * was writing. That last point is not a nicety — see `translateConstraintError`.
- */
-/**
  * The rows a `given` stage receives (given.feature): one record per row, keyed by variable name
  * without its `$`. `null` is an absent value — admitted only for a variable declared optional (`?`).
  */
@@ -616,6 +610,14 @@ interface StreamScope {
   readonly inserted?: Map<string, string>;
 }
 
+/**
+ * The engine: executes TypeQLite against SQLite. Open a database with `new TypeDBLiteInterpreter(path)`, `define` a
+ * schema, then `execute` writes and `query` reads.
+ *
+ * Deliberately an **interpreter, not a SQL generator**: bindings are resolved by executing, so a
+ * failing statement can say which one it was and a constraint violation knows which attribute it
+ * was writing. That last point is not a nicety — see `translateConstraintError`.
+ */
 export class TypeDBLiteInterpreter {
   private readonly db: SqliteDatabase;
   private schema: SchemaModel = {

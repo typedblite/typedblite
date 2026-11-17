@@ -10,6 +10,8 @@
  * 🔴 `index.ts` re-exports this file and adds the Node-only modules, so the two entry points cannot
  * drift apart. Nothing reachable from here may import `node:` — `browser-entry.test.ts` bundles it
  * for the browser and fails on any.
+ *
+ * @module @typedblite/runtime/browser
  */
 //
 // 🔴 What this file exports is the public API, which semver covers (docs/guides/compatibility.md). It names what
