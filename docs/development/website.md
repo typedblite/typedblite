@@ -88,7 +88,9 @@ generated syntax tree is put in "Syntax tree" by `tools/typedoc-categories.mjs` 
 site's `plugin` option may replace that list, from `astro.config.mjs` too), since `langium generate` rewrites the files a tag
 would live in. TypeDoc checks every `@categoryDescription` against every group, so `categorizeByGroup` stays `false`; with it on, each
 description warns for each kind that lacks the category, and warnings are errors. A name without a category in a package that uses them
-lands in "Other", so tag a new export. The overview's title is set with
+lands in "Other", so tag a new export. A class or interface page opens with a
+"Member summary" (a table per group: constructors, properties, accessors, methods, each member's first sentence, linked to its
+heading), which `typedoc-site.mjs` builds from the page TypeDoc rendered, so the sentence is the doc comment's. The overview's title is set with
 `name: 'API reference'` and its introduction is added by the plugin. Because the TypeDoc run reads the packages' sources and the generated AST, `website:prepare`
 builds the libraries first.
 
