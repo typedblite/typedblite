@@ -143,7 +143,7 @@ something is public or published.
 5. **Docs that need published packages:** run the five-minute tour again against the registry (it is written and
    tested from the tarballs; `npm run tour` swaps two commands for them, and the guide is not linked from the README
    until then); hosting the playground and the API reference at
-   `typedblite.dev` (GitHub Pages, plus DNS); the demo GIF and badges; "TypeDB vs TypeDBLite", which TypeDB Ltd
+   `typedblite.dev` (Cloudflare, live 2026-11-17); the demo GIF and badges; "TypeDB vs TypeDBLite", which TypeDB Ltd
    should have the chance to read.
 6. **Governance, before going public:** `CODE_OF_CONDUCT.md` (Insights, Community Standards, Add: the official
    Contributor Covenant text, which the tooling here cannot fetch); DCO or CLA (decision 4); who answers issues and
@@ -531,25 +531,27 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
 - [ ] "TypeDB vs TypeDBLite" page: what's the same, what differs, when to use which. Written to be
       fair to TypeDB; ask TypeDB Ltd to read it (Phase 0 contact).
 - [ ] "Why not X?" page (4.3). *Drafted 2026-11-15, `docs/guides/why-not-x.md`, for review; not linked from the README yet.*
-- [ ] API reference generated from TSDoc (TypeDoc) and published to GitHub Pages; link from the README.
-      *Generated and checked (2026-11-15): `npm run docs:api`, `npm run check-api` in the gate. Publishing it waits
-      with the playground's hosting.*
-- [ ] Docs site: GitHub Pages, served at `typedblite.dev` (CNAME plus DNS records, "Enforce HTTPS" on). Layout:
+- [ ] API reference generated from TSDoc (TypeDoc) and published with the site; link from the README.
+      *Generated and checked (2026-11-15): `npm run docs:api`, `npm run check-api` in the gate. Published 2026-11-17 as
+      `/api/` on the site (it is pages of the site, built by `starlight-typedoc`).*
+- [ ] Docs site, served at `typedblite.dev` (Cloudflare; HTTPS is automatic). Layout:
       `typedblite.dev` for the landing page and docs, `/playground` for the playground, `/api` for the TypeDoc
-      reference. **Built, not published (2026-11-15): `apps/website`** (Astro Starlight; every page generated from the
+      reference. **Built 2026-11-15, live 2026-11-17: `apps/website`** (Astro Starlight; every page generated from the
       repository's Markdown; `website:check` follows every internal link; [The website](../../development/website.md)).
       The playground is a page inside the site's Starlight layout, and the API reference is generated as pages of it
-      (`starlight-typedoc`), so the whole site has one shell. It is deployed to Cloudflare at `typedblite.dev` instead (2026-11-17, `npm run deploy:site`); the unused GitHub Pages
-      workflow `site.yml` was removed. Left: removing the "not on npm yet" notices at launch.
+      (`starlight-typedoc`), so the whole site has one shell. It is deployed by hand to Cloudflare, as an assets-only Worker with `typedblite.dev` as its custom domain
+      (`npm run deploy:site`, `apps/website/cloudflare.config.ts`; [The website](../../development/website.md)). The GitHub
+      Pages plan was dropped: its workflow `site.yml` never ran and was removed, and so were the `CNAME` and `.nojekyll`
+      files. Left: removing the "not on npm yet" notices at launch.
 - [ ] Mail on the domain: a `security@` and a `hello@` alias (forwarding is enough) so `SECURITY.md` and
       the press kit don't depend on a personal address. Add SPF/DKIM/DMARC if the aliases will send.
 - [ ] Use the domain in package metadata (`homepage`), the VS Code extension manifest, the README badges,
       and the repo's website field.
-- [ ] The **browser playground** (6.1), hosted on the same Pages site. **Built but not hosted, 2026-11-14** (`apps/playground`): the
+- [ ] The **browser playground** (6.1), hosted on the same site. **Built 2026-11-14, hosted 2026-11-17 at `/playground/`** (`apps/playground`): the
       engine on WASM SQLite in a worker, three examples, errors that name their line, a shareable `#code=` link; 60
       unit tests and 11 in real Chromium, including that nothing leaves the page and that a program's text is never
-      shown as markup. **Not done:** hosting (GitHub Pages needs Actions or a manual publish; build with
-      `node build.mjs --minify`; about 2.1 MB gzipped on a first visit) and a real-browser test of Stop. **Updated
+      shown as markup. **Not done:** a real-browser test of Stop. (About 2.1 MB gzipped on a first visit; build with
+      `node build.mjs --minify`.) **Updated
       2026-11-15:** the editor is now Monaco with the real language server over LSP in a worker (the extension's
       server), so highlighting, diagnostics, completion, hover, rename and formatting are the extension's.
 
