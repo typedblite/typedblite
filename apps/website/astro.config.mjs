@@ -55,7 +55,7 @@ export default defineConfig({
         }),
       ],
       customCss: ['./src/styles/site.css'],
-      components: { Head: './src/components/Head.astro', Footer: './src/components/Footer.astro' },
+      components: { Head: './src/components/Head.astro', Sidebar: './src/components/Sidebar.astro', Footer: './src/components/Footer.astro' },
       ...(REPO_PUBLIC ? { editLink: { baseUrl: `${REPO_URL}/edit/main/` } } : {}),
       // The themes are VS Code's own Dark+ and Light+, the ones the editor and the playground use, so a fence is
       // coloured as it is there. The plugin lays the language server's semantic tokens over the grammar's.
