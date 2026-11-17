@@ -119,7 +119,7 @@ function describePage(contents) {
   return describeMember(lines, 0);
 }
 
-/** The `index.md` of one category's folder: every declaration in it, with its description, as the package's own page lists its categories. */
+/** The `index.md` of one category's folder: every declaration in it, with its description, as the package's own page lists its categories. Starlight's generated sidebar lists it first in its folder, as "Overview". */
 function categoryPage(dir, category, entries) {
   const where = `\`${dir}\``;
   const rows = entries
@@ -130,6 +130,9 @@ editUrl: false
 next: false
 prev: false
 title: "${dir}: ${CATEGORIES[category]}"
+sidebar:
+  label: Overview
+  order: 0
 ---
 
 ${CATEGORIES[category]} that ${where} exports.

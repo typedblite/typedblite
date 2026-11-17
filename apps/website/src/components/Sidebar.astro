@@ -1,9 +1,9 @@
 ---
 /**
- * Starlight's sidebar, with one change: the label of an API reference group (the section, a package, a nested module) links to
- * that group's own index page when it has one (`src/content/docs/api/**\/index.md`: TypeDoc writes one for the overview, each
- * package and each module, and the site plugin writes one for each category). Starlight's groups are bare `<details>`, so clicking the label only opened or closed them and the
- * overview pages were reachable only from the page body. The caret still toggles the group.
+ * Starlight's sidebar, with one change: an API reference group (the section, a package, a nested module, a category) gets an "Overview" entry
+ * first, linking to the group's own index page when it has one (`src/content/docs/api/**\/index.md`: TypeDoc writes one for the overview, each
+ * package and each module, and the site plugin writes one for each category). Starlight's groups are bare `<details>` with no link, so the overview pages were reachable only from the page body.
+ * The group's label still only opens and closes it.
  */
 import Default from '@astrojs/starlight/components/Sidebar.astro';
 import { getCollection } from 'astro:content';
@@ -21,7 +21,9 @@ const pages = Object.fromEntries(indexes.map((id) => [id, `/${id}/`]));
 <script is:inline define:vars={{ pages }}>
   (() => {
     const root = document.querySelector('ul.top-level');
-    if (!root) return;
+    const link = root?.querySelector('li > a');
+    if (!link) return;
+    const template = { item: link.parentElement, link };
     // `segs` is the labels of the API groups above (`API reference` itself is not one): /api/<package>/<module>.
     const walk = (list, segs, inApi) => {
       for (const li of list.children) {
@@ -33,35 +35,25 @@ const pages = Object.fromEntries(indexes.map((id) => [id, `/${id}/`]));
         const here = isRoot ? [] : inApi ? [...segs, text] : segs;
         const key = isRoot || inApi ? ['api', ...here].join('/').replace(/@/g, '').replace(/ /g, '-').toLowerCase() : undefined;
         const href = key && pages[key];
-        if (href && label) {
-          const a = document.createElement('a');
+        const sub = details.querySelector(':scope > ul');
+        // A category's folder already lists its own index page (the site plugin names it "Overview"); the others do not.
+        if (href && sub && !sub.querySelector(`:scope > li > a[href="${href}"]`)) {
+          // An "Overview" entry first in the group, made from a link and an item the sidebar already has so it is styled the same.
+          const li = template.item.cloneNode(false);
+          const a = template.link.cloneNode(true);
           a.href = href;
-          a.className = 'group-link';
-          a.textContent = label.textContent;
+          a.removeAttribute('aria-current');
+          a.querySelector('span').textContent = 'Overview';
           if (location.pathname.replace(/\/$/, '') === href.replace(/\/$/, '')) {
             a.setAttribute('aria-current', 'page');
             details.open = true;
           }
-          label.textContent = '';
-          label.appendChild(a);
+          li.appendChild(a);
+          sub.prepend(li);
         }
-        const sub = details.querySelector(':scope > ul');
         if (sub) walk(sub, here, inApi || isRoot);
       }
     };
     walk(root, [], false);
   })();
 </script>
-
-<style is:global>
-  .group-link {
-    color: inherit;
-    text-decoration: none;
-  }
-  .group-link:hover {
-    text-decoration: underline;
-  }
-  .group-link[aria-current='page'] {
-    color: var(--sl-color-text-accent);
-  }
-</style>
