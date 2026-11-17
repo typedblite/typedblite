@@ -122,8 +122,7 @@ cd apps/website && npx cf@latest deploy ./dist
 - `cf` is a release candidate (`1.0.0-rc.1` when this was written), so check `cf deploy --help` if a flag has moved.
 - `apps/website/.cloudflare/` is the build output of a deploy or dry run. It is git-ignored.
 
-`.github/workflows/site.yml` is the older plan to publish to GitHub Pages. It has never run (Actions is off, see the
-launch plan) and is not how the site is published. `assemble.mjs` still writes the `CNAME` and `.nojekyll` files that
-Pages needed; Cloudflare ignores them.
+The site was first planned for GitHub Pages; that workflow (`site.yml`) never ran and has been removed.
+`assemble.mjs` still writes the `CNAME` and `.nojekyll` files that Pages needed; Cloudflare ignores them.
 
 Before launch, read the landing page's "Pre-release" notice and the guides' "not on npm yet" notes, and remove them.

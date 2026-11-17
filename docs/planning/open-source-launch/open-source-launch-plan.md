@@ -539,8 +539,8 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       reference. **Built, not published (2026-11-15): `apps/website`** (Astro Starlight; every page generated from the
       repository's Markdown; `website:check` follows every internal link; [The website](../../development/website.md)).
       The playground is a page inside the site's Starlight layout, and the API reference is generated as pages of it
-      (`starlight-typedoc`), so the whole site has one shell. `site.yml` deploys it and has never run. Left: public repository or Pages-capable plan, Pages source, DNS and
-      HTTPS, and removing the "not on npm yet" notices at launch.
+      (`starlight-typedoc`), so the whole site has one shell. It is deployed to Cloudflare at `typedblite.dev` instead (2026-11-17, `npm run deploy:site`); the unused GitHub Pages
+      workflow `site.yml` was removed. Left: removing the "not on npm yet" notices at launch.
 - [ ] Mail on the domain: a `security@` and a `hello@` alias (forwarding is enough) so `SECURITY.md` and
       the press kit don't depend on a personal address. Add SPF/DKIM/DMARC if the aliases will send.
 - [ ] Use the domain in package metadata (`homepage`), the VS Code extension manifest, the README badges,
