@@ -78,16 +78,19 @@ import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
 /**
  * Validation for what the grammar accepts but the runtime does not implement.
  *
+ * This is the middle layer, and it is the one with teeth, because these constructs *parse*. A schema using `@card` is
+ * accepted, the generator ignores it, and without this layer the author would be left believing a constraint exists
+ * that does not. Unsupported TypeQLite fails loudly at three layers and never silently succeeds: unknown syntax is a
+ * parse error; syntax deliberately not implemented is reported here, naming the construct; anything reaching the
+ * interpreter unhandled throws.
+ *
+ * An annotation leaves the not-enforced list only when the runtime genuinely implements it, with a test proving so.
+ *
+ * @privateRemarks
  * 🔴 [ADR-002](../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 7:
  * unsupported TypeQLite fails loudly at three layers and **never silently succeeds**. Unknown syntax
  * is a parse error; syntax deliberately not implemented is reported here, naming the construct;
  * anything reaching the interpreter unhandled throws.
- *
- * This is the middle layer, and it is the one with teeth, because these constructs *parse*. A
- * schema using `@card` is accepted, the generator ignores it, and without this layer the author
- * would be left believing a constraint exists that does not. That is the exact failure mode this
- * feature exists to avoid — GraphQLite 0.6.1 answering an edge to a missing node by silently
- * writing one between two unrelated nodes (spike, 2026-08-29).
  *
  * ⚠️ **"Loudly" changed shape on 2026-09-11, by founder decision.** An unenforced annotation was
  * an *error* — the schema was refused. That refused every valid TypeDB schema that used one:
@@ -98,8 +101,10 @@ import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
  * on every call. Not a refusal, not a silence. The conformance report card measures each
  * annotation's semantics scenario by scenario until it is enforced.
  *
- * **Removing a check here is how a silent success gets reintroduced.** An annotation leaves the
- * not-enforced list only when the runtime genuinely implements it, with a test proving so.
+ * The failure mode this layer exists to avoid: GraphQLite 0.6.1 answering an edge to a missing node by silently
+ * writing one between two unrelated nodes (spike, 2026-08-29).
+ *
+ * **Removing a check here is how a silent success gets reintroduced.**
  */
 export function registerValidationChecks(services: TypeQLiteServices): void {
   const registry = services.validation.ValidationRegistry;
@@ -142,7 +147,7 @@ export class TypeQLiteValidator {
    *
    * One rule, one message shape, for every kind: the annotation's name comes from the node's own
    * keyword, so adding an annotation to the grammar and registering it above is the whole cost of
-   * reporting it. `@card(0..)` is the live one — a documentation store's schema uses it.
+   * reporting it.
    */
   checkAnnotationNotEnforced(node: Annotation, accept: ValidationAcceptor): void {
     if (isKeyAnnotation(node) || isUniqueAnnotation(node) || isAbstractAnnotation(node)) return;
@@ -403,7 +408,7 @@ export class TypeQLiteValidator {
 
   /**
    * Owning the same attribute twice is idempotent when the two say the same thing — `owns price, owns
-   * price` (define.feature L319, `@key` alike at L358) — and refused when they disagree, on `@key` or
+   * price` — and refused when they disagree, on `@key` or
    * any annotation, or one is ordered: which would win is not the writer's to guess.
    */
   checkNoDuplicateOwns(
@@ -451,7 +456,7 @@ export class TypeQLiteValidator {
   /**
    * Every variable a `let` or a comparison reads is bound somewhere in the `match` — by a concept
    * pattern or another `let`. `$v == $a; $v > $h;` with no `let $v` is TypeDB's *"The variable 'v'
-   * must be bound to a value before it's used"* (expression.feature L34), and it is a compile-time
+   * must be bound to a value before it's used"*, and it is a compile-time
    * refusal there, so it is one here — not a zero-row answer from the engine.
    */
   checkValueVariablesBound(node: Pipeline, accept: ValidationAcceptor): void {
@@ -506,13 +511,14 @@ function* labelled(clause: DefineClause) {
 /**
  * What a `match` binds, read from the AST alone.
  *
- * 🔴 Mirrors `constraintsOf`'s merging: two patterns naming the same variable are one thing, which
- * is what makes `$p has person-kind $old;` after `$p isa person, ...` a projection of the
- * thing the first pattern found rather than a second, unconstrained one.
- *
  * An anonymous relation pattern binds no variable of its own and is deliberately absent from
  * `things` — the interpreter invents `__anonN` for it, and that is a name nobody wrote and nothing
  * should offer back.
+ *
+ * @privateRemarks
+ * 🔴 Mirrors `constraintsOf`'s merging: two patterns naming the same variable are one thing, which
+ * is what makes `$p has person-kind $old;` after `$p isa person, ...` a projection of the
+ * thing the first pattern found rather than a second, unconstrained one.
  */
 export interface MatchBindings {
   /** Attribute variables — those bound by a `has … $var`. A `select` may name these or `things`. */

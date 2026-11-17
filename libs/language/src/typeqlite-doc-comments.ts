@@ -1,9 +1,10 @@
 /**
- * TypeDB's doc comment: `#! This represents a person` on the line or lines directly above a
- * definition. Returns `undefined` when there is none.
+ * TypeDB's doc comment: `#! This represents a person` on the line or lines directly above a definition. Returns
+ * `undefined` when there is none.
  *
- * It is read from the source text because comments are hidden from the AST (metadata.feature L189).
+ * It is read from the source text because comments are hidden from the AST.
  *
+ * @privateRemarks
  * 🔴 One rule, two readers. The runtime stores the comment as the definition's documentation, and the
  * editor shows it on hover. It lived in the runtime's SQL generator until the editor needed it, and a
  * second copy would have been a second definition of TypeQLite (ADR-008).

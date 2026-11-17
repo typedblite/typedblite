@@ -152,11 +152,14 @@ export class TypeDBLiteReplicator {
   }
 
   /**
+   * Replicates continuously, until the session is cancelled: holds a subscription to the hub open and pushes local
+   * changes as they appear. Being caught up reports `ready` and keeps the subscription running.
+   *
+   * @privateRemarks
    * 🔴 Never stops because it has already caught up.
    *
-   * "Caught up" reports `ready` and keeps the subscription. Prior art's coordinator returned early
-   * once a checkpoint existed and so replicated exactly once — the failure this method is named
-   * against.
+   * Prior art's coordinator returned early once a checkpoint existed and so replicated exactly once — the failure
+   * this method is named against.
    */
   public replicateContinuously(
     options: ReplicationOptions,

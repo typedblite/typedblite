@@ -14,6 +14,7 @@ export type SyncDirection = 'push' | 'pull' | 'duplex';
 /**
  * A position in each direction's log.
  *
+ * @privateRemarks
  * 🔴 Not a single opaque token. A duplex replication has two independent positions — how far we
  * have pulled and how far we have pushed — and one string cannot carry both without encoding a
  * record inside it, which is an opaque token pretending not to be one. Prior art's

@@ -125,8 +125,17 @@ const { TypeQLite } = createTypeQLiteServices(EmptyFileSystem);
 export type ConceptKind = 'entity' | 'relation' | 'attribute' | 'value' | 'type';
 
 /**
- * A result cell — a concept, the way the TypeDB driver hands one back.
+ * A result cell: a concept, the way the TypeDB driver hands one back. A cell carries what it is:
  *
+ * - an **entity** or **relation**: its `iid` and its actual `type` — `writer`, not the `person` the query wrote, because TypeDB answers the instance's own type;
+ * - an **attribute**: its actual `type` and its value;
+ * - a **value**: a value type and a value (an expression's or a reducer's result);
+ * - a **type**: a schema type by its label — `person`, or a role type as `employment:employee` — which is what `match $x sub person;` answers. It has no iid and no value.
+ *
+ * The three `as…()` readers work on an attribute or value cell and **throw on a thing or a type**, with the driver's
+ * own message shape. A repository that projects a thing reads `iid` and `type` and nothing else.
+ *
+ * @privateRemarks
  * 🔴 **A cell was a string, and only a string, until Phase 02 of the conformance feature.** The
  * projection emitted one column per `has` binding and nothing else, so a thing variable contributed
  * nothing to its row and the empty row was dropped — `match $x isa person;` answered zero rows at
@@ -138,10 +147,6 @@ export type ConceptKind = 'entity' | 'relation' | 'attribute' | 'value' | 'type'
  * - a **value**: a value type and a value (an expression's or a reducer's result);
  * - a **type** (Phase 05): a schema type by its label — `person`, or a role type as
  *   `employment:employee` — what `match $x sub person;` answers. No iid, no value.
- *
- * The three `as…()` readers work on an attribute or value cell and **throw on a thing or a
- * type**, with the driver's own message shape. The repositories only ever read attribute cells,
- * so they are untouched; a repository that projects a thing reads `iid` and `type` and nothing else.
  */
 export class TypeDBLiteValue {
   private constructor(
@@ -249,6 +254,11 @@ export class TypeDBLiteValue {
   }
 
   /**
+   * An attribute's or value's integer. It throws rather than coercing, matching the driver.
+   *
+   * @throws on a thing or a type, and on a value that is not an integer.
+   *
+   * @privateRemarks
    * 🔴 Throws rather than coercing, matching the driver. `rowString` cannot read a numeric
    * attribute because `asString()` throws there; `rowNumber` tries `asInteger` first and falls
    * through to `asDouble`. Coercing here would make `rowNumber` return a number for a genuinely
@@ -1438,6 +1448,7 @@ export class TypeDBLiteInterpreter {
   /**
    * Run a write pipeline: `insert`, `put`, or `delete`, optionally preceded by a `match`.
    *
+   * @privateRemarks
    * 🔴 Each pipeline runs in a transaction. TypeDB's `execute` is atomic per statement, and here
    * one TypeQLite insert becomes several SQL statements — the thing, then each attribute, then each
    * role. Without this, a `@key` violation on the second attribute leaves the thing row behind:
@@ -2707,7 +2718,7 @@ export class TypeDBLiteInterpreter {
 
   /**
    * Commit — after what TypeDB checks at commit, which no single statement could: a relation left
-   * with no player is removed (insert.feature L1061), and the schema and data must stand as a whole
+   * with no player is removed, and the schema and data must stand as a whole
    * (`validateCommit`). A commit that fails rolls the whole transaction back, as TypeDB's does.
    */
   commitTransaction(): void {
@@ -5264,16 +5275,12 @@ export class TypeDBLiteInterpreter {
   }
 
   /**
-   * The thing TypeDB numbers `<kind>:<type id>:<object id>` — the driver's iid cell in a given row
-   * (`iid:entity:0:1`, given.feature L114), so a harness can pass one. TypeDB allocates a type id per
-   * kind, in definition order, and an object id per type, in creation order (`ObjectVertex::
-   * build_entity(type_id, object_id)` in TypeDB's behaviour steps, read 2026-11-12); the spec's
-   * Backgrounds define and insert "first to guarantee numbering". Here that is the `type`th type of
-   * the kind as `schema_element` recorded it, and the `object`th thing of exactly that type by
-   * `thing.iid`.
+   * The thing TypeDB would number `<kind>:<type id>:<object id>` (`iid:entity:0:1`): the `object`th thing of exactly
+   * the `type`th type of that kind. TypeDB allocates a type id per kind, in definition order, and an object id per
+   * type, in creation order. Returns `undefined` when there is no such thing.
    *
-   * ⚠️ TypeDB never reuses an object id, and a deleted thing leaves no row here — after a delete, the
-   * numbering of later things in the type shifts down. No scenario numbers a thing after a delete.
+   * TypeDB never reuses an object id, and a deleted thing leaves no row here, so after a delete the numbering of
+   * later things in the type shifts down.
    */
   thingNumbered(kind: 'entity' | 'relation', type: number, object: number): number | undefined {
     const types = (this.db.prepare("SELECT name FROM schema_element WHERE kind = 'type' ORDER BY rowid").all() as Array<{ name: string }>)

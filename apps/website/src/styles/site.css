@@ -53,3 +53,10 @@ pre.mermaid {
   line-height: 1.1;
   color: var(--sl-color-accent-high);
 }
+
+/* Starlight colours its cards in turn (purple, orange, green, red, blue). The site has one accent. */
+.card,
+.card:nth-child(n) {
+  --sl-card-border: var(--sl-color-accent) !important;
+  --sl-card-bg: var(--sl-color-accent-low) !important;
+}

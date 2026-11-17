@@ -213,7 +213,7 @@ export class ChangeLog {
     for (const key of keys) insert.run(key);
   }
 
-  /** Public since Phase 03 of the conformance feature: `loadSchema` derives key ownerships from it for a database that predates `schema_key_owns`. */
+  /** The attribute types that carry `@key`. `loadSchema` derives key ownerships from it for a database that predates `schema_key_owns`. */
   public keyTypes(): ReadonlySet<string> {
     const rows = this.db
       .prepare('SELECT type FROM key_attribute')
@@ -293,6 +293,7 @@ export class ChangeLog {
   /**
    * The leaves of an entity's revision tree — every revision that is nobody's parent.
    *
+   * @privateRemarks
    * 🔴 Phase 01 kept a single head, which is correct only while one node writes. The moment a
    * revision arrives from elsewhere with a parent that is not the current head, the entity has a
    * *set* of leaves, and a head is a lie that silently picks a winner by arrival order.
@@ -320,6 +321,7 @@ export class ChangeLog {
   /**
    * Every losing leaf — the equivalent of CouchDB's `_conflicts`.
    *
+   * @privateRemarks
    * 🔴 Goal 2 is not met by retaining losers internally. If nothing can enumerate them the data is
    * present and the guarantee is not, so this is part of the deliverable rather than a convenience.
    */
@@ -459,6 +461,7 @@ export class ChangeLog {
   /**
    * Make the winning revision visible to TypeQLite.
    *
+   * @privateRemarks
    * 🔴 Writes rows directly rather than going through `TypeDBLiteInterpreter.execute()`, and that is
    * the point: `execute` logs what it writes, so projecting a replicated revision through it would
    * append a *new* local revision for a change that originated elsewhere. Two nodes would then
@@ -633,6 +636,7 @@ export class ChangeLog {
   /**
    * Apply a batch of pushed revisions **all or none**, and return how many were new.
    *
+   * @privateRemarks
    * 🔴 A hub that applied a batch record by record answered `[good, bad, good]` with an error and left
    * the first record applied and the third unread, so a client that retried the batch retried the bad
    * record too, and what the hub held depended on where the failure fell. One savepoint around the
@@ -700,6 +704,10 @@ export class ChangeLog {
   /**
    * Drop revision history that nothing can read, keeping every leaf.
    *
+   * `keepAncestors` retains the most recent N non-leaf revisions per entity, for anyone who wants
+   * a shallow tree rather than none. It defaults to 0, which is what a single node wants.
+   *
+   * @privateRemarks
    * 🔴 **What it may never remove, and why.** [ADR-003](../../../docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)
    * Decision 4 requires losing revisions to be *retained and enumerable* — `conflictsOf` is part of
    * the deliverable, not a convenience. So every **leaf** survives with its state: the winner and
@@ -712,9 +720,6 @@ export class ChangeLog {
    * CouchDB's own compaction has exactly this property. Nothing here has a peer — ADR-003 D5 is
    * explicit that this cannot replicate with a real CouchDB — so the history being truncated is
    * history of a conversation that never happened.
-   *
-   * `keepAncestors` retains the most recent N non-leaf revisions per entity, for anyone who wants
-   * a shallow tree rather than none. It defaults to 0, which is what a single node wants.
    *
    * 🔴 **Reclaiming the file is a separate act.** SQLite frees pages to its own freelist on DELETE
    * and returns nothing to the filesystem without `VACUUM`, which cannot run inside a transaction.

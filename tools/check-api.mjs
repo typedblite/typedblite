@@ -13,7 +13,10 @@
 // 3. Every name the API exports has a doc comment, and so has every member a class or interface declares itself
 //    (one it inherits is described where it is declared). The reference shows the first line of that comment beside the
 //    name, so a missing one is a gap in what a reader sees. The generated syntax tree (`src/generated/`) is documented
-//    by libs/language/scripts/document-generated.mts, and its members are not checked.
+//    by libs/language/scripts/document-generated.mts, and is checked like the rest.
+//
+// 4. No doc comment shows a `🔴` or `⚠️` note. Those mark a maintainer's note (why something is as it is, how it was
+//    found), and belong under `@privateRemarks`, which the reference leaves out.
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -73,14 +76,23 @@ try {
       reflection.type?.declaration?.comment;
     return (comment?.summary ?? []).some((part) => (part.text ?? '').trim() !== '');
   };
+  const visibleText = (reflection) => {
+    const comments = [reflection.comment, ...(reflection.signatures ?? []).map((s) => s.comment), reflection.getSignature?.comment, reflection.type?.declaration?.comment];
+    return comments
+      .flatMap((comment) => [...(comment?.summary ?? []), ...(comment?.blockTags ?? []).filter((tag) => tag.tag !== '@privateRemarks').flatMap((tag) => tag.content ?? [])])
+      .map((part) => part.text ?? '')
+      .join('');
+  };
+  const noted = [];
   const undocumented = [];
   for (const module of api.children ?? []) {
     for (const exported of module.children ?? []) {
       if (exported.kind !== REFERENCE && !described(exported)) undocumented.push(`${module.name}: ${exported.name}`);
-      if (exported.sources?.[0]?.fileName.includes('/generated/')) continue;
+      if (/🔴|⚠️/.test(visibleText(exported))) noted.push(`${module.name}: ${exported.name}`);
       for (const member of exported.children ?? []) {
         const inherited = member.inheritedFrom ?? member.signatures?.[0]?.inheritedFrom;
         if (!inherited && member.sources && !described(member)) undocumented.push(`${module.name}: ${exported.name}.${member.name}`);
+        if (!inherited && /🔴|⚠️/.test(visibleText(member))) noted.push(`${module.name}: ${exported.name}.${member.name}`);
       }
     }
   }
@@ -91,7 +103,13 @@ try {
     console.error('\nAdd a doc comment (its first sentence is what the reference shows), or mark it `@internal`.');
     process.exit(1);
   }
-  console.log('\nThe API reference builds cleanly, every type it mentions is exported, and every name has a doc comment.');
+  if (noted.length > 0) {
+    console.error(`\n${noted.length} doc comment(s) show a 🔴 or ⚠️ note in the API reference:`);
+    for (const name of noted.slice(0, 40)) console.error(`  - ${name}`);
+    console.error('\nMove the note under `@privateRemarks`, which the reference leaves out.');
+    process.exit(1);
+  }
+  console.log('\nThe API reference builds cleanly, every type it mentions is exported, every name has a doc comment, and none shows a maintainer note.');
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

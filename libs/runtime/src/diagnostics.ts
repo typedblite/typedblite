@@ -107,21 +107,21 @@ export const DiagnosticCode = {
   duplicateLabel: TypeQLiteValidationCode.duplicateLabel,
   /** `undefine`/`redefine` applied — what changed, as a fact. */
   schemaChanged: 'typedblite.schema-changed',
-  /** `$x sub person, has name $n` — a variable used as a type and as a thing in one pattern (Phase 05). */
+  /** `$x sub person, has name $n` — a variable used as a type and as a thing in one pattern. */
   mixedPattern: 'typedblite.mixed-pattern',
-  /** An arithmetic result outside its type — a 64-bit integer overflow, a division by zero (Phase 06). */
+  /** An arithmetic result outside its type — a 64-bit integer overflow, a division by zero. */
   valueOutOfRange: 'typedblite.value-out-of-range',
-  /** A function the engine does not know (Phase 06). */
+  /** A function the engine does not know. */
   unknownFunction: 'typedblite.unknown-function',
-  /** A built-in called with the wrong number of arguments (Phase 06). */
+  /** A built-in called with the wrong number of arguments. */
   functionArity: 'typedblite.function-arity',
-  /** A value expression reads a variable nothing binds (Phase 06). */
+  /** A value expression reads a variable nothing binds. */
   unboundValue: 'typedblite.unbound-value',
-  /** A `let` variable assigned twice in one branch (Phase 06). */
+  /** A `let` variable assigned twice in one branch. */
   valueAssignedTwice: 'typedblite.value-assigned-twice',
-  /** `let`s that wait on each other and can never be evaluated (Phase 06). */
+  /** `let`s that wait on each other and can never be evaluated. */
   valueCycle: 'typedblite.value-cycle',
-  /** A reducer the engine does not know, or one applied to the wrong kind of variable (Phase 06). */
+  /** A reducer the engine does not know, or one applied to the wrong kind of variable. */
   reducer: 'typedblite.reducer',
   /**
    * A `fetch` the engine refuses before any row: a variable not available to it, a key mapped twice,
@@ -148,6 +148,7 @@ export type DiagnosticCodeValue =
 /**
  * The range used when a statement can be located but a *term* inside it cannot.
  *
+ * @privateRemarks
  * 🔴 The honest case is a SQLite constraint violation: it is raised inside the database, which has
  * never seen the TypeQLite, so there is no term to point at. Pointing at one anyway would be worse
  * than pointing at the whole statement.

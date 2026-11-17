@@ -8,6 +8,7 @@ they are listed here.
 ## [Unreleased]
 
 ### Changed
+- **The API reference shows no maintainer notes, and describes the generated syntax tree's properties.** Notes marked `🔴` or `⚠️` on an exported name moved under `@privateRemarks`, which TypeDoc leaves out, and a few comments were reworded where the note was the only description. The properties of the generated node types (`EntityDef.name`, `OwnsTrait.ordered`, …) are described from their types and, for a flag, from the keyword the grammar writes. `check-api` fails on a `🔴` or `⚠️` note that would show.
 - **Every name in the API has a doc comment**, and so has every member a class or interface declares itself, so the API
   reference describes everything it lists. `npm run check-api` now fails when one is missing. The generated syntax tree
   (`@typedblite/language`'s `src/generated/`) is documented by a step after `langium generate`

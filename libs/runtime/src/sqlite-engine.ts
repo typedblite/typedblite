@@ -8,6 +8,10 @@ export interface EngineRow {
 /**
  * A SQLite engine behind `TypeDBLiteDatabase`'s five methods.
  *
+ * Async throughout because the port is, not because SQLite is: `node:sqlite` is synchronous, and
+ * pretending otherwise here would be the only honest place to hide a future async engine.
+ *
+ * @privateRemarks
  * 🔴 This deliberately has no dependency on application-layer code, and application code should not
  * depend on this class directly — only on the port interface. The port
  * ([ADR-002](../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 1) is
@@ -15,9 +19,6 @@ export interface EngineRow {
  * direct dependency either way would work and would quietly make SQLite *the* engine, which
  * Decision 1 exists to prevent — this is the default adapter, and a TypeDB server over the network
  * is another.
- *
- * Async throughout because the port is, not because SQLite is: `node:sqlite` is synchronous, and
- * pretending otherwise here would be the only honest place to hide a future async engine.
  */
 export class SqliteEngine {
   private readonly interpreter: TypeDBLiteInterpreter;
@@ -35,6 +36,7 @@ export class SqliteEngine {
   /**
    * This engine's change log.
    *
+   * @privateRemarks
    * 🔴 **This does not widen the port.** `TypeDBLiteDatabase`'s five methods are the port
    * ([ADR-002](../../../docs/architecture/adr-002-typeql-engine-as-a-port.md) Decision 1) and
    * they stay five — a TypeDB server over the network has no change log and must not be asked for
@@ -86,13 +88,12 @@ export class SqliteEngine {
   }
 
   /**
-   * Run `work` in one transaction:
-   * `BEGIN IMMEDIATE`, then `COMMIT` if it resolves or `ROLLBACK` if it throws, rethrowing the
-   * same error. Inside `work`, this engine's own `execute` and `query` are in the transaction.
+   * Run `work` in one transaction: `BEGIN IMMEDIATE`, then `COMMIT` if it resolves or `ROLLBACK` if it throws,
+   * rethrowing the same error. Inside `work`, this engine's own `execute` and `query` are in the transaction.
    *
-   * 🔴 One handle, one transaction at a time. Two overlapping calls on the same engine would share
-   * one SQLite connection and so one transaction; `TypeDBLiteDatabase` serialises them, and a second
-   * `BEGIN` here is refused rather than silently joined.
+   * One handle, one transaction at a time. Two overlapping calls on the same engine would share one SQLite connection
+   * and so one transaction; `TypeDBLiteDatabase` serialises them, and a second `BEGIN` here is refused rather than
+   * silently joined.
    */
   async transaction<T>(work: () => Promise<T>): Promise<T> {
     this.interpreter.beginTransaction();
