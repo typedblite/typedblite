@@ -39,6 +39,10 @@ export default defineConfig({
             plugin: [fileURLToPath(new URL('./src/plugins/typedoc-site.mjs', import.meta.url))],
             // /api/ and /api/typedblite/runtime/ are the overview pages, not .../readme/.
             entryFileName: 'index',
+            // A table of Name and Description, not a bare list, for the overview and for each package's members.
+            indexFormat: 'table',
+            // The overview page's title (the standalone HTML reference keeps the project's name, TypeDBLite).
+            name: 'API reference',
           },
           sidebar: { label: 'API reference', collapsed: true },
           errorOnEmptyDocumentation: true,
