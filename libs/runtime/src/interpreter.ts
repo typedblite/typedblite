@@ -152,18 +152,22 @@ export class TypeDBLiteValue {
     private readonly id: number | undefined,
   ) {}
 
+  /** An entity cell: its `iid` and its own type. */
   static entity(iid: number, type: string): TypeDBLiteValue {
     return new TypeDBLiteValue('entity', type, '', iid);
   }
 
+  /** A relation cell: its `iid` and its own type. */
   static relation(iid: number, type: string): TypeDBLiteValue {
     return new TypeDBLiteValue('relation', type, '', iid);
   }
 
+  /** An attribute cell: its type, and its value as text. */
   static attribute(type: string, value: string): TypeDBLiteValue {
     return new TypeDBLiteValue('attribute', type, value, undefined);
   }
 
+  /** A value cell: the result of an expression or a reducer, with its value type and its value as text. */
   static value(valueType: string, value: string): TypeDBLiteValue {
     return new TypeDBLiteValue('value', valueType, value, undefined);
   }
@@ -173,6 +177,7 @@ export class TypeDBLiteValue {
     return new TypeDBLiteValue('type', label, '', undefined);
   }
 
+  /** Whether this cell is a schema type, as `match $x sub person;` answers. */
   isType(): boolean {
     return this.kind === 'type';
   }
@@ -183,22 +188,27 @@ export class TypeDBLiteValue {
     return this.type;
   }
 
+  /** Whether this cell is an entity. */
   isEntity(): boolean {
     return this.kind === 'entity';
   }
 
+  /** Whether this cell is a relation. */
   isRelation(): boolean {
     return this.kind === 'relation';
   }
 
+  /** Whether this cell is a thing, an entity or a relation: one with an `iid`. */
   isThing(): boolean {
     return this.id !== undefined;
   }
 
+  /** Whether this cell is an attribute. */
   isAttribute(): boolean {
     return this.kind === 'attribute';
   }
 
+  /** Whether this cell is a value: the result of an expression or a reducer. */
   isValue(): boolean {
     return this.kind === 'value';
   }
@@ -229,6 +239,11 @@ export class TypeDBLiteValue {
     return this.raw;
   }
 
+  /**
+   * An attribute's or value's text.
+   *
+   * @throws on a thing or a type, which have no string value.
+   */
   asString(): string {
     return this.valueOrThrow('string');
   }
@@ -248,6 +263,11 @@ export class TypeDBLiteValue {
     return Number.parseInt(raw, 10);
   }
 
+  /**
+   * An attribute's or value's number as a double.
+   *
+   * @throws on a thing or a type, and on a value that is not a number.
+   */
   asDouble(): number {
     const raw = this.valueOrThrow('double');
     const value = Number.parseFloat(raw);
@@ -264,15 +284,25 @@ export class TypeDBLiteValue {
   }
 }
 
+/** The schema applied to a database, as sorted lists: what `schemaSnapshot()` returns. */
 export interface TypeDBLiteSchemaSnapshot {
+  /** The entity and relation types, which are the things that can have instances. */
   readonly types: readonly string[];
+  /** Which of `types` are relations. */
   readonly relations: readonly string[];
+  /** The attribute types. */
   readonly attributes: readonly string[];
+  /** Each attribute a type owns directly, not through a parent. */
   readonly owns: readonly { readonly owner: string; readonly attribute: string }[];
+  /** Each type with the type it is a subtype of. */
   readonly parents: readonly { readonly type: string; readonly parent: string }[];
+  /** The value type of each attribute. */
   readonly valueTypes: readonly { readonly attribute: string; readonly valueType: string }[];
+  /** The roles of each relation. */
   readonly roles: readonly { readonly relation: string; readonly role: string }[];
+  /** The roles each type plays, written `relation:role`. */
   readonly plays: readonly { readonly player: string; readonly role: string }[];
+  /** The annotations set on types, ownerships and roles: where, which, and as written. */
   readonly annotations: readonly { readonly subject: string; readonly category: string; readonly text: string }[];
 }
 
@@ -364,11 +394,13 @@ export interface QueryTrace {
   findRelationsCalls: number;
   /** `candidates()` lookups, and the rows they returned. */
   candidatesCalls: number;
+  /** The rows those lookups returned. */
   candidateRows: number;
   /** Rows the relation lookups read (`findRelationsCalls`): role-player combinations, before they are bound. */
   relationRows: number;
-  /** SQLite statements prepared and executed (`all`/`get`/`run`/`exec`) during the query. */
+  /** `prepare()` calls the engine made during the query. */
   statementsPrepared: number;
+  /** Statements the engine ran during the query: its `all`, `get`, `run`, `iterate` and `exec` calls. */
   statementsExecuted: number;
 }
 
@@ -538,6 +570,7 @@ export type GivenRows = ReadonlyArray<Readonly<Record<string, TypeDBLiteValue | 
 
 /** What `execute()` reports: its diagnostics, and what its last write pipeline answers. */
 export interface WriteReport extends ExecutionReport {
+  /** The rows the last write pipeline answers, when it ends in `select` or similar. */
   readonly rows: ReadonlyArray<Record<string, TypeDBLiteValue>>;
   /** When the pipeline ends in `fetch`: a document per answer, and `rows` is empty. */
   readonly documents?: ReadonlyArray<JsonValue>;
@@ -641,6 +674,14 @@ export class TypeDBLiteInterpreter {
   private readonly tracing: boolean;
   private readonly planJoins: boolean;
 
+  /**
+   * Opens a database, creating it if it does not exist.
+   *
+   * @param location `:memory:` for a database that lives only in this object, or the path of a SQLite file, which is also
+   * what `openDatabase` in `options` is given.
+   * @param busyTimeoutMs How long a write waits for another writer's lock before failing with `SQLITE_BUSY`. Default 5000.
+   * @param options Tracing, join planning, and which SQLite binding to open the database with.
+   */
   constructor(location = ':memory:', busyTimeoutMs = 5000, options: TypeDBLiteOptions = {}) {
     // Beneath the tracing proxy, so a trace still counts every `prepare()` the engine asks for —
     // the shape of the work, which is what tests assert on — not whether the cache answered it.
@@ -795,6 +836,7 @@ export class TypeDBLiteInterpreter {
     return this.schema.types.size > 0 || this.schema.attributes.size > 0;
   }
 
+  /** The schema applied to this database, as sorted lists. Survives a reopen. */
   schemaSnapshot(): TypeDBLiteSchemaSnapshot {
     return {
       types: [...this.schema.types].sort(),
@@ -2772,6 +2814,7 @@ export class TypeDBLiteInterpreter {
     }
   }
 
+  /** Closes the database. The interpreter cannot be used afterwards. */
   close(): void {
     this.db.close();
   }
@@ -5205,15 +5248,15 @@ export class TypeDBLiteInterpreter {
       : TypeDBLiteValue.entity(iid, type);
   }
 
-  /**
-   * Every attribute of the given type a thing owns — the driver's `getHas`. The harness resolves a
-   * `key:ref:0` identifier through this rather than trusting anything the cell carries.
-   */
   /** The value type an attribute type holds, through its parents — what a driver reads off the schema. */
   attributeValueType(attribute: string): string | undefined {
     return this.valueTypeOfAttribute(attribute);
   }
 
+  /**
+   * Every attribute of the given type that the thing with this `iid` owns, as attribute cells: the driver's `getHas`.
+   * Read the thing's own attributes through this rather than trusting anything a cell carries.
+   */
   attributesOf(iid: number, attribute: string): ReadonlyArray<TypeDBLiteValue> {
     return this.readAttributes(iid, attribute).map((v) => TypeDBLiteValue.attribute(v.type, v.value));
   }

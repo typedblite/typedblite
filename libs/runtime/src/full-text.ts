@@ -12,7 +12,9 @@
 import type { SqliteDatabase } from './sqlite-database.js';
 import type { EntityState } from './canonical.js';
 
+/** One result of a full-text search. */
 export interface SearchHit {
+  /** The thing that matched, as `entityId` spells it. */
   readonly entityId: string;
   /** BM25 score. Lower is better, matching SQLite's convention. */
   readonly rank: number;
@@ -70,7 +72,16 @@ const TAG_ATTRIBUTE = /(^|-)tags?$/;
  * rowid, so a stale key can never remove another entity's row.
  */
 
+/**
+ * Full-text search over a store's things, in SQLite's FTS5. It is kept current by the change log as things are written, and
+ * reached through `db.changeLog.fullText`.
+ */
 export class FullTextIndex {
+  /**
+   * Opens the index over a database. It creates nothing until {@link ensureSchema}.
+   *
+   * @param db The database that holds the index.
+   */
   public constructor(private readonly db: SqliteDatabase) {}
 
   /**
@@ -97,6 +108,11 @@ export class FullTextIndex {
     }
   }
 
+  /**
+   * Creates the index's tables if they do not exist.
+   *
+   * @throws if this SQLite has no FTS5.
+   */
   public ensureSchema(): void {
     FullTextIndex.assertAvailable(this.db);
     this.db.exec(DDL);
@@ -132,6 +148,7 @@ export class FullTextIndex {
       .run(entityId, rowid);
   }
 
+  /** Removes a thing from the index. Does nothing if it is not there. */
   public remove(entityId: string): void {
     this.reconcile();
     const key = this.db
@@ -194,6 +211,7 @@ export class FullTextIndex {
     return rows.map((row) => ({ entityId: row.entity_id, rank: Number(row.rank) }));
   }
 
+  /** How many things are indexed. */
   public count(): number {
     const row = this.db
       .prepare('SELECT count(*) AS n FROM entity_fts')

@@ -42,14 +42,24 @@ function linkTo(target: AstNode, origin: LabelSite, names: NameProvider): Locati
   return LocationLink.create(AstUtils.getDocument(target).uri.toString(), cst.range, name, origin.range);
 }
 
+/**
+ * Go to definition for a label that is a plain `ID` (`isa person`). Langium answers for cross-references first;
+ * when it finds nothing, the label is resolved through {@link TypeQLiteLabels} to the definitions it names (ADR-008 D5).
+ */
 export class TypeQLiteDefinitionProvider extends DefaultDefinitionProvider {
   private readonly labels: TypeQLiteLabels;
 
+  /**
+   * Created with the language's services by {@link TypeQLiteModule}.
+   *
+   * @param services Langium's services, with the label resolver.
+   */
   constructor(services: WithLabels) {
     super(services);
     this.labels = services.labels.Labels;
   }
 
+  /** Langium's definitions of the position, or, when it has none, those of the label under it. */
   override async getDefinition(
     document: LangiumDocument,
     params: DefinitionParams,
@@ -75,11 +85,17 @@ export class TypeQLiteDefinitionProvider extends DefaultDefinitionProvider {
 export class TypeQLiteReferencesProvider extends DefaultReferencesProvider {
   private readonly labels: TypeQLiteLabels;
 
+  /**
+   * Created with the language's services by {@link TypeQLiteModule}.
+   *
+   * @param services Langium's services, with the label resolver.
+   */
   constructor(services: WithLabels) {
     super(services);
     this.labels = services.labels.Labels;
   }
 
+  /** Every reference to what the position names: Langium's cross-references, and the labels that use it. */
   override async findReferences(
     document: LangiumDocument,
     params: ReferenceParams,
@@ -136,11 +152,20 @@ export class TypeQLiteReferencesProvider extends DefaultReferencesProvider {
 export class TypeQLiteDocumentValidator extends DefaultDocumentValidator {
   private readonly labels: TypeQLiteLabels;
 
+  /**
+   * Created with the language's services by {@link TypeQLiteModule}.
+   *
+   * @param services Langium's services, with the label resolver.
+   */
   constructor(services: WithLabels) {
     super(services);
     this.labels = services.labels.Labels;
   }
 
+  /**
+   * Langium's diagnostics, and a warning for each label that names a type the workspace does not define. The
+   * warnings are left out when the document has parse errors, and in a workspace that defines no type at all.
+   */
   override async validateDocument(
     document: LangiumDocument,
     options?: ValidationOptions,

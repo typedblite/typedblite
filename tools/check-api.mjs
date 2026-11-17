@@ -9,6 +9,11 @@
 //
 // An export or member marked `@internal` is left out of the reference (`excludeInternal`), and what it mentions
 // is not checked. `npm run docs:api` writes the HTML reference to dist/api.
+//
+// 3. Every name the API exports has a doc comment, and so has every member a class or interface declares itself
+//    (one it inherits is described where it is declared). The reference shows the first line of that comment beside the
+//    name, so a missing one is a gap in what a reader sees. The generated syntax tree (`src/generated/`) is documented
+//    by libs/language/scripts/document-generated.mts, and its members are not checked.
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,7 +60,38 @@ try {
     console.error('\nExport each from its package entry point, or mark what mentions it `@internal`.');
     process.exit(1);
   }
-  console.log('\nThe API reference builds cleanly, and every type it mentions is exported.');
+
+  // 3. A doc comment on every export, and on every member declared in this repository.
+  const api = JSON.parse(readFileSync(json, 'utf8'));
+  const REFERENCE = 4194304; // TypeDoc's ReflectionKind.Reference: a re-export, described where it is declared
+  const described = (reflection) => {
+    const comment =
+      reflection.comment ??
+      reflection.signatures?.[0]?.comment ??
+      reflection.getSignature?.comment ??
+      reflection.setSignature?.comment ??
+      reflection.type?.declaration?.comment;
+    return (comment?.summary ?? []).some((part) => (part.text ?? '').trim() !== '');
+  };
+  const undocumented = [];
+  for (const module of api.children ?? []) {
+    for (const exported of module.children ?? []) {
+      if (exported.kind !== REFERENCE && !described(exported)) undocumented.push(`${module.name}: ${exported.name}`);
+      if (exported.sources?.[0]?.fileName.includes('/generated/')) continue;
+      for (const member of exported.children ?? []) {
+        const inherited = member.inheritedFrom ?? member.signatures?.[0]?.inheritedFrom;
+        if (!inherited && member.sources && !described(member)) undocumented.push(`${module.name}: ${exported.name}.${member.name}`);
+      }
+    }
+  }
+  if (undocumented.length > 0) {
+    console.error(`\n${undocumented.length} name(s) in the API have no doc comment:`);
+    for (const name of undocumented.slice(0, 40)) console.error(`  - ${name}`);
+    if (undocumented.length > 40) console.error(`  … and ${undocumented.length - 40} more`);
+    console.error('\nAdd a doc comment (its first sentence is what the reference shows), or mark it `@internal`.');
+    process.exit(1);
+  }
+  console.log('\nThe API reference builds cleanly, every type it mentions is exported, and every name has a doc comment.');
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

@@ -19,6 +19,7 @@ import {
 import { revisionProblem, type ChangeLog, type ChangeRecord } from './change-log.js';
 import { isReplicable } from './canonical.js';
 
+/** How a hub serves its change stream: polling, batch size, port and the limits that protect it. */
 export interface ChangeStreamOptions {
   /**
    * How often to look for new changes.

@@ -21,11 +21,20 @@ import { kindOf } from './typeqlite-navigation.js';
 export class TypeQLiteCompletionProvider extends DefaultCompletionProvider {
   private readonly labels: TypeQLiteLabels;
 
+  /**
+   * Created with the language's services by {@link TypeQLiteModule}.
+   *
+   * @param services Langium's services, with the label resolver.
+   */
   constructor(services: LangiumServices & { labels: { Labels: TypeQLiteLabels } }) {
     super(services);
     this.labels = services.labels.Labels;
   }
 
+  /**
+   * At a position that takes a plain `ID` for a type or a role, offers the workspace's definitions of the kind
+   * expected there; anywhere else, Langium's completion.
+   */
   protected override completionFor(
     context: CompletionContext,
     next: NextFeature,

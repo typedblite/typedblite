@@ -32,7 +32,8 @@ All three run in `npm run gate` (the clean room only in the full gate, not `--qu
 release workflow:
 
 - **`npm run check-api`** ([`tools/check-api.mjs`](../../tools/check-api.mjs)) builds the API reference with
-  TypeDoc, every warning an error, and fails if a public signature mentions a type the package does not export.
+  TypeDoc, every warning an error, and fails if a public signature mentions a type the package does not export, or if a
+  name the API exports, or a member a class or interface declares, has no doc comment.
   `npm run docs:api` writes the reference as HTML to `dist/api`.
 
 - **`npm run check-packages`** ([`tools/check-packages.mjs`](../../tools/check-packages.mjs)) reads

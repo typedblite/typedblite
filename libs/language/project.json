@@ -11,7 +11,7 @@
     "langium-generate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "langium generate && tsx scripts/generate-textmate.mts",
+        "command": "langium generate && tsx scripts/generate-textmate.mts && tsx scripts/document-generated.mts",
         "cwd": "libs/language"
       }
     },

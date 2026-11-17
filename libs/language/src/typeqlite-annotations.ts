@@ -43,6 +43,7 @@ export type AnnotationSubject =
   | 'relates list'
   | 'plays';
 
+/** The kind of an annotation: its keyword without the `@`, which is also its node type's name without `Annotation`, lower-cased. */
 export type AnnotationCategory =
   | 'key'
   | 'unique'
@@ -59,6 +60,7 @@ export type AnnotationCategory =
 
 const METADATA: readonly AnnotationCategory[] = ['doc', 'meta'];
 
+/** For each place an annotation can sit, the categories it admits there. The whole of the placement rule. */
 export const ADMITTED: Readonly<Record<AnnotationSubject, ReadonlySet<AnnotationCategory>>> = {
   'entity type': new Set(['abstract', ...METADATA]),
   'relation type': new Set(['abstract', 'cascade', ...METADATA]),

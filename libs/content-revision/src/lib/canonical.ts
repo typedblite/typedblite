@@ -9,19 +9,30 @@
 
 /** One attribute of a thing. Values are TEXT in storage, so the encoding does not type them. */
 export interface CanonicalAttribute {
+  /** The attribute type's label. */
   readonly type: string;
+  /** The value, as the text it is stored as. */
   readonly value: string;
 }
 
 /** One role a thing plays, naming the *entity id* of the player — never a local `iid`. */
 export interface CanonicalRole {
+  /** The role's label. */
   readonly role: string;
+  /** The entity id of the thing playing it. */
   readonly player: string;
 }
 
+/**
+ * Everything about a thing that a revision covers: its type, its attributes and the roles it plays. What
+ * {@link canonical} encodes and {@link computeRevision} hashes.
+ */
 export interface EntityState {
+  /** The thing's type label. */
   readonly type: string;
+  /** Its attributes, in any order: the encoding sorts them. */
   readonly attributes: readonly CanonicalAttribute[];
+  /** The roles it plays, in any order: the encoding sorts them. */
   readonly roles: readonly CanonicalRole[];
 }
 

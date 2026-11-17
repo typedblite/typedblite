@@ -81,7 +81,7 @@ standalone HTML reference to `dist/api`, which the site does not use. `src/plugi
 that points a doc comment's link to an architecture decision record at its page (`/decisions/…`) rather than at a copy of
 the file, and stops those copies being made. The overview pages are `/api/` and `/api/typedblite/<package>/`
 (`entryFileName: 'index'`), each listing its members in a table with a one-line description from the doc comment
-(`indexFormat: 'table'`; a dash means the source has no doc comment for that name yet). The overview's title is set with
+(`indexFormat: 'table'`; `npm run check-api` fails when a name has no doc comment, so none is blank). The overview's title is set with
 `name: 'API reference'` and its introduction is added by the plugin. Because the TypeDoc run reads the packages' sources and the generated AST, `website:prepare`
 builds the libraries first.
 

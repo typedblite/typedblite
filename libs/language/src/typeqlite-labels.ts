@@ -49,13 +49,17 @@ import {
  */
 export type LabelKind = 'type' | 'entity' | 'relation' | 'attribute' | 'role';
 
+/** A position in a document where TypeQLite names a type or a role with a plain `ID`. */
 export interface LabelSite {
   /** The label as written. */
   readonly name: string;
+  /** What the position expects to name. */
   readonly kind: LabelKind;
   /** For a role, the relation it belongs to, when the pattern names one. */
   readonly relation?: string;
+  /** Where the label is in its document. */
   readonly range: Range;
+  /** The document that holds it. */
   readonly document: LangiumDocument;
   /**
    * Whether an unresolved label here is worth a warning. `$t label person` asserts a label rather
@@ -72,6 +76,9 @@ const TARGETS: Record<Exclude<LabelKind, 'role'>, readonly string[]> = {
   attribute: [AttributeDef.$type],
 };
 
+/** The Langium services, with TypeQLite's label resolver: what the label-aware providers are constructed with. */
+export type TypeQLiteLabelServices = LangiumServices & { labels: { Labels: TypeQLiteLabels } };
+
 /**
  * Labels that are plain `ID`s: every position where TypeQLite names a type without a
  * cross-reference (ADR-008 D5). That covers pipelines (`isa`, `has`, `links`, role players, type
@@ -81,14 +88,16 @@ const TARGETS: Record<Exclude<LabelKind, 'role'>, readonly string[]> = {
  * query has no schema in scope when it runs. So they are resolved here, in the editor, through the
  * workspace index (ADR-008 D3), and nothing here is a validation check (ADR-008 D2).
  */
-/** The Langium services, with TypeQLite's label resolver: what the label-aware providers are constructed with. */
-export type TypeQLiteLabelServices = LangiumServices & { labels: { Labels: TypeQLiteLabels } };
-
 export class TypeQLiteLabels {
   private readonly index: IndexManager;
   private readonly documents: LangiumDocuments;
   private readonly locator: AstNodeLocator;
 
+  /**
+   * Created with the language's services by {@link TypeQLiteModule}.
+   *
+   * @param services Langium's services.
+   */
   constructor(services: LangiumServices) {
     this.index = services.shared.workspace.IndexManager;
     this.documents = services.shared.workspace.LangiumDocuments;

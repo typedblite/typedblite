@@ -44,6 +44,7 @@ type Oo1Db = InstanceType<Sqlite3['oo1']['DB']>;
 let sqlite3: Sqlite3 | undefined;
 const keepers = new Map<string, Oo1Db>();
 
+/** How {@link initWasmSqlite} starts SQLite. */
 export interface WasmSqliteOptions {
   /** Emscripten module options, for example `locateFile` when the `.wasm` is served from a URL. */
   readonly moduleOptions?: Record<string, unknown>;
@@ -69,6 +70,13 @@ type PoolUtil = {
 };
 let pool: PoolUtil | undefined;
 
+/**
+ * Initialises the WASM SQLite module, once, and optionally installs OPFS persistence. Call it, and await it, before
+ * constructing an interpreter with {@link openWasmSqlite}. Calling it again returns the module already loaded.
+ *
+ * @param options Where to find the `.wasm`, and whether to persist to the Origin Private File System.
+ * @returns The initialised `@sqlite.org/sqlite-wasm` module.
+ */
 export async function initWasmSqlite(
   options: WasmSqliteOptions = {},
 ): Promise<Sqlite3> {
