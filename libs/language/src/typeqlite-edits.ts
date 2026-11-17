@@ -41,9 +41,9 @@ type WithLabels = TypeQLiteLabelServices;
 /**
  * Rename a type or a role everywhere the workspace names it.
  *
- * 🔴 Langium's rename edits cross-references only. A TypeQLite label in a query (`isa person`) is a
- * plain `ID` (ADR-008 D5), so renaming `person` in its schema would leave every query naming a type
- * that no longer exists. This edits the label uses too, and a rename may start from a label.
+ * Langium's rename edits cross-references only. A TypeQLite label in a query (`isa person`) is a plain `ID` (ADR-008
+ * D5), so renaming `person` in its schema would leave every query naming a type that no longer exists. This edits the
+ * label uses too, and a rename may start from a label.
  */
 export class TypeQLiteRenameProvider extends DefaultRenameProvider {
   private readonly labels: TypeQLiteLabels;

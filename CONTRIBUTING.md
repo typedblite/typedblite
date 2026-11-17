@@ -150,7 +150,8 @@ that the release workflow publishes. [Releasing](docs/development/releasing.md) 
   `DocumentValidator`.
 - **Comments explain why, not what.** A `🔴` marks a note that is non-obvious, was learned the hard
   way, and would be easy to get wrong again. Keep them, and add your own when you learn something
-  that way.
+  that way. On an exported name, put the note under `@privateRemarks`: the API reference leaves that tag out,
+  and `npm run check-api` fails if a `🔴` or `⚠️` note would show there.
 
 ## Decisions
 

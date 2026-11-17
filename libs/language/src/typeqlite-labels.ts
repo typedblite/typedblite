@@ -84,6 +84,7 @@ export type TypeQLiteLabelServices = LangiumServices & { labels: { Labels: TypeQ
  * cross-reference (ADR-008 D5). That covers pipelines (`isa`, `has`, `links`, role players, type
  * patterns), a re-open's label, and `undefine` and `redefine` targets.
  *
+ * @privateRemarks
  * 🔴 They stay plain `ID`s on purpose. The runtime reads them as strings in hundreds of places, and a
  * query has no schema in scope when it runs. So they are resolved here, in the editor, through the
  * workspace index (ADR-008 D3), and nothing here is a validation check (ADR-008 D2).
@@ -202,9 +203,12 @@ export class TypeQLiteLabels {
 }
 
 /**
- * The same label positions, by grammar rule and property: what completion sees while a statement is
- * still being typed, before there is an AST node to ask. 🔴 Keep it in step with `sitesOf` below;
- * `labels.spec.ts` checks that every entry still names a real rule and property.
+ * The same label positions, by grammar rule and property: what completion sees while a statement is still being
+ * typed, before there is an AST node to ask.
+ *
+ * @privateRemarks
+ *
+ * 🔴 Keep it in step with `sitesOf` below; `labels.spec.ts` checks that every entry still names a real rule and property.
  */
 export const LABEL_POSITIONS: Readonly<Record<string, LabelKind>> = {
   'IsaProperty.type': 'type',

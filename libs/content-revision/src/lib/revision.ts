@@ -49,10 +49,11 @@ export function digestOf(rev: Revision): string {
 }
 
 /**
- * Derives a revision from an entity's state, its parent and whether it deletes it. The generation is the parent's plus one
- * (1 for the first revision), and the digest is a hash of the content, so the same edit on the same parent gives the same
- * revision on every node.
+ * Derives a revision from an entity's state, its parent and whether it deletes it. The generation is the parent's
+ * plus one (1 for the first revision), and the digest is a hash of the content, so the same edit on the same parent
+ * gives the same revision on every node.
  *
+ * @privateRemarks
  * 🔴 The separator is `\0`, and the parts are length-prefixed by `canonical` already.
  *
  * Concatenating with a printable separator would let a crafted attribute value shift the boundary
@@ -110,6 +111,7 @@ export function conflicts(leaves: readonly Leaf[]): readonly Leaf[] {
  * order, applied to whatever a caller's own row shape is, rather than each caller mapping to
  * `Leaf` and finding its own row back by hand.
  *
+ * @privateRemarks
  * 🔴 **Promoted here after two bounded contexts of a downstream application wrote the identical six
  * lines** (code review, 2026-09-13, reuse angle): both
  * were already fully generic over `{ revision: Revision }`, so the second one was a copy with a new

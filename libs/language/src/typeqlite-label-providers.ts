@@ -141,13 +141,15 @@ export class TypeQLiteReferencesProvider extends DefaultReferencesProvider {
 /**
  * The unknown-label warning (ADR-008 D6).
  *
+ * It runs only where a document is built, which is the editor, so the runtime never sees it. It warns only in a
+ * workspace that defines at least one type: in TypeDB the schema lives in the database, and a query file with no
+ * schema beside it may be perfectly correct.
+ *
+ * @privateRemarks
  * 🔴 This is a `DocumentValidator`, not a check in `ValidationRegistry`, and that is the whole point
  * (ADR-008 D2). The runtime runs every registered check through `validateSync`, so a registered check
  * would refuse a query whose type lives only in the database. A `DocumentValidator` runs only where a
  * document is built, which is only in the editor.
- *
- * It warns only in a workspace that defines at least one type. In TypeDB the schema lives in the
- * database, and a query file with no schema beside it may be perfectly correct.
  */
 export class TypeQLiteDocumentValidator extends DefaultDocumentValidator {
   private readonly labels: TypeQLiteLabels;
@@ -200,6 +202,7 @@ function unknownMessage(site: LabelSite): string {
 /**
  * Relinks a document that holds labels whenever any document changes.
  *
+ * @privateRemarks
  * 🔴 Langium relinks a document when something it cross-references changed. A label is not a
  * cross-reference, so a query file would keep a stale unknown-label warning after the schema file
  * defining the type was saved. A document with label sites therefore counts every change as its own.
@@ -214,6 +217,10 @@ export class TypeQLiteDocumentBuilder extends DefaultDocumentBuilder {
   /**
    * Publishes a validated document's diagnostics even if a newer update has cancelled the build.
    *
+   * The diagnostics already exist at this point, and sending them is cheap, so cancelling here saves
+   * nothing and loses them for good. Every other phase keeps its token.
+   *
+   * @privateRemarks
    * 🔴 Langium 4.4 sets a document's state to `Validated`, and marks its build completed, and only
    * then calls the `Validated` phase listeners, which is where the language server sends the
    * diagnostics. It checks the cancellation token before each listener. An editor that opens several
@@ -222,9 +229,6 @@ export class TypeQLiteDocumentBuilder extends DefaultDocumentBuilder {
    * is already `Validated` and complete, no later build revisits it. Its diagnostics are never sent
    * until the file is edited. It hit the first document of five about three runs in ten
    * (`apps/vscode/test/server.test.ts`).
-   *
-   * The diagnostics already exist at this point, and sending them is cheap, so cancelling here saves
-   * nothing and loses them for good. Every other phase keeps its token.
    */
   protected override notifyDocumentPhase(
     document: LangiumDocument,

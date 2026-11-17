@@ -236,7 +236,7 @@ token rule there would be a second definition of the language.
 - **No default exports.** Named exports only.
 - **No barrel re-exports of internal implementation.** Each package's `index.ts` exports only the public API.
 - **Diagnostic codes** (`DiagnosticCode`) are the right way to report a schema or query problem from the runtime. Do not throw a plain `Error` for a user-visible condition that should produce a structured diagnostic.
-- **Comments explain WHY, not WHAT.** A comment that restates what the code obviously does adds noise. A `🔴` marker in a comment means the note is non-obvious, was found through debugging or a spec reading, and would be easy to get wrong again.
+- **Comments explain WHY, not WHAT.** A comment that restates what the code obviously does adds noise. A `🔴` marker in a comment means the note is non-obvious, was found through debugging or a spec reading, and would be easy to get wrong again. On an exported name, put such a note under `@privateRemarks`: the API reference leaves that tag out, and `npm run check-api` fails if a `🔴` or `⚠️` note would show there.
 
 ---
 

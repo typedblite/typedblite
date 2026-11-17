@@ -132,6 +132,7 @@ export class ChangeStreamClient {
   /**
    * Subscribe. Reconnects on a dropped connection, resuming from `Last-Event-ID`.
    *
+   * @privateRemarks
    * 🔴 Being caught up is `paused`, never terminal. Prior art's coordinator returned early once it
    * had synced, so it replicated exactly once and its suite proved the gate rather than the loop.
    */

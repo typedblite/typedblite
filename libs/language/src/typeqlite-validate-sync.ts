@@ -14,6 +14,7 @@ import type { TypeQLiteServices } from './typeqlite-module.js';
 /**
  * A diagnostic whose message is plain text.
  *
+ * @privateRemarks
  * 🔴 LSP 3.18 (`vscode-languageserver` 10) widened `Diagnostic.message` to `string | MarkupContent`.
  * Every TypeQLite check reports a string, and the runtime's execution reports (ADR-004) carry
  * strings, so this API keeps saying so instead of passing the widening on to every caller.
@@ -23,17 +24,18 @@ export type SyncDiagnostic = Omit<Diagnostic, 'message'> & { message: string };
 /**
  * A registry whose wrapper keeps a synchronous check synchronous.
  *
- * 🔴 **Langium wraps EVERY registered check in an `async` function**, in
- * `ValidationRegistry.wrapValidationException`, so `getChecks()` yields promise-returning callables
- * however the rule was written. That is right for the language server, which awaits them, and it is
- * what stops a synchronous engine using the registry at all: the promise is the wrapper's, not the
- * rule's, and there is no way to drain a microtask synchronously.
- *
  * `wrapValidationException` is `protected` and `ValidationRegistry` is a DI slot, so this is
  * Langium's own extension point rather than a fork. The override keeps the wrapper's actual job —
  * catch a throwing check and report it as a diagnostic instead of letting it escape — and returns
  * the check's own result, so a genuinely async rule still surfaces as a promise and
  * {@link validateSync} refuses it rather than ignoring it.
+ *
+ * @privateRemarks
+ * 🔴 **Langium wraps EVERY registered check in an `async` function**, in
+ * `ValidationRegistry.wrapValidationException`, so `getChecks()` yields promise-returning callables
+ * however the rule was written. That is right for the language server, which awaits them, and it is
+ * what stops a synchronous engine using the registry at all: the promise is the wrapper's, not the
+ * rule's, and there is no way to drain a microtask synchronously.
  */
 export class SyncValidationRegistry extends ValidationRegistry {
   /**
@@ -62,17 +64,21 @@ export class SyncValidationRegistry extends ValidationRegistry {
 /**
  * Run the registered validation checks over an AST, synchronously.
  *
+ * It is Langium's own driver with the `await` removed. The loop is `DefaultDocumentValidator.validateAstNodes` —
+ * `streamAst`, then `getChecks(node.$type)` per node — and `getChecks` is public API for exactly this. What is not
+ * re-implemented is any rule: they stay in `TypeQLiteValidator`, registered once, and serve the language server and
+ * the engine alike.
+ *
+ * A check that returns a promise is refused, not awaited: every check in `TypeQLiteValidator` is synchronous, and
+ * silently ignoring an async one would leave a rule that appears registered and never runs.
+ *
+ * @privateRemarks
  * 🔴 **Why this exists rather than `DocumentValidator`.** Langium's validator is the right thing and
  * this reuses its registry and every rule in `TypeQLiteValidator` — but `validateDocument` is `async`,
  * for cancellation and for checks that may return a promise. The interpreter is synchronous
  * throughout, because `node:sqlite`'s `DatabaseSync` is, and `execute`/`query` are called
  * synchronously from every repository. Making them async to reach a validator would ripple through
  * the whole persistence layer to buy nothing: **every check in `TypeQLiteValidator` is synchronous.**
- *
- * So this is Langium's own driver with the `await` removed. The loop is
- * `DefaultDocumentValidator.validateAstNodes` — `streamAst`, then `getChecks(node.$type)` per node —
- * and `getChecks` is public API for exactly this. What is NOT re-implemented is any rule: they stay
- * in `TypeQLiteValidator`, registered once, and serve the language server and the engine alike.
  *
  * ⚠️ **A check that returns a promise is refused, not awaited.** Silently ignoring one would mean a
  * rule that appears registered and never runs — the shape ADR-002 D7 exists to prevent. If a rule

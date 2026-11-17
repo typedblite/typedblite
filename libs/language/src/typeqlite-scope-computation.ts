@@ -10,15 +10,16 @@ import { isDefineClause, isTypeExtensionDef, type TypeQLiteFile } from './genera
 /**
  * What a TypeQLite document contributes to the workspace's one schema (ADR-008 D3).
  *
- * 🔴 Langium's default exports only the root's direct children, and a TypeQLite root's children are
- * clauses, which have no name. So until this existed nothing was exported, and nothing resolved
- * across files. It was worse inside one file: a definition is a local symbol of its own `define`
- * clause, so a second clause could not see the first.
- *
  * Every named definition in a `define` clause is exported under its label. A re-open
  * (`employment relates manager;`) is exported too, under the label it re-opens, so that the role
  * scope can find its traits wherever it is written. No cross-reference targets a `TypeExtensionDef`,
  * so exporting one cannot make a reference resolve to it.
+ *
+ * @privateRemarks
+ * 🔴 Langium's default exports only the root's direct children, and a TypeQLite root's children are
+ * clauses, which have no name. So until this existed nothing was exported, and nothing resolved
+ * across files. It was worse inside one file: a definition is a local symbol of its own `define`
+ * clause, so a second clause could not see the first.
  *
  * ⚠️ This is editor-only by construction (ADR-008 D2). The runtime parses and runs `validateSync`; it
  * never builds a document, so scope computation never runs for it.

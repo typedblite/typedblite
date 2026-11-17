@@ -21,19 +21,19 @@ import {
 /**
  * Scoping for TypeQLite: role references, and the order in which one workspace's schema is searched.
  *
+ * A role reference's scope is exactly the `relates` traits of the relation named alongside it. That makes *"a `plays`
+ * names a role its relation actually relates"* a resolution rule, which Langium reports with a position, rather than
+ * a validator.
+ *
+ * When the relation itself does not resolve, the role scope is empty rather than global. The unresolved-relation
+ * error is the real one; offering role completions from an unknown relation would only add noise on top of it.
+ *
+ * @privateRemarks
  * 🔴 A role name is only meaningful **inside its relation**. `membership:member` and
  * `project-task:owner` both declare roles, and two relations may each relate a role called
  * `member` without collision. Resolving `role` in the global scope would be wrong twice over: it
  * would accept `membership:owner` (a role that exists, but not on that relation), and it would make
  * two identical role names ambiguous.
- *
- * Instead the scope for `RoleRef.role` is exactly the `relates` traits of the relation named
- * alongside it. That turns *"a `plays` names a role its relation actually relates"* from a
- * validator into a resolution rule, which Langium reports, with a position, for free.
- *
- * When the relation itself does not resolve, the role scope is empty rather than global. The
- * unresolved-relation error is the real one; offering role completions from an unknown relation
- * would only add noise on top of it.
  *
  * ⚠️ A role may also be added by a RE-OPEN, such as `employment relates manager;`, a
  * `TypeExtensionDef` naming the relation with no kind keyword, which the behaviour spec writes
@@ -75,6 +75,10 @@ export class TypeQLiteScopeProvider extends DefaultScopeProvider {
   }
 
   /**
+   * The workspace's definitions of a type, with the current document's first. A workspace is one schema, but when two
+   * files define one label, the definition beside the reference is the one its author meant.
+   *
+   * @privateRemarks
    * 🔴 The current document's definitions come before the rest of the workspace's. A workspace is
    * one schema (ADR-008 D3), but when two files define one label, the definition beside the
    * reference is the one its author meant. Without this, which one won would depend on the order in

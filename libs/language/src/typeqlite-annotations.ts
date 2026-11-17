@@ -13,22 +13,21 @@ import {
 } from './generated/ast.js';
 
 /**
- * Where each annotation may sit — TypeDB 3's table, as `define.feature` states it row by row
- * (`can set annotation @X to Y` / `cannot set annotation @X to Y`, L1290–L1990 at the pin).
+ * Where each annotation may sit: the places TypeDB 3 admits it, as its behaviour specification states row by row.
  *
+ * The subjects are syntactic: the AST says whether an annotation follows the type's name, its `sub`, its `value`, or
+ * a trait. A re-open (`player @abstract;`) does not say which kind of type it names, so it admits the union of the
+ * three kinds; the interpreter, which knows the applied schema, refuses `@independent` on a re-opened entity.
+ *
+ * `@cascade` is TypeDB's own *"temporarily turned off"*: kept on relation types, where it belonged, and nowhere else.
+ * `@distinct` belongs to lists (`owns name[]`, `relates parent[]`) and to nothing else; a list admits everything its
+ * unordered form does, and that.
+ *
+ * @privateRemarks
  * 🔴 This is the whole of one rule, in one place, read by one check. Before Phase 03 of the
  * conformance feature the validator had a single row of it — `@key` on a `relates` — as a rule of
  * its own, and every other misplacement was accepted, applied, and reported as *"parsed and not
  * enforced"*: 280 of the specification's scenarios stopped on exactly that.
- *
- * The subjects are syntactic: the AST says whether an annotation follows the type's name, its
- * `sub`, its `value`, or a trait. A re-open (`player @abstract;`) does not say which kind of type
- * it names, so it admits the union of the three kinds; the interpreter, which knows the applied
- * schema, refuses `@independent` on a re-opened entity.
- *
- * `@cascade` is TypeDB's own *"temporarily turned off"* — kept on relation types, where it
- * belonged, and nowhere else. `@distinct` belongs to lists — `owns name[]`, `relates parent[]` —
- * and to nothing else; a list admits everything its unordered form does, and that (L1728, L1495).
  */
 export type AnnotationSubject =
   | 'entity type'
@@ -104,7 +103,7 @@ const ISO_DURATION = /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(
 /**
  * Whether a literal can constrain a value type — `@values(0.1)` cannot constrain an `integer`,
  * `@regex("A")` nothing but a `string`, `@range("A".."B")` nothing but a `string`. The table is
- * the spec's own *wrong value type* outlines, L1622 and L1843: an integer literal fits `integer`,
+ * the specification's own *wrong value type* outlines: an integer literal fits `integer`,
  * `double` and `decimal` (no row refuses it there); a string fits `string`, and `duration` when it
  * reads as one.
  */

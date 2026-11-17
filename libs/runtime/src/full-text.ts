@@ -87,6 +87,7 @@ export class FullTextIndex {
   /**
    * Throws with a usable message if this SQLite lacks FTS5, rather than failing obscurely later.
    *
+   * @privateRemarks
    * 🔴 **In the `temp` schema, and only "no such module" means no FTS5.** The probe used to create
    * and drop a table in the MAIN database: a write on every open, so every open took the write lock,
    * and on a read-only connection the write failed and was reported as a missing FTS5 — sending the
@@ -195,10 +196,8 @@ export class FullTextIndex {
   /**
    * Search, using FTS5's own query syntax.
    *
-   * Column filters are written `doctype:adr`, matching the shape a documentation store already issues
-   * against Nouveau. Prefix is `term*`. Lucene's fuzzy (`~`), boost (`^`) and range syntax have no
-   * equivalent — a query using them is a caller error here, and that gap is recorded in the phase
-   * summary rather than silently returning nothing.
+   * Column filters are written `doctype:adr`. Prefix is `term*`. Lucene's fuzzy (`~`), boost (`^`) and
+   * range syntax have no equivalent: a query using them is a caller error here, not a silent empty answer.
    */
   public search(query: string, limit = 50): readonly SearchHit[] {
     const rows = this.db
