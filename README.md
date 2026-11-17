@@ -98,6 +98,7 @@ Or try it in a browser, with three examples to start from: `npm run playground`,
 | [Embedding the runtime](docs/guides/embedding-the-runtime.md) | The engine API: results, transactions, diagnostics, options |
 | [The TypeQLite language](docs/guides/typeqlite-language.md) | What you can write, and what is not supported yet |
 | [Replication and search](docs/guides/replication-and-search.md) | The change log, syncing stores, full-text search |
+| [API reference](https://typedblite.dev/api/) | Every exported class, function and type of the libraries, generated from the TSDoc comments |
 | [Contributing](CONTRIBUTING.md) | Setup, workflow, and the checks a change must pass |
 | [All documentation](docs/README.md) | Including architecture and testing |
 

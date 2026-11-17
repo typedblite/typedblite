@@ -531,9 +531,10 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
 - [ ] "TypeDB vs TypeDBLite" page: what's the same, what differs, when to use which. Written to be
       fair to TypeDB; ask TypeDB Ltd to read it (Phase 0 contact).
 - [ ] "Why not X?" page (4.3). *Drafted 2026-11-15, `docs/guides/why-not-x.md`, for review; not linked from the README yet.*
-- [ ] API reference generated from TSDoc (TypeDoc) and published with the site; link from the README.
+- [x] API reference generated from TSDoc (TypeDoc) and published with the site; link from the README.
       *Generated and checked (2026-11-15): `npm run docs:api`, `npm run check-api` in the gate. Published 2026-11-17 as
-      `/api/` on the site (it is pages of the site, built by `starlight-typedoc`).*
+      `/api/` on the site (it is pages of the site, built by `starlight-typedoc`). Linked from the README's
+      Documentation table.*
 - [ ] Docs site, served at `typedblite.dev` (Cloudflare; HTTPS is automatic). Layout:
       `typedblite.dev` for the landing page and docs, `/playground` for the playground, `/api` for the TypeDoc
       reference. **Built 2026-11-15, live 2026-11-17: `apps/website`** (Astro Starlight; every page generated from the
