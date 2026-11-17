@@ -1,0 +1,67 @@
+---
+/**
+ * Starlight's sidebar, with one change: the label of an API reference group (the section, a package, a nested module) links to
+ * that group's own index page when it has one (`src/content/docs/api/**\/index.md`, which TypeDoc writes for the overview, each
+ * package and each module). Starlight's groups are bare `<details>`, so clicking the label only opened or closed them and the
+ * overview pages were reachable only from the page body. The caret still toggles the group.
+ */
+import Default from '@astrojs/starlight/components/Sidebar.astro';
+import { getCollection } from 'astro:content';
+
+const docs = await getCollection('docs');
+// The loader's id for an `index.md` is its directory's (`api/typedblite/runtime`, `@` already dropped).
+const indexes = docs.filter((d) => d.filePath?.startsWith('src/content/docs/api/') && d.filePath.endsWith('/index.md')).map((d) => d.id);
+// The sidebar's group labels, in nesting order, map to the page's path: `API reference` → /api/, `@typedblite/runtime` → /api/typedblite/runtime/,
+// then `wasm` under it → /api/typedblite/runtime/wasm/. A group with no index page (`Interfaces`, `Classes`…) stays as it was.
+const pages = Object.fromEntries(indexes.map((id) => [id, `/${id}/`]));
+---
+
+<Default {...Astro.props}><slot /></Default>
+
+<script is:inline define:vars={{ pages }}>
+  (() => {
+    const root = document.querySelector('ul.top-level');
+    if (!root) return;
+    // `segs` is the labels of the API groups above (`API reference` itself is not one): /api/<package>/<module>.
+    const walk = (list, segs, inApi) => {
+      for (const li of list.children) {
+        const details = li.querySelector(':scope > details');
+        if (!details) continue;
+        const label = details.querySelector(':scope > summary .large');
+        const text = label?.textContent?.trim() ?? '';
+        const isRoot = !inApi && text === 'API reference';
+        const here = isRoot ? [] : inApi ? [...segs, text] : segs;
+        const key = isRoot || inApi ? ['api', ...here].join('/').replace(/@/g, '').toLowerCase() : undefined;
+        const href = key && pages[key];
+        if (href && label) {
+          const a = document.createElement('a');
+          a.href = href;
+          a.className = 'group-link';
+          a.textContent = label.textContent;
+          if (location.pathname.replace(/\/$/, '') === href.replace(/\/$/, '')) {
+            a.setAttribute('aria-current', 'page');
+            details.open = true;
+          }
+          label.textContent = '';
+          label.appendChild(a);
+        }
+        const sub = details.querySelector(':scope > ul');
+        if (sub) walk(sub, here, inApi || isRoot);
+      }
+    };
+    walk(root, [], false);
+  })();
+</script>
+
+<style is:global>
+  .group-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .group-link:hover {
+    text-decoration: underline;
+  }
+  .group-link[aria-current='page'] {
+    color: var(--sl-color-text-accent);
+  }
+</style>
