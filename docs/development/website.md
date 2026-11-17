@@ -102,14 +102,19 @@ holds its settings: the name, the `typedblite.dev` custom domain, `workers.dev`,
 plain object, so loading it needs no `cf` dependency. To deploy:
 
 ```bash
-npm exec nx -- run website:check                  # build the site and check it
-cd apps/website && npx cf@latest deploy ./dist    # upload dist/ and apply the config
-npx cf@latest deploy ./dist --dry-run             # to preview: no upload, no credentials needed
+npm run deploy:site                               # build the site, check it, then upload dist/ and apply the config
+```
+
+which is these two steps (add `--dry-run` to the second to preview: no upload, no credentials needed):
+
+```bash
+npm exec nx -- run website:check
+cd apps/website && npx cf@latest deploy ./dist
 ```
 
 - Sign in first with `cf auth login --no-browser` (approve the code in the browser within five minutes), or set
   `CLOUDFLARE_API_TOKEN`. `cf auth whoami` shows who you are.
-- `cf deploy ./dist` skips the build, which is why the check comes first. The directory form is only for sites with no
+- `cf deploy ./dist` skips the build, which is why the script (and the steps above) run the check first. The directory form is only for sites with no
   server-side code, and it deploys whatever is in `dist/`.
 - `typedblite.dev` is a zone on the same Cloudflare account. Its DNS has only the mail records (MX, SPF, DKIM); the
   custom domain adds the web records itself. `cf zones list` shows only the first 20 zones, so filter with
