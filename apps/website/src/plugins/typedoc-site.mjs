@@ -7,8 +7,9 @@
  * would treat them as pages of their own and refuse them for lack of a title.
  */
 import { MarkdownPageEvent, MarkdownRendererEvent } from 'typedoc-plugin-markdown';
+import { REPO_PUBLIC, REPO_URL } from '../../scripts/content-map.mjs';
 
-const GRAMMAR_URL = 'https://github.com/typedblite/typedblite/blob/main/libs/language/src/typeqlite.langium';
+const GRAMMAR_URL = `${REPO_URL}/blob/main/libs/language/src/typeqlite.langium`;
 // The syntax tree's declarations are generated from the grammar and are not in the repository, so TypeDoc's source line for them is
 // plain text that points at nothing. Say where they come from, and link that.
 const GENERATED_SOURCE = /^Defined in: libs\/language\/src\/generated\/[\w.-]+:\d+$/gm;
@@ -112,7 +113,12 @@ export function load(app) {
     page.contents = page.contents
       ?.replace(MEDIA_LINK, (_, name, hash = '') => `](/decisions/${name}/${hash})`)
       .replace(GUIDE_LINK, (_, name, hash = '') => `](/guide/${name}/${hash})`)
-      .replace(GENERATED_SOURCE, () => (said++ === 0 ? `Generated from [the TypeQLite grammar](${GRAMMAR_URL}).` : ''));
+      .replace(GENERATED_SOURCE, () => (said++ === 0 ? (REPO_PUBLIC ? `Generated from [the TypeQLite grammar](${GRAMMAR_URL}).` : 'Generated from the TypeQLite grammar.') : ''));
+    // "Defined in" links point at the repository's source files: text only while the repository is private.
+    if (!REPO_PUBLIC && page.contents) {
+      const repoLink = new RegExp(`\\[([^\\]]+)\\]\\(${REPO_URL.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/[^)\\s]*\\)`, 'g');
+      page.contents = page.contents.replace(repoLink, '$1');
+    }
     // A class or an interface: what it has, before the detail of each.
     if (/(^|\/)(classes|interfaces)\/[^/]+\.md$/.test(page.url) && page.contents) {
       const summary = memberSummary(page.contents, page.model?.name ?? 'Constructor');

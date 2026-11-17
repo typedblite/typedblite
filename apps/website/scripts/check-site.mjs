@@ -1,12 +1,13 @@
 /**
  * Checks the built site in dist/: every internal link, image, script and stylesheet points at a file that
  * exists, every `#fragment` on a page the site generated points at an id on that page, and the pieces the
- * launch depends on are there (the playground, the API reference, the search index, the custom-domain file).
+ * launch depends on are there (the playground, the API reference, the search index, the favicon and the 404 page), and, while the repository is private, that nothing links to it.
  * It reads the HTML as text, so it needs no browser and no dependency.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { REPO_PUBLIC, REPO_URL } from './content-map.mjs';
 
 const DIST = resolve(dirname(fileURLToPath(import.meta.url)), '../dist');
 const problems = [];
@@ -54,6 +55,8 @@ for (const page of pages) {
   const base = '/' + dirname(relativePage).replace(/\\/g, '/').replace(/^\.$/, '') + '/';
   for (const match of html.matchAll(/\s(?:href|src)="([^"]*)"/g)) {
     const target = match[1];
+    // While the repository is private a link to it is a dead link for every visitor (REPO_PUBLIC, content-map.mjs).
+    if (!REPO_PUBLIC && target.startsWith(REPO_URL)) problems.push(`${relativePage}: links to the private repository (${target})`);
     if (!target || /^([a-z][a-z0-9+.-]*:|\/\/|data:)/i.test(target)) continue;
     links += 1;
     const [pathPart, fragment] = target.split('#');
