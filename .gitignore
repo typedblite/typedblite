@@ -32,3 +32,5 @@ apps/**/src/**/*.d.ts
 .nx/polygraph
 .claude/worktrees
 .claude/settings.local.json
+# Cloudflare deploy output (cf deploy)
+.cloudflare/

@@ -2,7 +2,7 @@
 
 `apps/website` builds the static site planned for `typedblite.dev`: a landing page, the guides, the five-minute
 tour, the API reference, the playground, and the project's own documents, all from this repository. It is
-[Astro](https://astro.build) with [Starlight](https://starlight.astro.build), published as plain files to GitHub Pages.
+[Astro](https://astro.build) with [Starlight](https://starlight.astro.build), published as plain files to Cloudflare (a Worker with static assets).
 
 ## One copy of every page
 
@@ -96,13 +96,29 @@ builds the libraries first.
 
 ## Publishing
 
-`.github/workflows/site.yml` builds with `website:check` and deploys `apps/website/dist` to GitHub Pages. **It has
-never run** (Actions is off, see the launch plan). To publish:
+The site is live at <https://typedblite.dev>, deployed by hand to Cloudflare as an assets-only Worker named
+`typedblite-website` (also at `typedblite-website.davejackson-dev.workers.dev`). `apps/website/cloudflare.config.ts`
+holds its settings: the name, the `typedblite.dev` custom domain, `workers.dev`, and the site's own 404 page. It is a
+plain object, so loading it needs no `cf` dependency. To deploy:
 
-1. Make the repository public, or use a plan that allows Pages on a private one.
-2. Settings, Pages, Source: **GitHub Actions**. Enable the workflow.
-3. Point `typedblite.dev` at GitHub Pages (four `A` records and an `AAAA` set for the apex, or a `CNAME` for `www`,
-   per GitHub's custom-domain documentation), then set the domain in Settings, Pages, and enable **Enforce HTTPS**.
-4. Before launch, read the landing page's "Pre-release" notice and the guides' "not on npm yet" notes, and remove them.
+```bash
+npm exec nx -- run website:check                  # build the site and check it
+cd apps/website && npx cf@latest deploy ./dist    # upload dist/ and apply the config
+npx cf@latest deploy ./dist --dry-run             # to preview: no upload, no credentials needed
+```
 
-The site is not public until step 2, so nothing here is visible before launch.
+- Sign in first with `cf auth login --no-browser` (approve the code in the browser within five minutes), or set
+  `CLOUDFLARE_API_TOKEN`. `cf auth whoami` shows who you are.
+- `cf deploy ./dist` skips the build, which is why the check comes first. The directory form is only for sites with no
+  server-side code, and it deploys whatever is in `dist/`.
+- `typedblite.dev` is a zone on the same Cloudflare account. Its DNS has only the mail records (MX, SPF, DKIM); the
+  custom domain adds the web records itself. `cf zones list` shows only the first 20 zones, so filter with
+  `--name typedblite.dev`.
+- `cf` is a release candidate (`1.0.0-rc.1` when this was written), so check `cf deploy --help` if a flag has moved.
+- `apps/website/.cloudflare/` is the build output of a deploy or dry run. It is git-ignored.
+
+`.github/workflows/site.yml` is the older plan to publish to GitHub Pages. It has never run (Actions is off, see the
+launch plan) and is not how the site is published. `assemble.mjs` still writes the `CNAME` and `.nojekyll` files that
+Pages needed; Cloudflare ignores them.
+
+Before launch, read the landing page's "Pre-release" notice and the guides' "not on npm yet" notes, and remove them.
