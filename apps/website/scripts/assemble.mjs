@@ -3,7 +3,7 @@
  * is Astro's too: starlight-typedoc writes it as pages, see astro.config.mjs.) Both must be built
  * first (website:build depends on them).
  */
-import { cpSync, existsSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,7 +23,4 @@ for (const [from, to, how] of parts) {
   const keep = (file) => !(to === 'playground' && file === join(source, 'index.html'));
   cpSync(source, join(DIST, to), { recursive: true, filter: keep });
 }
-// GitHub Pages serves the custom domain from this file, and `.nojekyll` stops it processing the files.
-writeFileSync(join(DIST, 'CNAME'), 'typedblite.dev\n');
-writeFileSync(join(DIST, '.nojekyll'), '');
 console.log('assemble: the playground is in dist/');
