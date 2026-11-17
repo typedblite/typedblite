@@ -23,6 +23,8 @@ import { isDefineClause, isTypeExtensionDef, type TypeQLiteFile } from './genera
  *
  * ⚠️ This is editor-only by construction (ADR-008 D2). The runtime parses and runs `validateSync`; it
  * never builds a document, so scope computation never runs for it.
+ *
+ * @category Language features
  */
 export class TypeQLiteScopeComputation extends DefaultScopeComputation {
   /**

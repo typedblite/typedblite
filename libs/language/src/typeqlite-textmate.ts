@@ -14,6 +14,8 @@ import { AstUtils, GrammarAST, GrammarUtils, stream, type Grammar } from 'langiu
  * `entity`, `string` and `@key` alike. TypeDB's TypeQL extension scopes them by what they are, and
  * themes colour them apart. This uses the same scopes, so that any theme colours TypeQLite as it
  * colours TypeQL (ADR-008 D8, row 3, amended 2026-11-13).
+ *
+ * @category Highlighting
  */
 export const KEYWORD_SCOPES: Readonly<Record<string, readonly string[]>> = {
   // Statements, pipeline stages, constraints and clauses.
@@ -40,10 +42,18 @@ export const KEYWORD_SCOPES: Readonly<Record<string, readonly string[]>> = {
 
 const ANNOTATION_SCOPE = 'keyword.annotations';
 
-/** The file the grammar is written to, beside `langium-config.json`. */
+/**
+ * The file the grammar is written to, beside `langium-config.json`.
+ *
+ * @category Highlighting
+ */
 export const TEXTMATE_OUT = 'syntaxes/typeqlite.tmLanguage.json';
 
-/** A TextMate grammar, as the JSON file VS Code reads: what {@link typeqliteTextMate} returns. */
+/**
+ * A TextMate grammar, as the JSON file VS Code reads: what {@link typeqliteTextMate} returns.
+ *
+ * @category Highlighting
+ */
 export interface TextMateGrammar {
   /** The language's name. */
   readonly name: string;
@@ -61,6 +71,8 @@ export interface TextMateGrammar {
  * The keywords of a Langium grammar, collected as `langium-cli`'s own TextMate generator collects
  * them: every keyword in a reachable parser or infix rule. (`collectKeywords` is not exported from
  * `langium-cli`, so this restates it.)
+ *
+ * @category Highlighting
  */
 export function grammarKeywords(grammar: Grammar): string[] {
   const keywords = new Set<string>();
@@ -84,6 +96,8 @@ export function grammarKeywords(grammar: Grammar): string[] {
  * and `.` before it, so a variable or a `$p.value` path is never read as a keyword. The regexes have
  * to run in both Oniguruma (VS Code) and JavaScript (the preview's tokenizer), so they keep to
  * syntax both share.
+ *
+ * @category Highlighting
  */
 export function typeqliteTextMate(keywords: readonly string[], fileTypes: readonly string[]): TextMateGrammar {
   const scoped = new Map<string, string>();

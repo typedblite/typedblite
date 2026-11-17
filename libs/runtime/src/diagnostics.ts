@@ -14,7 +14,11 @@ import { TypeQLiteValidationCode } from '@typedblite/language';
  * *attached* to the thrown error, never substituted for it. See `attachDiagnostic`.
  */
 
-/** The `source` of every diagnostic the engine produces. */
+/**
+ * The `source` of every diagnostic the engine produces.
+ *
+ * @category Diagnostics
+ */
 export const DIAGNOSTIC_SOURCE = 'typedblite';
 
 /**
@@ -23,16 +27,26 @@ export const DIAGNOSTIC_SOURCE = 'typedblite';
  * Execution facts are counts rather than lists precisely so a large write cannot produce a large
  * payload — but a statement with hundreds of unknown attributes still could, so the collector stops
  * and says how many it dropped.
+ *
+ * @category Diagnostics
  */
 export const MAX_DIAGNOSTICS = 50;
 
-/** What running a statement reports besides its rows: facts about the run, and the diagnostics of a refusal. */
+/**
+ * What running a statement reports besides its rows: facts about the run, and the diagnostics of a refusal.
+ *
+ * @category Diagnostics
+ */
 export interface ExecutionReport {
   /** The diagnostics of the run, at most {@link MAX_DIAGNOSTICS}. Each has a stable `code`, from {@link DiagnosticCode}. */
   readonly diagnostics: readonly Diagnostic[];
 }
 
-/** Codes are stable identifiers a consumer can branch on; messages are for people. */
+/**
+ * Codes are stable identifiers a consumer can branch on; messages are for people.
+ *
+ * @category Diagnostics
+ */
 export const DiagnosticCode = {
   // 🔴 Not re-declared. This rule lives in `TypeQLiteValidator` and is forwarded from `parse()` as a
   // fact, so a second string here would be a second vocabulary for one rule — which is exactly
@@ -141,7 +155,11 @@ export const DiagnosticCode = {
   revisionNotDerived: 'typedblite.revision-not-derived',
 } as const;
 
-/** One of the codes in {@link DiagnosticCode}. */
+/**
+ * One of the codes in {@link DiagnosticCode}.
+ *
+ * @category Diagnostics
+ */
 export type DiagnosticCodeValue =
   (typeof DiagnosticCode)[keyof typeof DiagnosticCode];
 
@@ -152,6 +170,8 @@ export type DiagnosticCodeValue =
  * 🔴 The honest case is a SQLite constraint violation: it is raised inside the database, which has
  * never seen the TypeQLite, so there is no term to point at. Pointing at one anyway would be worse
  * than pointing at the whole statement.
+ *
+ * @category Diagnostics
  */
 export const WHOLE_DOCUMENT: Range = {
   start: { line: 0, character: 0 },
@@ -198,6 +218,8 @@ export function attachDiagnostic<E>(error: E, diagnostic: Diagnostic): E {
 /**
  * The diagnostic attached to an error the engine threw, or `undefined` for any other error. Branch on its `code`, not on
  * the message.
+ *
+ * @category Diagnostics
  */
 export const diagnosticOf = (error: unknown): Diagnostic | undefined =>
   error && typeof error === 'object'

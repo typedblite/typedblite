@@ -8,6 +8,8 @@
  * 🔴 One rule, two readers. The runtime stores the comment as the definition's documentation, and the
  * editor shows it on hover. It lived in the runtime's SQL generator until the editor needed it, and a
  * second copy would have been a second definition of TypeQLite (ADR-008).
+ *
+ * @category Language features
  */
 export function docCommentOf(definition: {
   $cstNode?: { offset: number; root: { fullText: string } };

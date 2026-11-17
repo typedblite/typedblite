@@ -44,6 +44,8 @@ type WithLabels = TypeQLiteLabelServices;
  * Langium's rename edits cross-references only. A TypeQLite label in a query (`isa person`) is a plain `ID` (ADR-008
  * D5), so renaming `person` in its schema would leave every query naming a type that no longer exists. This edits the
  * label uses too, and a rename may start from a label.
+ *
+ * @category Language features
  */
 export class TypeQLiteRenameProvider extends DefaultRenameProvider {
   private readonly labels: TypeQLiteLabels;
@@ -135,6 +137,8 @@ export class TypeQLiteRenameProvider extends DefaultRenameProvider {
  *
  * `duplicate-owns` (which of two disagreeing `owns` is meant) and `reserved-keyword` (what the new
  * name should be) are the writer's to decide, so they get no fix.
+ *
+ * @category Language features
  */
 export class TypeQLiteCodeActionProvider implements CodeActionProvider {
   private readonly labels: TypeQLiteLabels;
@@ -276,7 +280,11 @@ export class TypeQLiteCodeActionProvider implements CodeActionProvider {
   }
 }
 
-/** Levenshtein distance: how many single-character edits turn one label into the other. */
+/**
+ * Levenshtein distance: how many single-character edits turn one label into the other.
+ *
+ * @category Language features
+ */
 export function editDistance(a: string, b: string): number {
   let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i += 1) {

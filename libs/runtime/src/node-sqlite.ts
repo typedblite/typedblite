@@ -8,5 +8,7 @@ import type { SqliteDatabase, SqliteOpener } from './sqlite-database.js';
  * 🔴 The only file in this package that imports `node:sqlite`. Keeping it that way is what lets a
  * browser bundle include the interpreter without pulling in a Node built-in; do not import
  * `node:sqlite` from anywhere else in `src/`.
+ *
+ * @category SQLite binding
  */
 export const openNodeSqlite: SqliteOpener = (location: string): SqliteDatabase => new DatabaseSync(location);

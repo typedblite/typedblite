@@ -105,6 +105,8 @@ import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
  * writing one between two unrelated nodes (spike, 2026-08-29).
  *
  * **Removing a check here is how a silent success gets reintroduced.**
+ *
+ * @category Validation
  */
 export function registerValidationChecks(services: TypeQLiteServices): void {
   const registry = services.validation.ValidationRegistry;
@@ -140,6 +142,8 @@ export function registerValidationChecks(services: TypeQLiteServices): void {
 /**
  * TypeQLite's validation checks, as methods. `registerValidationChecks` registers them with the services'
  * validation registry; the runtime runs them synchronously through `validateSync`.
+ *
+ * @category Validation
  */
 export class TypeQLiteValidator {
   /**
@@ -489,10 +493,18 @@ const RESERVED = new Set([
   'relates', 'has', 'links', 'insert', 'delete', 'define', 'undefine', 'put', 'update',
 ]);
 
-/** Whether TypeDB refuses `word` as an identifier with `[DEX31]` — see `RESERVED`. */
+/**
+ * Whether TypeDB refuses `word` as an identifier with `[DEX31]` — see `RESERVED`.
+ *
+ * @category Validation
+ */
 export const isReservedKeyword = (word: string): boolean => RESERVED.has(word);
 
-/** The `[DEX31]` refusal, worded once for the validator and for the engine's parse step. */
+/**
+ * The `[DEX31]` refusal, worded once for the validator and for the engine's parse step.
+ *
+ * @category Validation
+ */
 export const reservedKeywordMessage = (word: string): string =>
   `'${word}' is a reserved TypeQLite keyword and cannot be used as an ` +
   'identifier — TypeDB refuses it with [DEX31]. Qualify it: `project-id`, `task-kind`.';
@@ -519,6 +531,8 @@ function* labelled(clause: DefineClause) {
  * 🔴 Mirrors `constraintsOf`'s merging: two patterns naming the same variable are one thing, which
  * is what makes `$p has person-kind $old;` after `$p isa person, ...` a projection of the
  * thing the first pattern found rather than a second, unconstrained one.
+ *
+ * @category Validation
  */
 export interface MatchBindings {
   /** Attribute variables — those bound by a `has … $var`. A `select` may name these or `things`. */
@@ -669,7 +683,11 @@ function enclosingOutputs(node: AstNode): string[] {
   return outputs;
 }
 
-/** The variables an expression reads, in order of appearance. */
+/**
+ * The variables an expression reads, in order of appearance.
+ *
+ * @category Validation
+ */
 export function expressionVariables(expression: Expression): string[] {
   if (isVariableExpression(expression)) return [expression.variable];
   if (isBinaryExpression(expression)) return [...expressionVariables(expression.left), ...expressionVariables(expression.right)];
@@ -681,6 +699,8 @@ export function expressionVariables(expression: Expression): string[] {
 /**
  * What the patterns of a `match` bind, read from the AST alone: the variables a `select` may name, the things
  * with what their patterns say of them, and the variables that only play roles.
+ *
+ * @category Validation
  */
 export function bindingsOf(patterns: readonly Pattern[]): MatchBindings {
   const selectable = new Set<string>();

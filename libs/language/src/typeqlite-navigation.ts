@@ -37,7 +37,11 @@ import type { TypeQLiteLabels } from './typeqlite-labels.js';
  * nothing in it is a validation check.
  */
 
-/** A definition's kind, as the outline, workspace symbols and completion show it. */
+/**
+ * A definition's kind, as the outline, workspace symbols and completion show it.
+ *
+ * @category Language features
+ */
 export class TypeQLiteNodeKindProvider extends DefaultNodeKindProvider {
   /**
    * The symbol kind of a definition: a class for an entity, an interface for a relation, a property for an
@@ -71,7 +75,11 @@ export class TypeQLiteNodeKindProvider extends DefaultNodeKindProvider {
   }
 }
 
-/** The word that introduces a definition: the outline's detail, and hover's heading. */
+/**
+ * The word that introduces a definition: the outline's detail, and hover's heading.
+ *
+ * @category Language features
+ */
 export function kindOf(node: AstNode): string | undefined {
   if (isEntityDef(node)) return 'entity';
   if (isRelationDef(node)) return 'relation';
@@ -87,6 +95,8 @@ export function kindOf(node: AstNode): string | undefined {
  * The outline. Langium's default lists every node with a `name`. A re-open has none (it names the
  * type it re-opens through `type`), so `employment relates manager;` would vanish from the outline,
  * and the role it adds with it.
+ *
+ * @category Language features
  */
 export class TypeQLiteDocumentSymbolProvider extends DefaultDocumentSymbolProvider {
   /** The outline entries for a node. A re-open, which has no name of its own, is listed under the label it re-opens. */
@@ -115,6 +125,8 @@ export class TypeQLiteDocumentSymbolProvider extends DefaultDocumentSymbolProvid
  *
  * The documentation is TypeDB's two kinds: a `#!` doc comment above the definition, read by the same
  * rule the runtime stores it with (`docCommentOf`), and an `@doc("…")` annotation.
+ *
+ * @category Language features
  */
 export class TypeQLiteHoverProvider extends AstNodeHoverProvider {
   private readonly services: LangiumServices;

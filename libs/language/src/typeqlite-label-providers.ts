@@ -45,6 +45,8 @@ function linkTo(target: AstNode, origin: LabelSite, names: NameProvider): Locati
 /**
  * Go to definition for a label that is a plain `ID` (`isa person`). Langium answers for cross-references first;
  * when it finds nothing, the label is resolved through {@link TypeQLiteLabels} to the definitions it names (ADR-008 D5).
+ *
+ * @category Language features
  */
 export class TypeQLiteDefinitionProvider extends DefaultDefinitionProvider {
   private readonly labels: TypeQLiteLabels;
@@ -81,6 +83,8 @@ export class TypeQLiteDefinitionProvider extends DefaultDefinitionProvider {
  * References to a type are its cross-references (`owns name`, `sub person`) **and** its labels
  * (`has name`, `isa person`), wherever the request starts from: a declaration, a cross-reference,
  * or a label.
+ *
+ * @category Language features
  */
 export class TypeQLiteReferencesProvider extends DefaultReferencesProvider {
   private readonly labels: TypeQLiteLabels;
@@ -150,6 +154,8 @@ export class TypeQLiteReferencesProvider extends DefaultReferencesProvider {
  * (ADR-008 D2). The runtime runs every registered check through `validateSync`, so a registered check
  * would refuse a query whose type lives only in the database. A `DocumentValidator` runs only where a
  * document is built, which is only in the editor.
+ *
+ * @category Validation
  */
 export class TypeQLiteDocumentValidator extends DefaultDocumentValidator {
   private readonly labels: TypeQLiteLabels;
@@ -206,6 +212,8 @@ function unknownMessage(site: LabelSite): string {
  * 🔴 Langium relinks a document when something it cross-references changed. A label is not a
  * cross-reference, so a query file would keep a stale unknown-label warning after the schema file
  * defining the type was saved. A document with label sites therefore counts every change as its own.
+ *
+ * @category Language features
  */
 export class TypeQLiteDocumentBuilder extends DefaultDocumentBuilder {
   protected override shouldRelink(document: LangiumDocument, changedUris: Set<string>): boolean {

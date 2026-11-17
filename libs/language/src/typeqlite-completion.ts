@@ -17,6 +17,8 @@ import { kindOf } from './typeqlite-navigation.js';
  * a label that is a plain `ID` (`isa |`, `has |`, a role player), because there is no scope to ask.
  * Those positions are listed in `LABEL_POSITIONS`, and offer the workspace's definitions of the kind
  * each one expects (ADR-008 D5).
+ *
+ * @category Language features
  */
 export class TypeQLiteCompletionProvider extends DefaultCompletionProvider {
   private readonly labels: TypeQLiteLabels;
@@ -80,6 +82,8 @@ function labelKindOf(next: NextFeature): LabelKind | undefined {
  * - `plays employment:|` and `redefine employment:|`: the label before the colon.
  * - `$e isa employment (|`, `employment (|`, `… isa employment, links (|`: the relation the players
  *   belong to.
+ *
+ * @category Language features
  */
 export function relationBefore(text: string): string | undefined {
   const scoped = /([^\s,;:()$]+):[^\s,;:()$]*$/.exec(text);

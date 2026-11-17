@@ -28,6 +28,8 @@ import {
  * conformance feature the validator had a single row of it — `@key` on a `relates` — as a rule of
  * its own, and every other misplacement was accepted, applied, and reported as *"parsed and not
  * enforced"*: 280 of the specification's scenarios stopped on exactly that.
+ *
+ * @category Annotations
  */
 export type AnnotationSubject =
   | 'entity type'
@@ -42,7 +44,11 @@ export type AnnotationSubject =
   | 'relates list'
   | 'plays';
 
-/** The kind of an annotation: its keyword without the `@`, which is also its node type's name without `Annotation`, lower-cased. */
+/**
+ * The kind of an annotation: its keyword without the `@`, which is also its node type's name without `Annotation`, lower-cased.
+ *
+ * @category Annotations
+ */
 export type AnnotationCategory =
   | 'key'
   | 'unique'
@@ -59,7 +65,11 @@ export type AnnotationCategory =
 
 const METADATA: readonly AnnotationCategory[] = ['doc', 'meta'];
 
-/** For each place an annotation can sit, the categories it admits there. The whole of the placement rule. */
+/**
+ * For each place an annotation can sit, the categories it admits there. The whole of the placement rule.
+ *
+ * @category Annotations
+ */
 export const ADMITTED: Readonly<Record<AnnotationSubject, ReadonlySet<AnnotationCategory>>> = {
   'entity type': new Set(['abstract', ...METADATA]),
   'relation type': new Set(['abstract', 'cascade', ...METADATA]),
@@ -74,20 +84,36 @@ export const ADMITTED: Readonly<Record<AnnotationSubject, ReadonlySet<Annotation
   plays: new Set(['card', ...METADATA]),
 };
 
-/** `CardAnnotation` → `card`: the category is the node's own type name. */
+/**
+ * `CardAnnotation` → `card`: the category is the node's own type name.
+ *
+ * @category Annotations
+ */
 export const categoryOf = (node: Annotation): AnnotationCategory =>
   node.$type.replace(/Annotation$/, '').toLowerCase() as AnnotationCategory;
 
-/** `CardAnnotation` → `@card`, for messages. */
+/**
+ * `CardAnnotation` → `@card`, for messages.
+ *
+ * @category Annotations
+ */
 export const keywordOf = (node: Annotation): string => `@${categoryOf(node)}`;
 
-/** The subjects that admit a category — named in the refusal, so it says where the annotation goes. */
+/**
+ * The subjects that admit a category — named in the refusal, so it says where the annotation goes.
+ *
+ * @category Annotations
+ */
 export const subjectsAdmitting = (category: AnnotationCategory): AnnotationSubject[] =>
   (Object.keys(ADMITTED) as AnnotationSubject[]).filter(
     (subject) => subject !== 'type' && ADMITTED[subject].has(category),
   );
 
-/** The value types TypeDB 3 has. `long` is TypeDB 2's name for `integer`, kept for older callers. */
+/**
+ * The value types TypeDB 3 has. `long` is TypeDB 2's name for `integer`, kept for older callers.
+ *
+ * @category Annotations
+ */
 export const VALUE_TYPES: ReadonlySet<string> = new Set([
   'string', 'integer', 'long', 'double', 'decimal', 'boolean', 'datetime-tz', 'datetime', 'date',
   'duration',
@@ -106,6 +132,8 @@ const ISO_DURATION = /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(
  * the specification's own *wrong value type* outlines: an integer literal fits `integer`,
  * `double` and `decimal` (no row refuses it there); a string fits `string`, and `duration` when it
  * reads as one.
+ *
+ * @category Annotations
  */
 export function literalFits(literal: Literal, valueType: string): boolean {
   if (isStringLiteral(literal)) {
@@ -126,7 +154,11 @@ export function literalFits(literal: Literal, valueType: string): boolean {
   return false;
 }
 
-/** What a literal is, for a message: `a string`, `an integer`, … */
+/**
+ * What a literal is, for a message: `a string`, `an integer`, …
+ *
+ * @category Annotations
+ */
 export function literalKind(literal: Literal): string {
   if (isStringLiteral(literal)) return 'a string';
   if (isIntLiteral(literal)) return 'an integer';

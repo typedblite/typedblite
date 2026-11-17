@@ -11,7 +11,11 @@
  */
 import type { ChangeRecord } from './change-log.js';
 
-/** What a subscription calls as the hub's stream delivers changes and as its own state changes. */
+/**
+ * What a subscription calls as the hub's stream delivers changes and as its own state changes.
+ *
+ * @category Change stream
+ */
 export interface ChangeStreamHandlers {
   /**
    * Called with each change, in order. If it throws, the subscription stops without reconnecting and `onFailed` is
@@ -31,7 +35,11 @@ export interface ChangeStreamHandlers {
   onFailed?(error: Error, cause?: 'transport' | 'apply'): void;
 }
 
-/** A running subscription to a hub's change stream. */
+/**
+ * A running subscription to a hub's change stream.
+ *
+ * @category Change stream
+ */
 export interface ChangeStreamSubscription {
   /** Stops it: no more reconnects and no more calls to the handlers. */
   cancel(): Promise<void>;
@@ -39,7 +47,11 @@ export interface ChangeStreamSubscription {
   readonly lastEventId: number;
 }
 
-/** How a {@link ChangeStreamClient} connects and retries. */
+/**
+ * How a {@link ChangeStreamClient} connects and retries.
+ *
+ * @category Change stream
+ */
 export interface ChangeStreamClientOptions {
   /** Retry delay after a dropped connection, in milliseconds. It grows linearly with each failed attempt. Default 200. */
   readonly retryMs?: number;
@@ -84,6 +96,8 @@ function readFrame(frame: string): { id?: number; data?: string } {
 /**
  * The spoke's side of a hub's change stream: subscribes to the hub's server-sent events and pushes revisions to it. Reconnects
  * on a dropped connection, resuming from the last change it delivered.
+ *
+ * @category Change stream
  */
 export class ChangeStreamClient {
   private controller?: AbortController;

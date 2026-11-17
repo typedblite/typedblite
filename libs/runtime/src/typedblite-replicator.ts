@@ -17,15 +17,23 @@ import {
 /**
  * Where a continuous replication is: `syncing` while it is receiving, `ready` once it has caught up (and still
  * running), `failed` after an error, `idle` after it is cancelled.
+ *
+ * @category Replication
  */
 export type SyncStatus = 'idle' | 'syncing' | 'ready' | 'failed';
 /**
  * Whether a failure can be waited out. `terminal` means the replication has stopped and will fail the same way again (a change
  * that cannot be applied); `transient` is a connection or a push that may work on a later attempt.
+ *
+ * @category Replication
  */
 export type SyncErrorClass = 'transient' | 'terminal';
 
-/** How {@link TypeDBLiteReplicator} replicates. */
+/**
+ * How {@link TypeDBLiteReplicator} replicates.
+ *
+ * @category Replication
+ */
 export interface ReplicationOptions {
   /** Which way to move changes. */
   readonly direction: SyncDirection;
@@ -39,7 +47,11 @@ export interface ReplicationOptions {
   readonly timeoutMs?: number;
 }
 
-/** What a continuous replication reports as it runs. All are optional. */
+/**
+ * What a continuous replication reports as it runs. All are optional.
+ *
+ * @category Replication
+ */
 export interface ReplicationEvents {
   /** A change was received and applied. `applied` is the number of revisions that were new. */
   onChange?(applied: number): void;
@@ -51,7 +63,11 @@ export interface ReplicationEvents {
   onFailed?(error: Error, classification: SyncErrorClass): void;
 }
 
-/** A running continuous replication. */
+/**
+ * A running continuous replication.
+ *
+ * @category Replication
+ */
 export interface ReplicationSession {
   /** Where it is now. */
   readonly status: SyncStatus;
@@ -64,6 +80,8 @@ export interface ReplicationSession {
  *
  * `replicateOnce` drains in both directions and returns; `replicateContinuously` holds an SSE
  * subscription open and pushes local work as it appears.
+ *
+ * @category Replication
  */
 export class TypeDBLiteReplicator {
   private readonly client: ChangeStreamClient;

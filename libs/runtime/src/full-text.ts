@@ -12,7 +12,11 @@
 import type { SqliteDatabase } from './sqlite-database.js';
 import type { EntityState } from './canonical.js';
 
-/** One result of a full-text search. */
+/**
+ * One result of a full-text search.
+ *
+ * @category Full-text search
+ */
 export interface SearchHit {
   /** The thing that matched, as `entityId` spells it. */
   readonly entityId: string;
@@ -75,6 +79,8 @@ const TAG_ATTRIBUTE = /(^|-)tags?$/;
 /**
  * Full-text search over a store's things, in SQLite's FTS5. It is kept current by the change log as things are written, and
  * reached through `db.changeLog.fullText`.
+ *
+ * @category Full-text search
  */
 export class FullTextIndex {
   /**

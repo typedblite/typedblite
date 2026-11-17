@@ -19,7 +19,11 @@ import {
 import { revisionProblem, type ChangeLog, type ChangeRecord } from './change-log.js';
 import { isReplicable } from './canonical.js';
 
-/** How a hub serves its change stream: polling, batch size, port and the limits that protect it. */
+/**
+ * How a hub serves its change stream: polling, batch size, port and the limits that protect it.
+ *
+ * @category Change stream
+ */
 export interface ChangeStreamOptions {
   /**
    * How often to look for new changes.
@@ -115,6 +119,8 @@ function frame(record: ChangeRecord): string {
  * `path` is where the handler believes it is mounted (default `/changes`); anything else is a 404.
  * `close()` ends every open stream — without that, a held-open response keeps the process alive and
  * a test hangs rather than failing.
+ *
+ * @category Change stream
  */
 export function createChangeStreamHandler(
   log: ChangeLog,
@@ -265,6 +271,8 @@ export function createChangeStreamHandler(
  * Serve a change log over HTTP on its own port.
  *
  * Returns the server plus a `close()` that also ends every open stream.
+ *
+ * @category Change stream
  */
 export function serveChangeStream(
   log: ChangeLog,

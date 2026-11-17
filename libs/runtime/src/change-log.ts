@@ -72,7 +72,11 @@ export function revisionProblem(record: {
   return undefined;
 }
 
-/** One revision in the change log: what `since()` returns, and what replication sends. */
+/**
+ * One revision in the change log: what `since()` returns, and what replication sends.
+ *
+ * @category Change log
+ */
 export interface ChangeRecord {
   /** Its position in this store's log, increasing. A cursor for `since()`; local to the store. */
   readonly seq: number;
@@ -88,13 +92,21 @@ export interface ChangeRecord {
   readonly state?: EntityState;
 }
 
-/** How much history `compact` may keep behind each leaf. */
+/**
+ * How much history `compact` may keep behind each leaf.
+ *
+ * @category Change log
+ */
 export interface CompactionOptions {
   /** Non-leaf revisions retained per entity, most recent first. Default 0 — leaves only. */
   readonly keepAncestors?: number;
 }
 
-/** What `compact` did. */
+/**
+ * What `compact` did.
+ *
+ * @category Change log
+ */
 export interface CompactionReport {
   /** Things with history in the log. */
   readonly entities: number;
@@ -108,7 +120,11 @@ export interface CompactionReport {
   readonly bytesReclaimed: number;
 }
 
-/** What a thing is, resolved to node-independent terms. Captured before a delete removes it. */
+/**
+ * What a thing is, resolved to node-independent terms. Captured before a delete removes it.
+ *
+ * @category Change log
+ */
 export interface EntityIdentity {
   /** The thing's cross-node id: `type/key`, or `local:…` when it has no key. */
   readonly entityId: string;
@@ -162,6 +178,8 @@ CREATE INDEX IF NOT EXISTS pending_role_player ON pending_role(player_id);`;
  * A store's change log: every committed change as a revision, in commit order, with each thing's revision tree, its
  * conflicts, compaction, and the full-text index kept with it. Reached as `db.changeLog`. It is what
  * {@link replicateOnce} and {@link TypeDBLiteReplicator} read from and apply to.
+ *
+ * @category Change log
  */
 export class ChangeLog {
   /** Full-text search over the projected state (Goal 6). Kept current inside projection. */
