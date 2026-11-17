@@ -45,5 +45,6 @@ export const TypeQLiteValidationCode = {
   unknownLabel: 'typedblite.unknown-label',
 } as const;
 
+/** A diagnostic code of a validation rule: one of the values of {@link TypeQLiteValidationCode}. */
 export type TypeQLiteValidationCodeValue =
   (typeof TypeQLiteValidationCode)[keyof typeof TypeQLiteValidationCode];

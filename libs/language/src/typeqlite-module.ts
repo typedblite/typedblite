@@ -38,6 +38,7 @@ import {
 
 /** Language-specific services — the seam ADR-002 Decision 7's middle layer lives in. */
 export interface TypeQLiteAddedServices {
+  /** The validator whose checks `registerValidationChecks` registers. */
   validation: {
     TypeQLiteValidator: TypeQLiteValidator;
   };
@@ -47,8 +48,14 @@ export interface TypeQLiteAddedServices {
   };
 }
 
+/** Langium's services for a language, with TypeQLite's added: its validator and its label resolver. */
 export type TypeQLiteServices = LangiumServices & TypeQLiteAddedServices;
 
+/**
+ * The services TypeQLite writes itself, which replace or add to Langium's defaults: the formatter, semantic tokens,
+ * outline, hover, definition, references, completion, rename and code actions, the label resolver, the scope
+ * provider and computation, and the validator and registry.
+ */
 export const TypeQLiteModule: Module<
   TypeQLiteServices,
   PartialLangiumServices & TypeQLiteAddedServices
@@ -98,6 +105,14 @@ export const TypeQLiteSharedModule: Module<LangiumSharedServices, PartialLangium
   },
 };
 
+/**
+ * Creates the TypeQLite language services: Langium's defaults, the generated modules and the hand-written ones,
+ * composed, with the validation checks registered. **Start here** to parse, validate or serve TypeQLite.
+ *
+ * @param context The file system and, for a language server, the connection. Use `EmptyFileSystem` from Langium
+ * where there is no disk.
+ * @returns `shared`, the services of the workspace, and `TypeQLite`, those of the language.
+ */
 export function createTypeQLiteServices(context: DefaultSharedModuleContext): {
   shared: LangiumSharedServices;
   TypeQLite: TypeQLiteServices;

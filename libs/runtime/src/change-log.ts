@@ -110,7 +110,9 @@ export interface CompactionReport {
 
 /** What a thing is, resolved to node-independent terms. Captured before a delete removes it. */
 export interface EntityIdentity {
+  /** The thing's cross-node id: `type/key`, or `local:…` when it has no key. */
   readonly entityId: string;
+  /** Its type, attributes and roles, by label. */
   readonly state: EntityState;
 }
 
@@ -156,6 +158,11 @@ CREATE TABLE IF NOT EXISTS pending_role (
 );
 CREATE INDEX IF NOT EXISTS pending_role_player ON pending_role(player_id);`;
 
+/**
+ * A store's change log: every committed change as a revision, in commit order, with each thing's revision tree, its
+ * conflicts, compaction, and the full-text index kept with it. Reached as `db.changeLog`. It is what
+ * {@link replicateOnce} and {@link TypeDBLiteReplicator} read from and apply to.
+ */
 export class ChangeLog {
   /** Full-text search over the projected state (Goal 6). Kept current inside projection. */
   public readonly fullText: FullTextIndex;
@@ -173,6 +180,7 @@ export class ChangeLog {
     this.fullText = new FullTextIndex(db);
   }
 
+  /** Creates the log's tables if they do not exist, and migrates an older one. Safe to repeat. */
   public ensureSchema(): void {
     this.db.exec(DDL);
     this.migrate();

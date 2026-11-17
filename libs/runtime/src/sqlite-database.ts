@@ -1,3 +1,40 @@
+/** A value bound to a statement parameter, or read back from a column. */
+export type SqliteParameter = string | number | bigint | null | Uint8Array;
+
+/** A row as SQLite returns it: column name to value. */
+export type SqliteRow = Record<string, unknown>;
+
+/** Named parameters, keyed WITHOUT the `:`/`@`/`$` prefix. */
+export type SqliteNamedParameters = Record<string, SqliteParameter>;
+
+/** What `run` reports. Only `changes` is read — see `SqliteStatement.run`. */
+export interface SqliteRunResult {
+  /** Rows inserted, updated or deleted. `node:sqlite` returns a `number` (a `bigint` only when asked). */
+  readonly changes: number | bigint;
+}
+
+/**
+ * The overloads mirror `node:sqlite`'s: positional parameters, or one named-parameter object
+ * (optionally followed by positional ones).
+ */
+export interface SqliteStatement {
+  /** The first row, or `undefined` when there is none. */
+  get(...parameters: SqliteParameter[]): SqliteRow | undefined;
+  get(named: SqliteNamedParameters, ...parameters: SqliteParameter[]): SqliteRow | undefined;
+  /** Every row, as plain objects keyed by column name. */
+  all(...parameters: SqliteParameter[]): SqliteRow[];
+  all(named: SqliteNamedParameters, ...parameters: SqliteParameter[]): SqliteRow[];
+  /**
+   * 🔴 `changes` IS read: `change-log.ts` runs an `INSERT OR IGNORE` and treats `changes > 0` as
+   * "this revision was new" — the answer replication gives for whether a row was applied. A binding
+   * that cannot report it exactly (many WASM wrappers expose `sqlite3_changes()` only on the
+   * database, not per statement) must read it straight after the statement. `lastInsertRowid` is
+   * read nowhere; do not rely on it without widening this contract first.
+   */
+  run(...parameters: SqliteParameter[]): SqliteRunResult;
+  run(named: SqliteNamedParameters, ...parameters: SqliteParameter[]): SqliteRunResult;
+}
+
 /**
  * The synchronous SQLite surface TypeDBLite's interpreter runs against.
  *
@@ -28,44 +65,12 @@
  *   must be accepted. A binding with no WAL (an in-memory or single-connection OPFS database) may
  *   report a different journal mode, which the engine already tolerates; it must not throw.
  */
-export type SqliteParameter = string | number | bigint | null | Uint8Array;
-
-/** A row as SQLite returns it: column name to value. */
-export type SqliteRow = Record<string, unknown>;
-
-/** Named parameters, keyed WITHOUT the `:`/`@`/`$` prefix. */
-export type SqliteNamedParameters = Record<string, SqliteParameter>;
-
-/** What `run` reports. Only `changes` is read — see `SqliteStatement.run`. */
-export interface SqliteRunResult {
-  /** Rows inserted, updated or deleted. `node:sqlite` returns a `number` (a `bigint` only when asked). */
-  readonly changes: number | bigint;
-}
-
-/**
- * The overloads mirror `node:sqlite`'s: positional parameters, or one named-parameter object
- * (optionally followed by positional ones).
- */
-export interface SqliteStatement {
-  /** The first row, or `undefined` when there is none. */
-  get(...parameters: SqliteParameter[]): SqliteRow | undefined;
-  get(named: SqliteNamedParameters, ...parameters: SqliteParameter[]): SqliteRow | undefined;
-  all(...parameters: SqliteParameter[]): SqliteRow[];
-  all(named: SqliteNamedParameters, ...parameters: SqliteParameter[]): SqliteRow[];
-  /**
-   * 🔴 `changes` IS read: `change-log.ts` runs an `INSERT OR IGNORE` and treats `changes > 0` as
-   * "this revision was new" — the answer replication gives for whether a row was applied. A binding
-   * that cannot report it exactly (many WASM wrappers expose `sqlite3_changes()` only on the
-   * database, not per statement) must read it straight after the statement. `lastInsertRowid` is
-   * read nowhere; do not rely on it without widening this contract first.
-   */
-  run(...parameters: SqliteParameter[]): SqliteRunResult;
-  run(named: SqliteNamedParameters, ...parameters: SqliteParameter[]): SqliteRunResult;
-}
-
 export interface SqliteDatabase {
+  /** Runs one or more statements that return nothing, such as schema DDL. */
   exec(sql: string): void;
+  /** Prepares a statement, which can then be run with positional or named parameters. */
   prepare(sql: string): SqliteStatement;
+  /** Closes the connection. */
   close(): void;
   /**
    * Whether a transaction is open on this handle. Optional: `node:sqlite` has it from Node 22.16

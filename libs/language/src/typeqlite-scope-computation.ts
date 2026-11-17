@@ -24,6 +24,10 @@ import { isDefineClause, isTypeExtensionDef, type TypeQLiteFile } from './genera
  * never builds a document, so scope computation never runs for it.
  */
 export class TypeQLiteScopeComputation extends DefaultScopeComputation {
+  /**
+   * Exports every named definition of each `define` clause under its label, and each re-open under the label it
+   * re-opens, so that references resolve across clauses and across files.
+   */
   override async collectExportedSymbols(
     document: LangiumDocument,
     cancelToken = Cancellation.CancellationToken.None,

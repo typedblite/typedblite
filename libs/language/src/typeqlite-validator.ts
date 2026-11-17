@@ -132,6 +132,10 @@ export function registerValidationChecks(services: TypeQLiteServices): void {
   registry.register(checks, validator);
 }
 
+/**
+ * TypeQLite's validation checks, as methods. `registerValidationChecks` registers them with the services'
+ * validation registry; the runtime runs them synchronously through `validateSync`.
+ */
 export class TypeQLiteValidator {
   /**
    * An annotation the runtime does not enforce — reported on every parse, never refused.
@@ -250,6 +254,10 @@ export class TypeQLiteValidator {
     }
   }
 
+  /**
+   * Checks the annotations on an `owns`, `relates` or `plays` trait against the ones that subject admits. A list
+   * (`owns name[]`, `relates parent[]`) admits `@distinct` besides.
+   */
   checkAnnotationsOnTrait(node: OwnsTrait | RelatesTrait | PlaysTrait, accept: ValidationAcceptor): void {
     // A list — `owns name[]`, `relates parent[]` — admits `@distinct` besides (define.feature L1728).
     const list = (isOwnsTrait(node) || node.$type === 'RelatesTrait') && (node as OwnsTrait | RelatesTrait).ordered;
@@ -664,6 +672,10 @@ export function expressionVariables(expression: Expression): string[] {
   return [];
 }
 
+/**
+ * What the patterns of a `match` bind, read from the AST alone: the variables a `select` may name, the things
+ * with what their patterns say of them, and the variables that only play roles.
+ */
 export function bindingsOf(patterns: readonly Pattern[]): MatchBindings {
   const selectable = new Set<string>();
   const things = new Map<

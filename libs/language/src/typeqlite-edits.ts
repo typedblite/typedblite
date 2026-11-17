@@ -49,6 +49,12 @@ export class TypeQLiteRenameProvider extends DefaultRenameProvider {
   private readonly labels: TypeQLiteLabels;
   private readonly identifier: RegExp;
 
+  /**
+   * Created with the language's services by {@link TypeQLiteModule}.
+   *
+   * @param services Langium's services, with the label resolver.
+   * @throws if the grammar has no `ID` terminal.
+   */
   constructor(services: WithLabels) {
     super(services);
     this.labels = services.labels.Labels;
@@ -58,6 +64,12 @@ export class TypeQLiteRenameProvider extends DefaultRenameProvider {
     this.identifier = new RegExp(`^(?:${GrammarUtils.terminalRegex(id).source})$`, 'u');
   }
 
+  /**
+   * Renames the type or role at the position everywhere the workspace names it: its definition, its
+   * cross-references and its label uses.
+   *
+   * @throws a `ResponseError` if the new name is not a TypeQLite label, or is a reserved keyword.
+   */
   override async rename(
     document: LangiumDocument,
     params: RenameParams,
@@ -87,6 +99,7 @@ export class TypeQLiteRenameProvider extends DefaultRenameProvider {
     return { changes };
   }
 
+  /** The range of the label under the position when it names a definition, otherwise Langium's answer. */
   override prepareRename(
     document: LangiumDocument,
     params: TextDocumentPositionParams,
@@ -127,6 +140,11 @@ export class TypeQLiteCodeActionProvider implements CodeActionProvider {
   private readonly labels: TypeQLiteLabels;
   private readonly services: WithLabels;
 
+  /**
+   * Created with the language's services by {@link TypeQLiteModule}.
+   *
+   * @param services Langium's services, with the label resolver.
+   */
   constructor(services: WithLabels) {
     this.services = services;
     this.labels = services.labels.Labels;

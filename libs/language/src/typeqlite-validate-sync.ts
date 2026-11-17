@@ -36,6 +36,10 @@ export type SyncDiagnostic = Omit<Diagnostic, 'message'> & { message: string };
  * {@link validateSync} refuses it rather than ignoring it.
  */
 export class SyncValidationRegistry extends ValidationRegistry {
+  /**
+   * Wraps a check as Langium does, so that a check that throws is reported as an error diagnostic, but returns
+   * the check's own result rather than a promise. A cancellation is rethrown, not reported.
+   */
   protected override wrapValidationException(
     check: ValidationCheck,
     thisObj: unknown,

@@ -45,12 +45,22 @@ export class TypeQLiteScopeProvider extends DefaultScopeProvider {
   private readonly documents: LangiumDocuments;
   private readonly locator: AstNodeLocator;
 
+  /**
+   * Created with the language's services by {@link TypeQLiteModule}.
+   *
+   * @param services Langium's services.
+   */
   constructor(services: LangiumServices) {
     super(services);
     this.documents = services.shared.workspace.LangiumDocuments;
     this.locator = services.workspace.AstNodeLocator;
   }
 
+  /**
+   * The scope of a reference. A role's is the `relates` traits of the relation named beside it, those added by
+   * re-opens included, and is empty when the relation does not resolve. Any other reference gets Langium's scope,
+   * with the current document's definitions before the rest of the workspace's.
+   */
   override getScope(context: ReferenceInfo): Scope {
     if (isRoleRef(context.container) && context.property === 'role') {
       const relation = context.container.relation?.ref;

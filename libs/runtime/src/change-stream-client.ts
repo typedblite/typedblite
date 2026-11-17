@@ -11,7 +11,12 @@
  */
 import type { ChangeRecord } from './change-log.js';
 
+/** What a subscription calls as the hub's stream delivers changes and as its own state changes. */
 export interface ChangeStreamHandlers {
+  /**
+   * Called with each change, in order. If it throws, the subscription stops without reconnecting and `onFailed` is
+   * called with `'apply'`; the change is not counted as seen, so a resume starts at it.
+   */
   onChange(record: ChangeRecord): void;
   /** Caught up — nothing further for now. Not a terminal state. */
   onPaused?(): void;
@@ -26,15 +31,22 @@ export interface ChangeStreamHandlers {
   onFailed?(error: Error, cause?: 'transport' | 'apply'): void;
 }
 
+/** A running subscription to a hub's change stream. */
 export interface ChangeStreamSubscription {
+  /** Stops it: no more reconnects and no more calls to the handlers. */
   cancel(): Promise<void>;
   /** The last `seq` seen, which is what a reconnect resumes from. */
   readonly lastEventId: number;
 }
 
+/** How a {@link ChangeStreamClient} connects and retries. */
 export interface ChangeStreamClientOptions {
-  /** Retry delay after a dropped connection. Linear, matching prior art's coordinator. */
+  /** Retry delay after a dropped connection, in milliseconds. It grows linearly with each failed attempt. Default 200. */
   readonly retryMs?: number;
+  /**
+   * How many failed connection attempts in a row to retry before giving up, calling `onFailed` with `'transport'`.
+   * A connection that succeeds resets the count. Default 5.
+   */
   readonly maxRetries?: number;
   /**
    * Headers to send with every request — a bearer token, for a hub that wants one. A function, and
@@ -69,18 +81,29 @@ function readFrame(frame: string): { id?: number; data?: string } {
   return result;
 }
 
+/**
+ * The spoke's side of a hub's change stream: subscribes to the hub's server-sent events and pushes revisions to it. Reconnects
+ * on a dropped connection, resuming from the last change it delivered.
+ */
 export class ChangeStreamClient {
   private controller?: AbortController;
   private retryTimer?: NodeJS.Timeout;
   private stopped = false;
   private seen = 0;
 
+  /**
+   * Creates a client for one hub.
+   *
+   * @param url The hub's base URL. Changes are read and pushed at `<url>/changes`.
+   * @param options How it retries, and the headers to send.
+   */
   public constructor(
     /** Public so a replicator can read the stream once without reaching into a private field. */
     public readonly url: string,
     private readonly options: ChangeStreamClientOptions = {},
   ) {}
 
+  /** The `seq` of the last change delivered, which a reconnect resumes from. */
   public get lastEventId(): number {
     return this.seen;
   }

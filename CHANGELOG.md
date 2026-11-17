@@ -8,6 +8,10 @@ they are listed here.
 ## [Unreleased]
 
 ### Changed
+- **Every name in the API has a doc comment**, and so has every member a class or interface declares itself, so the API
+  reference describes everything it lists. `npm run check-api` now fails when one is missing. The generated syntax tree
+  (`@typedblite/language`'s `src/generated/`) is documented by a step after `langium generate`
+  (`libs/language/scripts/document-generated.mts`), because Langium writes those files without comments.
 - **`@typedblite/language`: `EntityDef` and `RelationDef` hold their `sub` and `value` clauses in lists** (`superTypes`, `valueTypes`),
   not in `superType` and `valueType`. The grammar lets those clauses sit among a type's traits, so one could be written
   twice, and the second overwrote the first without a word (Langium warned of it on every build). A second `sub` or

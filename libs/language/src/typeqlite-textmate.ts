@@ -41,11 +41,17 @@ const ANNOTATION_SCOPE = 'keyword.annotations';
 /** The file the grammar is written to, beside `langium-config.json`. */
 export const TEXTMATE_OUT = 'syntaxes/typeqlite.tmLanguage.json';
 
+/** A TextMate grammar, as the JSON file VS Code reads: what {@link typeqliteTextMate} returns. */
 export interface TextMateGrammar {
+  /** The language's name. */
   readonly name: string;
+  /** The grammar's root scope. */
   readonly scopeName: string;
+  /** The file extensions it applies to. */
   readonly fileTypes: readonly string[];
+  /** The patterns tried at the top level, in order. */
   readonly patterns: readonly object[];
+  /** The named patterns the others include. */
   readonly repository: Readonly<Record<string, object>>;
 }
 

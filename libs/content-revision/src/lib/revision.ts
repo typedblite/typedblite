@@ -20,13 +20,21 @@ export type Revision = string;
 
 const DIGEST_LENGTH = 32;
 
+/** What {@link computeRevision} derives a revision from. */
 export interface RevisionInput {
   /** Absent for a tombstone, which has no state. */
   readonly state?: EntityState;
+  /** The revision this one follows. Absent for the first revision of an entity. */
   readonly parent?: Revision;
+  /** Whether this revision deletes the entity. */
   readonly deleted?: boolean;
 }
 
+/**
+ * The generation of a revision: the number before the dash, 1 for an entity's first revision.
+ *
+ * @throws if `rev` is not `<generation>-<digest>`.
+ */
 export function generationOf(rev: Revision): number {
   const generation = Number(rev.slice(0, rev.indexOf('-')));
   if (!Number.isInteger(generation) || generation < 1) {
@@ -35,6 +43,7 @@ export function generationOf(rev: Revision): number {
   return generation;
 }
 
+/** The digest of a revision: everything after the first dash. */
 export function digestOf(rev: Revision): string {
   return rev.slice(rev.indexOf('-') + 1);
 }
@@ -55,6 +64,14 @@ export function computeRevision(input: RevisionInput): Revision {
   return `${generation}-${digest}`;
 }
 
+/** A leaf of an entity's revision tree: a revision nothing has superseded, live or deleted. */
+export interface Leaf {
+  /** The leaf's revision. */
+  readonly rev: Revision;
+  /** Whether it is a tombstone. */
+  readonly deleted: boolean;
+}
+
 /**
  * The winner among an entity's leaves, per ADR-003 Decision 3. Total: live beats tombstone, then
  * highest generation, then greatest digest. A tie at the last step would require equal digests,
@@ -64,11 +81,6 @@ export function computeRevision(input: RevisionInput): Revision {
  * are exactly what differ between nodes, and a rule reading any of them picks a different winner on
  * each, which is divergence rather than a conflict.
  */
-export interface Leaf {
-  readonly rev: Revision;
-  readonly deleted: boolean;
-}
-
 export function winner(leaves: readonly Leaf[]): Leaf | undefined {
   if (leaves.length === 0) return undefined;
   const live = leaves.filter((leaf) => !leaf.deleted);

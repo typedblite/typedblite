@@ -39,6 +39,11 @@ import type { TypeQLiteLabels } from './typeqlite-labels.js';
 
 /** A definition's kind, as the outline, workspace symbols and completion show it. */
 export class TypeQLiteNodeKindProvider extends DefaultNodeKindProvider {
+  /**
+   * The symbol kind of a definition: a class for an entity, an interface for a relation, a property for an
+   * attribute, a struct, a field, a function, an enum member for a role and a namespace for a re-open.
+   * Anything else is Langium's.
+   */
   override getSymbolKind(node: AstNode): SymbolKind {
     if (isEntityDef(node)) return SymbolKind.Class;
     if (isRelationDef(node)) return SymbolKind.Interface;
@@ -51,6 +56,10 @@ export class TypeQLiteNodeKindProvider extends DefaultNodeKindProvider {
     return super.getSymbolKind(node);
   }
 
+  /**
+   * The completion item kind of a definition: a class for an entity, an interface for a relation, a property for an
+   * attribute, a struct, a function and an enum member for a role. Anything else is Langium's.
+   */
   override getCompletionItemKind(node: AstNode): CompletionItemKind {
     if (isEntityDef(node)) return CompletionItemKind.Class;
     if (isRelationDef(node)) return CompletionItemKind.Interface;
@@ -80,6 +89,7 @@ export function kindOf(node: AstNode): string | undefined {
  * and the role it adds with it.
  */
 export class TypeQLiteDocumentSymbolProvider extends DefaultDocumentSymbolProvider {
+  /** The outline entries for a node. A re-open, which has no name of its own, is listed under the label it re-opens. */
   protected override getSymbol(document: LangiumDocument, node: AstNode): DocumentSymbol[] {
     if (isTypeExtensionDef(node) && node.$cstNode) {
       const label = GrammarUtils.findNodeForProperty(node.$cstNode, 'type');
@@ -109,6 +119,11 @@ export class TypeQLiteDocumentSymbolProvider extends DefaultDocumentSymbolProvid
 export class TypeQLiteHoverProvider extends AstNodeHoverProvider {
   private readonly services: LangiumServices;
 
+  /**
+   * Created with the language's services by {@link TypeQLiteModule}.
+   *
+   * @param services Langium's services.
+   */
   constructor(services: LangiumServices) {
     super(services);
     this.services = services;
@@ -135,6 +150,10 @@ export class TypeQLiteHoverProvider extends AstNodeHoverProvider {
     return { contents: { kind: 'markdown', value: contents.join('\n\n---\n\n') }, range: site.range };
   }
 
+  /**
+   * The hover text for a definition: its role label for a role, its source, its `#!` doc comment and `@doc`
+   * annotations, and where else the workspace re-opens it. `undefined` for a node that is not a definition.
+   */
   protected override getAstNodeHoverContent(node: AstNode): string | undefined {
     const kind = kindOf(node);
     if (kind === undefined || !node.$cstNode) return undefined;

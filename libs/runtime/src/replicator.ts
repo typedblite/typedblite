@@ -8,6 +8,7 @@
  */
 import type { ChangeRecord } from './change-log.js';
 
+/** Which way a replication moves changes: `push` sends the local ones, `pull` takes the remote ones, `duplex` does both. */
 export type SyncDirection = 'push' | 'pull' | 'duplex';
 
 /**
@@ -19,18 +20,25 @@ export type SyncDirection = 'push' | 'pull' | 'duplex';
  * `SyncResult { checkpointToken: string }` is exactly that shape, and it is why it was rejected.
  */
 export interface SyncCursor {
+  /** How far the local store has pulled: the last `seq` of the remote's log it applied. */
   readonly pull?: number;
+  /** How far the local store has pushed: the last `seq` of its own log the remote has. */
   readonly push?: number;
 }
 
+/** What one replication did. */
 export interface SyncOutcome {
+  /** Where each direction got to: keep it and pass it as `from` to resume. */
   readonly cursor: SyncCursor;
+  /** How many revisions were new to the store that received them. A pair that is already in sync applies none. */
   readonly applied: number;
+  /** How many conflicts the local store holds on the things this run touched. */
   readonly conflicts: number;
 }
 
 /** What replication needs of a store. `ChangeLog` satisfies it structurally. */
 export interface ReplicationEndpoint {
+  /** The changes after `cursor` (default 0), at most `limit`, in order. */
   since(cursor?: number, limit?: number): readonly ChangeRecord[];
   /** Returns whether the revision was new to this endpoint. */
   applyRemote(record: {
@@ -40,11 +48,15 @@ export interface ReplicationEndpoint {
     deleted: boolean;
     state?: ChangeRecord['state'];
   }): boolean;
+  /** The leaves of a thing that did not win: the conflicts it holds. */
   conflictsOf(entityId: string): readonly { rev: string; deleted: boolean }[];
 }
 
+/** How {@link replicateOnce} replicates. */
 export interface ReplicateOptions {
+  /** Which way to move changes. */
   readonly direction: SyncDirection;
+  /** Where each direction resumes. Absent, it starts from the beginning of the log. */
   readonly from?: SyncCursor;
   /** Batch size. Bounded so a large backlog does not become one enormous read. */
   readonly limit?: number;

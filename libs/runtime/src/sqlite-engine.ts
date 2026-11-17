@@ -22,6 +22,12 @@ export interface EngineRow {
 export class SqliteEngine {
   private readonly interpreter: TypeDBLiteInterpreter;
 
+  /**
+   * Opens a database and an interpreter over it.
+   *
+   * @param location `:memory:`, or the path of a SQLite file.
+   * @param options How the interpreter opens the database and runs queries.
+   */
   constructor(location = ':memory:', options: TypeDBLiteOptions = {}) {
     this.interpreter = new TypeDBLiteInterpreter(location, undefined, options);
   }
@@ -45,14 +51,17 @@ export class SqliteEngine {
     return this.interpreter.hasSchema;
   }
 
+  /** The schema applied to this database, as sorted lists. */
   schemaSnapshot(): TypeDBLiteSchemaSnapshot {
     return this.interpreter.schemaSnapshot();
   }
 
+  /** Applies schema definitions: the `define` of the interpreter. Safe to repeat. */
   async define(schema: string): Promise<unknown> {
     return this.interpreter.define(schema);
   }
 
+  /** Runs a pipeline for its effect and returns the execution report. */
   async execute(query: string): Promise<unknown> {
     // 🔴 Return the engine's report rather than swallowing it. This adapter is the only thing
     // between the interpreter and every repository in the workspace, so dropping the report here
@@ -60,6 +69,7 @@ export class SqliteEngine {
     return this.interpreter.execute(query);
   }
 
+  /** Runs a pipeline and returns its rows. */
   async query(query: string): Promise<{ rows: readonly EngineRow[] }> {
     return this.interpreter.query(query);
   }
@@ -102,6 +112,7 @@ export class SqliteEngine {
     return result;
   }
 
+  /** Closes the database. */
   async close(): Promise<void> {
     this.interpreter.close();
   }

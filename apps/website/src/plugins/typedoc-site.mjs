@@ -13,8 +13,7 @@ const MEDIA_LINK = /\]\((?:\.\.\/)*_media\/(adr-[\w-]+)\.md(#[^)]*)?\)/g;
 const OVERVIEW = `Everything the four packages export, generated from their source and checked on every build. A name that is not listed
 here is not public, whatever the package contains. To learn how the pieces fit, start with
 [Embedding the runtime](/guide/embedding-the-runtime/), then come here for the detail; the engine's entry point is
-[TypeDBLiteInterpreter](/api/typedblite/runtime/classes/typedbliteinterpreter/). A dash in the description column means the
-source has no doc comment for that name yet.`;
+[TypeDBLiteInterpreter](/api/typedblite/runtime/classes/typedbliteinterpreter/).`;
 
 /** @param {import('typedoc').Application} app */
 export function load(app) {

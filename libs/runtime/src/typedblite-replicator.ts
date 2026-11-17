@@ -14,11 +14,22 @@ import {
   type SyncDirection,
 } from './replicator.js';
 
+/**
+ * Where a continuous replication is: `syncing` while it is receiving, `ready` once it has caught up (and still
+ * running), `failed` after an error, `idle` after it is cancelled.
+ */
 export type SyncStatus = 'idle' | 'syncing' | 'ready' | 'failed';
+/**
+ * Whether a failure can be waited out. `terminal` means the replication has stopped and will fail the same way again (a change
+ * that cannot be applied); `transient` is a connection or a push that may work on a later attempt.
+ */
 export type SyncErrorClass = 'transient' | 'terminal';
 
+/** How {@link TypeDBLiteReplicator} replicates. */
 export interface ReplicationOptions {
+  /** Which way to move changes. */
   readonly direction: SyncDirection;
+  /** Where each direction resumes. Absent, it starts from the beginning of the log. */
   readonly from?: SyncCursor;
   /**
    * `replicateOnce` only: fail if the hub has not answered, pull and push together, within this many
@@ -28,15 +39,23 @@ export interface ReplicationOptions {
   readonly timeoutMs?: number;
 }
 
+/** What a continuous replication reports as it runs. All are optional. */
 export interface ReplicationEvents {
+  /** A change was received and applied. `applied` is the number of revisions that were new. */
   onChange?(applied: number): void;
+  /** The replication has caught up and is waiting for more. It is still running. */
   onPaused?(): void;
+  /** The replication is receiving changes. */
   onActive?(): void;
+  /** The replication failed. `classification` says whether it is worth waiting for another attempt. */
   onFailed?(error: Error, classification: SyncErrorClass): void;
 }
 
+/** A running continuous replication. */
 export interface ReplicationSession {
+  /** Where it is now. */
   readonly status: SyncStatus;
+  /** Stops it: the subscription and the pushing. */
   cancel(): Promise<void>;
 }
 
@@ -49,6 +68,14 @@ export interface ReplicationSession {
 export class TypeDBLiteReplicator {
   private readonly client: ChangeStreamClient;
 
+  /**
+   * Creates a replicator for one store and one hub.
+   *
+   * @param log The local store's change log (`db.changeLog`).
+   * @param hubUrl The hub's base URL.
+   * @param pushIntervalMs How often a continuous replication pushes local changes. Default 100.
+   * @param headers Headers for every request, called per request: a bearer token, for a hub that wants one.
+   */
   public constructor(
     private readonly log: ChangeLog,
     hubUrl: string,
@@ -59,6 +86,11 @@ export class TypeDBLiteReplicator {
     this.client = new ChangeStreamClient(hubUrl, { retryMs: 200, headers });
   }
 
+  /**
+   * Replicates once in the requested direction, then returns. Resume from the returned cursor.
+   *
+   * @throws if the hub does not answer within `options.timeoutMs`, or the request fails.
+   */
   public async replicateOnce(options: ReplicationOptions): Promise<{
     cursor: SyncCursor;
     applied: number;

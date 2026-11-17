@@ -25,7 +25,9 @@ export const DIAGNOSTIC_SOURCE = 'typedblite';
  */
 export const MAX_DIAGNOSTICS = 50;
 
+/** What running a statement reports besides its rows: facts about the run, and the diagnostics of a refusal. */
 export interface ExecutionReport {
+  /** The diagnostics of the run, at most {@link MAX_DIAGNOSTICS}. Each has a stable `code`, from {@link DiagnosticCode}. */
   readonly diagnostics: readonly Diagnostic[];
 }
 
@@ -138,6 +140,7 @@ export const DiagnosticCode = {
   revisionNotDerived: 'typedblite.revision-not-derived',
 } as const;
 
+/** One of the codes in {@link DiagnosticCode}. */
 export type DiagnosticCodeValue =
   (typeof DiagnosticCode)[keyof typeof DiagnosticCode];
 
@@ -190,6 +193,10 @@ export function attachDiagnostic<E>(error: E, diagnostic: Diagnostic): E {
   return error;
 }
 
+/**
+ * The diagnostic attached to an error the engine threw, or `undefined` for any other error. Branch on its `code`, not on
+ * the message.
+ */
 export const diagnosticOf = (error: unknown): Diagnostic | undefined =>
   error && typeof error === 'object'
     ? (error as WithDiagnostic).diagnostic
