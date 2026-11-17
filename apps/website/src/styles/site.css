@@ -1,3 +1,6 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/nunito';
+
 /* TypeDBLite's colours: ink #15171C, paper #F4F2EE, signal orange #E8590C (docs/brand/README.md).
    Orange text on paper is 3.6:1, short of 4.5:1, so text accents use a darker orange in the light theme. */
 :root {
@@ -14,6 +17,16 @@
 :root[data-theme='dark'] {
   --sl-color-bg: #15171c;
   --sl-color-accent: #f97316;
+}
+
+/* Headings are set in Nunito, the wordmark's typeface (docs/brand/README.md), and body text in Inter. Both are
+   self-hosted, so no request leaves the site. */
+:root {
+  --sl-font: 'Inter Variable';
+  --sl-font-heading: 'Nunito Variable', var(--__sl-font);
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--sl-font-heading);
 }
 
 .site-disclaimer a {
