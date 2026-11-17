@@ -66,9 +66,8 @@ npm run site                            # build, then serve dist/ on http://loca
 
 `build-site` builds the playground, runs `astro build` (which generates the API pages, below), then
 `scripts/assemble.mjs` copies the playground's scripts, workers and `.wasm` beside the page Astro built at `/playground/`,
-and writes the `CNAME` file. `check` runs three scripts on the result. `check-site.mjs`: every `href` and `src` resolves to
-a file, every `#fragment` resolves to an id (the API pages included), and the playground, the API, the search index and
-`CNAME` exist. `check-highlighting.mjs` and `check-playground.mjs`, above. It is a step of `npm run gate`.
+`check` runs three scripts on the result. `check-site.mjs`: every `href` and `src` resolves to
+a file, every `#fragment` resolves to an id (the API pages included), and the playground, the API and the search index exist. `check-highlighting.mjs` and `check-playground.mjs`, above. It is a step of `npm run gate`.
 
 ## The API reference is pages of the site
 
@@ -122,7 +121,7 @@ cd apps/website && npx cf@latest deploy ./dist
 - `cf` is a release candidate (`1.0.0-rc.1` when this was written), so check `cf deploy --help` if a flag has moved.
 - `apps/website/.cloudflare/` is the build output of a deploy or dry run. It is git-ignored.
 
-The site was first planned for GitHub Pages; that workflow (`site.yml`) never ran and has been removed.
-`assemble.mjs` still writes the `CNAME` and `.nojekyll` files that Pages needed; Cloudflare ignores them.
+The site was first planned for GitHub Pages; that workflow (`site.yml`) never ran and has been removed, along with the
+`CNAME` and `.nojekyll` files the build used to write for it. The domain is set by `cloudflare.config.ts`.
 
 Before launch, read the landing page's "Pre-release" notice and the guides' "not on npm yet" notes, and remove them.

@@ -22,7 +22,7 @@ if (!existsSync(DIST)) {
   process.exit(1);
 }
 
-for (const required of ['index.html', 'playground/index.html', 'playground/worker.js', 'playground/sqlite3.wasm', 'api/index.html', 'CNAME', 'sitemap-index.xml', 'pagefind/pagefind.js', 'favicon.svg', '404.html']) {
+for (const required of ['index.html', 'playground/index.html', 'playground/worker.js', 'playground/sqlite3.wasm', 'api/index.html', 'sitemap-index.xml', 'pagefind/pagefind.js', 'favicon.svg', '404.html']) {
   if (!existsSync(join(DIST, required))) problems.push(`dist/${required} is missing`);
 }
 
