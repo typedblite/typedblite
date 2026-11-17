@@ -248,7 +248,7 @@ could not say how closely it matches TypeDB, and could not have got as close as 
 |---|---|---|---|
 | **TypeDB™** | The polymorphic database | [typedb.com](https://typedb.com) · [GitHub](https://github.com/typedb/typedb) | TypeDBLite reimplements its data model and behaviour in TypeScript, over SQLite |
 | **TypeQL™** | TypeDB's query language | [Reference](https://typedb.com/docs/typeql-reference/) · [GitHub](https://github.com/typedb/typeql) | TypeQLite is a dialect of TypeQL 3.x, and follows its syntax |
-| **TypeDB Studio** | TypeDB's IDE | [Docs](https://typedb.com/docs/tools/studio) · [GitHub](https://github.com/typedb/typedb-studio) | The model for TypeDBLite's proposed [graph explorer](docs/planning/graph-explorer/graph-explorer.feature.md) |
+| **TypeDB Studio** | TypeDB's IDE | [Docs](https://typedb.com/docs/tools/studio) · [GitHub](https://github.com/typedb/typedb-studio) | The model for TypeDBLite's proposed [graph explorer](docs/planning/workbench/graph-explorer/graph-explorer.feature.md) |
 | **TypeDB Behaviour Specification** | TypeDB's Cucumber conformance suite | [GitHub](https://github.com/typedb/typedb-behaviour) | Vendored unmodified in [`libs/conformance/spec/`](libs/conformance/spec/) as TypeDBLite's [conformance oracle](CONFORMANCE.md) |
 
 **Trademarks.** TypeDB™ and TypeQL™ are trademarks of TypeDB Ltd. TypeDB Studio is a product of

@@ -5,30 +5,28 @@ decided-by: []
 title: TypeQLite Graph Explorer
 feature: graph-explorer
 branch: feat/graph-explorer
-depends-on: [editor]
+initiative: workbench
+depends-on: [editor, engine-host]
 ---
 
 # TypeQLite Graph Explorer — Feature Doc
 
 > **Status:** 📋 Proposed, not started · **Written:** 2026-11-12 · **Branch:** `feat/graph-explorer`,
-> from `main`, not yet cut · **Depends on:** [TypeQLite Editor](../editor/editor.feature.md)
+> from `main`, not yet cut · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md)
 > (complete) · **Governed by:** an ADR that Phase 00 writes
 >
 > Request, 2026-11-12: *a graph explorer, modelled after TypeDB Studio.*
 >
-> 🔴 **This is the feature that the two earlier documents said would justify an initiative.** The
-> editor's feature document placed "result tables, browsing a live store's schema, transactions and
-> a graph view" out of scope, describing them as a database IDE, and said an initiative earns its
-> place once that is taken on ([Out of scope](../editor/editor.feature.md#out-of-scope)). The
-> [debugger](../debugger/debugger.feature.md) said the same about building alongside it. This
-> document and the debugger now share a piece of work that neither owns: **a host that runs the
-> engine for the editor** (see [Shared with the debugger](#shared-with-the-debugger)). It is written
-> as a feature, as requested. **Once either feature is scheduled, write an initiative over both,**
-> and make that host its first feature.
+> **A feature in the [Workbench initiative](../workbench.initiative.md).** The editor's feature
+> document said an initiative would earn its place once "result tables, browsing a live store's
+> schema, transactions and a graph view" were taken on. This is that work. It shares **a host that
+> runs the engine for the editor** with the [debugger](../debugger/debugger.feature.md) and the
+> [notebook](../notebook/notebook.feature.md), and the initiative builds that host first, as the
+> [engine host](../engine-host/engine-host.feature.md) feature. This document no longer owns it.
 
 ## Process
 
-Per the [Multi-Phase Lifecycle Standard](../../standards/governance/multi-phase-lifecycle-standard.md).
+Per the [Multi-Phase Lifecycle Standard](../../../standards/governance/multi-phase-lifecycle-standard.md).
 `feat/graph-explorer` is cut from `main` when Phase 00 starts. Each phase branch,
 `phase/graph-explorer/<NN>-<slug>`, is cut from it and merges back into it. Each phase's checklist
 is written when that phase starts. Questions for the founder are asked in Phase 00.
@@ -81,33 +79,27 @@ This is load-bearing. Check it again before relying on it.
 | Thing | State |
 | ----- | ----- |
 | Answers | `query()` returns `rows` of `TypeDBLiteValue` cells. An entity or relation carries its `iid` and its actual `type`. An attribute carries its `type` and value. A `fetch` returns `documents` (JSON). **A thing cell is already a node** |
-| Attribute identity | Stored once per type and value ([ADR-006](../../architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md)) and has **no iid**. Its node key is `(type, value)` |
+| Attribute identity | Stored once per type and value ([ADR-006](../../../architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md)) and has **no iid**. Its node key is `(type, value)` |
 | Pinning by iid | The grammar admits `$x iid 0x…` (`typeqlite.langium`, at line 639) and `iid($x)`. So "expand this node" can be written as a query |
-| Role names in answers | **Not verified.** For a `links` edge to carry its role label, a query must be able to return the role a player plays. Phase 00 checks whether a role-type variable works in TypeQLite. If it does not, the graph is a real caller for that construct ([AGENTS.md](../../../AGENTS.md), caller-first) |
+| Role names in answers | **Not verified.** For a `links` edge to carry its role label, a query must be able to return the role a player plays. Phase 00 checks whether a role-type variable works in TypeQLite. If it does not, the graph is a real caller for that construct ([AGENTS.md](../../../../AGENTS.md), caller-first) |
 | Schema | `schemaSnapshot()` returns `types`, `relations`, `attributes`, `owns`, `parents`, `valueTypes`, `roles`, `plays` and `annotations`. **This is the schema graph, already as data** |
 | Reading a thing | `attributesOf(iid, attribute)` is public. Reading a relation's role players, or the relations a thing plays in, goes through a query |
 | Transactions | `beginTransaction`, `commitTransaction` and `rollbackTransaction` on the interpreter. `SqliteEngine` wraps them, and the async `define`, `execute` and `query` |
-| Statement classification | [`apps/cli/src/session.ts`](../../../apps/cli/src/session.ts) chooses between define, read and write by the leading keyword and the write stages. It lives in the CLI, and the [debugger](../debugger/debugger.feature.md) needs it too |
+| Statement classification | [`apps/cli/src/session.ts`](../../../../apps/cli/src/session.ts) chooses between define, read and write by the leading keyword and the write stages. It lives in the CLI, and the [debugger](../debugger/debugger.feature.md) needs it too |
 | Live changes | The change log and change stream (ADR-003) publish every write as a revision over SSE. **A graph could refresh when the store changes**, but nothing uses them for that yet |
 | SQLite outside Node | `SqliteDatabase` is an interface. The runtime README says "a WASM SQLite binding running synchronously inside a Web Worker satisfies this interface", so **the engine could run inside a browser** |
-| Extension | [`apps/vscode`](../../../apps/vscode) has no webview, no tree view, no commands besides the language server's, and never loads the runtime |
+| Extension | [`apps/vscode`](../../../../apps/vscode) has no webview, no tree view, no commands besides the language server's, and never loads the runtime |
 
-## Shared with the debugger
+## What the engine host gives it, and what it adds
 
-Both features need the same thing, and neither should build it alone:
+The explorer runs on the [engine host](../engine-host/engine-host.feature.md): open a database, run
+a statement in auto or manual transactions, return rows, facts and refusals. The host also owns
+the **one statement classifier** (define, read, write), moved out of the CLI.
 
-- **An engine host.** Something on the editor's side that opens a database, runs a statement in a
-  transaction, and returns rows, facts and refusals. It has to answer **where the engine runs**:
-  in the extension host (which depends on `node:sqlite` being in Electron's Node, not yet
-  verified), in a separate Node process, or in a worker running WASM SQLite.
-- **One statement classifier** for define, read and write, moved out of the CLI and shared.
 - **Not shared: the rule for writes.** The debugger avoids the question by always running in
   `:memory:` ([its invariant 4](../debugger/debugger.feature.md#-the-invariants-every-phase-is-bound-by)).
   The explorer opens real stores, so it keeps its own rule (invariant 3 below). If copying a store
   into memory is built for the debugger, the explorer could reuse it for a "scratch copy" mode.
-
-If both features are scheduled, these become the first feature of an initiative. If only this one
-is scheduled, they are its Phase 01.
 
 ## 🔴 The invariants every phase is bound by
 
@@ -121,7 +113,7 @@ caller-first.
 **2. The explorer changes nothing about the engine's answers.** It adds no runtime behaviour. Any
 runtime change it does need (an export, a role-variable construct) goes through the usual path,
 and the conformance run stays at **1742 of 1756**
-([ADR-005](../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
+([ADR-005](../../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
 
 **3. Nothing is written unless the user chose to write.** In auto mode a write commits, as it does
 in Studio. That is the user's choice, so the transaction control always shows which mode is on.
@@ -188,10 +180,8 @@ packaged `.vsix`.
 
 These are for the founder.
 
-1. **Initiative or feature?** The recommendation is an initiative over this feature and the
-   debugger, with the engine host as its first feature, once either is scheduled.
-2. **Where the engine runs:** in the extension host, in a separate Node process, or in a worker
-   with WASM SQLite. This is shared with the debugger, and the two must agree.
+1. ~~**Initiative or feature?**~~ **Decided 2026-11-17:** the [Workbench initiative](../workbench.initiative.md).
+2. ~~**Where the engine runs.**~~ Moved to the [engine host](../engine-host/engine-host.feature.md).
 3. **Graph library.** Candidates: Sigma.js with Graphology (WebGL, built for large graphs),
    Cytoscape.js (rich layouts and styling), or vis-network. Choose on the size bound
    (invariant 4) and licence. Which library Studio uses was not confirmed.
@@ -217,7 +207,7 @@ messages, and asserts the model it reports. Pixel tests are not used.
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
 | 00 | Scope, the Studio mapping, the shared engine host, and the ADR | Not started | |
-| 01 | Engine host: open, transactions, run, a shared classifier (moves to the initiative if one is written) | Not started | |
+| 01 | ~~Engine host~~ — now the [engine-host feature](../engine-host/engine-host.feature.md), built first | Moved | |
 | 02 | Run and results: Run on a statement, and the Log, Table and Raw views | Not started | |
 | 03 | Schema: the type tree and the schema graph | Not started | |
 | 04 | Answer graph: the graph model, rendering, highlight, search | Not started | |
@@ -233,10 +223,8 @@ This is a forward plan. Each phase's checklist is written when that phase starts
 Check whether a role-type variable works in TypeQLite, and whether `node:sqlite` is in VS Code's
 Electron Node. Choose the graph library and the webview stack.
 
-**01 — Engine host.** A process or module that opens a database and runs statements in auto or
-manual transactions, behind a message protocol, with specs run without VS Code. The CLI's
-classifier moves somewhere shared. If an initiative is written, this phase becomes its first
-feature, and the debugger uses it too.
+**01 — Moved.** The engine host is its own feature, built first. This phase is kept so the
+numbers below stay stable.
 
 **02 — Run and results.** A **Run** command, a CodeLens and Ctrl+Enter on a statement in a `.tql`
 file. A results panel with the Log, Table and Raw views. A transaction control in the status bar.
@@ -264,18 +252,18 @@ Anything a phase defers is recorded here, not only in a commit message.
 
 ## Key Documents
 
-- [TypeQLite Editor](../editor/editor.feature.md) and
-  [ADR-008](../../architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md):
+- [TypeQLite Editor](../../editor/editor.feature.md) and
+  [ADR-008](../../../architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md):
   the extension this builds on
 - [TypeQLite Debugger](../debugger/debugger.feature.md): the other proposed feature that needs an
   engine host
-- [ADR-003](../../architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md): the change
+- [ADR-003](../../../architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md): the change
   log, for live refresh
-- [ADR-004](../../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md):
+- [ADR-004](../../../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md):
   execution facts, which become the Log view
-- [ADR-006](../../architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md): why an
+- [ADR-006](../../../architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md): why an
   attribute node is keyed by type and value
-- [`libs/runtime/README.md`](../../../libs/runtime/README.md): the `SqliteDatabase` interface, and
+- [`libs/runtime/README.md`](../../../../libs/runtime/README.md): the `SqliteDatabase` interface, and
   WASM SQLite
 - [TypeDB Studio manual](https://typedb.com/docs/manual/studio) and
   [repository](https://github.com/typedb/typedb-studio)
