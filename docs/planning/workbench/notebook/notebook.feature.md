@@ -5,13 +5,14 @@ decided-by: []
 title: TypeQLite Notebook
 feature: notebook
 branch: feat/notebook
-depends-on: [editor]
+initiative: workbench
+depends-on: [editor, engine-host]
 ---
 
 # TypeQLite Notebook — Feature Doc
 
 > **Status:** 📋 Proposed, not started · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
-> `main`, not yet cut · **Depends on:** [TypeQLite Editor](../editor/editor.feature.md) (complete)
+> `main`, not yet cut · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete)
 > · **Shares work with:** [Graph Explorer](../graph-explorer/graph-explorer.feature.md) and
 > [Debugger](../debugger/debugger.feature.md) · **Governed by:** an ADR that Phase 00 writes
 >
@@ -22,14 +23,15 @@ depends-on: [editor]
 > it, against one store that persists from cell to cell. That reading is the first thing Phase 00
 > confirms with the founder (see [Open questions](#open-questions-for-phase-00)).
 >
-> **A feature, not an initiative.** On its own it has one deliverable: a notebook serializer, a
-> controller that runs cells, and an output renderer. But it needs the same **engine host** that
-> the graph explorer and the debugger need, and none of the three should build it alone. See
-> [Shared with the graph explorer and the debugger](#shared-with-the-graph-explorer-and-the-debugger).
+> **A feature in the [Workbench initiative](../workbench.initiative.md).** Its own deliverable is
+> a notebook serializer, a controller that runs cells, and an output renderer. It runs on the
+> [engine host](../engine-host/engine-host.feature.md) and its session, which the initiative builds
+> first and shares with the [graph explorer](../graph-explorer/graph-explorer.feature.md) and the
+> [debugger](../debugger/debugger.feature.md).
 
 ## Process
 
-Per the [Multi-Phase Lifecycle Standard](../../standards/governance/multi-phase-lifecycle-standard.md).
+Per the [Multi-Phase Lifecycle Standard](../../../standards/governance/multi-phase-lifecycle-standard.md).
 `feat/notebook` is cut from `main` when Phase 00 starts. Each phase branch,
 `phase/notebook/<NN>-<slug>`, is cut from it and merges back into it. Each phase's checklist is
 written when that phase starts. Questions for the founder are asked in Phase 00.
@@ -43,8 +45,8 @@ REPL. The reader cannot change a query and see what happens without leaving the 
 
 A notebook puts them in one file. It is the natural way to:
 
-- **Teach TypeQLite.** The guides ([the TypeQLite language](../../guides/typeqlite-language.md),
-  [the five-minute tour](../../guides/five-minute-tour.md)) could be run, not only read.
+- **Teach TypeQLite.** The guides ([the TypeQLite language](../../../guides/typeqlite-language.md),
+  [the five-minute tour](../../../guides/five-minute-tour.md)) could be run, not only read.
 - **Explore a store step by step**, keeping each query and its answers next to the reasoning.
 - **Share a reproducible example**, such as a bug report: a schema, some data, the query that goes
   wrong, and what it printed.
@@ -56,31 +58,27 @@ this document, which was written from the other feature documents.
 
 | Thing | State |
 | ----- | ----- |
-| The `.tql` language and editor | Complete ([editor feature](../editor/editor.feature.md), ADR-008): a Langium language server in [`apps/vscode`](../../../apps/vscode) with diagnostics, navigation, completion, rename and quick fixes |
+| The `.tql` language and editor | Complete ([editor feature](../../editor/editor.feature.md), ADR-008): a Langium language server in [`apps/vscode`](../../../../apps/vscode) with diagnostics, navigation, completion, rename and quick fixes |
 | Running statements | `define`, `execute` and `query` on the interpreter and on `SqliteEngine`, with `beginTransaction`, `commitTransaction` and `rollbackTransaction` |
 | Answers | `query()` returns `rows` of `TypeDBLiteValue` cells; a `fetch` returns `documents` as JSON |
-| Execution facts and refusals | Returned as a report ([ADR-004](../../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md)) |
-| Statement classification | In [`apps/cli/src/session.ts`](../../../apps/cli/src/session.ts), chooses define, read or write. Needs to move somewhere shared |
+| Execution facts and refusals | Returned as a report ([ADR-004](../../../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md)) |
+| Statement classification | In [`apps/cli/src/session.ts`](../../../../apps/cli/src/session.ts), chooses define, read or write. Needs to move somewhere shared |
 | Extension side | The extension has no notebook API use, no webview, and never loads the runtime |
-| Embedded Markdown | The Markdown preview already highlights TypeQLite fences in the editor's colours ([ADR-010](../../architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md)). A notebook's Markdown cells can reuse that |
+| Embedded Markdown | The Markdown preview already highlights TypeQLite fences in the editor's colours ([ADR-010](../../../architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md)). A notebook's Markdown cells can reuse that |
 
-## Shared with the graph explorer and the debugger
+## What the engine host gives it, and what it adds
 
-All three features need **an engine host**: something on the editor's side that opens a database,
-runs a statement in a transaction, and returns rows, facts and refusals. It must answer **where the
-engine runs**: in the extension host (which depends on `node:sqlite` being in Electron's Node, not
-yet verified), in a separate Node process, or in a worker running WASM SQLite.
+The notebook runs on the [engine host](../engine-host/engine-host.feature.md): open a database, run
+a statement in a transaction, return rows, facts and refusals, in a **session** that keeps one store
+open across statements. The host's session is the notebook's kernel. Where the engine runs is the
+host's decision, not this feature's.
 
-The notebook adds two things of its own:
+The notebook adds, on top of the host:
 
-- **A kernel lifetime.** A notebook's store lives as long as its session, across cells. The host
-  needs a "session" notion (one store, opened once, kept) rather than one statement at a time. The
-  explorer's open database is the same thing.
-- **A restart.** Restart must drop the session and re-create an in-memory store, or reopen the
-  file.
-
-If any two of the three features are scheduled, write an initiative over them and make the engine
-host its first feature. If only this one is scheduled, the host is its Phase 01.
+- **Cells map to a session.** Each notebook gets one session. Restart drops it and re-creates an
+  in-memory store, or reopens the file.
+- **One statement or many per cell**, and what a cell prints when a later statement fails after an
+  earlier one committed (open question 6).
 
 ## 🔴 The invariants every phase is bound by
 
@@ -90,7 +88,7 @@ to the notebook. A cell's output could be reproduced by pasting the cell into th
 
 **2. The notebook changes nothing about the engine's answers.** It adds no runtime behaviour. Any
 runtime change it does need goes through the usual path, and the conformance run stays at **1742
-of 1756** ([ADR-005](../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
+of 1756** ([ADR-005](../../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
 
 **3. Nothing is written to a real store by surprise.** A notebook runs against an in-memory store
 by default. Opening a file store is an explicit choice, shown in the notebook's status, and a write
@@ -166,8 +164,7 @@ These are for the founder.
 2. **File format.** A new extension (such as `.tqlnb`) in a plain-text format of our own, a
    Markdown file whose `typeql` fences are cells, or `.ipynb`. The recommendation is Markdown-like
    text, for invariant 4. Decide with the guides in mind.
-3. **Where the engine runs**, shared with the explorer and the debugger: the extension host, a
-   separate Node process, or a worker with WASM SQLite. The three must agree.
+3. ~~**Where the engine runs.**~~ Decided by the [engine host](../engine-host/engine-host.feature.md).
 4. **Cross-cell language services.** Does the language server see the notebook as one document
    (concatenated cells) or as many? This decides how rename and go-to-definition cross cells.
 5. **Default store.** In memory only, or remember the last file per notebook? And one store per
@@ -192,7 +189,7 @@ fixture notebook, runs its cells and asserts the outputs. Pixel tests are not us
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
 | 00 | Scope, the file format, the shared engine host, and the ADR | Not started | |
-| 01 | Engine host with a session: open, run in a kept store, restart (moves to the initiative if one is written) | Not started | |
+| 01 | ~~Engine host with a session~~ — now the [engine-host feature](../engine-host/engine-host.feature.md), built first | Moved | |
 | 02 | Format: the serializer and the notebook type | Not started | |
 | 03 | Run: the controller, run all, restart, outputs for rows, JSON, facts and refusals | Not started | |
 | 04 | Language services across cells | Not started | |
@@ -207,9 +204,8 @@ This is a forward plan. Each phase's checklist is written when that phase starts
 Electron Node. Settle the file format and the engine host with the explorer's and the debugger's
 documents.
 
-**01 — Engine host with a session.** A module that opens a database once and runs statements in it
-until restart, behind a message protocol, with specs run without VS Code. The CLI's classifier
-moves somewhere shared.
+**01 — Moved.** The engine host is its own feature, built first. This phase is kept so the
+numbers below stay stable.
 
 **02 — Format.** A notebook serializer and parser, with no outputs stored by default, and the
 notebook type registered in the extension.
@@ -234,18 +230,18 @@ Anything a phase defers is recorded here, not only in a commit message.
 
 ## Key Documents
 
-- [TypeQLite Editor](../editor/editor.feature.md) and
-  [ADR-008](../../architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md):
+- [TypeQLite Editor](../../editor/editor.feature.md) and
+  [ADR-008](../../../architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md):
   the extension this builds on
 - [TypeQLite Graph Explorer](../graph-explorer/graph-explorer.feature.md) and
   [TypeQLite Debugger](../debugger/debugger.feature.md): the other proposed features that need an
   engine host
-- [ADR-004](../../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md):
+- [ADR-004](../../../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md):
   execution facts, which become cell output
-- [ADR-010](../../architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md):
+- [ADR-010](../../../architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md):
   TypeQLite highlighting in Markdown
-- [The TypeQLite language](../../guides/typeqlite-language.md) and
-  [the five-minute tour](../../guides/five-minute-tour.md): the guides a notebook could make
+- [The TypeQLite language](../../../guides/typeqlite-language.md) and
+  [the five-minute tour](../../../guides/five-minute-tour.md): the guides a notebook could make
   runnable
 - [VS Code Notebook API](https://code.visualstudio.com/api/extension-guides/notebook): the
   serializer, controller and renderer this would use

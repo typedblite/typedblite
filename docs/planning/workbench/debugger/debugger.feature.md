@@ -5,31 +5,28 @@ decided-by: []
 title: TypeQLite Debugger
 feature: debugger
 branch: feat/debugger
-depends-on: [editor]
+initiative: workbench
+depends-on: [editor, engine-host]
 ---
 
 # TypeQLite Debugger — Feature Doc
 
 > **Status:** 📋 Proposed, not started · **Written:** 2026-11-12 · **Branch:** `feat/debugger`, from
-> `main`, not yet cut · **Depends on:** [TypeQLite Editor](../editor/editor.feature.md) (complete) ·
+> `main`, not yet cut · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete) ·
 > **Governed by:** ADR-009, which Phase 00 writes
 >
 > Request, 2026-11-12: *a debugger for TypeQLite, as a future feature. "I believe we should be able
 > to use the Interpreter to make this possible."*
 >
-> **A feature, not an initiative.** It has one deliverable: a debug adapter, plus the runtime hook
-> that feeds it. Its only dependency is the editor, which is already complete. The editor's feature
-> document said an initiative would be needed if a surface that *runs queries* were planned
-> ([Out of scope](../editor/editor.feature.md#out-of-scope)). A debugger does run queries, but it
-> needs no results grid and no live store browser. If that database IDE is taken on alongside this
-> feature, both share the question of where the runtime executes, and that is the point to write
-> an initiative over both. That database IDE is now proposed as the
-> [Graph Explorer](../graph-explorer/graph-explorer.feature.md), which sets out the work the two
-> features share.
+> **A feature in the [Workbench initiative](../workbench.initiative.md).** It has one deliverable:
+> a debug adapter, plus the runtime hook that feeds it. It runs statements, so it depends on the
+> [engine host](../engine-host/engine-host.feature.md), which the initiative builds first and
+> shares with the [graph explorer](../graph-explorer/graph-explorer.feature.md) and the
+> [notebook](../notebook/notebook.feature.md). The initiative document holds the sequencing.
 
 ## Process
 
-Per the [Multi-Phase Lifecycle Standard](../../standards/governance/multi-phase-lifecycle-standard.md).
+Per the [Multi-Phase Lifecycle Standard](../../../standards/governance/multi-phase-lifecycle-standard.md).
 `feat/debugger` is cut from `main` when Phase 00 starts. Each phase branch,
 `phase/debugger/<NN>-<slug>`, is cut from `feat/debugger` and merges back into it. Each phase's
 checklist is written when that phase starts. Questions for the founder are asked in Phase 00.
@@ -53,7 +50,7 @@ time, in a `:memory:` store that no real database ever sees.
 You are right that the interpreter can carry this. Verified on disk on 2026-11-12:
 
 1. **It already runs in discrete steps, with rows passed between them.**
-   [`runStages`](../../../libs/runtime/src/interpreter.ts) is one loop over a pipeline's stages.
+   [`runStages`](../../../../libs/runtime/src/interpreter.ts) is one loop over a pipeline's stages.
    Each stage turns an `Array<Record<string, Binding>>` into another one. **A stage boundary is a
    step, and the rows array at that boundary is the Variables view.**
 2. **It already marks the steps inside a `match`.** `combinations()` calls `note(stage)` after
@@ -104,16 +101,16 @@ This is load-bearing. Check it again before relying on it.
 
 | Thing | State |
 | ----- | ----- |
-| Interpreter | [`interpreter.ts`](../../../libs/runtime/src/interpreter.ts), 6,060 lines, holding `TypeDBLiteInterpreter`. Its public entry points are `define(text)`, `execute(text, given?)` and `query(text, given?)`, plus `beginTransaction`, `commitTransaction` and `rollbackTransaction` |
+| Interpreter | [`interpreter.ts`](../../../../libs/runtime/src/interpreter.ts), 6,060 lines, holding `TypeDBLiteInterpreter`. Its public entry points are `define(text)`, `execute(text, given?)` and `query(text, given?)`, plus `beginTransaction`, `commitTransaction` and `rollbackTransaction` |
 | Stage loop | `runStages(pipeline, scopes, start)` has one `switch` per stage type: match, insert, put, delete, update, select, sort, offset, limit, distinct, require and reduce. The rows array is replaced after each stage |
 | Stage plan | `planStages` returns one `StreamScope` per stage boundary, giving the variables `available`, their `kinds` and their `valueTypes`. **That is the static half of the Variables view**: what each variable is, as well as its value |
 | Steps inside a `match` | `combinations()` and its `note()` calls, at lines 3811–3968 |
-| Trace precedent | `QueryTrace` and `lastQueryTrace()`, enabled by the `trace` option or `TYPEDBLITE_TRACE=1`, and tested in [`query-trace.test.ts`](../../../libs/runtime/test/query-trace.test.ts) |
-| Differential precedent | [`relation-join-planning-differential.test.ts`](../../../libs/runtime/test/relation-join-planning-differential.test.ts) runs `planJoins: false` and `planJoins: true` and asserts that the two produce the same rows in the same order. **This is the shape of test that proves the debug hook changes nothing** |
-| Execution facts | [`diagnostics.ts`](../../../libs/runtime/src/diagnostics.ts) (ADR-004): facts are returned, never emitted, have stable codes, and are capped at `MAX_DIAGNOSTICS = 50` |
-| Statement classification | [`apps/cli/src/session.ts`](../../../apps/cli/src/session.ts) chooses between `define`, `query` and `execute` by the statement's leading keyword, and whether it has a write stage. This is textual, and deliberately so. **This logic lives in the CLI, so a debugger cannot reuse it yet** |
-| SQLite | Only [`node-sqlite.ts`](../../../libs/runtime/src/node-sqlite.ts) imports `node:sqlite`. The workspace's Node is ≥ 22.16. Whether the extension host's Electron Node includes `node:sqlite` is **not verified** |
-| Extension | [`apps/vscode`](../../../apps/vscode) depends on `@typedblite/language` only. It contributes no `debuggers` and no `breakpoints`, and its language server never loads the runtime |
+| Trace precedent | `QueryTrace` and `lastQueryTrace()`, enabled by the `trace` option or `TYPEDBLITE_TRACE=1`, and tested in [`query-trace.test.ts`](../../../../libs/runtime/test/query-trace.test.ts) |
+| Differential precedent | [`relation-join-planning-differential.test.ts`](../../../../libs/runtime/test/relation-join-planning-differential.test.ts) runs `planJoins: false` and `planJoins: true` and asserts that the two produce the same rows in the same order. **This is the shape of test that proves the debug hook changes nothing** |
+| Execution facts | [`diagnostics.ts`](../../../../libs/runtime/src/diagnostics.ts) (ADR-004): facts are returned, never emitted, have stable codes, and are capped at `MAX_DIAGNOSTICS = 50` |
+| Statement classification | [`apps/cli/src/session.ts`](../../../../apps/cli/src/session.ts) chooses between `define`, `query` and `execute` by the statement's leading keyword, and whether it has a write stage. This is textual, and deliberately so. **This logic lives in the CLI, so a debugger cannot reuse it yet** |
+| SQLite | Only [`node-sqlite.ts`](../../../../libs/runtime/src/node-sqlite.ts) imports `node:sqlite`. The workspace's Node is ≥ 22.16. Whether the extension host's Electron Node includes `node:sqlite` is **not verified** |
+| Extension | [`apps/vscode`](../../../../apps/vscode) depends on `@typedblite/language` only. It contributes no `debuggers` and no `breakpoints`, and its language server never loads the runtime |
 
 ## 🔴 The invariants every phase is bound by
 
@@ -121,7 +118,7 @@ This is load-bearing. Check it again before relying on it.
 same rows in the same order, with the same facts and the same refusals, whether the hook is on or
 off. This is proven two ways: by a differential test in the shape of the join-planning one, and by
 **the conformance run with the hook switched on**, which must match the run with it off at **1742
-of 1756** ([ADR-005](../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
+of 1756** ([ADR-005](../../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
 
 **2. When the hook is off, it costs nothing.** Every hook point is one `undefined` check, as with
 `QueryTrace`. The replication and oracle suites run thousands of queries each. Making them pay
@@ -234,7 +231,7 @@ These are for the founder.
    Node 24 used here, but their availability on the workspace's minimum Node (22.16) is not
    verified. Either would also need the `SqliteDatabase` binding to accept something other than a
    location.
-3. **Where the adapter runs:** in-process in the extension host (which needs `node:sqlite` in
+3. **Where the adapter runs** (the engine host decides where the *engine* runs; this is about the adapter): in-process in the extension host (which needs `node:sqlite` in
    Electron's Node, not yet verified), or as a separate Node process (`DebugAdapterExecutable`),
    which needs a `node` on the user's PATH.
 4. **Where the adapter lives:** a new `libs/debugger` that `apps/vscode` bundles, or inside
@@ -310,13 +307,13 @@ Anything a phase defers is recorded here, not only in a commit message.
 
 ## Key Documents
 
-- [TypeQLite Editor](../editor/editor.feature.md), the feature this one builds on, and
-  [ADR-008](../../architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md)
-- [ADR-004](../../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md):
+- [TypeQLite Editor](../../editor/editor.feature.md), the feature this one builds on, and
+  [ADR-008](../../../architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md)
+- [ADR-004](../../../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md):
   facts are returned, never emitted. The hook follows the same rule
-- [ADR-005](../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md):
+- [ADR-005](../../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md):
   the conformance pass count may never go down. It is this feature's regression oracle, with the
   hook on
-- [Multi-Phase Lifecycle Standard](../../standards/governance/multi-phase-lifecycle-standard.md)
-- [`libs/runtime/README.md`](../../../libs/runtime/README.md): why the engine is synchronous
+- [Multi-Phase Lifecycle Standard](../../../standards/governance/multi-phase-lifecycle-standard.md)
+- [`libs/runtime/README.md`](../../../../libs/runtime/README.md): why the engine is synchronous
 - [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/specification)
