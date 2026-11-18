@@ -1,15 +1,18 @@
 /**
- * In `astro dev`, serves the playground's scripts, workers and `.wasm`, which its own build makes and
- * scripts/assemble.mjs puts beside the page in `dist/`. The page at /playground/ is Astro's
- * (src/pages/playground.astro). Without this the dev server answers 404 for the playground's assets.
- * `website:dev` builds the playground first. Nothing is copied: the folder is read in place. Dev server only.
+ * In `astro dev`, serves the playground's and the sync demo's scripts, workers and `.wasm`, which their own builds make and
+ * scripts/assemble.mjs puts beside the pages in `dist/`. The pages at /playground/ and /sync-demo/ are Astro's
+ * (src/pages/playground.astro, sync-demo.astro). Without this the dev server answers 404 for their assets.
+ * `website:dev` builds both first. Nothing is copied: the folder is read in place. Dev server only.
  */
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('../../../..', import.meta.url)));
-const MOUNTS = { '/playground': join(ROOT, 'apps/playground/.build') };
+const MOUNTS = {
+  '/playground': join(ROOT, 'apps/playground/.build'),
+  '/sync-demo': join(ROOT, 'apps/sync-demo/.build-browser'),
+};
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -38,8 +41,8 @@ export function mountBuilt() {
             response.writeHead(301, { location: `${mount}/${url.search}` }).end();
             return;
           }
-          // The playground's page is Astro's (src/pages/playground.astro); only its scripts and assets are served here.
-          if (mount === '/playground' && (url.pathname.endsWith('/') || url.pathname === '/playground/index.html')) return next();
+          // Each page is Astro's (src/pages/playground.astro, sync-demo.astro); only its scripts and assets are served here.
+          if (url.pathname.endsWith('/') || url.pathname === `${mount}/index.html`) return next();
           const base = MOUNTS[mount];
           let file = normalize(join(base, decodeURIComponent(url.pathname.slice(mount.length))));
           if (file !== base && !file.startsWith(base + sep)) return next(); // no `..` out of the folder
@@ -49,7 +52,7 @@ export function mountBuilt() {
             response.end(
               existsSync(base)
                 ? `Not found: ${url.pathname}`
-                : `${mount}/ is not built. Run: npm exec nx -- run website:dev (it builds the playground and the API first).`,
+                : `${mount}/ is not built. Run: npm exec nx -- run website:dev (it builds the playground, the sync demo and the API first).`,
             );
             return;
           }

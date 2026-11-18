@@ -1,0 +1,24 @@
+/*
+ * The in-browser hub page. Scoped to `.bh` and reading only `--bh-*` custom properties, so the site can map them
+ * onto Starlight's colours (apps/website/src/pages/sync-demo.astro) and the standalone page can define its own.
+ */
+.bh { font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: var(--bh-ink); }
+.bh * { box-sizing: border-box; }
+.bh-hub { background: var(--bh-panel); border: 1px solid var(--bh-line); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; }
+.bh-row { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
+.bh-row h2 { margin: 0; font-size: 1.1rem; border: 0; padding: 0; }
+.bh-state { font-weight: 700; display: inline-flex; align-items: center; gap: 7px; }
+.bh-state::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.bh-state[data-tone='on'] { color: var(--bh-on); }
+.bh-state[data-tone='off'] { color: var(--bh-off); }
+.bh-state[data-tone='wait'] { color: var(--bh-wait); }
+.bh button { font: inherit; font-weight: 600; padding: 5px 14px; border: 1px solid transparent; border-radius: 8px; background: var(--bh-accent); color: var(--bh-accent-ink); cursor: pointer; }
+.bh button.bh-quiet { background: transparent; color: var(--bh-ink); border-color: var(--bh-line); }
+.bh button:focus-visible { outline: 2px solid var(--bh-accent); outline-offset: 2px; }
+.bh-count { margin-left: auto; color: var(--bh-muted); }
+.bh-muted { color: var(--bh-muted); font-size: 13px; margin: 8px 0 0; }
+.bh-alert { color: var(--bh-off); font-weight: 600; margin: 8px 0 0; }
+.bh-tasks { margin: 8px 0 0; padding-left: 18px; font-size: 14px; list-style: none; }
+.bh-tasks li { padding: 1px 0; }
+.bh-devices { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; }
+.bh-devices iframe { width: 100%; height: 440px; border: 1px solid var(--bh-line); border-radius: 10px; background: var(--bh-panel); color-scheme: normal; }

@@ -17,6 +17,7 @@
     "gate": "node tools/gate.mjs",
     "playground": "nx run playground:serve",
     "site": "nx run website:serve",
+    "demo:browser": "nx run sync-demo:browser-hub",
     "deploy:site": "nx run website:check && cd apps/website && npx --yes cf@latest deploy ./dist",
     "check-packages": "node tools/check-packages.mjs",
     "clean-room": "node tools/clean-room.mjs",

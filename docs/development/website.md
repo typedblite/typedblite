@@ -41,6 +41,21 @@ opens the built page in Chromium and checks that the shell is there, the first e
 load, and the editor follows the theme. The playground's scripts find their workers beside themselves
 (`import.meta.url`), so the page may be at any URL.
 
+## The sync demo is a page of the site
+
+`/sync-demo/` is the same arrangement for the offline-first demo: an Astro page (`src/pages/sync-demo.astro`) inside
+Starlight's layout around the demo's markup (`apps/sync-demo/src/browser-hub/app.html`), its styles (`app.css`, scoped
+to `.bh`, reading only `--bh-*` custom properties, which the page maps onto Starlight's colours) and its scripts, Workers
+and `.wasm`, copied beside the page by `scripts/assemble.mjs`. The page owns the hub (a dedicated Worker on WASM SQLite
+and OPFS) and embeds three device pages as iframes (`/sync-demo/device.html?device=a`, absolute because the site answers
+with and without the trailing slash). The devices follow Starlight's `data-theme` through the same-origin parent. The build
+is `sync-demo:build-browser`, and its output is static files whose every URL is relative, which
+`apps/sync-demo/test/browser-hub-build.test.ts` and the browser tests (served under a sub-path) hold to.
+`scripts/check-sync-demo.mjs` (part of `website:check`) opens the built page in Chromium and checks that the shell is
+there, the hub and the devices start, a task reaches another device and the hub, a device can be cut off and
+reconnected, the devices follow the theme, and the page works without the trailing slash. Only one tab can own the
+hub's store, and the page says so ([the demo's README](../../apps/sync-demo/README.md#in-your-browser-in-one-page)).
+
 ## How a TypeQLite fence is coloured
 
 As in the editor, in two layers. Shiki colours it with the TextMate grammar, in VS Code's own Dark+ and Light+ themes
@@ -58,16 +73,16 @@ highlighted at once do not mix (the provider keeps state), and that the colours 
 ## Commands
 
 ```bash
-npm exec nx -- run website:dev          # astro dev with live reload; builds the playground first and serves its assets
+npm exec nx -- run website:dev          # astro dev with live reload; builds the playground and the sync demo first and serves their assets
 npm exec nx -- run website:build-site   # the whole site into apps/website/dist
 npm exec nx -- run website:check        # build it, then follow every internal link in dist/
 npm run site                            # build, then serve dist/ on http://localhost:4321
 ```
 
-`build-site` builds the playground, runs `astro build` (which generates the API pages, below), then
-`scripts/assemble.mjs` copies the playground's scripts, workers and `.wasm` beside the page Astro built at `/playground/`,
-`check` runs three scripts on the result. `check-site.mjs`: every `href` and `src` resolves to
-a file, every `#fragment` resolves to an id (the API pages included), and the playground, the API and the search index exist. `check-highlighting.mjs` and `check-playground.mjs`, above. It is a step of `npm run gate`.
+`build-site` builds the playground and the sync demo, runs `astro build` (which generates the API pages, below), then
+`scripts/assemble.mjs` copies their scripts, workers and `.wasm` beside the pages Astro built at `/playground/` and `/sync-demo/`,
+`check` runs four scripts on the result. `check-site.mjs`: every `href` and `src` resolves to
+a file, every `#fragment` resolves to an id (the API pages included), and the playground, the API and the search index exist. `check-highlighting.mjs`, `check-playground.mjs` and `check-sync-demo.mjs`, above. It is a step of `npm run gate`.
 
 ## The API reference is pages of the site
 

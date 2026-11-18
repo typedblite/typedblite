@@ -70,8 +70,8 @@ Nx project names (not the npm package names):
 - `typedblite` — the CLI, npm package `typedblite` (it was `typedblite-cli`; `npx typedblite` needs the unscoped name)
 - `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
 - `playground` — `typedblite-playground`, TypeQLite in a browser: the engine on WASM SQLite in a worker, and Monaco with the real language server over LSP in another; also has `test-browser` and `serve`
-- `website` — `typedblite-website`, the `typedblite.dev` static site (Astro Starlight): pages generated from the repository's Markdown, the API reference (starlight-typedoc) and the playground; targets `build-site`, `check`, `dev`, `serve` (it has no `build`, so `npm run build` does not build it; [docs/development/website.md](docs/development/website.md))
-- `sync-demo` — `typedblite-sync-demo`, the offline-first sync demo; also has `smoke`, `test-browser`, `serve`, `demo` and `android-setup`/`android-apk`/`android-emulator`
+- `website` — `typedblite-website`, the `typedblite.dev` static site (Astro Starlight): pages generated from the repository's Markdown, the API reference (starlight-typedoc), the playground and the sync demo; targets `build-site`, `check`, `dev`, `serve` (it has no `build`, so `npm run build` does not build it; [docs/development/website.md](docs/development/website.md))
+- `sync-demo` — `typedblite-sync-demo`, the offline-first sync demo; also has `smoke`, `test-browser`, `serve`, `demo` and `android-setup`/`android-apk`/`android-emulator`; and the in-browser hub (the hub in a Worker, three devices in one page, which the website serves at `/sync-demo/`): `build-browser`, `browser-hub` (serve, `npm run demo:browser`) and `test-browser-hub`
 
 Coverage is enabled only on CI (`CI=true`), with an 80% floor on statements, lines and functions in
 every project. 🔴 Never exclude a file to pass the floor unless it only runs inside a host the unit
@@ -266,6 +266,7 @@ token rule there would be a second definition of the language.
 | Editing the grammar without regenerating locally | Tools run from source (`tsx`, vitest aliases) read `src/generated/`, which only `langium-generate` refreshes |
 | Adding a construct to the grammar with no caller | Grammar scope is measured, not guessed — find the caller first |
 | Squash-merging or rebase-merging a pull request | Merge pull requests with a merge commit only. Squashing collapses its commits into one, and rebasing rewrites their hashes: either loses the individual history, which the maintainer wants kept |
+| Hosting a TypeDBLite store on OPFS in a SharedWorker or a service worker | Chromium has no synchronous OPFS handles there, so the store cannot open ("Missing required OPFS APIs"), and a SharedWorker has no nested `Worker` to delegate to. The store lives in a dedicated Worker; `apps/sync-demo/src/browser-hub/` has the shape that works |
 | Trusting a gate after a dependency bump without a clean build | `build` is `tsc -b`, which is incremental: a library whose sources did not change is not re-emitted, so its dependants are judged against stale declarations, even with `--skip-nx-cache`. Delete `out/` and `*.tsbuildinfo` first (the `vscode-languageserver` 10 bump hid a type error for a whole phase this way) |
 
 ---

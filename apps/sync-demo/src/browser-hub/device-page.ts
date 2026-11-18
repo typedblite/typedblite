@@ -1,21 +1,21 @@
 /**
- * The device's page: the task list, the add box, and what the sync is doing. The engine runs in the
- * worker; this only renders what it publishes, and saves the sync cursor (a worker has no
- * `localStorage`) so a reloaded or restarted device resumes where it stopped.
+ * One embedded device's page: the task list, the add box, what the sync is doing, and this device's own
+ * Disconnect / Reconnect switch. A copy of `../client/main.ts` (the shipped device page) with three differences: its
+ * engine reaches the hub through a `MessagePort` the embedding page hands it (`window.parent.browserHub`) instead of
+ * `fetch` through the switchboard, it has the switch, and it follows the embedding page's light/dark theme.
  *
- * `?device=pwa|electron|android` names the device; `?fresh` wipes its store first. The driver reads
- * `window.typedbliteDemo`.
+ * `?device=a|b|c` names the device; `?fresh` wipes its store first. Tests read `window.typedbliteDemo`.
  */
 import type { FromWorker, ToWorker } from '../client/protocol.js';
 
 type State = Extract<FromWorker, { type: 'state' }>;
 
 const params = new URLSearchParams(location.search);
-const control = new BroadcastChannel('typedblite-spike-hub');
+const control = new BroadcastChannel('typedblite-browser-hub');
 const device = params.get('device') ?? 'pwa';
 const LABELS: Record<string, string> = { a: 'Device A', b: 'Device B', c: 'Device C' };
 const label = LABELS[device] ?? device;
-const cursorKey = `typedblite-demo-cursor-${device}`;
+const cursorKey = `typedblite-browser-hub-cursor-${device}`;
 
 const read = (key: string): string | null => {
   try {
@@ -37,7 +37,28 @@ document.title = `Tasks · ${label}`;
 $('device').textContent = label;
 document.documentElement.dataset['device'] = device;
 
-const worker = new Worker('/spike-device-worker.js', { type: 'module' });
+/**
+ * Follow the embedding page's `data-theme` (Starlight's light/dark switch), which a `prefers-color-scheme` media query
+ * inside an iframe cannot see. With no embedding page, or one that sets none, the media query decides.
+ */
+function followParentTheme(): void {
+  if (window.parent === window) return;
+  try {
+    const root = window.parent.document.documentElement;
+    const apply = (): void => {
+      const theme = root.dataset['theme'];
+      if (theme === 'light' || theme === 'dark') document.documentElement.dataset['theme'] = theme;
+      else delete document.documentElement.dataset['theme'];
+    };
+    apply();
+    new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  } catch {
+    // A cross-origin parent: the media query decides.
+  }
+}
+followParentTheme();
+
+const worker = new Worker(new URL('./device-worker.js', import.meta.url), { type: 'module' });
 
 /**
  * Ask the embedding page for a MessagePort to the hub (a dedicated Worker it owns, which holds the store in
@@ -45,14 +66,30 @@ const worker = new Worker('/spike-device-worker.js', { type: 'module' });
  * terminated hub's port is dead, and the page starts a fresh worker.
  */
 type HubHost = { connect(): MessagePort };
+let disconnected = false;
 function connectHub(): void {
-  const host = (window.parent as unknown as { spikeHub?: HubHost }).spikeHub;
+  if (disconnected) return;
+  const host = (window.parent as unknown as { browserHub?: HubHost }).browserHub;
   const port = host?.connect() ?? null;
   worker.postMessage({ type: 'hub-port', port }, port ? [port] : []);
 }
 control.onmessage = (event: MessageEvent<{ type: 'up' | 'down' }>) => {
   if (event.data.type === 'down') worker.postMessage({ type: 'hub-port', port: null });
   else connectHub();
+};
+
+/**
+ * This device's own switch: cut its line to the hub (it keeps working locally and queues its changes)
+ * and restore it. A device the user disconnected stays disconnected when the hub comes back up.
+ */
+$<HTMLButtonElement>('link').onclick = () => {
+  disconnected = !disconnected;
+  const button = $<HTMLButtonElement>('link');
+  button.textContent = disconnected ? 'Reconnect' : 'Disconnect';
+  button.setAttribute('aria-pressed', String(disconnected));
+  if (disconnected) worker.postMessage({ type: 'hub-port', port: null });
+  else connectHub();
+  send({ type: 'sync' }); // so the status line follows at once, not on the next 1.5 s tick
 };
 connectHub();
 const send = (message: ToWorker): void => worker.postMessage(message);

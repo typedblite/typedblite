@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 /**
- * SPIKE copy of ../client/worker.ts. One device's engine, in a dedicated Web Worker; it reaches the hub through a MessagePort (wire.ts) instead of the switchboard.
- * Original: one device's engine, in a dedicated Web Worker: TypeDBLite on WASM SQLite, its store in OPFS, and a
+ * One device's engine, in a dedicated Web Worker. A copy of `../client/worker.ts` whose hub is a `MessagePort` the page gives it (`wire.ts`) instead of the switchboard.
+ * Originally: one device's engine, in a dedicated Web Worker: TypeDBLite on WASM SQLite, its store in OPFS, and a
  * sync with the hub every 1.5 s through this device's line on the switchboard.
  *
  * It imports only the public packages — `@typedblite/runtime` (the browser entry, chosen by the
@@ -33,9 +33,9 @@ function publish(synced: readonly string[] = []): void {
 
 async function open(name: string, cursor: DeviceState['cursor'] | undefined, fresh: boolean): Promise<void> {
   await initWasmSqlite({
-    moduleOptions: { locateFile: (file: string) => `/${file}` },
+    moduleOptions: { locateFile: (file: string) => new URL(file, scope.location.href).href },
     // One pool per device name: the Electron window and a browser tab on one origin stay apart.
-    sahPool: { name: `typedblite-demo-${name}`, directory: `/typedblite-demo-${name}` },
+    sahPool: { name: `typedblite-browser-hub-${name}`, directory: `/typedblite-browser-hub-${name}` },
   });
   if (fresh) await wipeOpfsPool();
   const db = new TypeDBLiteInterpreter('/tasks.db', undefined, { openDatabase: openWasmSqlite });

@@ -1,0 +1,19 @@
+<div class="bh">
+  <section class="bh-hub" aria-labelledby="bh-hub-title">
+    <div class="bh-row">
+      <h2 id="bh-hub-title">The hub</h2>
+      <span id="bh-state" class="bh-state" data-tone="wait" role="status">Starting…</span>
+      <button id="bh-toggle" type="button">Take the hub down</button>
+      <button id="bh-reset" type="button" class="bh-quiet">Reset the demo</button>
+      <span class="bh-count">Tasks on the hub: <b id="bh-count">–</b></span>
+    </div>
+    <p id="bh-info" class="bh-muted"></p>
+    <p id="bh-alert" class="bh-alert" role="alert" hidden></p>
+    <ul id="bh-tasks" class="bh-tasks" aria-label="Tasks the hub holds"></ul>
+  </section>
+  <div class="bh-devices">
+    <iframe title="Device A" src="device.html?device=a"></iframe>
+    <iframe title="Device B" src="device.html?device=b"></iframe>
+    <iframe title="Device C" src="device.html?device=c"></iframe>
+  </div>
+</div>
