@@ -47,6 +47,43 @@ entity task, owns task-id @key, owns title, owns done, owns created-at, owns ori
 
 `@key` is what makes a task replicable. Its identity on every device is `task/<task-id>`.
 
+## In your browser, in one page
+
+The same demo with nothing to install, and nothing but the browser: **the hub runs in the page too.**
+`npm run demo:browser` serves it at <http://127.0.0.1:4400/>, and the website shows it at `/sync-demo/`. One page
+owns the hub and embeds three devices. Each is a TypeDBLite store on WASM SQLite and OPFS in its own Worker, with
+a Disconnect / Reconnect switch in its card header. The hub's header takes the hub down, which is a real kill, and
+brings it back on the store it left.
+
+```mermaid
+flowchart LR
+  page["The page<br/>owns the hub, hands out ports"]
+  page -- "MessagePort" --> a["Device A<br/>Worker · WASM SQLite · OPFS"]
+  page -- "MessagePort" --> b["Device B"]
+  page -- "MessagePort" --> c["Device C"]
+  a & b & c -- "fetch over the port" --> hub["Hub<br/>dedicated Worker · WASM SQLite · OPFS<br/>change stream: SSE out, POST in"]
+```
+
+What differs from the hub above, and what does not:
+
+- **The hub's logic is the same, without `node:http`.** `src/browser-hub/hub-core.ts` serves the same routes, the same
+  bearer token, the same SSE framing and the same refusals as `src/hub/main.ts`. A unit test runs one scenario against
+  both and checks they end in the same place.
+- **A device reaches it with `fetch` over a `MessagePort`.** `TypeDBLiteReplicator` calls the global `fetch`, so a
+  device's Worker routes `hub://` URLs through the port (`src/browser-hub/wire.ts`). It is the library, unchanged.
+- 🔴 **The hub is a dedicated Worker, not a SharedWorker.** Chromium has no synchronous OPFS handles in a SharedWorker
+  (the store fails to open with "Missing required OPFS APIs") and no nested `Worker` there either, so a SharedWorker
+  cannot hold a SQLite store on OPFS, nor delegate to a Worker that can. A service worker cannot either. So one page owns
+  the hub, and hands each device a port.
+- **One tab at a time.** OPFS allows one connection per file, so a second tab of the page cannot open the hub's store or
+  the devices', and says so. Closing the first tab and reloading the second recovers it.
+- **It needs no `COOP`/`COEP` headers.** The SAH-pool VFS needs no `SharedArrayBuffer`.
+- **Chromium is what the tests run.** The page uses nothing Chromium-only that we know of, but Firefox and WebKit are not tested.
+
+The page is built by `nx run sync-demo:build-browser` into `.build-browser/`: static files, with every URL relative, so
+they can be served from any path. `device.html` is derived from the shipped device page at build time, so there is
+one copy of its markup and styles.
+
 ## Setup
 
 From the repository root, on a machine with Node.js 22.16 or later:
@@ -133,7 +170,14 @@ the step expects. Each convergence prints how long it took, typically 1 to 2 sec
 | Target | What it runs |
 | ------ | ------------ |
 | `nx run sync-demo:smoke` | The story's network events with three headless devices on `node:sqlite`, a real hub process, and the real switchboard. About 8 seconds |
-| `nx run sync-demo:test-browser` | The PWA in two Chromium profiles, including a reload with no network; the Electron app; and the whole story, run headless by the driver |
+| `nx run sync-demo:test-browser` | The PWA in two Chromium profiles, including a reload with no network; the Electron app; the whole story, run headless by the driver; and the in-browser hub (below) |
+| `nx run sync-demo:test-browser-hub` | Only the in-browser hub, in Chromium: the page served under a sub-path, syncing, each device's own switch, the hub killed and restarted five times, a reload, the reset, a second tab, and the theme. Part of `npm run gate` |
+
+The in-browser hub's other tests run under `nx run sync-demo:test`, on `node:sqlite` and `MessageChannel`:
+`browser-hub-core` (every route and refusal, SSE framing and resume, the port loop), `browser-hub-wire` (the `fetch`
+shim: streaming, abort, a cut line), `browser-hub-replication` (real devices through the real wire, offline and
+restart, and the same scenario against the Node hub), `browser-hub-static-server`, and `browser-hub-build` (the build's
+output: relocatable, no Node modules, the device page derived as expected).
 
 ## Troubleshooting
 
@@ -154,6 +198,7 @@ the step expects. Each convergence prints how long it took, typically 1 to 2 sec
 | `src/hub/` | The hub process |
 | `src/server/` | The demo server: the switchboard, the hub's lifecycle, the control API |
 | `src/client/` | The page, the device worker, the service worker, and the `Object.groupBy` polyfill for Android 14's WebView |
+| `src/browser-hub/` | The in-browser hub: its core, its wire, its Worker, the page that owns it and the device pages it embeds |
 | `src/electron/` | The desktop shell |
 | `src/driver/` | The story |
 | `mobile/` | The Capacitor app, and the Android setup, build and emulator scripts |

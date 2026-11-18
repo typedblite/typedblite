@@ -5,5 +5,5 @@
     "lib": ["ES2022", "WebWorker"], "strict": true, "skipLibCheck": true, "noEmit": true,
     "types": []
   },
-  "include": ["src/client/worker.ts", "src/client/sw.ts", "src/client/polyfills.ts", "src/client/protocol.ts"]
+  "include": ["src/client/worker.ts", "src/client/sw.ts", "src/client/polyfills.ts", "src/client/protocol.ts", "src/browser-hub/hub-worker.ts", "src/browser-hub/device-worker.ts", "src/browser-hub/hub-core.ts", "src/browser-hub/wire.ts"]
 }

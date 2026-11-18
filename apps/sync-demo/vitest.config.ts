@@ -34,6 +34,16 @@ export default defineConfig({
         'src/hub/main.ts',
         // The `serve` target's entry: it starts `server.ts`, which is tested, and waits.
         'src/server/main.ts',
+        // The in-browser hub's parts that need a browser: the page, the hub Worker (WASM SQLite on OPFS), the device
+        // engine and the device page. `test-browser/browser-hub.test.ts` runs them in Chromium; `hub-core.ts`,
+        // `wire.ts` and `static-server.ts` stay in, tested here on `node:sqlite` and `MessageChannel`.
+        // ⚠️ `test-browser` is not run in CI; `npm run gate` runs it.
+        'src/browser-hub/page.ts',
+        'src/browser-hub/hub-worker.ts',
+        'src/browser-hub/device-worker.ts',
+        'src/browser-hub/device-page.ts',
+        // The `browser-hub` target's entry: it starts `static-server.ts`, which is tested, and waits.
+        'src/browser-hub/serve.ts',
       ],
     },
   },

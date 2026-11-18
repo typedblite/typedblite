@@ -75,6 +75,7 @@ export default defineConfig({
             { slug: 'guide/getting-started' },
             { slug: 'guide/five-minute-tour' },
             { label: 'Playground', link: '/playground/', attrs: { target: '_self' } },
+            { label: 'Sync demo', link: '/sync-demo/', attrs: { target: '_self' } },
           ],
         },
         {

@@ -5,5 +5,5 @@
     "skipLibCheck": true, "declaration": false, "sourceMap": true,
     "types": ["node"], "rootDir": "src", "outDir": "out"
   },
-  "include": ["src/shared/**/*.ts", "src/hub/**/*.ts", "src/server/**/*.ts", "src/driver/**/*.ts"]
+  "include": ["src/shared/**/*.ts", "src/hub/**/*.ts", "src/server/**/*.ts", "src/driver/**/*.ts", "src/browser-hub/static-server.ts", "src/browser-hub/serve.ts"]
 }

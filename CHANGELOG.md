@@ -7,6 +7,9 @@ they are listed here.
 
 ## [Unreleased]
 
+### Added
+- **The sync demo runs in a browser page, hub included**, and the website shows it at `/sync-demo/`. One page owns the hub (a TypeDBLite store on WASM SQLite and OPFS in a dedicated Worker) and embeds three devices, each with its own store and a Disconnect / Reconnect switch; the hub can be killed and brought back on the store it left. `npm run demo:browser` serves it locally. The hub's logic is `apps/sync-demo/src/browser-hub/hub-core.ts`, and a test runs one scenario against it and against the Node hub and checks they end in the same place. A hub cannot be a SharedWorker: Chromium has no synchronous OPFS handles there. Only one tab can own the stores at a time, and the page says so.
+
 ### Changed
 - **The API reference's package pages are grouped by purpose and open with an overview.** Each package page lists its names under sections such as Engine, Replication and Validation, each with a description, instead of one alphabetical table per kind; the language package's generated syntax tree has a section of its own. The runtime, language, content-revision and WASM pages gained an introduction with a short example, and link the guides.
 - **Each class and interface page in the API reference opens with a member summary**: a table per group (constructors, properties, accessors, methods) with each member's first sentence, linked to its detail below.

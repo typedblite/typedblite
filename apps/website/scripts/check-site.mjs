@@ -23,7 +23,7 @@ if (!existsSync(DIST)) {
   process.exit(1);
 }
 
-for (const required of ['index.html', 'playground/index.html', 'playground/worker.js', 'playground/sqlite3.wasm', 'api/index.html', 'sitemap-index.xml', 'pagefind/pagefind.js', 'favicon.svg', '404.html']) {
+for (const required of ['index.html', 'playground/index.html', 'playground/worker.js', 'playground/sqlite3.wasm', 'sync-demo/index.html', 'sync-demo/device.html', 'sync-demo/hub.js', 'sync-demo/device-worker.js', 'sync-demo/sqlite3.wasm', 'api/index.html', 'sitemap-index.xml', 'pagefind/pagefind.js', 'favicon.svg', '404.html']) {
   if (!existsSync(join(DIST, required))) problems.push(`dist/${required} is missing`);
 }
 
@@ -59,7 +59,9 @@ for (const page of pages) {
     if (!REPO_PUBLIC && target.startsWith(REPO_URL)) problems.push(`${relativePage}: links to the private repository (${target})`);
     if (!target || /^([a-z][a-z0-9+.-]*:|\/\/|data:)/i.test(target)) continue;
     links += 1;
-    const [pathPart, fragment] = target.split('#');
+    // A query string is for the page, not a file: `device.html?device=a` is `device.html`.
+    const [withQuery, fragment] = target.split('#');
+    const pathPart = withQuery.split('?')[0];
     const absolute = pathPart === '' ? base : pathPart.startsWith('/') ? pathPart : new URL(pathPart, `http://x${base}`).pathname;
     const file = served(absolute);
     if (!file) {

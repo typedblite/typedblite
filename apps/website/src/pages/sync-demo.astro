@@ -1,0 +1,62 @@
+---
+/**
+ * The offline-first sync demo, inside the site's shell: Starlight's header, search, theme switch and sidebar around
+ * it. The page's markup is the demo's own fragment (`apps/sync-demo/src/browser-hub/app.html`, put in
+ * `.build-browser/` by `sync-demo:build-browser`); its scripts, workers and `.wasm` are that build's output, copied
+ * beside this page by `scripts/assemble.mjs` (in `astro dev`, `src/integrations/mount-built.mjs` serves them in
+ * place). Only the colours are the site's: the demo reads `--bh-*` custom properties, mapped to Starlight's below,
+ * and its embedded device pages follow the site's `data-theme`.
+ */
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import fragment from '../../../sync-demo/.build-browser/app.html?raw';
+import { REPO_PUBLIC, REPO_URL } from '../../scripts/content-map.mjs';
+
+// The fragment's iframes are relative, so the standalone page can be served from anywhere. The site's page is
+// reachable with and without a trailing slash, so here they are anchored at the demo's folder.
+const app = fragment.replaceAll('src="device.html', 'src="/sync-demo/device.html');
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Sync demo',
+    description: 'Offline-first sync in your browser: three devices and their hub, each a TypeDBLite store on WASM SQLite, with nothing to install.',
+    tableOfContents: false,
+    editUrl: REPO_PUBLIC ? `${REPO_URL}/edit/main/apps/sync-demo/src/browser-hub/app.html` : false,
+    head: [{ tag: 'link', attrs: { rel: 'stylesheet', href: '/sync-demo/app.css' } }],
+  }}
+>
+  <p>
+    Three devices and the hub they sync through, all running in this page. Each device is a TypeDBLite store on WASM
+    SQLite in its own worker, saved in your browser, and the hub is a fourth store in another. Add a task on one
+    device and watch it reach the others. Then cut a device off, or take the hub down, keep working, and bring them
+    back: everything written meanwhile converges.
+  </p>
+  <div class="not-content sync-demo" set:html={app} />
+  <p>
+    Nothing leaves your browser. The page owns the hub for as long as it is open, so only one tab of this page can run
+    the demo at a time; "Reset the demo" wipes every store here and starts again.
+  </p>
+  <script is:inline type="module" src="/sync-demo/page.js"></script>
+</StarlightPage>
+
+<style is:global>
+  /* Three devices side by side want more room than a page of prose. */
+  :root {
+    --sl-content-width: 100rem;
+  }
+  .sync-demo .bh {
+    --bh-ink: var(--sl-color-text);
+    --bh-muted: var(--sl-color-gray-3);
+    --bh-line: var(--sl-color-hairline);
+    --bh-panel: var(--sl-color-bg);
+    --bh-accent: var(--sl-color-text-accent);
+    --bh-accent-ink: var(--sl-color-text-invert);
+    --bh-on: var(--sl-color-green);
+    --bh-off: var(--sl-color-red);
+    --bh-wait: var(--sl-color-orange);
+    font-family: var(--sl-font-system);
+  }
+  .sync-demo {
+    margin: 1.5rem 0;
+  }
+</style>

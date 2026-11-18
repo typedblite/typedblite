@@ -1,10 +1,11 @@
 /**
- * The wire between a device and the hub SharedWorker: a `fetch` over a MessagePort.
+ * The wire between a device and the hub: a `fetch` over a `MessagePort`.
  *
- * The replicator calls the global `fetch`, so the device worker replaces it for `hub://` URLs and
- * leaves every other URL alone. The hub answers a request with a head, any number of chunks (an SSE
- * stream is one that never ends), and an end — or the requester cancels.
+ * The replicator calls the global `fetch`, so a device's engine replaces it for `hub://` URLs and leaves every
+ * other URL alone. The hub answers a request with a head, any number of chunks (an SSE stream is one that never
+ * ends) and an end, or the requester cancels. Nothing here touches a worker, so it runs, and is tested, in Node.
  */
+
 export type HubRequest = {
   readonly type: 'request';
   readonly id: number;
@@ -14,6 +15,7 @@ export type HubRequest = {
   readonly body?: string;
 };
 export type HubCancel = { readonly type: 'cancel'; readonly id: number };
+/** Asks of the hub itself, from the page's panel. */
 export type HubControl = { readonly type: 'tasks' } | { readonly type: 'info' };
 export type ToHub = HubRequest | HubCancel | HubControl;
 
@@ -25,21 +27,35 @@ export type FromHub =
   | { readonly type: 'info'; readonly info: HubInfo };
 
 export interface HubInfo {
-  readonly opfs: boolean;
-  readonly lastOpenError: string;
+  /** `opening` while it retries, `open` once the store is open (on OPFS, in the browser), `failed` when it gave up. */
+  readonly state: 'opening' | 'open' | 'failed';
+  /** The last reason it did not open, empty when it did. */
+  readonly openError: string;
   readonly openedAt: string;
+  readonly openAttempts: number;
+  /** Ports connected: the page's panel and each device. */
   readonly peers: number;
   readonly requests: number;
   readonly openStreams: number;
-  readonly openAttempts: number;
 }
 
-/** What `installHubFetch` hands back: the device worker gives it the current port, or `null` when the hub is gone. */
+/** The shim's failure for a hub that cannot be reached: what `fetch` itself throws with no network. */
+const unreachable = (): TypeError => new TypeError('Failed to fetch');
+
+/**
+ * Route the global `fetch` for `hub://` URLs through a port. `setPort(null)` is the line being cut: every
+ * request in flight fails, and later ones fail at once, which the device reads as offline.
+ */
 export function installHubFetch(): { setPort(port: MessagePort | null): void } {
   const realFetch = globalThis.fetch.bind(globalThis);
   let port: MessagePort | null = null;
   let next = 1;
-  type Entry = { resolve(response: Response): void; reject(error: unknown): void; controller?: ReadableStreamDefaultController<Uint8Array>; headed: boolean };
+  type Entry = {
+    resolve(response: Response): void;
+    reject(error: unknown): void;
+    controller?: ReadableStreamDefaultController<Uint8Array>;
+    headed: boolean;
+  };
   const pending = new Map<number, Entry>();
   const encoder = new TextEncoder();
 
@@ -77,8 +93,7 @@ export function installHubFetch(): { setPort(port: MessagePort | null): void } {
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (!url.startsWith('hub://')) return realFetch(input, init);
-    // What a real fetch does with no network: a TypeError. The device reads it as "offline".
-    if (!port) return Promise.reject(new TypeError('Failed to fetch'));
+    if (!port) return Promise.reject(unreachable());
     const target = new URL(url);
     const id = next++;
     const signal = init?.signal ?? undefined;
@@ -106,12 +121,12 @@ export function installHubFetch(): { setPort(port: MessagePort | null): void } {
   }) as typeof fetch;
 
   return {
-    setPort(next: MessagePort | null): void {
+    setPort(replacement: MessagePort | null): void {
       if (port) port.onmessage = null;
       port?.close();
-      port = next;
+      port = replacement;
       if (port) port.onmessage = onMessage;
-      else failAll(new TypeError('Failed to fetch'));
+      else failAll(unreachable());
     },
   };
 }

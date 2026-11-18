@@ -32,7 +32,7 @@ export const PAGES = [
   ['apps/cli/README.md', 'tools/cli', 'Command line'],
   ['apps/vscode/README.md', 'tools/vscode', 'VS Code extension'],
   ['apps/playground/README.md', 'tools/playground', 'Playground (about)'],
-  ['apps/sync-demo/README.md', 'tools/sync-demo', 'Sync demo'],
+  ['apps/sync-demo/README.md', 'tools/sync-demo', 'Sync demo (about)'],
 
   ['libs/runtime/README.md', 'packages/runtime', '@typedblite/runtime'],
   ['libs/language/README.md', 'packages/language', '@typedblite/language'],

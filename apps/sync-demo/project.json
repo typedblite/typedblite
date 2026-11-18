@@ -45,7 +45,8 @@
     "test": {
       "executor": "nx:run-commands",
       "dependsOn": [
-        "build"
+        "build",
+        "build-browser"
       ],
       "options": {
         "command": "vitest run",
@@ -75,7 +76,8 @@
     "test-browser": {
       "executor": "nx:run-commands",
       "dependsOn": [
-        "build"
+        "build",
+        "build-browser"
       ],
       "options": {
         "command": "vitest run --config vitest.browser.config.ts",
@@ -113,6 +115,44 @@
       ],
       "options": {
         "command": "node out/driver/demo.js",
+        "cwd": "apps/sync-demo"
+      }
+    },
+    "browser-hub": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build-browser"
+      ],
+      "options": {
+        "command": "node out/browser-hub/serve.js",
+        "cwd": "apps/sync-demo"
+      }
+    },
+    "build-browser": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "^build"
+      ],
+      "options": {
+        "commands": [
+          "tsc -b tsconfig.app.json",
+          "node build-browser-hub.mjs"
+        ],
+        "parallel": false,
+        "cwd": "apps/sync-demo"
+      },
+      "outputs": [
+        "{projectRoot}/.build-browser",
+        "{projectRoot}/out"
+      ]
+    },
+    "test-browser-hub": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build-browser"
+      ],
+      "options": {
+        "command": "vitest run --config vitest.browser.config.ts test-browser/browser-hub.test.ts",
         "cwd": "apps/sync-demo"
       }
     }

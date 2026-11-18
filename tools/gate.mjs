@@ -78,6 +78,10 @@ const steps = [
         { name: 'WASM SQLite suite', command: 'npm exec nx -- run typedblite-runtime:test-wasm' },
         { name: 'browser suite (Chromium, OPFS)', run: requireChromium, command: 'npm exec nx -- run typedblite-runtime:test-browser' },
         { name: 'playground in Chromium', run: requireChromium, command: 'npm exec nx -- run playground:test-browser' },
+        // The sync demo's in-browser hub: a hub Worker and three device Workers on WASM SQLite and OPFS, in one page
+        // (apps/sync-demo/test-browser/browser-hub.test.ts). The rest of sync-demo's browser tests (Electron, the PWA
+        // and the story driver) are not part of the gate.
+        { name: 'sync demo in Chromium (in-browser hub)', run: requireChromium, command: 'npm exec nx -- run sync-demo:test-browser-hub' },
         // The site: the guides, the API reference and the playground built into one folder, and every internal
         // link in it followed (apps/website/scripts/check-site.mjs).
         { name: 'website', command: 'npm exec nx -- run website:check' },

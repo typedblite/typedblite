@@ -12,23 +12,23 @@
     },
     "build-site": {
       "executor": "nx:run-commands",
-      "dependsOn": ["prepare", "playground:build"],
+      "dependsOn": ["prepare", "playground:build", "sync-demo:build-browser"],
       "options": { "commands": ["astro build", "node scripts/assemble.mjs"], "parallel": false, "cwd": "apps/website" },
       "outputs": ["{projectRoot}/dist"]
     },
     "check": {
       "executor": "nx:run-commands",
       "dependsOn": ["build-site"],
-      "options": { "commands": ["node scripts/check-site.mjs", "node scripts/check-highlighting.mjs", "node scripts/check-playground.mjs"], "parallel": false, "cwd": "apps/website" }
+      "options": { "commands": ["node scripts/check-site.mjs", "node scripts/check-highlighting.mjs", "node scripts/check-playground.mjs", "node scripts/check-sync-demo.mjs"], "parallel": false, "cwd": "apps/website" }
     },
     "dev": {
       "executor": "nx:run-commands",
-      "dependsOn": ["prepare", "playground:build"],
+      "dependsOn": ["prepare", "playground:build", "sync-demo:build-browser"],
       "options": { "command": "astro dev", "cwd": "apps/website" }
     },
     "dev-watch": {
       "executor": "nx:run-commands",
-      "dependsOn": ["prepare", "playground:build"],
+      "dependsOn": ["prepare", "playground:build", "sync-demo:build-browser"],
       "options": { "commands": ["node ../playground/watch.mjs", "astro dev"], "parallel": true, "cwd": "apps/website" }
     },
     "serve": {
