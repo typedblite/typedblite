@@ -19,10 +19,10 @@
 .pg #status { color: var(--pg-muted); margin-left: auto; }
 .pg-panes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 @container pg (min-width: 52rem) { .pg-panes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
-.pg-pane { background: var(--pg-panel); border: 1px solid var(--pg-line); border-radius: 12px; padding: 12px; min-width: 0; }
+.pg-pane { display: flex; flex-direction: column; background: var(--pg-panel); border: 1px solid var(--pg-line); border-radius: 12px; padding: 12px; min-width: 0; }
 .pg-pane h2 { margin: 0 0 8px; padding: 0; border: 0; font-size: 1rem; line-height: 1.5; }
-.pg #editor { width: 100%; height: 420px; border: 1px solid var(--pg-line); border-radius: 8px; overflow: hidden; }
-.pg #output { min-height: 420px; overflow-x: auto; }
+.pg #editor { width: 100%; flex: 1 1 0; min-height: max(420px, calc(100dvh - 20rem)); contain: size; border: 1px solid var(--pg-line); border-radius: 8px; overflow: hidden; }
+.pg #output { min-height: max(420px, calc(100dvh - 20rem)); overflow-x: auto; }
 .pg .step { border: 1px solid var(--pg-line); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
 .pg .step > header { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 12px; background: var(--pg-code); font-size: .875rem; color: var(--pg-muted); }
 .pg .step > header strong { color: var(--pg-ink); }

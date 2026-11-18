@@ -26,6 +26,11 @@
       "dependsOn": ["prepare", "playground:build"],
       "options": { "command": "astro dev", "cwd": "apps/website" }
     },
+    "dev-watch": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["prepare", "playground:build"],
+      "options": { "commands": ["node ../playground/watch.mjs", "astro dev"], "parallel": true, "cwd": "apps/website" }
+    },
     "serve": {
       "executor": "nx:run-commands",
       "dependsOn": ["build-site"],
