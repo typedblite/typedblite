@@ -1,14 +1,19 @@
-// Run docs/guides/five-minute-tour.md as a user would: `npm run tour`, after a build. `-- --keep` leaves the
+// Run docs/guides/five-minute-tour.tql.md as a user would: `npm run tour`, after a build. `-- --keep` leaves the
 // directory for a look.
 //
 // The packages are packed, as `npm publish` would, and installed from their tarballs in empty directories
 // outside this repository. The tour's own commands and files are then taken from the guide and run, so the
-// guide cannot drift from what the packages do. Three kinds of marker, each an HTML comment on the line before
-// a fenced block, say what to do with it; unmarked blocks are prose and are not run:
+// guide cannot drift from what the packages do. The guide is a notebook (ADR-012) with shell and Node steps between its
+// cells, and `tools/tour-doc.mjs` reads it. What this run does with each kind of block:
 //
 //   <!-- tour:file NAME -->        write the block to NAME in the tour directory
 //   <!-- tour:run [exit=N] -->     run the block with bash, expecting exit status N (default 0)
 //   <!-- tour:output -->           the block must equal what the previous run block printed (stdout and stderr)
+//   <!-- tour:store FILE -->       the reader chooses FILE as the notebook's store and runs the cells again
+//   a ```typeql cell               before the store: nothing (the notebook keeps them in memory). From the store on: run on
+//                                  the file by the packed CLI, as the notebook would, so the commands that follow see its data
+//   <!-- tour:expect -->           skipped here. `apps/vscode/test/tour-journey.test.ts` holds every printed answer to what runs
+//                                  on the notebook's own engine, and the VS Code e2e does it in the editor
 //
 // Two commands are swapped, because nothing is on npm yet: `npx typedblite` runs the CLI installed from its
 // tarball, and `npm install @typedblite/runtime` installs the tarballs of the runtime and what it needs. Once
@@ -21,9 +26,10 @@ import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PUBLISHABLE } from './publishable.mjs';
+import { parseTour } from './tour-doc.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const GUIDE = join(ROOT, 'docs/guides/five-minute-tour.md');
+const GUIDE = join(ROOT, 'docs/guides/five-minute-tour.tql.md');
 const keep = process.argv.includes('--keep');
 
 if (process.platform === 'win32') {
@@ -48,25 +54,6 @@ function must(result, label) {
   return result.stdout;
 }
 
-/** The guide's blocks, in order: { kind: 'file' | 'run' | 'output', arg, body, line }. */
-function parseGuide(markdown) {
-  const lines = markdown.split('\n');
-  const blocks = [];
-  for (let i = 0; i < lines.length; i++) {
-    const marker = /^<!--\s*tour:(file|run|output)\s*(.*?)\s*-->$/.exec(lines[i]);
-    if (!marker) continue;
-    const open = lines[i + 1] ?? '';
-    if (!/^```/.test(open)) throw new Error(`${GUIDE}:${i + 1}: a tour marker must be followed by a fenced block`);
-    const body = [];
-    let j = i + 2;
-    while (j < lines.length && !/^```\s*$/.test(lines[j])) body.push(lines[j++]);
-    if (j >= lines.length) throw new Error(`${GUIDE}:${i + 1}: the fenced block is not closed`);
-    blocks.push({ kind: marker[1], arg: marker[2], body: body.join('\n'), line: i + 1 });
-    i = j;
-  }
-  return blocks;
-}
-
 const trimEnds = (text) => text.split('\n').map((line) => line.trimEnd()).join('\n').trim();
 
 for (const { dir } of PUBLISHABLE) {
@@ -77,7 +64,8 @@ for (const { dir } of PUBLISHABLE) {
   }
 }
 
-const blocks = parseGuide(readFileSync(GUIDE, 'utf8'));
+const { steps: blocks, problems } = parseTour(readFileSync(GUIDE, 'utf8'));
+if (problems.length > 0) throw new Error(`the guide is not marked up correctly:\n${problems.join('\n')}`);
 if (!blocks.some((block) => block.kind === 'run')) throw new Error('the guide has no tour:run block');
 
 const room = mkdtempSync(join(tmpdir(), 'typedblite-tour-'));
@@ -109,13 +97,30 @@ try {
       .replace(/\bnpm install @typedblite\/runtime\b/g, `npm install --no-audit --no-fund ${libraries.map(quote).join(' ')}`);
 
   let previous; // { stdout, line } of the last run block, for the output block after it
+  let store; // the file the notebook was told to use, once the tour says so
+  const cells = [];
+  /** A cell, run on the notebook's file by the packed CLI, as the notebook would. A refusal is the notebook's answer, not a failure. */
+  const runCell = (source, where) => {
+    const result = run(join(tool, 'node_modules/.bin/typedblite'), ['--database', store, '--exec', source], project, env, 600_000);
+    console.log(`  cell ${where} on ${store.split('/').pop()} (exit ${result.status})`);
+  };
   for (const block of blocks) {
     const where = `${GUIDE.replace(`${ROOT}/`, '')}:${block.line}`;
-    if (block.kind === 'file') {
-      writeFileSync(join(project, block.arg), `${block.body}\n`);
-      console.log(`  wrote ${block.arg}`);
+    if (block.kind === 'cell') {
+      cells.push(block);
+      // In memory until the reader chooses a file: nothing on disk for the commands to see.
+      if (store) runCell(block.source, where);
+    } else if (block.kind === 'expect') {
+      // The answer under a cell: held to what runs by tour-journey.test.ts, on the notebook's own engine.
+    } else if (block.kind === 'store') {
+      store = join(project, block.file);
+      console.log(`  store ${block.file}: the notebook starts again on it, and runs the ${cells.length} cells above`);
+      for (const cell of cells) runCell(cell.source, `${GUIDE.replace(`${ROOT}/`, '')}:${cell.line}`);
+    } else if (block.kind === 'file') {
+      writeFileSync(join(project, block.name), `${block.body}\n`);
+      console.log(`  wrote ${block.name}`);
     } else if (block.kind === 'run') {
-      const expected = Number(/exit=(\d+)/.exec(block.arg)?.[1] ?? 0);
+      const expected = block.exit;
       const result = run('bash', ['-c', `{\n${swap(block.body)}\n} 2>&1`], project, env, 600_000);
       const printed = result.stdout ?? '';
       const ok = !result.error && result.status === expected;
@@ -125,7 +130,7 @@ try {
         failed = true;
       }
       previous = { printed, line: block.line };
-    } else {
+    } else if (block.kind === 'output') {
       if (!previous) throw new Error(`${where}: a tour:output block must follow a tour:run block`);
       const same = trimEnds(previous.printed) === trimEnds(block.body);
       console.log(`  output ${where} ... ${same ? 'ok' : 'FAILED'}`);

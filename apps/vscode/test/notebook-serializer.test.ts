@@ -49,7 +49,7 @@ describe('saving a notebook', () => {
   });
 
   it('writes the guide that the five-minute tour is, byte for byte', () => {
-    const tour = readFileSync(resolve(__dirname, '../../../docs/guides/five-minute-tour.md'), 'utf8');
+    const tour = readFileSync(resolve(__dirname, '../../../docs/guides/five-minute-tour.tql.md'), 'utf8');
     const data = open(tour);
     // The tour is mostly shell and TypeScript, and has one TypeQLite fence; making it a runnable notebook is Phase 06.
     expect(data.cells.filter((c) => c.kind === vscode.NotebookCellKind.Code).length).toBeGreaterThanOrEqual(1);

@@ -68,7 +68,7 @@ npm run gate -- --quick # the first six steps only
 both apply), the **WASM** suite, the engine's **browser** suite, the **playground** in Chromium, the **website** (built, with every internal link followed), the **VS Code
 e2e**, and the **clean-room install** (`npm run clean-room`: the npm tarballs installed in an empty directory
 and used; see [Releasing](releasing.md#the-checks-a-package-must-pass)), and the **five-minute tour**
-(`npm run tour`: the guide's commands and files run as written, from the tarballs). It sets `NX_SKIP_NX_CACHE`, so no
+(`npm run tour`: the guide's commands and files run as written, from the tarballs; see [The tour](#the-five-minute-tour)). It sets `NX_SKIP_NX_CACHE`, so no
 task is replayed from a cache. The last seven are skipped by `--quick`. The browser suites need Playwright's
 Chromium, the e2e a display, and the clean room the npm registry, for the packages' dependencies.
 
@@ -187,3 +187,21 @@ runtime tests. The revision *hash* is pinned: `sha256.spec.ts` proves it identic
   not count, assert on SQLite's own plan, as `full-text-key.test.ts` does with `EXPLAIN QUERY PLAN`.
   Timings belong to the load test, `nx run typedblite-runtime:bench`
   ([Performance](performance.md)), which writes them to a results file.
+
+## The five-minute tour
+
+`docs/guides/five-minute-tour.tql.md` is a **notebook** (a Markdown file whose `typeql` fences are cells, ADR-012) and also the
+page on GitHub and the website. It is tested by playing it as a reader does, in layers, all reading it through one parser
+(`tools/tour-doc.mjs`), so none can read it differently from another:
+
+| Test | What it plays | Where |
+| ---- | ------------- | ----- |
+| `npm run tour` | The shell and Node steps, from the **packed tarballs** installed in an empty directory; the cells from the notebook's file store on, run by the packed CLI so the commands see their data | `tools/tour.mjs` |
+| `tour-journey.test.ts` | The **whole tour in one timeline**: cells on the notebook's own kernel and the real engine host, commands and the program in a real shell with the real CLI, on the same files. Every answer printed (under a cell, or under a command) must be the one that ran | `apps/vscode/test/` |
+| `tour-structure.test.ts` | The page: every fenced block is a cell, a printed answer or a step (none is only prose); every cell has its answer under it; steps are numbered and referred to by number; every link and anchor resolves; the controls are named as the extension names them; it stays short enough to be five minutes | `apps/vscode/test/` |
+| The VS Code e2e | The same journey **through a real VS Code**, installed from the `.vsix`: a `.tql.md` opens as a notebook, the kernel is chosen without the reader choosing it, every cell's output is what the page prints | `apps/vscode/e2e/` |
+
+When the tour or the engine changes on purpose, `TOUR_RECORD=1 npx vitest run test/tour-journey.test.ts` (from `apps/vscode`)
+rewrites the printed answers to what ran. Read the diff: it is the page a reader will see, and a changed answer is a changed
+experience.
+

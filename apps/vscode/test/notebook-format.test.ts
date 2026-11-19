@@ -116,7 +116,7 @@ describe('every Markdown file in the repository', () => {
 
   it('is a lot of files, including the guides', () => {
     expect(files.length).toBeGreaterThan(50);
-    expect(files).toContain('docs/guides/five-minute-tour.md');
+    expect(files).toContain('docs/guides/five-minute-tour.tql.md');
   });
 
   it('round-trips byte for byte', () => {

@@ -11,8 +11,7 @@ Choose your starting point by what you want to do.
 | Guide | What it covers |
 | ----- | -------------- |
 | [Getting started](guides/getting-started.md) | Build from source, run your first schema and queries from the CLI, then from code |
-| [The reading list, as a notebook](guides/reading-list.tql.md) | The TypeQLite half of the tour as a notebook you run in VS Code: a schema, inserts, queries and a refusal. A spec runs it on the engine and checks its answers against the tour's |
-| [Five-minute tour](guides/five-minute-tour.md) | From an empty folder to a small program on one SQLite file: a schema, the CLI, and Node. Tested by `npm run tour` |
+| [Five-minute tour](guides/five-minute-tour.tql.md) | A notebook that keeps a reading list in one SQLite file, then uses the same file from the command line and a Node program. Open it in VS Code, or read it as a transcript. Every cell, command and answer is tested |
 | [Embedding the runtime](guides/embedding-the-runtime.md) | The engine API: `define`, `execute`, `query`, result values, transactions, diagnostics and refusals, options, custom SQLite bindings |
 | [The TypeQLite language](guides/typeqlite-language.md) | What TypeQLite supports: schema, annotations, pipelines, patterns, expressions, functions, `fetch`, and the known gaps |
 | [Versions and compatibility](guides/compatibility.md) | What a version number promises: what counts as breaking, stores and upgrades, replication between versions, requirements |

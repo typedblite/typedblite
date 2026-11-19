@@ -190,7 +190,7 @@ code --install-extension apps/vscode/dist/typeqlite-0.0.1.vsix
 
 ## Next steps
 
-- [Five-minute tour](five-minute-tour.md): a small program on one SQLite file, from an empty folder (for after
+- [Five-minute tour](five-minute-tour.tql.md): a notebook, the command line and a small program on one SQLite file, from an empty folder (for after
   the first release, when it installs from npm).
 - [Embedding the runtime](embedding-the-runtime.md): the whole engine API.
 - [The TypeQLite language](typeqlite-language.md): everything you can write.

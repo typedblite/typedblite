@@ -45,7 +45,7 @@ REPL. The reader cannot change a query and see what happens without leaving the 
 A notebook puts them in one file. It is the natural way to:
 
 - **Teach TypeQLite.** The guides ([the TypeQLite language](../../../guides/typeqlite-language.md),
-  [the five-minute tour](../../../guides/five-minute-tour.md)) could be run, not only read.
+  [the five-minute tour](../../../guides/five-minute-tour.tql.md)) could be run, not only read.
 - **Explore a store step by step**, keeping each query and its answers next to the reasoning.
 - **Share a reproducible example**, such as a bug report: a schema, some data, the query that goes
   wrong, and what it printed.
@@ -136,7 +136,7 @@ packaged `.vsix`.
       output. *e2e.*
 - [x] Output past the row limit reports how many rows it did not show.
 - [x] The notebook's guides can be run: the five-minute tour converted to a notebook runs to
-      completion and its answers match the tour's. *Spec.* (`docs/guides/reading-list.tql.md`: the tour's TypeQLite half, with the tour's own statements; the half of the tour that is shell and Node is not a notebook's.)
+      completion and its answers match the tour's. *Spec.* (Done first as `docs/guides/reading-list.tql.md`, then by the tour itself: `docs/guides/five-minute-tour.tql.md` is a notebook, played end to end.)
 - [x] 🔴 The conformance run is unchanged at **1742 of 1756**.
 - [x] `AGENTS.md`, the README and the project overview memory name the notebook.
 - [x] Build, typecheck and test are green for everything touched, from a clean tree.
@@ -239,7 +239,7 @@ Anything a phase defers is recorded here, not only in a commit message.
 - [ADR-010](../../../architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md):
   TypeQLite highlighting in Markdown
 - [The TypeQLite language](../../../guides/typeqlite-language.md) and
-  [the five-minute tour](../../../guides/five-minute-tour.md): the guides a notebook could make
+  [the five-minute tour](../../../guides/five-minute-tour.tql.md): the guides a notebook could make
   runnable
 - [VS Code Notebook API](https://code.visualstudio.com/api/extension-guides/notebook): the
   serializer, controller and renderer this would use
