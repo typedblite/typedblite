@@ -82,6 +82,22 @@ invariant 1). A cell is not wrapped in a transaction.
   consumer that needs something the host lacks adds it to the host through a small change there (initiative rule).
 - A notebook runs at most one statement at a time, because the host's sidecar answers one request at a time.
 
+## Made exact in Phase 03 (running cells)
+
+- **The sidecar needs no `limit`.** Measured: 50,000 rows came through it in 0.7 s as one 2.3 MiB line (5,000 in 0.35 s),
+  so a 200,000-row answer is about 3 s and 9 MiB. The whole answer still crosses the sidecar; the notebook bounds what
+  it **renders** (`typedblite.notebook.maxRows`, default 1,000) and counts the rest ("N more rows are not shown").
+  A host `limit` is deferred until answers reach millions of rows.
+- **Outputs use built-in MIME types, so there is no renderer of our own:** a table is `text/markdown` with a
+  `text/plain` fallback, a `fetch` is `application/json`, facts are standard output, a refusal is an error output. A
+  value is escaped so nothing in an answer can alter a table or become markup (a `$` would otherwise read as math).
+- **A refusal is shown on its cell as an error output** with the engine's own message and its line and column in the cell
+  (the host's range for the statement, added to where the statement starts in the cell), and **ends the run**: the cells
+  after it are not started. VS Code's own Run All, Run Above and Run Below call one handler, so none needed code.
+- **The host's session is not assumed to last.** If the host process was restarted under a notebook, the next statement
+  opens a new, empty store and says so in the cell, instead of failing every cell.
+- **Restart** is a command (`typedblite.notebook.restart`, on the notebook toolbar) over `session.restart`.
+
 ## Not decided here
 
 How a table and a refusal render (Phase 03), the export formats (Phase 05), and whether a Markdown cell's own

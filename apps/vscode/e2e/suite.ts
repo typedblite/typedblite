@@ -55,6 +55,15 @@ async function diagnosticsSettled(uri: vscode.Uri, quiet = 500): Promise<void> {
   }
 }
 
+/** Polls until `done`, for things the editor finishes on its own schedule. */
+async function waitFor(done: () => boolean, what: string, timeout = 30_000): Promise<void> {
+  const started = Date.now();
+  while (!done()) {
+    if (Date.now() - started > timeout) throw new Error(`timed out waiting for ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 const codeOf = (diagnostic: vscode.Diagnostic) =>
   typeof diagnostic.code === 'object' ? diagnostic.code.value : diagnostic.code;
 
@@ -505,6 +514,43 @@ const cases: Record<string, () => Promise<void>> = {
       notebook.getCells().map((cell) => cell.kind),
       [vscode.NotebookCellKind.Markup, vscode.NotebookCellKind.Code],
     );
+  },
+
+  async 'Run All runs the cells through the engine host: outputs, a refusal on its cell, and nothing marked changed'() {
+    const notebook = await vscode.workspace.openNotebookDocument(uriOf('run.tql.md'));
+    await vscode.window.showNotebookDocument(notebook);
+    await vscode.commands.executeCommand('notebook.execute');
+    // Cells 1 to 4 run; cell 4 is refused, so cell 5 is never started.
+    await waitFor(() => notebook.cellAt(4).executionSummary?.success !== undefined, 'the refused cell to finish');
+
+    const text = (cell: vscode.NotebookCell, mime: string): string[] =>
+      cell.outputs.flatMap((output) => output.items.filter((item) => item.mime === mime).map((item) => new TextDecoder().decode(item.data)));
+    assert.equal(notebook.cellAt(1).executionSummary?.success, true);
+    assert.deepEqual(text(notebook.cellAt(1), 'text/plain'), ['Schema applied.']);
+    assert.ok(text(notebook.cellAt(2), 'text/markdown')[0]!.includes('entity'), 'an insert answers what it made');
+    assert.ok(text(notebook.cellAt(3), 'text/markdown')[0]!.includes('Dune'), 'a later cell sees what an earlier cell inserted');
+
+    assert.equal(notebook.cellAt(4).executionSummary?.success, false);
+    const refusal = JSON.parse(text(notebook.cellAt(4), 'application/vnd.code.notebook.error')[0]!) as { name: string; message: string };
+    assert.equal(refusal.name, 'TypeQLite refused this statement');
+    assert.match(refusal.message, /nonexistent-type.*line 1, column/);
+    assert.equal(notebook.cellAt(5).executionSummary?.success, undefined, 'the cell after the refusal was not run');
+    assert.equal(notebook.cellAt(5).outputs.length, 0);
+
+    // Feature invariant 4: running a notebook does not change the file, so it is not dirty.
+    assert.equal(notebook.isDirty, false);
+  },
+
+  async 'restart empties the notebook\'s store, and a cell that needs the schema is then refused'() {
+    const notebook = await vscode.workspace.openNotebookDocument(uriOf('run.tql.md'));
+    await vscode.window.showNotebookDocument(notebook);
+    await vscode.commands.executeCommand('typedblite.notebook.restart');
+    await vscode.commands.executeCommand('notebook.cell.execute', { ranges: [{ start: 3, end: 4 }], document: notebook.uri });
+    await waitFor(() => notebook.cellAt(3).executionSummary?.success === false, 'the query on the empty store to be refused');
+    const output = notebook.cellAt(3).outputs[0]!.items.find((item) => item.mime === 'application/vnd.code.notebook.error')!;
+    const refusal = JSON.parse(new TextDecoder().decode(output.data)) as { name: string; message: string };
+    assert.equal(refusal.name, 'No schema yet');
+    assert.match(refusal.message, /no schema has been applied/);
   },
 
   // Last, because it deletes a file from the workspace.

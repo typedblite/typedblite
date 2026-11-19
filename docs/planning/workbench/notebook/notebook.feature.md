@@ -11,7 +11,7 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Notebook — Feature Doc
 
-> **Status:** 🚧 Phase 02 complete (2026-11-19), Phase 03 next · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
+> **Status:** 🚧 Phase 03 complete (2026-11-19), Phase 04 next · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
 > `main` · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete)
 > · **Governed by:** [ADR-012](../../../architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) · **Shares work with:** [Graph Explorer](../graph-explorer/graph-explorer.feature.md) and
 > [Debugger](../debugger/debugger.feature.md)
@@ -126,15 +126,15 @@ packaged `.vsix`.
 
 - [x] The serializer round-trips: parse then serialize gives the same bytes for a fixture notebook,
       and records no outputs by default. *Spec, without VS Code.* (Every tracked Markdown file in the repository, not one fixture.)
-- [ ] A cell runs through the engine host, and a later cell sees what an earlier cell defined and
-      inserted. *Host spec, without VS Code.*
+- [x] A cell runs through the engine host, and a later cell sees what an earlier cell defined and
+      inserted. *Host spec, without VS Code.* (`test/notebook-host.test.ts`, on the real host bundle.)
 - [ ] A schema defined in one cell resolves in another, in diagnostics and in completion. *Language
       server spec, and e2e.*
-- [ ] Restart gives an empty store, and a cell that needs the schema fails with the engine's own
-      refusal. *Host spec.*
-- [ ] A refusal shows on the cell with its message and location; execution facts show in the
+- [x] Restart gives an empty store, and a cell that needs the schema fails with the engine's own
+      refusal. *Host spec*, and e2e.
+- [x] A refusal shows on the cell with its message and location; execution facts show in the
       output. *e2e.*
-- [ ] Output past the row limit reports how many rows it did not show.
+- [x] Output past the row limit reports how many rows it did not show.
 - [ ] The notebook's guides can be run: the five-minute tour converted to a notebook runs to
       completion and its answers match the tour's. *Spec.*
 - [ ] 🔴 The conformance run is unchanged at **1742 of 1756**.
@@ -188,9 +188,9 @@ fixture notebook, runs its cells and asserts the outputs. Pixel tests are not us
 | 00 | Scope, the file format, the shared engine host, and the ADR | Complete | [summary](phases/00-scope-and-adr/summary.md) |
 | 01 | ~~Engine host with a session~~ — now the [engine-host feature](../engine-host/engine-host.feature.md), built first | Moved | |
 | 02 | Format: the serializer and the notebook type | Complete | [summary](phases/02-format/summary.md) |
-| 03 | Run: the controller, run all, restart, outputs for rows, JSON, facts and refusals | Not started | |
+| 03 | Run: the controller, run all, restart, outputs for rows, JSON, facts and refusals, **and the row limit** | Complete | [summary](phases/03-run/summary.md) |
 | 04 | Language services across cells | Not started | |
-| 05 | Store choice, output bounds, export | Not started | |
+| 05 | Store choice, export (the output bound moved to Phase 03) | Not started | |
 | 06 | Packaging, e2e, a guide as a notebook, docs | Not started | |
 
 ## Phase Intent
