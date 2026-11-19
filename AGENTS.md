@@ -15,8 +15,10 @@ flowchart LR
   libs --> language["language/<br/><b>@typedblite/language</b><br/>grammar, AST, language services"]
   libs --> runtime["runtime/<br/><b>@typedblite/runtime</b><br/>interpreter, storage, change log"]
   libs --> revision["content-revision/<br/><b>@typedblite/content-revision</b><br/>revision identifiers"]
+  libs --> session["session/<br/><b>@typedblite/session</b><br/>session core, statement classifier"]
   libs --> conformance["conformance/<br/><b>typedblite-conformance</b><br/>TypeDB behaviour spec and report card"]
   apps --> cli["cli/<br/><b>typedblite</b><br/>the CLI: REPL and file runner"]
+  apps --> host["engine-host/<br/><b>@typedblite/engine-host</b> (private)<br/>NestJS CQRS host that runs statements in sessions (ADR-011)"]
   apps --> vscode["vscode/<br/><b>typeqlite</b> extension<br/>the TypeQLite editor: a Langium language server"]
 ```
 
@@ -24,7 +26,10 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  cli --> runtime
+  cli --> session
+  session --> runtime
+  engine-host --> session
+  engine-host --> runtime
   sync-demo --> runtime
   conformance --> runtime
   runtime --> language
@@ -68,6 +73,8 @@ Nx project names (not the npm package names):
 - `content-revision` — `@typedblite/content-revision`
 - `typedblite-conformance` — also has `report`
 - `typedblite` — the CLI, npm package `typedblite` (it was `typedblite-cli`; `npx typedblite` needs the unscoped name)
+- `typedblite-session` — `@typedblite/session`, a session over the engine (transactions, restart) and the statement classifier, shared by the CLI and the host; no NestJS
+- `engine-host` — `@typedblite/engine-host` (private), the workbench's NestJS CQRS host (ADR-011); the core only so far, so no transport and no binary yet
 - `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
 - `playground` — `typedblite-playground`, TypeQLite in a browser: the engine on WASM SQLite in a worker, and Monaco with the real language server over LSP in another; also has `test-browser` and `serve`
 - `website` — `typedblite-website`, the `typedblite.dev` static site (Astro Starlight): pages generated from the repository's Markdown, the API reference (starlight-typedoc), the playground and the sync demo; targets `build-site`, `check`, `dev`, `serve` (it has no `build`, so `npm run build` does not build it; [docs/development/website.md](docs/development/website.md))
@@ -81,8 +88,8 @@ Test suites time out at 30 seconds per test.
 
 ### Packaging
 
-Four packages are published to npm, at one version, by Nx release: `@typedblite/content-revision`,
-`@typedblite/language`, `@typedblite/runtime` and the CLI, `typedblite`. They are listed in
+Five packages are published to npm, at one version, by Nx release: `@typedblite/content-revision`,
+`@typedblite/language`, `@typedblite/runtime`, `@typedblite/session` and the CLI, `typedblite`. They are listed in
 `tools/publishable.mjs`, which must agree with `release.projects` in `nx.json`.
 [Releasing](docs/development/releasing.md) is the process; [Versions and compatibility](docs/guides/compatibility.md)
 is what a version promises.
@@ -193,6 +200,8 @@ npm exec nx -- run typedblite-conformance:report   # the full card and a failure
 - Test files for `libs/language` live in `libs/language/test/` with `.spec.ts` extension.
 - Test files for `libs/runtime` live in `libs/runtime/test/` with `.test.ts` extension.
 - Test files for `apps/cli` live in `apps/cli/test/` with `.test.mts` extension.
+- Test files for `libs/session` and `apps/engine-host` live in their `test/` directories with `.test.ts` extension. The host's specs call the CQRS buses through `@nestjs/testing`, with no transport and no VS Code.
+- 🔴 NestJS is allowed in `apps/engine-host` and nowhere else: `@typedblite/runtime`, `@typedblite/language` and `@typedblite/session` take no dependency on it (ADR-011 D2), so the published CLI does not either.
 - Test files for `apps/vscode` live in `apps/vscode/test/` (`.test.ts`, run by vitest against the built
   bundle; the Markdown preview's modules that import no `vscode` are tested from source). Its e2e (`nx run typeqlite-vscode:e2e`) packages the extension, installs the `.vsix` into a
   downloaded VS Code through `@vscode/test-electron`, and runs the cases there. It is off by default:

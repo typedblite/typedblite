@@ -95,7 +95,7 @@ try {
       return [name, join(tarballs, filename)];
     }),
   );
-  const libraries = [packed['content-revision'], packed['typeqlite-language'], packed['typedblite-runtime']];
+  const libraries = [packed['content-revision'], packed['typeqlite-language'], packed['typedblite-runtime'], packed['typedblite-session']];
 
   // `npx typedblite` stands for the CLI installed from its tarball, found on PATH.
   writeFileSync(join(tool, 'package.json'), '{"name":"tour-tool","private":true}\n');

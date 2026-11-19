@@ -1,0 +1,23 @@
+{
+  "name": "@typedblite/engine-host",
+  "description": "The TypeQLite engine host: a NestJS CQRS app that runs statements in sessions, for the workbench's consumers",
+  "version": "0.0.1",
+  "license": "MPL-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/cqrs": "^11.0.3",
+    "@typedblite/runtime": "*",
+    "@typedblite/session": "*",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.0.0"
+  }
+}

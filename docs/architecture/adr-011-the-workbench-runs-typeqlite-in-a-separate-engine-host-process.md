@@ -47,7 +47,11 @@ for now. Publishing it later changes nothing else.
 
 **D3. The host's session core replaces `TypeDBLiteSession`.** The `typedblite` CLI moves onto the
 core and its specs pass unchanged. The CLI stays a separate binary, so the published CLI does not
-take NestJS.
+take NestJS. **Amended 2026-11-19 (Phase 01):** because the CLI is published and the host is private,
+the core cannot live in the host. It lives in a new, NestJS-free, **published** package,
+`@typedblite/session` (`libs/session`): the session, the statement classifier and `splitStatements`.
+The CLI and the host both depend on it, and the host adds NestJS and the buses. This makes five
+published packages, not four. The runtime's exports do not change (D9).
 
 **D4. Names.** App `apps/engine-host`, package `@typedblite/engine-host` (private), binary
 `typedblite-host`, operations `session.open`, `session.run`, `session.begin`, `session.commit`,
@@ -86,6 +90,13 @@ That blocks publishing the repository, not building the host.
 - Users of the workbench need Node ≥ 22.16 on PATH.
 - The host adds a dependency tree to `apps/`, and none to the engine.
 - The debugger's execution model, and the notebook's restart, can now rely on a process boundary.
+
+## Found while building the core (Phase 01)
+
+A session opened on a file **before** another session's `define` does not see that schema, because the
+interpreter loads a file's schema when it opens. It refuses with `no-schema` until it restarts. The host
+reports this and does not work round it (invariant 2). Whether the engine should refresh the schema is
+the engine's decision, not the host's.
 
 ## Not decided here
 

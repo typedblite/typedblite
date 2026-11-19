@@ -34,7 +34,8 @@
     "typedblite": "./out/main.js"
   },
   "dependencies": {
-    "@typedblite/runtime": "0.0.1"
+    "@typedblite/runtime": "0.0.1",
+    "@typedblite/session": "0.0.1"
   },
   "publishConfig": {
     "access": "public"
