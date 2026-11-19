@@ -1,6 +1,6 @@
 ---
 kind: feature
-status: in-progress
+status: complete
 decided-by: [adr-012]
 title: TypeQLite Notebook
 feature: notebook
@@ -11,7 +11,7 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Notebook — Feature Doc
 
-> **Status:** 🚧 Phase 05 complete (2026-11-19), Phase 06 next · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
+> **Status:** ✅ Complete (2026-11-19): every phase merged into `feat/notebook`; the merge into `main` is the founder's call · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
 > `main` · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete)
 > · **Governed by:** [ADR-012](../../../architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) · **Shares work with:** [Graph Explorer](../graph-explorer/graph-explorer.feature.md) and
 > [Debugger](../debugger/debugger.feature.md)
@@ -135,11 +135,11 @@ packaged `.vsix`.
 - [x] A refusal shows on the cell with its message and location; execution facts show in the
       output. *e2e.*
 - [x] Output past the row limit reports how many rows it did not show.
-- [ ] The notebook's guides can be run: the five-minute tour converted to a notebook runs to
-      completion and its answers match the tour's. *Spec.*
-- [ ] 🔴 The conformance run is unchanged at **1742 of 1756**.
-- [ ] `AGENTS.md`, the README and the project overview memory name the notebook.
-- [ ] Build, typecheck and test are green for everything touched, from a clean tree.
+- [x] The notebook's guides can be run: the five-minute tour converted to a notebook runs to
+      completion and its answers match the tour's. *Spec.* (`docs/guides/reading-list.tql.md`: the tour's TypeQLite half, with the tour's own statements; the half of the tour that is shell and Node is not a notebook's.)
+- [x] 🔴 The conformance run is unchanged at **1742 of 1756**.
+- [x] `AGENTS.md`, the README and the project overview memory name the notebook.
+- [x] Build, typecheck and test are green for everything touched, from a clean tree.
 
 ## Out of scope
 
@@ -191,7 +191,7 @@ fixture notebook, runs its cells and asserts the outputs. Pixel tests are not us
 | 03 | Run: the controller, run all, restart, outputs for rows, JSON, facts and refusals, **and the row limit** | Complete | [summary](phases/03-run/summary.md) |
 | 04 | Language services across cells | Complete | [summary](phases/04-language/summary.md) |
 | 05 | Store choice, export (the output bound moved to Phase 03) | Complete | [summary](phases/05-store-export/summary.md) |
-| 06 | Packaging, e2e, a guide as a notebook, docs | Not started | |
+| 06 | Packaging, e2e, a guide as a notebook, docs | Complete | [summary](phases/06-packaging/summary.md) |
 
 ## Phase Intent
 

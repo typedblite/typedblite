@@ -131,6 +131,15 @@ invariant 1). A cell is not wrapped in a transaction.
 - **Export** is of the notebook as the editor holds it, edits included: a **script** of the code cells, one blank line apart, and
   **Markdown** with every code cell as a fenced `typeql` block (the guides' spelling), neither with outputs.
 
+## Made exact in Phase 06 (the guide, and packaging)
+
+- **A guide is a notebook.** `docs/guides/reading-list.tql.md` is the TypeQLite half of the five-minute tour, using the tour's own
+  statements, and a spec runs it on the real engine host and checks its answers against the tour's. The tour's shell and Node
+  halves are not a notebook's, and `given` statements (values supplied by a program) have no notebook form, so they became literals.
+  The guide's last cell is refused on purpose, so Run All ends there.
+- **The package carries everything the notebook needs:** the `.vsix` is 1.3 MB, with the host bundle, both notebook types and no
+  test, source or map; the e2e runs against it.
+
 ## Not decided here
 
 How a table and a refusal render (Phase 03), the export formats (Phase 05), and whether a Markdown cell's own

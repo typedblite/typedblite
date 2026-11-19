@@ -16,5 +16,14 @@ The first release. Nothing has been published to a marketplace yet.
 - The TypeDBLite mark as the icon of `.typeqlite` and `.tql` files, in light and dark forms. VS Code uses it
   when your file icon theme has no icon of its own for TypeQLite.
 - Formatting, and semantic highlighting that colours a label by what it resolves to and keywords by kind.
+- **TypeQLite notebooks.** A Markdown file whose `typeql` fences are code cells: `*.tql.md` opens as a notebook, and any `.md`
+  file by "Open With". Run a cell, Run All, Run Above and Below, and Restart: the cells run on the TypeDBLite engine, in one
+  store kept from cell to cell, and answer with a table, JSON, the engine's execution facts, or its own refusal on the cell. The
+  language features work across a notebook's cells, and each notebook is a schema of its own. A notebook runs in memory until
+  you choose a store file and when its writes become permanent (hold changes until you commit, or commit each statement); the
+  choice is never saved in the notebook. Export as a `.tql` script or as Markdown. Saving never writes outputs, and an unedited
+  notebook is written back byte for byte.
+- **The engine host**, bundled and started as a process on first use, with a `node` it checks first (`typedblite.host.node`):
+  needs Node 22.16 or newer. Other extensions reach it through the command `typedblite.host.request`.
 - TypeQLite code blocks coloured in your theme, in the Markdown preview and the Markdown editor. In a remote
   window, the preview needs the optional TypeQLite Theme Bridge, installed in your local VS Code.
