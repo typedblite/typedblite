@@ -11,7 +11,7 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Debugger — Feature Doc
 
-> **Status:** 🚧 Phase 00 in progress (2026-11-19): [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)
+> **Status:** 🚧 In progress (2026-11-19): phases 00–01 complete; [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)
 > accepted · **Written:** 2026-11-12 · **Branch:** `feat/debugger`, from `main`
 > (`4fa6d8d`), cut 2026-11-19 · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete),
 > [engine host](../engine-host/engine-host.feature.md) (complete) · **Governed by:**
@@ -284,7 +284,7 @@ packaged `.vsix`.
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
 | 00 | [Scope, the DAP mapping, and ADR-014](phases/00-scope-and-adr/summary.md) | Complete | ADR-014 accepted, B1–B11 |
-| 01 | The step hook: events, the recording, the cap, and proof that it is harmless | Not started | |
+| 01 | [The step hook: events, the recording, the cap, and proof that it is harmless](phases/01-step-hook/summary.md) | Complete | Conformance with the hook on: 1742 of 1756, byte-identical |
 | 02 | Adapter shell: launch a file, statement-level steps, output, Run Without Debugging | Not started | |
 | 03 | Stages and rows: stage steps, the Rows and Scope variables, line breakpoints | Not started | |
 | 04 | Inside a `match`: constraint steps, function and fetch frames, `or`/`not`/`try` | Not started | |
@@ -343,8 +343,9 @@ Anything a phase defers is recorded here, not only in a commit message.
   opening a store read-only to copy it breaks invariant 4.
 - **Evaluating expressions in the debug console** (Phase 00, ADR-014 B1). It needs a store that is
   still at the stop, which only a blocking worker (approach B) gives.
-- **Streaming a recording in parts** (Phase 00, ADR-014). Decided only if Phase 01's measurements show
-  that one JSON line is too large.
+- **Streaming a recording in parts** (Phase 00, ADR-014). Phase 01 measured the largest realistic recording at
+  2.1 MB (a 6,000-row join), an eighth of the 16 MB ceiling, so one JSON line is enough. Revisit only if a real
+  program passes the ceiling.
 
 ## Key Documents
 
