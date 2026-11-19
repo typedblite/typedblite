@@ -2,7 +2,7 @@
  * Opens the built site's sync demo in Chromium: the page Astro built inside Starlight's layout, with the demo's
  * scripts beside it. It checks that the shell is there (Starlight's header, theme switch and sidebar), that the hub
  * and the three embedded devices started on WASM SQLite and OPFS, that a task typed into one device reaches another and
- * the hub, that each device has its own colour on its card, on the chip that says where a task was made and in the hub's list, that a device can be cut off and reconnected, that the devices follow the site's light and dark switch, that
+ * the hub, that the highlight takes the colour of the device that made the change, that each device has its own colour on its card, on the chip that says where a task was made and in the hub's list, that a device can be cut off and reconnected, that the devices follow the site's light and dark switch, that
  * the page also works at the URL without its trailing slash, and that nothing failed to load. Needs Playwright's Chromium
  * (`npx playwright-core install chromium`). Run by `website:check`, after the build.
  */
@@ -86,6 +86,13 @@ try {
   const hubChipA = await colour(page, '#bh-tasks .bh-origin[data-origin="a"]');
   expect(hubChipA === cardColours[0], `the hub lists Device A in ${hubChipA}, not its card's ${cardColours[0]}`);
   expect((await colour(frame('b'), 'li .origin[data-origin="a"]')) === cardColours[0], "the chip on B for A's task is not A's colour");
+
+  // Who made a change, not who made the task, decides the highlight: B checks A's task and A's row says B made the change.
+  await frame('b').locator('#tasks li input').first().check();
+  await until("A's row says B made the change, and still says A made the task", async () => {
+    const row = frame('a').locator('#tasks li').first();
+    return (await row.getAttribute('data-editor')) === 'b' && (await row.locator('.origin').getAttribute('data-origin')) === 'a';
+  });
 
   await frame('c').click('#link');
   await until('C says it is offline', async () => /^Offline/.test(await frame('c').locator('#status').innerText()));

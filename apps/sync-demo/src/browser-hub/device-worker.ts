@@ -48,7 +48,7 @@ async function syncNow(): Promise<void> {
   if (!device || syncing) return;
   syncing = true;
   publish();
-  const fingerprint = (tasks: ReturnType<DemoDevice['tasks']>) => new Map(tasks.map((task) => [task.id, `${task.title}\u0000${task.done}`]));
+  const fingerprint = (tasks: ReturnType<DemoDevice['tasks']>) => new Map(tasks.map((task) => [task.id, `${task.title}\u0000${task.done}\u0000${task.editedBy}`]));
   const before = fingerprint(device.tasks());
   const applied = await device.syncOnce();
   syncing = false;

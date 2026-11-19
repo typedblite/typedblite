@@ -593,12 +593,12 @@ describe('each device has its own colour', () => {
   /** Start recording, in a device page, every row that is given the fading highlight, and what colour it has at that moment. */
   const recordFlashes = (target: Frame): Promise<void> =>
     target.evaluate(() => {
-      type Flash = { origin: string | undefined; title: string | null | undefined; background: string };
+      type Flash = { editor: string | undefined; title: string | null | undefined; background: string };
       const seen: Flash[] = [];
       (window as unknown as { flashes: Flash[] }).flashes = seen;
       const note = (element: Element): void => {
         if (element instanceof HTMLElement && element.tagName === 'LI' && element.classList.contains('flash')) {
-          seen.push({ origin: element.dataset['origin'], title: element.querySelector('.title')?.textContent, background: getComputedStyle(element).backgroundColor });
+          seen.push({ editor: element.dataset['editor'], title: element.querySelector('.title')?.textContent, background: getComputedStyle(element).backgroundColor });
         }
       };
       // A new row is given the class before it is in the list (a childList record); an existing row gets it later (an attribute record).
@@ -609,8 +609,8 @@ describe('each device has its own colour', () => {
         }
       }).observe(document.getElementById('tasks')!, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
     });
-  const flashes = (target: Frame): Promise<Array<{ origin?: string; title?: string | null; background: string }>> =>
-    target.evaluate(() => (window as unknown as { flashes: Array<{ origin?: string; title?: string | null; background: string }> }).flashes);
+  const flashes = (target: Frame): Promise<Array<{ editor?: string; title?: string | null; background: string }>> =>
+    target.evaluate(() => (window as unknown as { flashes: Array<{ editor?: string; title?: string | null; background: string }> }).flashes);
   /** What `rule` computes to in this page, for comparing: a colour the page itself resolves, so it is the browser's own arithmetic. */
   const resolved = (target: Frame, device: string): Promise<string> =>
     target.evaluate((name) => {
@@ -623,31 +623,73 @@ describe('each device has its own colour', () => {
     }, device);
   const YELLOW = 'rgb(255, 244, 194)'; // #fff4c2, the shipped page's highlight
 
-  it('the highlight that fades takes the colour of the device that made the task, not one yellow for all', async () => {
-    const seenBy = frame(page, 'b');
-    await recordFlashes(seenBy);
-    await add(page, 'a', 'Flash from A');
-    await add(page, 'c', 'Flash from C');
-    await until('B has flashed both', async () => (await flashes(seenBy)).filter((f) => /^Flash from/.test(f.title ?? '')).length >= 2);
-    const byTitle = Object.fromEntries((await flashes(seenBy)).map((f) => [f.title, f]));
-    expect(byTitle['Flash from A']!.origin).toBe('a');
-    expect(byTitle['Flash from C']!.origin).toBe('c');
-    expect(byTitle['Flash from A']!.background).toBe(await resolved(seenBy, 'a'));
-    expect(byTitle['Flash from C']!.background).toBe(await resolved(seenBy, 'c'));
-    expect(byTitle['Flash from A']!.background).not.toBe(byTitle['Flash from C']!.background);
-    for (const name of ['a', 'c']) expect(byTitle[`Flash from ${name.toUpperCase()}`]!.background).not.toBe(YELLOW);
+  const clearFlashes = (target: Frame): Promise<void> => target.evaluate(() => ((window as unknown as { flashes: unknown[] }).flashes.length = 0));
+  const flashOf = async (target: Frame, title: string) => (await flashes(target)).find((f) => f.title === title);
+  const flashedBy = (title: string, names: readonly string[]) => async (): Promise<boolean> => (await Promise.all(names.map((n) => flashOf(frame(page, n), title)))).every(Boolean);
+
+  it('the highlight takes the colour of the device that made the change: added on A, checked on B, unchecked on C', async () => {
+    for (const name of NAMES) await recordFlashes(frame(page, name));
+    const check = async (title: string, editor: 'a' | 'b' | 'c', seenBy: Array<'a' | 'b' | 'c'>): Promise<void> => {
+      await until(`${seenBy.join(' and ').toUpperCase()} flash "${title}"`, flashedBy(title, seenBy));
+      for (const name of seenBy) {
+        const flash = (await flashOf(frame(page, name), title))!;
+        expect(flash.editor, `${name} saw the change as made by`).toBe(editor);
+        expect(flash.background, `${name}'s highlight`).toBe(await resolved(frame(page, name), editor));
+        expect(flash.background).not.toBe(YELLOW);
+      }
+    };
+
+    // Task 1 is added on A: B and C show A's colour.
+    await add(page, 'a', 'Task 1');
+    await check('Task 1', 'a', ['b', 'c']);
+
+    // It is checked on B: A and C show B's colour, not A's, though A made the task.
+    for (const name of NAMES) await clearFlashes(frame(page, name));
+    await frame(page, 'b').locator('li', { hasText: 'Task 1' }).locator('input').check();
+    await check('Task 1', 'b', ['a', 'c']);
+    expect((await flashOf(frame(page, 'a'), 'Task 1'))!.background).not.toBe(await resolved(frame(page, 'a'), 'a'));
+
+    // It is unchecked on C: A and B show C's colour, not A's.
+    for (const name of NAMES) await clearFlashes(frame(page, name));
+    await frame(page, 'c').locator('li', { hasText: 'Task 1' }).locator('input').uncheck();
+    await check('Task 1', 'c', ['a', 'b']);
+    expect((await flashOf(frame(page, 'b'), 'Task 1'))!.background).not.toBe(await resolved(frame(page, 'b'), 'a'));
+
+    // The chip still says who made the task: A, in every device, through all of it.
+    for (const name of NAMES) {
+      const chip = frame(page, name).locator('li', { hasText: 'Task 1' }).locator('.origin');
+      expect(await chip.getAttribute('data-origin')).toBe('a');
+      expect(await chip.innerText()).toBe('Device A');
+    }
   });
 
-  it('a task changed on another device flashes in the colour of the device that made the task', async () => {
-    // The change log records which device made a task, not who last changed it, so a completed task flashes in its maker's colour.
-    const seenBy = frame(page, 'b');
-    await seenBy.evaluate(() => ((window as unknown as { flashes: unknown[] }).flashes.length = 0));
-    const row = frame(page, 'c').locator('li', { hasText: 'Made on A' }).locator('input');
-    await row.check();
-    await until('B flashes it', async () => (await flashes(seenBy)).some((f) => f.title === 'Made on A'));
-    const flash = (await flashes(seenBy)).find((f) => f.title === 'Made on A')!;
-    expect(flash.origin).toBe('a');
-    expect(flash.background).toBe(await resolved(seenBy, 'a'));
+  it('each of the three colours appears, and none is the old yellow, when the three devices each make a change', async () => {
+    for (const name of NAMES) await clearFlashes(frame(page, name));
+    await add(page, 'b', 'Flash from B');
+    await until('A and C flash it', flashedBy('Flash from B', ['a', 'c']));
+    await add(page, 'c', 'Flash from C');
+    await until('A and B flash it', flashedBy('Flash from C', ['a', 'b']));
+    const seen = [(await flashOf(frame(page, 'a'), 'Flash from B'))!, (await flashOf(frame(page, 'a'), 'Flash from C'))!];
+    expect(seen[0]!.background).not.toBe(seen[1]!.background);
+    for (const flash of seen) expect(flash.background).not.toBe(YELLOW);
+  });
+
+  it('a change that arrives with others is shown in its own editor’s colour: two devices change two tasks in one sync', async () => {
+    await add(page, 'a', 'Pair 1');
+    await add(page, 'a', 'Pair 2');
+    await until('B and C have both', async () => (await Promise.all(['b', 'c'].map((n) => titles(page, n)))).every((list) => list.includes('Pair 1') && list.includes('Pair 2')));
+    // A is cut off while B and C each change a different task, then A comes back and receives both at once.
+    await frame(page, 'a').click('#link');
+    await until('A is offline', () => offline(page, ['a']));
+    await clearFlashes(frame(page, 'a'));
+    await frame(page, 'b').locator('li', { hasText: 'Pair 1' }).locator('input').check();
+    await frame(page, 'c').locator('li', { hasText: 'Pair 2' }).locator('input').check();
+    await until('the hub has both', async () => (await hub(page)).tasks.filter((t) => /^Pair/.test(t.title) && t.done).length === 2);
+    await frame(page, 'a').click('#link');
+    await until('A flashes both', flashedBy('Pair 1', ['a']));
+    await until('A flashes the second', flashedBy('Pair 2', ['a']));
+    expect((await flashOf(frame(page, 'a'), 'Pair 1'))!.background).toBe(await resolved(frame(page, 'a'), 'b'));
+    expect((await flashOf(frame(page, 'a'), 'Pair 2'))!.background).toBe(await resolved(frame(page, 'a'), 'c'));
   });
 
   it('a device’s own writes do not flash, and the flash fades back to the card', async () => {

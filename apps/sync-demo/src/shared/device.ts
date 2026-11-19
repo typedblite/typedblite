@@ -58,18 +58,24 @@ export class DemoDevice {
     const trimmed = title.trim();
     if (!trimmed) return;
     this.db.execute(
-      'given $id: string, $title: string, $at: string, $origin: string; ' +
-        'insert $t isa task, has task-id $id, has title $title, has done false, has created-at $at, has origin $origin;',
-      [{ id: text(globalThis.crypto.randomUUID()), title: text(trimmed), at: text(new Date().toISOString()), origin: text(this.name) }],
+      'given $id: string, $title: string, $at: string, $origin: string, $by: string; ' +
+        'insert $t isa task, has task-id $id, has title $title, has done false, has created-at $at, has origin $origin, has edited-by $by;',
+      [{ id: text(globalThis.crypto.randomUUID()), title: text(trimmed), at: text(new Date().toISOString()), origin: text(this.name), by: text(this.name) }],
     );
   }
 
   setDone(id: string, done: boolean): void {
     // `has task-id == $id`, not `has task-id $id`: a given `$id` is a string VALUE, and `has … $id`
     // would bind an attribute — matching nothing, and writing nothing.
-    const report = this.db.execute('given $id: string, $done: boolean; match $t isa task, has task-id == $id; update $t has done $done;', [
-      { id: text(id), done: flag(done) },
-    ]);
+    //
+    // 🔴 `edited-by` is written in the same `update` as `done`, so the change and its author are one revision and travel
+    // together: every device can say who made the latest change. And a write that changes nothing is not made: setting
+    // `done` to what it already is would still change `edited-by`, and show as an edit by this device that no one sees.
+    if (this.tasks().find((task) => task.id === id)?.done === done) return;
+    const report = this.db.execute(
+      'given $id: string, $done: boolean, $by: string; match $t isa task, has task-id == $id; update $t has done $done, has edited-by $by;',
+      [{ id: text(id), done: flag(done), by: text(this.name) }],
+    );
     // An update that matched nothing reports it as a fact, not a refusal; here it is a bug, so say so.
     if (report.diagnostics.some((diagnostic) => diagnostic.code === DiagnosticCode.emptyMatch)) {
       throw new Error(`No task '${id}' on this device.`);

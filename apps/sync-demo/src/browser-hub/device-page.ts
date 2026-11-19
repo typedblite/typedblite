@@ -135,7 +135,6 @@ function renderTasks(tasks: State['tasks'], flash: ReadonlySet<string>): void {
     if (!row) {
       const item = document.createElement('li');
       item.dataset['id'] = task.id;
-      item.dataset['origin'] = task.origin; // devices.css: the highlight that fades takes the colour of the device that made the task
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.onchange = () => send({ type: 'toggle', id: task.id, done: box.checked });
@@ -160,6 +159,8 @@ function renderTasks(tasks: State['tasks'], flash: ReadonlySet<string>): void {
       row.box.checked = task.done;
       row.item.classList.toggle('done', task.done);
     }
+    // Who made the latest change, and so whose colour the highlight takes (the chip, below, says who made the task).
+    row.item.dataset['editor'] = task.editedBy;
     if (flash.has(task.id)) {
       row.item.classList.add('flash');
       requestAnimationFrame(() => requestAnimationFrame(() => row?.item.classList.remove('flash')));
