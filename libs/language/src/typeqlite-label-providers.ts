@@ -180,7 +180,7 @@ export class TypeQLiteDocumentValidator extends DefaultDocumentValidator {
     cancelToken?: CancellationToken,
   ): Promise<Diagnostic[]> {
     const diagnostics = await super.validateDocument(document, options, cancelToken);
-    if (document.parseResult.parserErrors.length > 0 || !this.labels.workspaceHasSchema()) {
+    if (document.parseResult.parserErrors.length > 0 || !this.labels.workspaceHasSchema(document.uri)) {
       return diagnostics;
     }
     for (const site of this.labels.sitesIn(document)) {

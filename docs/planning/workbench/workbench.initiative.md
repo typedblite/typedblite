@@ -120,4 +120,4 @@ Update this table when a feature changes state.
 | engine-host | Complete: six phases in `feat/engine-host`, awaiting the merge into `main` ([ADR-011](../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) accepted) |
 | graph-explorer | Proposed |
 | debugger | Proposed |
-| notebook | Proposed |
+| notebook | Complete: every phase in `feat/notebook`, awaiting the merge into `main` ([ADR-012](../../architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) accepted) |

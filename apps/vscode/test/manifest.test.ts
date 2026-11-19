@@ -2,6 +2,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TEXTMATE_OUT } from '../../../libs/language/src/typeqlite-textmate';
 import { HOST_NODE_SETTING, HOST_REQUEST_COMMAND } from '../src/host/constants';
+import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from '../src/notebook/constants';
+import { RESTART_COMMAND } from '../src/notebook/controller';
+import { COMMIT_COMMAND, EXPORT_MARKDOWN_COMMAND, EXPORT_SCRIPT_COMMAND, HOLDS_CHANGES_CONTEXT, OPEN_STORE_COMMAND, ROLLBACK_COMMAND } from '../src/notebook/store-commands';
 import { FENCE_LANGUAGES } from '../src/markdown/protocol';
 import { THEME_BRIDGE_ID, THEME_FILES_COMMAND } from '../src/markdown/theme-source';
 
@@ -30,8 +33,8 @@ describe('the manifest agrees with langium-config.json', () => {
     expect([...contributed.extensions].sort()).toEqual([...language.fileExtensions].sort());
   });
 
-  it('activates on that language', () => {
-    expect(manifest.activationEvents).toEqual([`onLanguage:${language.id}`]);
+  it('activates on that language, and on opening either notebook type', () => {
+    expect(manifest.activationEvents).toEqual([`onLanguage:${language.id}`, `onNotebook:${NOTEBOOK_TYPE}`, `onNotebook:${NOTEBOOK_TYPE_MARKDOWN}`]);
   });
 
   it('points its grammar at the generated TextMate file, under the scope that file declares', () => {
@@ -96,9 +99,45 @@ describe('the manifest agrees with langium-config.json', () => {
     expect(manifest.main).toBe('./out/extension.cjs');
   });
 
+  // ADR-012 N2: `*.tql.md` is the notebook's own file and opens as one; any other `*.md` is a notebook only by choice, so
+  // no Markdown file is taken over.
+  it('contributes the notebook: `*.tql.md` by default, any `*.md` only as an option', () => {
+    const [own, any] = manifest.contributes.notebooks;
+    expect(own).toMatchObject({ type: NOTEBOOK_TYPE, priority: 'default', selector: [{ filenamePattern: '*.tql.md' }] });
+    expect(any).toMatchObject({ type: NOTEBOOK_TYPE_MARKDOWN, priority: 'option', selector: [{ filenamePattern: '*.md' }] });
+    expect(manifest.contributes.notebooks).toHaveLength(2);
+  });
+
+  // 🔴 Feature invariant 3: Commit and Rollback exist only for a notebook that holds its changes, so they are never offered
+  // against a store that commits each statement.
+  it('offers Commit and Rollback only while a notebook holds its changes, and the store and exports for notebooks', () => {
+    const palette: { command: string; when: string }[] = manifest.contributes.menus.commandPalette;
+    const whenOf = (command: string) => palette.find((entry) => entry.command === command)?.when;
+    for (const command of [COMMIT_COMMAND, ROLLBACK_COMMAND]) expect(whenOf(command), command).toContain(HOLDS_CHANGES_CONTEXT);
+    for (const command of [OPEN_STORE_COMMAND, EXPORT_SCRIPT_COMMAND, EXPORT_MARKDOWN_COMMAND, RESTART_COMMAND]) {
+      expect(whenOf(command), command).toMatch(/typeqlite-notebook/);
+    }
+    const toolbar: { command: string; when: string }[] = manifest.contributes.menus['notebook/toolbar'];
+    for (const command of [COMMIT_COMMAND, ROLLBACK_COMMAND]) expect(toolbar.find((e) => e.command === command)?.when, command).toBe(HOLDS_CHANGES_CONTEXT);
+  });
+
+  it('registers one serializer for each notebook type, with outputs transient', () => {
+    const source = readFileSync(resolve(APP, 'src/extension.ts'), 'utf8');
+    expect(source).toContain('for (const type of [NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN])');
+    expect(source).toContain('registerNotebookSerializer(type, serializer, { transientOutputs: true })');
+  });
+
   it('contributes the engine host command, hidden from the palette, and the setting that names its node', () => {
-    expect(manifest.contributes.commands).toEqual([expect.objectContaining({ command: HOST_REQUEST_COMMAND })]);
-    expect(manifest.contributes.menus.commandPalette).toEqual([{ command: HOST_REQUEST_COMMAND, when: 'false' }]);
+    expect(manifest.contributes.commands.map((c: { command: string }) => c.command)).toEqual([
+      HOST_REQUEST_COMMAND,
+      RESTART_COMMAND,
+      OPEN_STORE_COMMAND,
+      COMMIT_COMMAND,
+      ROLLBACK_COMMAND,
+      EXPORT_SCRIPT_COMMAND,
+      EXPORT_MARKDOWN_COMMAND,
+    ]);
+    expect(manifest.contributes.menus.commandPalette[0]).toEqual({ command: HOST_REQUEST_COMMAND, when: 'false' });
     const setting = manifest.contributes.configuration.properties[HOST_NODE_SETTING];
     expect(setting).toMatchObject({ type: 'string', default: '' });
     // A path to an executable is the machine's, not a workspace's: a repository must not choose what runs.

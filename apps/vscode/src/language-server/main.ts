@@ -4,6 +4,7 @@ import { startLanguageServer } from 'langium/lsp';
 import { NodeFileSystem } from 'langium/node';
 import { createConnection, ProposedFeatures } from 'vscode-languageserver/node';
 import { createTypeQLiteServices } from '@typedblite/language';
+import { NotebookAwareLanguageServer } from './notebook-sync.js';
 import { HIGHLIGHT_BLOCKS, type HighlightBlocksParams } from '../markdown/protocol.js';
 import { highlightBlocks } from './highlight-blocks.js';
 import type { RawGrammar } from './textmate.js';
@@ -23,7 +24,10 @@ import type { RawGrammar } from './textmate.js';
  * The transport (`--node-ipc` from the extension, `--stdio` from a test) comes from argv.
  */
 const connection = createConnection(ProposedFeatures.all);
-const { shared } = createTypeQLiteServices({ connection, ...NodeFileSystem });
+// A notebook's cells are documents of the workspace's one index, and the language library keeps each notebook's schema
+// to itself (ADR-012 N4). The server only has to say it takes notebooks, and listen for them.
+const { shared } = createTypeQLiteServices({ connection, ...NodeFileSystem }, { lsp: { LanguageServer: (services) => new NotebookAwareLanguageServer(services) } });
+shared.workspace.NotebookDocuments.listen(connection);
 
 // 🔴 The grammar the EDITOR uses: the copy the manifest contributes, beside `out/`, read when first
 // needed. Bundling a second copy would let the preview drift from the editor.

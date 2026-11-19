@@ -1,7 +1,7 @@
 ---
 kind: feature
-status: proposed
-decided-by: []
+status: complete
+decided-by: [adr-012]
 title: TypeQLite Notebook
 feature: notebook
 branch: feat/notebook
@@ -11,17 +11,16 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Notebook — Feature Doc
 
-> **Status:** 📋 Proposed, not started · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
-> `main`, not yet cut · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete)
-> · **Shares work with:** [Graph Explorer](../graph-explorer/graph-explorer.feature.md) and
-> [Debugger](../debugger/debugger.feature.md) · **Governed by:** an ADR that Phase 00 writes
+> **Status:** ✅ Complete (2026-11-19): every phase merged into `feat/notebook`; the merge into `main` is the founder's call · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
+> `main` · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete)
+> · **Governed by:** [ADR-012](../../../architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) · **Shares work with:** [Graph Explorer](../graph-explorer/graph-explorer.feature.md) and
+> [Debugger](../debugger/debugger.feature.md)
 >
 > Request, 2026-11-17: *a notebook, as a future feature.*
 >
 > 🔴 **The request was one line. This document reads it as a VS Code notebook for TypeQLite**:
 > a file of cells, some prose and some TypeQLite, where running a cell shows its answers beneath
-> it, against one store that persists from cell to cell. That reading is the first thing Phase 00
-> confirms with the founder (see [Open questions](#open-questions-for-phase-00)).
+> it, against one store that persists from cell to cell. **Confirmed by the founder on 2026-11-19** (ADR-012 N1).
 >
 > **A feature in the [Workbench initiative](../workbench.initiative.md).** Its own deliverable is
 > a notebook serializer, a controller that runs cells, and an output renderer. It runs on the
@@ -53,8 +52,8 @@ A notebook puts them in one file. It is the natural way to:
 
 ## What already exists — verify before relying on it
 
-This is load-bearing. Check it again when Phase 00 starts. It has **not** been verified on disk for
-this document, which was written from the other feature documents.
+Checked on disk on 2026-11-19, in Phase 00. The table was first written on 2026-11-17, before the engine host, and
+the rows marked **updated** are what changed.
 
 | Thing | State |
 | ----- | ----- |
@@ -62,8 +61,10 @@ this document, which was written from the other feature documents.
 | Running statements | `define`, `execute` and `query` on the interpreter and on `SqliteEngine`, with `beginTransaction`, `commitTransaction` and `rollbackTransaction` |
 | Answers | `query()` returns `rows` of `TypeDBLiteValue` cells; a `fetch` returns `documents` as JSON |
 | Execution facts and refusals | Returned as a report ([ADR-004](../../../architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md)) |
-| Statement classification | In [`apps/cli/src/session.ts`](../../../../apps/cli/src/session.ts), chooses define, read or write. Needs to move somewhere shared |
-| Extension side | The extension has no notebook API use, no webview, and never loads the runtime |
+| Statement classification | **Updated:** moved to [`@typedblite/session`](../../../../libs/session), shared by the CLI and the host (`classifyStatement`, `splitStatements`) |
+| The engine host | **Updated:** built ([engine-host](../engine-host/engine-host.feature.md)). Sessions, `statement.split`, `session.restart`; reachable from the extension through `HostClient` (`typedblite.host.request` and the exported `host` API) |
+| Extension side | The extension has no notebook API use and no webview, and never loads the runtime or imports the host. **Updated:** it starts the host as a process (ADR-011). Its language client selects `scheme: 'file'` documents only, so cells are not served yet |
+| Notebook cells in the language server | **New, measured (spike):** with `notebookDocumentSync` advertised and `NotebookDocuments.listen(connection)`, cells are built as documents and resolve across each other. The schema scope is the whole workspace, so notebooks would share one (ADR-012 N4) |
 | Embedded Markdown | The Markdown preview already highlights TypeQLite fences in the editor's colours ([ADR-010](../../../architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md)). A notebook's Markdown cells can reuse that |
 
 ## What the engine host gives it, and what it adds
@@ -123,22 +124,22 @@ it did not show, so the editor does not freeze.
 Each item names where it is to be proven. "e2e" means `nx run typeqlite-vscode:e2e` against the
 packaged `.vsix`.
 
-- [ ] The serializer round-trips: parse then serialize gives the same bytes for a fixture notebook,
-      and records no outputs by default. *Spec, without VS Code.*
-- [ ] A cell runs through the engine host, and a later cell sees what an earlier cell defined and
-      inserted. *Host spec, without VS Code.*
-- [ ] A schema defined in one cell resolves in another, in diagnostics and in completion. *Language
-      server spec, and e2e.*
-- [ ] Restart gives an empty store, and a cell that needs the schema fails with the engine's own
-      refusal. *Host spec.*
-- [ ] A refusal shows on the cell with its message and location; execution facts show in the
+- [x] The serializer round-trips: parse then serialize gives the same bytes for a fixture notebook,
+      and records no outputs by default. *Spec, without VS Code.* (Every tracked Markdown file in the repository, not one fixture.)
+- [x] A cell runs through the engine host, and a later cell sees what an earlier cell defined and
+      inserted. *Host spec, without VS Code.* (`test/notebook-host.test.ts`, on the real host bundle.)
+- [x] A schema defined in one cell resolves in another, in diagnostics and in completion. *Language
+      server spec, and e2e.* (And in go to definition, rename and hover, and a notebook's schema is its own.)
+- [x] Restart gives an empty store, and a cell that needs the schema fails with the engine's own
+      refusal. *Host spec*, and e2e.
+- [x] A refusal shows on the cell with its message and location; execution facts show in the
       output. *e2e.*
-- [ ] Output past the row limit reports how many rows it did not show.
-- [ ] The notebook's guides can be run: the five-minute tour converted to a notebook runs to
-      completion and its answers match the tour's. *Spec.*
-- [ ] 🔴 The conformance run is unchanged at **1742 of 1756**.
-- [ ] `AGENTS.md`, the README and the project overview memory name the notebook.
-- [ ] Build, typecheck and test are green for everything touched, from a clean tree.
+- [x] Output past the row limit reports how many rows it did not show.
+- [x] The notebook's guides can be run: the five-minute tour converted to a notebook runs to
+      completion and its answers match the tour's. *Spec.* (`docs/guides/reading-list.tql.md`: the tour's TypeQLite half, with the tour's own statements; the half of the tour that is shell and Node is not a notebook's.)
+- [x] 🔴 The conformance run is unchanged at **1742 of 1756**.
+- [x] `AGENTS.md`, the README and the project overview memory name the notebook.
+- [x] Build, typecheck and test are green for everything touched, from a clean tree.
 
 ## Out of scope
 
@@ -156,22 +157,18 @@ packaged `.vsix`.
 
 ## Open questions for Phase 00
 
-These are for the founder.
+**All six were answered on 2026-11-19 in [ADR-012](../../../architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md)** (N1 to N6, in this order):
 
-1. **Is this the intended meaning?** A VS Code notebook for TypeQLite, as described here, or
-   something else (a notebook in the playground, a Jupyter kernel, a Markdown-based runnable
-   guide)?
-2. **File format.** A new extension (such as `.tqlnb`) in a plain-text format of our own, a
-   Markdown file whose `typeql` fences are cells, or `.ipynb`. The recommendation is Markdown-like
-   text, for invariant 4. Decide with the guides in mind.
-3. ~~**Where the engine runs.**~~ Decided by the [engine host](../engine-host/engine-host.feature.md).
-4. **Cross-cell language services.** Does the language server see the notebook as one document
-   (concatenated cells) or as many? This decides how rename and go-to-definition cross cells.
-5. **Default store.** In memory only, or remember the last file per notebook? And one store per
-   notebook, or a picker per cell?
-6. **Should a cell be one statement or many?** A cell with several statements and a `match` after
-   an `insert` needs a rule for what it prints, and for what happens when the second statement
-   fails after the first committed.
+1. ~~**Is this the intended meaning?**~~ Yes: a VS Code notebook for TypeQLite.
+2. ~~**File format.**~~ Markdown: a `typeql` fence is a code cell, the text between is a Markdown cell. `*.tql.md` by
+   default and any `*.md` as an opt-in. Outputs are not stored, and an unedited notebook round-trips byte for byte.
+3. ~~**Where the engine runs.**~~ The [engine host](../engine-host/engine-host.feature.md): one session per notebook.
+4. ~~**Cross-cell language services.**~~ Many documents, with the schema scope restricted to the notebook (a change
+   to `libs/language`, in Phase 04).
+5. ~~**Default store.**~~ In memory, one per notebook. A file is an explicit choice for that session, never saved in
+   the notebook and never remembered.
+6. ~~**One statement or many per cell?**~~ A cell is a source: the host splits it, the statements run in order, and it
+   stops at the first refusal. Earlier statements stay committed.
 
 ## How this gets proven
 
@@ -188,13 +185,13 @@ fixture notebook, runs its cells and asserts the outputs. Pixel tests are not us
 
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
-| 00 | Scope, the file format, the shared engine host, and the ADR | Not started | |
+| 00 | Scope, the file format, the shared engine host, and the ADR | Complete | [summary](phases/00-scope-and-adr/summary.md) |
 | 01 | ~~Engine host with a session~~ — now the [engine-host feature](../engine-host/engine-host.feature.md), built first | Moved | |
-| 02 | Format: the serializer and the notebook type | Not started | |
-| 03 | Run: the controller, run all, restart, outputs for rows, JSON, facts and refusals | Not started | |
-| 04 | Language services across cells | Not started | |
-| 05 | Store choice, output bounds, export | Not started | |
-| 06 | Packaging, e2e, a guide as a notebook, docs | Not started | |
+| 02 | Format: the serializer and the notebook type | Complete | [summary](phases/02-format/summary.md) |
+| 03 | Run: the controller, run all, restart, outputs for rows, JSON, facts and refusals, **and the row limit** | Complete | [summary](phases/03-run/summary.md) |
+| 04 | Language services across cells | Complete | [summary](phases/04-language/summary.md) |
+| 05 | Store choice, export (the output bound moved to Phase 03) | Complete | [summary](phases/05-store-export/summary.md) |
+| 06 | Packaging, e2e, a guide as a notebook, docs | Complete | [summary](phases/06-packaging/summary.md) |
 
 ## Phase Intent
 
@@ -226,7 +223,8 @@ count of rows not shown. Export to `.tql` and to Markdown.
 
 Anything a phase defers is recorded here, not only in a commit message.
 
-- *(none yet)*
+- **The cost of a very large answer through the sidecar**, and so whether the host needs a `limit` input on `session.run`: measured in Phase 03 (ADR-012).
+- **A TypeScript cell using the runtime**, and **reading or writing `.ipynb`**: out of scope for this feature (already listed above), not refused.
 
 ## Key Documents
 

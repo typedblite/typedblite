@@ -4,7 +4,11 @@ import type { TypeQLiteFile } from '../src/generated/ast.js';
 
 type Diagnostic = NonNullable<LangiumDocument['diagnostics']>[number];
 
-export const uriOf = (name: string) => URI.parse(`file:///workspace/${name}`);
+/**
+ * A document's URI: a bare name is a file in the workspace, and a full URI (a notebook cell's, say) is itself, so a case
+ * can put documents of different schemas in one workspace (ADR-012 N4).
+ */
+export const uriOf = (name: string) => (/^[a-z][a-z-]*:/i.test(name) ? URI.parse(name) : URI.parse(`file:///workspace/${name}`));
 
 /**
  * The files on "disk". `DocumentBuilder.update` asks the file system whether a changed URI is a file,

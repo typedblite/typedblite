@@ -12,6 +12,11 @@ import { HIGHLIGHT_BLOCKS, type HighlightBlocksParams, type HighlightBlocksResul
 import { loadTheme, THEME_SETTINGS } from './markdown/theme-loader.js';
 import { HOST_NODE_SETTING, HOST_REQUEST_COMMAND } from './host/constants.js';
 import { HostClient, type HostEnvelope } from './host/host-client.js';
+import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from './notebook/constants.js';
+import { registerNotebookControllers } from './notebook/controller.js';
+import { registerNotebookStoreCommands } from './notebook/store-commands.js';
+import { NotebookSessions } from './notebook/notebook-sessions.js';
+import { TypeQLiteNotebookSerializer } from './notebook/serializer.js';
 
 let client: LanguageClient | undefined;
 let host: HostClient | undefined;
@@ -47,6 +52,12 @@ export async function activate(
     configuredNode: () => vscode.workspace.getConfiguration().get<string>(HOST_NODE_SETTING) || undefined,
   });
   host = hostClient;
+  // The notebook file format (ADR-012 N2). `transientOutputs`: outputs are never saved, and running a cell does not mark
+  // the notebook changed. Registered before the language server starts, so opening a notebook does not wait for it.
+  const serializer = new TypeQLiteNotebookSerializer();
+  for (const type of [NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN]) {
+    context.subscriptions.push(vscode.workspace.registerNotebookSerializer(type, serializer, { transientOutputs: true }));
+  }
   context.subscriptions.push(
     hostClient,
     vscode.commands.registerCommand(HOST_REQUEST_COMMAND, (operation: string, input?: Record<string, unknown>): Promise<HostEnvelope> => hostClient.request(operation, input)),
@@ -55,6 +66,11 @@ export async function activate(
       if (event.affectsConfiguration(HOST_NODE_SETTING)) void hostClient.stop();
     }),
   );
+  // The notebook's kernel: its cells are run by the engine host, one session per open notebook (ADR-012 N3).
+  const notebookSessions = new NotebookSessions(hostClient);
+  registerNotebookControllers(context, hostClient, notebookSessions);
+  // The notebook's store (in memory until the user chooses a file, ADR-012 N5), and what leaves it.
+  registerNotebookStoreCommands(context, notebookSessions);
 
   const serverModule = context.asAbsolutePath('out/language-server/main.cjs');
   // The server is a separate process, so a debugger can only attach to it if ITS argv carries
@@ -71,7 +87,12 @@ export async function activate(
     },
   };
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: 'typeqlite' }],
+    // A notebook's code cells are TypeQLite documents too, under their own scheme (ADR-012 N4): the language features
+    // (diagnostics, completion, definition, rename) answer in a cell as they do in a file.
+    documentSelector: [
+      { scheme: 'file', language: 'typeqlite' },
+      { scheme: 'vscode-notebook-cell', language: 'typeqlite' },
+    ],
   };
   const started = new LanguageClient('typeqlite', 'TypeQLite', serverOptions, clientOptions);
   client = started;

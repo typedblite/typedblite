@@ -47,7 +47,7 @@ export class TypeQLiteCompletionProvider extends DefaultCompletionProvider {
     const before = context.textDocument.getText().slice(0, context.tokenOffset);
     const relation = kind === 'role' ? relationBefore(before) : undefined;
     const offered = new Set<string>();
-    for (const candidate of this.labels.candidates(kind, relation)) {
+    for (const candidate of this.labels.candidates(kind, relation, context.textDocument.uri)) {
       const name = (candidate as { name?: string }).name;
       if (!name || offered.has(name)) continue;
       offered.add(name);

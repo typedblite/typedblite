@@ -198,6 +198,7 @@ no server. You can copy `readlist.db` to another machine, or open it in any SQLi
 
 ## Where next
 
+- [The reading list, as a notebook](reading-list.tql.md): the TypeQLite half of this tour, to run cell by cell in VS Code.
 - [The TypeQLite language](typeqlite-language.md): everything you can write in a schema and in queries.
 - [Embedding the runtime](embedding-the-runtime.md): transactions, `fetch` documents, tracing, and the whole API.
 - [Replication and search](replication-and-search.md): syncing two copies of a store, and full-text search.

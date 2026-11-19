@@ -18,7 +18,7 @@ TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) gr
 | `libs/conformance/` | `typedblite-conformance` | TypeDB behaviour spec vendored as Cucumber features |
 | `libs/session/` | `@typedblite/session` | A session over the engine (transactions, restart) and the statement classifier, shared by the CLI and the engine host |
 | `apps/cli/` | `typedblite` | The CLI: REPL and file runner |
-| `apps/vscode/` | `typeqlite` (private) | VS Code extension: the TypeQLite editor, a Langium language server (ADR-008); it also bundles and starts the engine host |
+| `apps/vscode/` | `typeqlite` (private) | VS Code extension: the TypeQLite editor, a Langium language server (ADR-008); it also bundles and starts the engine host, and provides TypeQLite notebooks (ADR-012) |
 | `apps/engine-host/` | `@typedblite/engine-host` (private) | The workbench's NestJS CQRS host that runs statements in sessions, over the CLI, REPL, sidecar, HTTP and MCP (ADR-011) |
 | `apps/sync-demo/` | `typedblite-sync-demo` (private) | Offline-first sync demo: PWA, Electron and Android devices and a TypeDBLite hub (ADR-009) |
 
@@ -53,5 +53,6 @@ The repo is completely self-contained and self-referential:
 | ADR-006 | An attribute is stored once per type and value |
 | ADR-007 | A scenario TypeDB itself fails is a deviation, and the oracle decides which |
 | ADR-008 | The TypeQLite editor is a Langium language server in this repository; nothing it knows reaches the runtime |
+| ADR-012 | The TypeQLite notebook is a Markdown file run on the engine host: a `typeql` fence is a cell, a notebook is a schema of its own, a store is the user's explicit choice and never saved |
 | ADR-011 | The workbench runs TypeQLite in a separate engine-host process: NestJS fenced into `apps/engine-host`, built on `@devx-micro/app-*`, MCP read-only by default |
 | ADR-009 | TypeDBLite runs in the browser on WASM SQLite: `@typedblite/runtime/wasm`, a browser entry, synchronous SHA-256 revisions |

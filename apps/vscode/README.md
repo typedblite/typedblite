@@ -59,6 +59,62 @@ The engine never sees this warning. It is produced by the editor alone.
   colours instead. On GitHub, TypeQLite code blocks are plain: GitHub has no TypeQL grammar, and allows
   no colours of a page's own.
 
+## Notebooks
+
+A **TypeQLite notebook** is a Markdown file: each fenced `typeql` block is a code cell, and the text between them is
+a Markdown cell ([ADR-012](../../docs/architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md)).
+
+- **`*.tql.md`** opens as a notebook. **Any other `.md` file** stays a Markdown file, and opens as a notebook only
+  when you choose **Open With… → TypeQLite Notebook (any Markdown file)**, so the guides open and read as notebooks
+  without being renamed.
+- **Opening and saving changes nothing.** The file is written back byte for byte unless you edit a cell, and an edit
+  changes only that cell's lines, so a notebook diffs like prose. **Outputs are never saved**, and running a cell does
+  not mark the notebook changed.
+- A fence is a cell only at the top level of the document. A `typeql` fence inside another fenced block, a block
+  quote or a list item is text.
+- A cell whose text contains a line of three backticks is written inside a longer fence, so it reads back whole.
+
+### Language features in cells
+
+Diagnostics, completion, hover, go to definition, rename and quick fixes work in a notebook's code cells as they do in a
+`.tql` file, **across the cells of one notebook**: a schema defined in one cell resolves in the next. **A notebook is a
+schema of its own.** A cell sees its own notebook's cells and nothing else, so two notebooks may define the same label,
+and a notebook and the workspace's `.tql` files do not see each other.
+
+### Choosing a store
+
+A notebook runs in **memory** until you choose a file: **"Choose the Notebook's Store…"** (the toolbar's database icon, or
+the status bar). Open an existing store file or create one, and then say **when a write becomes permanent**:
+
+- **Hold changes until I commit** (listed first, the safer one): nothing is permanent until you choose Commit. Commit and
+  Rollback appear on the toolbar while a notebook holds changes, and the next changes are held in turn. A commit the engine
+  refuses is rolled back, with its reason. Closing the notebook without committing makes nothing permanent.
+- **Commit each statement**: every successful statement is permanent at once.
+
+The status bar shows which file and which mode. **The choice is never saved in the notebook and never remembered**, so a
+notebook someone sends you runs in your memory, not on a path from their machine, and saving a notebook never touches a
+store. Switching asks first, because it ends the current session.
+
+### Exporting
+
+"Export the Notebook as a TypeQLite Script…" writes the code cells, one blank line apart, as a `.tql` file. "Export the
+Notebook as Markdown…" writes the prose and every code cell as a fenced `typeql` block. Both are of the notebook as it is in the
+editor, edits included, and neither has outputs.
+
+### Running cells
+
+Run a cell, or use VS Code's own **Run All**, **Run Above** and **Run Below**. Each notebook has **one store, in
+memory**, kept from cell to cell: a schema defined in one cell is there for the next. The cells are run by the
+[engine host](#the-engine-host), which splits a cell into statements and runs them in order.
+
+- **Answers** are a table for rows, JSON for a `fetch`, and the engine's own execution facts ("Wrote 1 thing(s)…").
+  A table shows the first **1,000** rows (`typedblite.notebook.maxRows`) and says how many it did not show.
+- **A refusal is the engine's own message**, on the cell that was refused, with its line and column. It ends the run: later
+  cells are not started, and the statements of the cell that ran before it **stay committed**.
+- **Restart** (the notebook toolbar, or "TypeQLite: Restart the Notebook's Store") closes the store and opens a fresh,
+  empty one. If the engine host itself was restarted, the next cell says so and starts a new, empty store.
+- Nothing is saved: outputs are not written to the file, and running a cell does not mark the notebook changed.
+
 ## The engine host
 
 The extension ships the TypeDBLite **engine host**, a separate process that runs TypeQLite statements in sessions

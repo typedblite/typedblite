@@ -41,7 +41,9 @@
   },
   "main": "./out/extension.cjs",
   "activationEvents": [
-    "onLanguage:typeqlite"
+    "onLanguage:typeqlite",
+    "onNotebook:typeqlite-notebook",
+    "onNotebook:typeqlite-notebook-markdown"
   ],
   "contributes": {
     "languages": [
@@ -85,6 +87,40 @@
         "command": "typedblite.host.request",
         "title": "TypeDBLite: Run an engine host operation",
         "category": "TypeDBLite"
+      },
+      {
+        "command": "typedblite.notebook.restart",
+        "title": "Restart the Notebook's Store",
+        "category": "TypeQLite",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "typedblite.notebook.openStore",
+        "title": "Choose the Notebook's Store\u2026",
+        "category": "TypeQLite",
+        "icon": "$(database)"
+      },
+      {
+        "command": "typedblite.notebook.commit",
+        "title": "Commit the Notebook's Changes",
+        "category": "TypeQLite",
+        "icon": "$(check)"
+      },
+      {
+        "command": "typedblite.notebook.rollback",
+        "title": "Roll Back the Notebook's Changes",
+        "category": "TypeQLite",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "typedblite.notebook.exportScript",
+        "title": "Export the Notebook as a TypeQLite Script\u2026",
+        "category": "TypeQLite"
+      },
+      {
+        "command": "typedblite.notebook.exportMarkdown",
+        "title": "Export the Notebook as Markdown\u2026",
+        "category": "TypeQLite"
       }
     ],
     "menus": {
@@ -92,6 +128,52 @@
         {
           "command": "typedblite.host.request",
           "when": "false"
+        },
+        {
+          "command": "typedblite.notebook.restart",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'"
+        },
+        {
+          "command": "typedblite.notebook.openStore",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'"
+        },
+        {
+          "command": "typedblite.notebook.exportScript",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'"
+        },
+        {
+          "command": "typedblite.notebook.exportMarkdown",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'"
+        },
+        {
+          "command": "typedblite.notebook.commit",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown' && typedblite.notebook.holdsChanges"
+        },
+        {
+          "command": "typedblite.notebook.rollback",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown' && typedblite.notebook.holdsChanges"
+        }
+      ],
+      "notebook/toolbar": [
+        {
+          "command": "typedblite.notebook.restart",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "typedblite.notebook.openStore",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "typedblite.notebook.commit",
+          "when": "typedblite.notebook.holdsChanges",
+          "group": "navigation@3"
+        },
+        {
+          "command": "typedblite.notebook.rollback",
+          "when": "typedblite.notebook.holdsChanges",
+          "group": "navigation@4"
         }
       ]
     },
@@ -103,9 +185,38 @@
           "default": "",
           "scope": "machine",
           "markdownDescription": "The `node` that runs the TypeDBLite engine host: a path, or empty for the one on PATH. It must be Node 22.16 or newer, which has `node:sqlite`."
+        },
+        "typedblite.notebook.maxRows": {
+          "type": "integer",
+          "default": 1000,
+          "minimum": 1,
+          "scope": "window",
+          "markdownDescription": "How many rows of an answer a notebook cell shows. The rest are counted, never dropped silently."
         }
       }
-    }
+    },
+    "notebooks": [
+      {
+        "type": "typeqlite-notebook",
+        "displayName": "TypeQLite Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.tql.md"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "type": "typeqlite-notebook-markdown",
+        "displayName": "TypeQLite Notebook (any Markdown file)",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ]
   },
   "vsce": {
     "dependencies": false

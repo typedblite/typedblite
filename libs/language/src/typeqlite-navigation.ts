@@ -27,6 +27,7 @@ import {
 } from './generated/ast.js';
 import { docCommentOf } from './typeqlite-doc-comments.js';
 import type { TypeQLiteLabels } from './typeqlite-labels.js';
+import { schemaOwnerOf } from './typeqlite-schema-owner.js';
 
 /**
  * Navigation for TypeQLite: what kind of thing each definition is, the outline, and hover.
@@ -191,8 +192,9 @@ export class TypeQLiteHoverProvider extends AstNodeHoverProvider {
   private reopensOf(node: { name: string } | RelationDef): string[] {
     const { IndexManager, LangiumDocuments } = this.services.shared.workspace;
     const locator = this.services.workspace.AstNodeLocator;
+    const owner = schemaOwnerOf(AstUtils.getDocument(node as AstNode).uri);
     return IndexManager.allElements(TypeExtensionDef.$type)
-      .filter((description) => description.name === node.name)
+      .filter((description) => description.name === node.name && schemaOwnerOf(description.documentUri) === owner)
       .map((description) => {
         const document = LangiumDocuments.getDocument(description.documentUri);
         const reopen = document && locator.getAstNode(document.parseResult.value, description.path);
