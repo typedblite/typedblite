@@ -45,7 +45,7 @@ nested frame placed in the call stack.
   that holds it, `$n > 100 · 2 → 1 row(s)`, whose Lets and comparisons read `2 → 1 kept, 1 dropped here`.
 - `@typedblite/session`: three splitter specs (a sub-query and a block kept whole; a multi-pattern write; a `;` in a
   string and in an end-of-line comment); its existing specs unchanged.
-- The gate, from a clean tree: see below.
+- The gate, from a clean tree: all 14 steps passed, the five-minute tour, the notebook guides and the clean-room install included, with the splitter changed.
 
 ## Deferred
 
