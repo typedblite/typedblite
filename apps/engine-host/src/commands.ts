@@ -10,11 +10,18 @@ export class OpenSessionCommand {
   ) {}
 }
 
-/** `session.run`: exactly one statement (`statement.split` splits a source). */
+/**
+ * `session.run`: exactly one statement (`statement.split` splits a source).
+ *
+ * Name the `sessionId` of an open session, or a `location`: the host then opens that store, runs the statement
+ * and closes it again, so a caller with no session to keep (the one-shot CLI) still has an operation to call.
+ * State across such calls is the file, not a session.
+ */
 export class RunStatementCommand {
   constructor(
-    readonly sessionId: string,
+    readonly sessionId: string | undefined,
     readonly statement: string,
+    readonly location?: string,
   ) {}
 }
 

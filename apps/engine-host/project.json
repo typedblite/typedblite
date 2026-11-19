@@ -14,7 +14,7 @@
         "^build"
       ],
       "options": {
-        "command": "tsc -b tsconfig.app.json",
+        "command": "tsc -b tsconfig.app.json && node ../../tools/make-executable.mjs out/main.js",
         "cwd": "apps/engine-host"
       },
       "outputs": [
