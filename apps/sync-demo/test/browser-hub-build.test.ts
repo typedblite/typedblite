@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const BUILD = fileURLToPath(new URL('../.build-browser', import.meta.url));
 const CLIENT = fileURLToPath(new URL('../src/client/index.html', import.meta.url));
 const read = (name: string): string => readFileSync(join(BUILD, name), 'utf8');
-const FILES = ['index.html', 'app.html', 'app.css', 'device.html', 'page.js', 'hub.js', 'device-worker.js', 'device.js', 'sqlite3.wasm'];
+const FILES = ['index.html', 'app.html', 'app.css', 'devices.css', 'device.html', 'page.js', 'hub.js', 'device-worker.js', 'device.js', 'sqlite3.wasm'];
 
 beforeAll(() => {
   if (!existsSync(join(BUILD, 'index.html'))) throw new Error(`No build at ${BUILD}. Run: npm exec nx -- run sync-demo:build-browser`);
@@ -96,11 +96,12 @@ describe('the page', () => {
     for (const selector of selectors) for (const part of selector.split(',')) expect(part.trim()).toMatch(/^\.bh\b/);
   });
 
-  it('reads colours only from --bh-* properties', () => {
+  it('reads colours only from --bh-* properties and the devices’ own', () => {
     const css = read('app.css');
     const used = [...css.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]!);
     expect(used.length).toBeGreaterThan(5);
-    expect(used.filter((name) => !name.startsWith('--bh-'))).toEqual([]);
+    // Its own `--bh-*`, and the devices' colours, which `devices.css` defines for every page that names a device.
+    expect(used.filter((name) => !name.startsWith('--bh-') && !name.startsWith('--device-'))).toEqual([]);
   });
 
   it('defines every --bh-* property the stylesheet reads, in the standalone page', () => {
@@ -145,5 +146,131 @@ describe('the device page', () => {
   it('is otherwise the shipped page: its form, list and status are all still there', () => {
     const device = read('device.html');
     for (const id of ['device', 'status', 'pending', 'add', 'title', 'tasks', 'empty', 'error']) expect(device).toContain(`id="${id}"`);
+  });
+});
+
+describe('the devices’ colours', () => {
+  type Palette = Record<'a' | 'b' | 'c', string>;
+  const css = read('devices.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  /** The three colours a rule block sets. */
+  const palette = (block: string): Palette => ({
+    a: block.match(/--device-a:\s*(#[0-9a-f]{6})/i)![1]!.toLowerCase(),
+    b: block.match(/--device-b:\s*(#[0-9a-f]{6})/i)![1]!.toLowerCase(),
+    c: block.match(/--device-c:\s*(#[0-9a-f]{6})/i)![1]!.toLowerCase(),
+  });
+  const block = (selector: string): string => css.match(new RegExp(`${selector}\\s*\\{([^}]*)\\}`))![1]!;
+  const light = palette(block(':root'));
+  const dark = palette(css.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)![1]!);
+
+  const rgb = (hex: string): number[] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const luminance = (hex: string): number => {
+    const [r, g, b] = rgb(hex).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (x: string, y: string): number => {
+    const [hi, lo] = [luminance(x), luminance(y)].sort((m, n) => n - m) as [number, number];
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const hue = (hex: string): number => {
+    const [r, g, b] = rgb(hex) as [number, number, number];
+    const max = Math.max(r, g, b);
+    const d = max - Math.min(r, g, b);
+    const h = d === 0 ? 0 : max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return (h * 60 + 360) % 360;
+  };
+  const apart = (x: string, y: string): number => {
+    const d = Math.abs(hue(x) - hue(y));
+    return Math.min(d, 360 - d);
+  };
+
+  // What the colours sit on, and what already means something, read from the pages themselves.
+  const shipped = readFileSync(CLIENT, 'utf8');
+  /** `#fff` is `#ffffff`. */
+  const full = (hex: string): string => (hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join('')}` : hex).toLowerCase();
+  const vars = (text: string): Record<string, string> => Object.fromEntries([...text.matchAll(/(--[\w-]+):\s*(#[0-9a-f]{3,6})\b/gi)].map((m) => [m[1]!, full(m[2]!)]));
+  const lightPage = vars(shipped.match(/^\s*:root\s*\{([^}]*)\}/m)![1]!);
+  const darkPage = vars(shipped.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)![1]!);
+  const themes = { light: { colours: light, page: lightPage }, dark: { colours: dark, page: darkPage } } as const;
+  const names = ['a', 'b', 'c'] as const;
+
+  it('is one colour per device, three different ones, in each theme', () => {
+    for (const { colours } of Object.values(themes)) expect(new Set(Object.values(colours)).size).toBe(3);
+  });
+
+  it('keeps the same three in each of the ways a page can be themed', () => {
+    expect(palette(block(":root\\[data-theme='light'\\]"))).toEqual(light);
+    expect(palette(block(":root\\[data-theme='dark'\\]"))).toEqual(dark);
+    expect(light).not.toEqual(dark);
+  });
+
+  it.each(['light', 'dark'] as const)('reads at least 4.5:1 on the %s theme’s page and card', (theme) => {
+    const { colours, page } = themes[theme];
+    for (const name of names) {
+      for (const background of [page['--bg']!, page['--card']!]) expect(contrast(colours[name], background), `${theme} ${name} on ${background}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it.each(['light', 'dark'] as const)('is a different hue from every other device, by 90 degrees at least, and from online, offline and waiting, by 30 (%s)', (theme) => {
+    const { colours, page } = themes[theme];
+    for (const [x, y] of [['a', 'b'], ['a', 'c'], ['b', 'c']] as const) expect(apart(colours[x], colours[y]), `${x} and ${y}`).toBeGreaterThanOrEqual(90);
+    for (const name of names) for (const status of ['--on', '--off', '--wait']) expect(apart(colours[name], page[status]!), `${name} and ${status}`).toBeGreaterThanOrEqual(30);
+  });
+
+  it('reads at least 4.5:1 on the hub panel’s background too, in the standalone page', () => {
+    const standalone = read('index.html');
+    const panel = (text: string): string => text.match(/--bh-panel:\s*(#[0-9a-f]{6})/i)![1]!.toLowerCase();
+    const lightPanel = panel(standalone.match(/:root\s*\{([^}]*)\}/)![1]!);
+    const darkPanel = panel(standalone.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)![1]!);
+    for (const name of names) {
+      expect(contrast(light[name], lightPanel)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(dark[name], darkPanel)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('is loaded by every page that names a device, from beside it', () => {
+    expect(read('device.html')).toContain('<link rel="stylesheet" href="devices.css">');
+    expect(read('index.html')).toContain('<link rel="stylesheet" href="devices.css">');
+  });
+
+  it('gives each device’s page its own colour, by the name it is opened with, and falls back to the accent', () => {
+    const device = read('device.html');
+    for (const name of names) expect(device).toContain(`:root[data-device="${name}"] { --device: var(--device-${name}); }`);
+    expect(device).toMatch(/header \{ border-top: 4px solid var\(--device, var\(--accent\)\); \}/);
+    expect(device).toMatch(/#device \{ color: var\(--device, var\(--muted\)\)/);
+  });
+
+  it('colours the chip that says where a task was made by the device that made it, on the device pages and in the hub', () => {
+    const device = read('device.html');
+    for (const name of names) {
+      expect(device).toContain(`.origin[data-origin="${name}"] { color: var(--device-${name}); border-color: var(--device-${name}); }`);
+      expect(read('app.css')).toContain(`.bh-origin[data-origin='${name}'] { color: var(--device-${name}); }`);
+    }
+  });
+
+  it('tints the row that flashes when a sync brings a task in with the colour of the device that made it, and keeps the chip on the card', () => {
+    const device = read('device.html');
+    for (const name of names) expect(device).toContain(`li[data-origin="${name}"] { --flash: color-mix(in srgb, var(--device-${name}) 28%, var(--card)); }`);
+    expect(device).toContain('li .origin { background: var(--card); }');
+    // The shipped page's own highlight is what an unknown device falls back to, and it still fades.
+    expect(device).toMatch(/li\.flash \{ background: var\(--flash\)/);
+    expect(read('device.js')).toMatch(/item\.dataset\["origin"\]\s*=\s*task\.origin/);
+  });
+
+  it.each(['light', 'dark'] as const)('keeps a task’s text readable (6.5:1, past AA’s 4.5:1) on every device’s tint, in the %s theme', (theme) => {
+    const percent = Number(read('device.html').match(/--device-a\) (\d+)%, var\(--card\)/)![1]) / 100;
+    const { colours, page } = themes[theme];
+    const channels = (hex: string): number[] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const mixed = (device: string): string => `#${channels(device).map((c, i) => Math.round(percent * c + (1 - percent) * channels(page['--card']!)[i]!).toString(16).padStart(2, '0')).join('')}`;
+    for (const name of names) {
+      expect(contrast(page['--ink']!, mixed(colours[name])), `${theme} ${name}`).toBeGreaterThanOrEqual(6.5);
+      // …and it is a tint worth the name: further from the card than the shipped yellow was.
+      expect(contrast(mixed(colours[name]), page['--card']!), `${theme} ${name} against the card`).toBeGreaterThanOrEqual(contrast(page['--flash']!, page['--card']!));
+    }
+  });
+
+  it('is not the only thing that names a device: each page writes the device’s name beside its colour', () => {
+    expect(read('device.js')).toMatch(/origin\.dataset\["origin"\]\s*=\s*task\.origin/);
+    expect(read('device.js')).toMatch(/Device A/);
+    expect(read('page.js')).toMatch(/origin\.textContent/);
   });
 });

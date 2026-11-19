@@ -135,6 +135,7 @@ function renderTasks(tasks: State['tasks'], flash: ReadonlySet<string>): void {
     if (!row) {
       const item = document.createElement('li');
       item.dataset['id'] = task.id;
+      item.dataset['origin'] = task.origin; // devices.css: the highlight that fades takes the colour of the device that made the task
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.onchange = () => send({ type: 'toggle', id: task.id, done: box.checked });
@@ -143,6 +144,7 @@ function renderTasks(tasks: State['tasks'], flash: ReadonlySet<string>): void {
       const origin = document.createElement('span');
       origin.className = 'origin';
       origin.textContent = LABELS[task.origin] ?? task.origin;
+      origin.dataset['origin'] = task.origin; // devices.css colours it by the device that made the task
       const label = document.createElement('label');
       label.append(box, title, origin);
       item.append(label);

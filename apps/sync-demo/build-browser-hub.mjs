@@ -7,8 +7,9 @@
  *
  * `device.html` is the shipped device page (`src/client/index.html`) with this feature's three differences made at
  * build time, so there is no second copy of its markup and styles to drift: no PWA manifest, a Disconnect /
- * Reconnect switch in the card header, and the light and dark palettes keyed on `data-theme`, which the page takes
- * from the page that embeds it.
+ * Reconnect switch in the card header, the light and dark palettes keyed on `data-theme`, which the page takes
+ * from the page that embeds it, and the device's own colour (`devices.css`) on its card, on the chips that say
+ * where a task was made, and on the highlight that fades when a sync brings a task in.
  */
 import { build } from 'esbuild';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -42,6 +43,7 @@ const app = readFileSync(join(SRC, 'app.html'), 'utf8');
 writeFileSync(join(OUT, 'app.html'), app);
 writeFileSync(join(OUT, 'index.html'), readFileSync(join(SRC, 'index.html'), 'utf8').replace('<!--@APP-->', app));
 copyFileSync(join(SRC, 'app.css'), join(OUT, 'app.css'));
+copyFileSync(join(SRC, 'devices.css'), join(OUT, 'devices.css'));
 
 // The device page, derived from the shipped one.
 const shipped = readFileSync(join(HERE, 'src/client/index.html'), 'utf8');
@@ -53,6 +55,7 @@ const device = shipped
   .replace('/main.js', 'device.js')
   .replace(/<link rel="manifest"[^>]*>\n?/, '')
   .replace(/<link rel="icon"[^>]*>\n?/, '')
+  .replace('<style>', '<link rel="stylesheet" href="devices.css">\n<style>')
   .replace(
     '</style>',
     [
@@ -65,10 +68,25 @@ const device = shipped
       '  #link { font: inherit; font-size: 13px; font-weight: 600; padding: 4px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); cursor: pointer; }',
       '  #link[aria-pressed="true"] { background: var(--off); border-color: var(--off); color: #fff; }',
       '  header #status, header #pending { flex-basis: 100%; }',
+      '  /* Each device\'s colour (devices.css): its card and its name, and the chip on a task made on any device. */',
+      '  :root[data-device="a"] { --device: var(--device-a); }',
+      '  :root[data-device="b"] { --device: var(--device-b); }',
+      '  :root[data-device="c"] { --device: var(--device-c); }',
+      '  header { border-top: 4px solid var(--device, var(--accent)); }',
+      '  #device { color: var(--device, var(--muted)); font-weight: 700; }',
+      '  .origin[data-origin="a"] { color: var(--device-a); border-color: var(--device-a); }',
+      '  .origin[data-origin="b"] { color: var(--device-b); border-color: var(--device-b); }',
+      '  .origin[data-origin="c"] { color: var(--device-c); border-color: var(--device-c); }',
+      '  /* The row that flashes when a sync brings a task in or changes it takes the colour of the device that made the task. */',
+      '  li[data-origin="a"] { --flash: color-mix(in srgb, var(--device-a) 28%, var(--card)); }',
+      '  li[data-origin="b"] { --flash: color-mix(in srgb, var(--device-b) 28%, var(--card)); }',
+      '  li[data-origin="c"] { --flash: color-mix(in srgb, var(--device-c) 28%, var(--card)); }',
+      '  /* The chip keeps the card behind it, so its text keeps its contrast while the row is tinted. */',
+      '  li .origin { background: var(--card); }',
       '</style>',
     ].join('\n'),
   )
   .replace('<h1>Tasks <small id="device"></small></h1>', '<h1>Tasks <small id="device"></small></h1>\n  <button id="link" type="button" aria-pressed="false">Disconnect</button>');
-if (!device.includes('id="link"') || device.includes('/main.js') || /(?:href|src)="\//.test(device)) throw new Error('the device page was not derived as expected');
+if (!device.includes('href="devices.css"') || !device.includes('id="link"') || device.includes('/main.js') || /(?:href|src)="\//.test(device)) throw new Error('the device page was not derived as expected');
 writeFileSync(join(OUT, 'device.html'), device);
 console.log(`in-browser hub built into ${OUT}`);

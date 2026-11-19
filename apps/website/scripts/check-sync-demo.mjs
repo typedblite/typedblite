@@ -2,7 +2,7 @@
  * Opens the built site's sync demo in Chromium: the page Astro built inside Starlight's layout, with the demo's
  * scripts beside it. It checks that the shell is there (Starlight's header, theme switch and sidebar), that the hub
  * and the three embedded devices started on WASM SQLite and OPFS, that a task typed into one device reaches another and
- * the hub, that a device can be cut off and reconnected, that the devices follow the site's light and dark switch, that
+ * the hub, that each device has its own colour on its card, on the chip that says where a task was made and in the hub's list, that a device can be cut off and reconnected, that the devices follow the site's light and dark switch, that
  * the page also works at the URL without its trailing slash, and that nothing failed to load. Needs Playwright's Chromium
  * (`npx playwright-core install chromium`). Run by `website:check`, after the build.
  */
@@ -79,6 +79,14 @@ try {
     return lists.every((titles) => titles.includes('Checked by the site')) && (await page.locator('#bh-tasks').innerText()).includes('Checked by the site — Device A');
   });
 
+  // Each device has its own colour, the same on its card, on the chip that says where a task was made, and in the hub's list.
+  const colour = (target, selector) => target.locator(selector).first().evaluate((element) => getComputedStyle(element).color);
+  const cardColours = await Promise.all(NAMES.map((name) => colour(frame(name), '#device')));
+  expect(new Set(cardColours).size === 3, `the devices do not have three different colours: ${cardColours.join(', ')}`);
+  const hubChipA = await colour(page, '#bh-tasks .bh-origin[data-origin="a"]');
+  expect(hubChipA === cardColours[0], `the hub lists Device A in ${hubChipA}, not its card's ${cardColours[0]}`);
+  expect((await colour(frame('b'), 'li .origin[data-origin="a"]')) === cardColours[0], "the chip on B for A's task is not A's colour");
+
   await frame('c').click('#link');
   await until('C says it is offline', async () => /^Offline/.test(await frame('c').locator('#status').innerText()));
   expect((await frame('c').locator('#link').getAttribute('aria-pressed')) === 'true', 'the Disconnect switch is not pressed after a click');
@@ -89,6 +97,7 @@ try {
   const light = await background('a');
   await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
   await until('every device follows the dark theme', async () => (await Promise.all(NAMES.map(background))).every((color) => color !== light));
+  await until('the device colours change with the theme', async () => (await colour(frame('a'), '#device')) !== cardColours[0]);
   await page.evaluate(() => (document.documentElement.dataset.theme = 'light'));
   await until('every device follows the light theme again', async () => (await Promise.all(NAMES.map(background))).every((color) => color === light));
 
