@@ -17,6 +17,7 @@ flowchart LR
   libs --> revision["content-revision/<br/><b>@typedblite/content-revision</b><br/>revision identifiers"]
   libs --> session["session/<br/><b>@typedblite/session</b><br/>session core, statement classifier"]
   libs --> conformance["conformance/<br/><b>typedblite-conformance</b><br/>TypeDB behaviour spec and report card"]
+  libs --> debugger["debugger/<br/><b>@typedblite/debugger</b> (private)<br/>the TypeQLite debug adapter (ADR-014)"]
   apps --> cli["cli/<br/><b>typedblite</b><br/>the CLI: REPL and file runner"]
   apps --> host["engine-host/<br/><b>@typedblite/engine-host</b> (private)<br/>NestJS CQRS host that runs statements in sessions (ADR-011)"]
   apps --> vscode["vscode/<br/><b>typeqlite</b> extension<br/>the TypeQLite editor: a Langium language server"]
@@ -38,6 +39,8 @@ flowchart LR
   runtime --> language
   runtime --> content-revision
   vscode --> language
+  vscode --> debugger
+  debugger --> notebook
 ```
 
 `apps/sync-demo` (the offline-first sync demo) depends on `@typedblite/runtime` only, through its public entry points — never `src/` (its feature doc's invariant 3).
@@ -78,6 +81,7 @@ Nx project names (not the npm package names):
 - `typedblite` — the CLI, npm package `typedblite` (it was `typedblite-cli`; `npx typedblite` needs the unscoped name)
 - `typedblite-notebook` — `@typedblite/notebook` (private), the notebook's pure logic shared by the extension and the browser page (ADR-012, ADR-013): the Markdown file format, the cell runner (it runs a cell through anything that answers the host's operations), the output model, the per-notebook session bookkeeping and the export. No VS Code, no host, no engine
 - `typedblite-session` — `@typedblite/session`, a session over the engine (transactions, restart) and the statement classifier, shared by the CLI and the host; no NestJS
+- `typedblite-debugger` — `@typedblite/debugger` (private), the TypeQLite debug adapter (ADR-014): a DAP session over a `:memory:` session on the engine host, recording one statement at a time through `session.debug` and stepping through the recordings. It declares the host's wire shapes itself (`test/wire.test.ts` proves them against the runtime's, record by record) and depends on neither the runtime nor the session package; its DAP specs run over a socket against an in-process stand-in for the host, and `apps/vscode/test/debug-adapter.test.ts` runs them against the real host bundle
 - `engine-host` — `@typedblite/engine-host` (private), the workbench's NestJS CQRS host (ADR-011), built on `@devx-micro/app-*`: the core, and the CLI, REPL, sidecar, HTTP and MCP transports (`typedblite-host`; HTTP and HTTP MCP are loopback only, and MCP is read-only unless `--mcp-write`). Its process specs run the built `out/main.js` and the bundle `dist/sidecar.cjs` (target `bundle`, which the extension ships), so `test` builds and bundles first
 - `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`. It bundles the engine host's sidecar (`sync-host` copies `engine-host:bundle`'s `dist/sidecar.cjs` to `out/host/`) and starts it as a process with a `node` it probes; it also provides notebooks (`src/notebook/`, ADR-012): `serializer.ts` is VS Code's model over the Markdown file format in `@typedblite/notebook`, which also holds the cell runner, the session bookkeeping (one session per notebook, a store the user chooses) and the export; `cell-output.ts` turns its outputs into VS Code's; a notebook is a schema of its own (`schemaOwnerOf` in `@typedblite/language`); 🔴 it never *imports* the host, the runtime or the session package (`manifest.test.ts` checks)
 - `playground` — `typedblite-playground`, TypeQLite in a browser: the engine on WASM SQLite in a worker, and Monaco with the real language server over LSP in another. It also builds the browser notebook (`src/notebook/`, ADR-013: `docs/guides/try-it.tql.md` run in a page, a kernel in a worker that answers the host's operation names over a `Session`); also has `test-browser` and `serve`

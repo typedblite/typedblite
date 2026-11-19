@@ -65,7 +65,8 @@ describe('--mcp-http', () => {
     expect(e.stderr).toContain('(write tier)');
     const client = new Client({ name: 'spec', version: '0' });
     await client.connect(new StreamableHTTPClientTransport(url));
-    expect((await client.listTools()).tools).toHaveLength(12);
+    // Every operation but session.debug, which is never a tool (ADR-014 B2).
+    expect((await client.listTools()).tools).toHaveLength(13);
     await client.close();
     e.stop();
     await running;

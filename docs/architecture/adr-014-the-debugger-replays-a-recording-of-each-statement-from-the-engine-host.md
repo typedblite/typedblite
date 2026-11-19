@@ -60,7 +60,13 @@ statement, as `session.run` does (ADR-011 D6), with the recorder on, and returns
 recording. 🔴 **The host refuses `session.debug` on any session whose location is not `:memory:`**, so the feature's
 invariant 4 is enforced where the store is opened, not only in the adapter. It is a command and **not an MCP
 tool** (ADR-011 D8). Rejected: the adapter loading `@typedblite/runtime` itself, which ADR-011 D7 allowed. That
-would be a second place where a statement's meaning is decided, which the initiative forbids.
+would be a second place where a statement's meaning is decided, which the initiative forbids. **Made exact in
+Phase 02:** `session.debug` takes `{ session, statement, limits? }` and answers `{ result, recording }`; on a session
+not at `:memory:` it fails with the host error `NOT_IN_MEMORY`, and nothing runs. The host also gains
+**`statement.locate`**, which answers each statement as written (comments inside it kept) and where it starts. The
+recording's ranges are relative to the statement, and `statement.split` drops comment lines and trims, so it cannot
+place them in the file. It shares `statement.split`'s splitting loop in `@typedblite/session` (`locateStatements`),
+so there is still one splitter.
 
 **B3. The adapter runs inline in the extension host** (`vscode.DebugAdapterInlineImplementation`) and reaches the
 engine through the extension's existing `HostClient`. It needs no `node:sqlite` and no process of its own.
@@ -70,7 +76,11 @@ Rejected: `DebugAdapterExecutable`, a second process that would need a second ho
 `@vscode/debugadapter` and reaches the host through a narrow interface it declares itself, as
 [`libs/notebook/src/host-types.ts`](../../libs/notebook/src/host-types.ts) does. It declares the recording's wire
 shape too, so it does **not** depend on `@typedblite/runtime`. It is tested in plain Node, without VS Code, and
-`apps/vscode` bundles it. The dependency graph gains `vscode -> debugger`.
+`apps/vscode` bundles it. The dependency graph gains `vscode -> debugger`. **Made exact in Phase 02:** a spec proves
+the declared shapes read the runtime's, assigning each record type on its own, because the compiler stops comparing
+recursive types at a depth limit and assumes the rest related (a check of `Recording` alone let a retyped field
+pass). The debugger reuses the notebook's `HostCaller`, `RunResult` and console formatting, so it also depends on
+`@typedblite/notebook`.
 
 **B5. The hook is not public API of `@typedblite/runtime`.** It is exported from a subpath,
 `@typedblite/runtime/debug`, never from the package root, and is documented there as internal and unstable.

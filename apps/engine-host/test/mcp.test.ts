@@ -77,9 +77,11 @@ describe('the tools a tier offers', () => {
     expect(tools.find((t) => t.name === 'session.run')!.inputSchema).toMatchObject({ required: ['statement'] });
   });
 
-  it('the write tier lists every operation, and marks the commands as not read-only', async () => {
+  it('the write tier lists every operation but session.debug, and marks the commands as not read-only', async () => {
     const { tools } = await (await connect('write')).listTools();
-    expect(tools).toHaveLength(12);
+    expect(tools).toHaveLength(13);
+    // A recording is for a person stepping through it: never a tool, in either tier (ADR-014 B2).
+    expect(tools.map((t) => t.name)).not.toContain('session.debug');
     expect(tools.find((t) => t.name === 'session.open')!.annotations?.readOnlyHint).toBe(false);
     expect(tools.find((t) => t.name === 'schema.get')!.annotations?.readOnlyHint).toBe(true);
   });
@@ -87,7 +89,7 @@ describe('the tools a tier offers', () => {
   it('lists only operations that declare an input schema', async () => {
     const operations = createHostOperations().map((operation) => (operation.name === 'session.list' ? { ...operation, inputSchema: undefined } : operation));
     expect(toolsFor('write', operations).map((o) => o.name)).not.toContain('session.list');
-    expect(toolsFor('write', operations)).toHaveLength(11);
+    expect(toolsFor('write', operations)).toHaveLength(12);
     const { tools } = await (await connect('write', operations)).listTools();
     expect(tools.map((t) => t.name)).not.toContain('session.list');
   });

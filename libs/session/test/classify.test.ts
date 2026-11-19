@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyStatement, splitStatements } from '../src/index.js';
+import { classifyStatement, locateStatements, splitStatements } from '../src/index.js';
 
 describe('classifyStatement', () => {
   it.each([
@@ -39,5 +39,40 @@ describe('splitStatements', () => {
 
   it('drops comment lines and keeps an unterminated tail', () => {
     expect(splitStatements('# note\ninsert $a isa a;\ninsert $b isa b')).toEqual(['insert $a isa a;', 'insert $b isa b']);
+  });
+});
+
+describe('locateStatements', () => {
+  const SOURCES = [
+    'match $s isa project;\ninsert $x isa task;\ninsert $y isa task;',
+    'define entity a; entity b;\ninsert $x isa a;',
+    '# a heading\n\nmatch $p isa person;\n  # why this filter\n  $p has age $a;\nselect $a;\n\n  insert $q isa person;',
+    'match $p isa person; select $p; sort $p; limit 1;\nmatch $q isa person; reduce $n = count;',
+    'insert $x isa a;\n\n   insert $y isa b; # trailing\n',
+    '',
+  ];
+
+  it('finds the statements splitStatements finds, comment lines aside', () => {
+    for (const source of SOURCES) {
+      const withoutComments = (text: string): string => text.replace(/^\s*#[^\n]*$/gm, '');
+      expect(locateStatements(source).map((statement) => withoutComments(statement.text))).toEqual(splitStatements(source).map(withoutComments));
+    }
+  });
+
+  it('says where each starts, and keeps the comments inside one as written', () => {
+    expect(locateStatements(SOURCES[2]!)).toEqual([
+      { text: 'match $p isa person;\n  # why this filter\n  $p has age $a;\nselect $a;', line: 2, character: 0 },
+      { text: 'insert $q isa person;', line: 7, character: 2 },
+    ]);
+  });
+
+  it('places each statement at its own text in the source', () => {
+    for (const source of SOURCES) {
+      const lines = source.split('\n');
+      for (const statement of locateStatements(source)) {
+        const first = statement.text.split('\n')[0]!;
+        expect(lines[statement.line]!.slice(statement.character, statement.character + first.length)).toBe(first);
+      }
+    }
   });
 });

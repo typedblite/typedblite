@@ -223,6 +223,7 @@
   },
   "dependencies": {
     "@devx-micro/app-sidecar": "0.2.1",
+    "@typedblite/debugger": "*",
     "@typedblite/language": "*",
     "@typedblite/notebook": "*",
     "jsonc-parser": "~3.3.1",
@@ -233,6 +234,7 @@
   "devDependencies": {
     "@types/markdown-it": "~14.1.2",
     "@types/vscode": "~1.91.0",
+    "@vscode/debugadapter-testsupport": "1.68.0",
     "@vscode/test-electron": "~3.1.0",
     "@vscode/vsce": "~3.9.2",
     "esbuild": "~0.28.1",
