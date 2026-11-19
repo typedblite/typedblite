@@ -9,12 +9,14 @@
     "node": ">=22.16"
   },
   "dependencies": {
+    "@devx-micro/app-http": "0.2.1",
     "@devx-micro/app-main": "0.2.1",
     "@devx-micro/app-runtime": "0.2.1",
     "@devx-micro/app-sidecar": "0.2.1",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/cqrs": "^11.0.3",
+    "@nestjs/platform-express": "^11.0.0",
     "@typedblite/runtime": "*",
     "@typedblite/session": "*",
     "reflect-metadata": "^0.2.0",

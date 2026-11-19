@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,6 +12,29 @@ import { afterEach, describe, expect, it } from 'vitest';
  */
 const MAIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'out', 'main.js');
 const host = (...args: string[]) => spawnSync(process.execPath, [MAIN, ...args], { encoding: 'utf8', timeout: 20_000 });
+
+const freePort = (): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address() as { port: number };
+      server.close(() => resolve(port));
+    });
+  });
+
+/** Calls `attempt` until it stops failing to connect: the child needs a moment to start listening. */
+async function eventually<T>(attempt: () => Promise<T>, timeoutMs = 15_000): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      return await attempt();
+    } catch (error) {
+      if (Date.now() > deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
 
 describe('the host as a process', () => {
   it('refuses an unrecognised mode flag by name, exit 2, and does not wait for anything', () => {
@@ -26,8 +50,8 @@ describe('the host as a process', () => {
     expect(`${result.stdout}${result.stderr}`).toContain('-x');
   });
 
-  it('with no arguments prints its operations and starts nothing (there is no HTTP mode yet)', () => {
-    const result = host();
+  it('--help prints its operations and starts nothing', () => {
+    const result = host('--help');
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('session.run');
   });
@@ -49,6 +73,23 @@ describe('the host as a process', () => {
     const result = host('session.opn');
     expect(result.status).not.toBe(0);
     expect(JSON.parse(result.stdout)).toMatchObject({ status: 'error', error: { code: 'UNKNOWN_OPERATION' } });
+  });
+});
+
+describe('with no arguments: HTTP', () => {
+  it('serves on loopback at the port the environment names, and stops when told to', async () => {
+    const port = await freePort();
+    const child = spawn(process.execPath, [MAIN], { env: { ...process.env, TYPEDBLITE_HOST_PORT: String(port) }, stdio: 'ignore' });
+    try {
+      const help = await eventually(() => fetch(`http://127.0.0.1:${port}/api/typedblite-host/help`));
+      expect(help.status).toBe(200);
+      expect(JSON.stringify(await help.json())).toContain('session.run');
+    } finally {
+      child.kill('SIGTERM');
+    }
+    const code = await new Promise<number | null>((resolve) => child.once('exit', resolve));
+    // Shutdown hooks run: the process ends on SIGTERM rather than being killed, so its sessions are released.
+    expect(code === 0 || code === null).toBe(true);
   });
 });
 
