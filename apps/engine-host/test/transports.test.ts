@@ -5,8 +5,12 @@ import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import type { INestApplication } from '@nestjs/common';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { createHostTool } from '../src/host-tool.js';
+import { createMcpServer } from '../src/mcp.js';
 import { runApi, runCli, runRepl, runSidecar } from '../src/main.js';
 
 /** What every transport answers, with the one field that is a fresh id each time left out. */
@@ -73,14 +77,35 @@ const repl: Send = async (operation, input) => {
 };
 
 let httpApp: INestApplication;
+let mcpTool: Awaited<ReturnType<typeof createHostTool>>;
+let mcpClient: Client;
 beforeAll(async () => {
+  mcpTool = await createHostTool();
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  await createMcpServer({ runtime: mcpTool.runtime, tier: 'write' }).connect(serverSide);
+  mcpClient = new Client({ name: 'parity', version: '0' });
+  await mcpClient.connect(clientSide);
   vi.stubEnv('TYPEDBLITE_HOST_PORT', '0');
   httpApp = await runApi();
   vi.unstubAllEnvs();
 });
 afterAll(async () => {
   await httpApp.close();
+  await mcpClient.close();
+  await mcpTool.close();
 });
+
+/** MCP, in the write tier: a tool call per operation. The text is the operation's data, or a fault's code. */
+const mcp: Send = async (operation, input) => {
+  const result = (await mcpClient.callTool({ name: operation, arguments: input })) as { isError?: boolean; content: { text: string }[] };
+  const body = JSON.parse(result.content[0]!.text) as { code?: string };
+  return {
+    operation,
+    kind: undefined as unknown as string,
+    exitCode: undefined as unknown as number,
+    ...(result.isError ? { status: 'error', error: { code: body.code! } } : { status: 'success', data: body }),
+  };
+};
 
 /** HTTP: a POST per operation. The body is the operation's data, and the status stands for the exit code. */
 const http: Send = async (operation, input) => {
@@ -121,13 +146,14 @@ const flow = async (send: Send, name: string): Promise<Answer[]> => {
   ];
 };
 
-describe('one operation, four transports: the same answer', () => {
-  it('the CLI, the sidecar, the REPL and HTTP answer the same flow the same way', async () => {
-    const [viaCli, viaSidecar, viaRepl, viaHttp] = await Promise.all([
+describe('one operation, five transports: the same answer', () => {
+  it('the CLI, the sidecar, the REPL, HTTP and MCP answer the same flow the same way', async () => {
+    const [viaCli, viaSidecar, viaRepl, viaHttp, viaMcp] = await Promise.all([
       flow(cli, 'cli'),
       flow(sidecar, 'sidecar'),
       flow(repl, 'repl'),
       flow(http, 'http'),
+      flow(mcp, 'mcp'),
     ]);
 
     // The data and the status are the same in all three, step by step.
@@ -135,6 +161,7 @@ describe('one operation, four transports: the same answer', () => {
     expect(reduce(viaSidecar)).toEqual(reduce(viaCli));
     expect(reduce(viaRepl)).toEqual(reduce(viaCli));
     expect(reduce(viaHttp)).toEqual(reduce(viaCli));
+    expect(reduce(viaMcp)).toEqual(reduce(viaCli));
     // The CLI and the sidecar also agree on the exit code and the kind, which the REPL's prose does not carry.
     expect(viaSidecar).toEqual(viaCli);
   });

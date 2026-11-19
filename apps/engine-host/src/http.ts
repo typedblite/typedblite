@@ -24,7 +24,7 @@ const RUNTIME = Symbol('typedblite-host.runtime');
 /** The parts of an HTTP request the loopback check reads, so no HTTP framework's types are needed. */
 export interface PeerRequest {
   readonly socket: { readonly remoteAddress?: string | undefined };
-  readonly headers: { readonly host?: string | undefined };
+  readonly headers: { readonly host?: string | undefined; readonly origin?: string | undefined };
 }
 
 /**
@@ -72,19 +72,38 @@ export const LOOPBACK = '127.0.0.1';
 
 const LOOPBACK_PEERS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+const LOOPBACK_NAMES = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+/** An `Origin` header names loopback: a page served from this machine, not from the internet. `null` is not loopback. */
+function originIsLoopback(origin: string): boolean {
+  try {
+    return LOOPBACK_NAMES.has(new URL(origin).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 
 /**
- * Refuses a request that did not come from this machine, or that names another host.
+ * Whether a request came from this machine, for this machine, from a page that is not elsewhere: the peer is
+ * loopback, the `Host` names loopback, and an `Origin`, when the browser sent one, names loopback too.
  *
- * 🔴 Binding to loopback is the first fence; this is the second. A web page in the user's browser can make the
- * browser send a request to `127.0.0.1`, and a DNS name the page controls can be pointed there (DNS rebinding),
- * so the peer address alone is not enough: the `Host` header must also name loopback. The host runs statements
- * against real stores, so it does not rely on the network being friendly.
+ * 🔴 Binding to loopback is the first fence, and this is the second. A web page in the user's browser can make the
+ * browser send a request to `127.0.0.1`, so the peer address says nothing about who asked. A DNS name the page
+ * controls can be pointed there (DNS rebinding), which the `Host` check stops. And a page that simply posts to
+ * `http://127.0.0.1:port` carries `Host: 127.0.0.1:port` and `Origin: https://that-page`, which the `Origin` check
+ * stops. The host runs statements against real stores, so it does not rely on the network being friendly.
+ * Shared by HTTP and HTTP MCP.
  */
-export function loopbackOnly(request: PeerRequest, _response: unknown, next: (error?: unknown) => void): void {
+export function isLoopbackRequest(request: PeerRequest): boolean {
   const peer = request.socket.remoteAddress ?? '';
   const host = request.headers.host ?? '';
-  if (!LOOPBACK_PEERS.has(peer) || !LOOPBACK_HOST.test(host)) {
+  const origin = request.headers.origin;
+  return LOOPBACK_PEERS.has(peer) && LOOPBACK_HOST.test(host) && (origin === undefined || originIsLoopback(origin));
+}
+
+/** Refuses, with a 403, a request that {@link isLoopbackRequest} does not accept. */
+export function loopbackOnly(request: PeerRequest, _response: unknown, next: (error?: unknown) => void): void {
+  if (!isLoopbackRequest(request)) {
     next(new ForbiddenException('typedblite-host answers loopback requests only.'));
     return;
   }

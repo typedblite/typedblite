@@ -33,9 +33,9 @@ const post = async (operation: string, body: unknown): Promise<{ status: number;
 };
 
 /** A request with a `Host` header of our choosing, which `fetch` will not send. */
-const withHost = (host: string): Promise<number> =>
+const withHost = (host: string, origin?: string): Promise<number> =>
   new Promise((resolve, reject) => {
-    const req = request({ host: '127.0.0.1', port, path: '/api/typedblite-host/help', headers: { host } }, (response) => {
+    const req = request({ host: '127.0.0.1', port, path: '/api/typedblite-host/help', headers: { host, ...(origin ? { origin } : {}) } }, (response) => {
       response.resume();
       resolve(response.statusCode ?? 0);
     });
@@ -94,6 +94,14 @@ describe('the loopback fence', () => {
     expect(await withHost(`evil.example:${port}`)).toBe(403);
     expect(await withHost(`localhost:${port}`)).toBe(200);
     expect(await withHost(`127.0.0.1:${port}`)).toBe(200);
+  });
+
+  // A page that posts to http://127.0.0.1:port carries a loopback Host and its own Origin; only the Origin shows it.
+  it('answers a request from another origin with 403, and one from a page on this machine with 200', async () => {
+    expect(await withHost(`127.0.0.1:${port}`, 'https://evil.example')).toBe(403);
+    expect(await withHost(`127.0.0.1:${port}`, 'null')).toBe(403);
+    expect(await withHost(`127.0.0.1:${port}`, 'http://localhost:5173')).toBe(200);
+    expect(await withHost(`127.0.0.1:${port}`, 'http://127.0.0.1:5173')).toBe(200);
   });
 
   it.each([
