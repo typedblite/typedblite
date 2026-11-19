@@ -84,7 +84,11 @@ function render(): void {
   $('bh-tasks').replaceChildren(
     ...(state === 'open' ? tasks : []).map((task) => {
       const item = document.createElement('li');
-      item.textContent = `${task.done ? '✓' : '○'} ${task.title} — ${LABELS[task.origin] ?? task.origin}`;
+      const origin = document.createElement('span');
+      origin.className = 'bh-origin';
+      origin.dataset['origin'] = task.origin; // app.css colours it with the device's colour (devices.css)
+      origin.textContent = LABELS[task.origin] ?? task.origin;
+      item.append(`${task.done ? '✓' : '○'} ${task.title} — `, origin);
       return item;
     }),
   );

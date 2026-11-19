@@ -75,6 +75,12 @@ What differs from the hub above, and what does not:
   (the store fails to open with "Missing required OPFS APIs") and no nested `Worker` there either, so a SharedWorker
   cannot hold a SQLite store on OPFS, nor delegate to a Worker that can. A service worker cannot either. So one page owns
   the hub, and hands each device a port.
+- **Each device has its own colour,** the same on its card, on the chip that says where a task was made, and in the hub's
+  list: cyan, rose and olive (`src/browser-hub/devices.css`), at least 100° of hue apart and clear of the green,
+  red and amber that already mean online, offline and waiting. The device's name is always written beside its colour. The main demo's clients are told apart
+  by name only. The highlight that fades on a task a sync has just brought in is tinted the same way, with the colour of the
+  device that made the task: the data records who made a task, not who last changed it, so a task someone else completed
+  flashes in its maker's colour.
 - **One tab at a time.** OPFS allows one connection per file, so a second tab of the page cannot open the hub's store or
   the devices', and says so. Closing the first tab and reloading the second recovers it.
 - **It needs no `COOP`/`COEP` headers.** The SAH-pool VFS needs no `SharedArrayBuffer`.
