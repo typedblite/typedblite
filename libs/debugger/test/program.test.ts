@@ -104,3 +104,106 @@ describe('closing', () => {
     expect(host.operations().filter((o) => o === 'session.close')).toHaveLength(1);
   });
 });
+
+describe('stages (Phase 03)', () => {
+  it('in: from a statement into its stages, each a frame inside the statement`s, at its own line', async () => {
+    const { debug } = await launch();
+    await debug.move('over');
+    await debug.move('over');
+    // At the read, lines 4-6: in runs it and stops at its first stage.
+    expect(await debug.move('in')).toEqual({ kind: 'stopped', reason: 'step' });
+    expect(debug.frames().map((f) => [f.name, f.line])).toEqual([
+      ['match · 1 → 3 row(s)', 4],
+      ['match $p isa person, has name $n;', 4],
+    ]);
+    expect(await debug.move('over')).toEqual({ kind: 'stopped', reason: 'step' });
+    expect(debug.frames()[0]).toMatchObject({ name: 'select · 3 → 3 row(s)', line: 6 });
+    expect(await debug.move('out')).toEqual({ kind: 'ended', exitCode: 0 });
+  });
+
+  it('shows a stage`s rows, its counts and its scope', async () => {
+    const { debug } = await launch();
+    await debug.move('over');
+    await debug.move('over');
+    await debug.move('in');
+    const [rows, stage, scope] = debug.scopes(debug.frames()[0]!);
+    expect(rows!.node).toMatchObject({ name: 'Rows', value: '3 row(s)', indexed: 3 });
+    const first = rows!.node.children!()[0]!;
+    expect(first.value).toMatch(/^\{ \$p: person 0x1e\w+, \$n: name "Cid" \}$/);
+    expect(stage!.node.children!().map((n) => [n.name, n.value])).toEqual([
+      ['stage', 'match'],
+      ['rows in', '1'],
+      ['rows out', '3'],
+    ]);
+    expect(scope!.node.children!().map((n) => n.name)).toEqual(['$p', '$n']);
+    // The statement's own frame shows what it did.
+    expect(debug.scopes(debug.frames()[1]!)[0]!.node.value).toBe('3 row(s)');
+  });
+
+  it('over, at a statement, does not stop in its stages', async () => {
+    const { debug } = await launch();
+    await debug.move('over');
+    await debug.move('over');
+    expect(debug.timeline.current.kind).toBe('statement');
+    expect(await debug.move('over')).toEqual({ kind: 'ended', exitCode: 0 });
+  });
+});
+
+describe('line breakpoints (Phase 03)', () => {
+  it('a statement`s first line holds at once; a line in no statement never does; another line waits for its statement', async () => {
+    const { debug } = await launch();
+    expect(debug.setBreakpoints([2, 6, 3, 9]).map((b) => [b.line, b.verified, b.message])).toEqual([
+      [2, true, undefined],
+      [6, false, 'Checked when its statement runs.'],
+      [3, false, 'No statement is on this line.'],
+      [9, false, 'No statement is on this line.'],
+    ]);
+  });
+
+  it('continue stops at each, and a waiting one is settled, and reported, when its statement runs', async () => {
+    const { debug } = await launch();
+    const settled: Array<[number, boolean]> = [];
+    debug.breakpointChanged = (b) => settled.push([b.line, b.verified]);
+    debug.setBreakpoints([2, 6]);
+    expect(await debug.start()).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    expect(debug.frames()[0]!.line).toBe(2);
+    expect(await debug.move('continue')).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    expect(debug.frames()[0]).toMatchObject({ name: 'select · 3 → 3 row(s)', line: 6 });
+    expect(settled).toEqual([[6, true]]);
+    expect(await debug.move('continue')).toEqual({ kind: 'ended', exitCode: 0 });
+  });
+
+  it('a line with no stage on it is settled as not holding', async () => {
+    const { debug } = await launch();
+    const settled: Array<[number, boolean, string | undefined]> = [];
+    debug.breakpointChanged = (b) => settled.push([b.line, b.verified, b.message]);
+    debug.setBreakpoints([5]);
+    expect(await debug.start()).toEqual({ kind: 'ended', exitCode: 0 });
+    expect(settled).toEqual([[5, false, 'No stage of this statement starts on this line.']]);
+  });
+
+  it('stops once in a statement on a line: before it runs, not again at its first stage on the same line', async () => {
+    const { debug } = await launch();
+    debug.setBreakpoints([4]);
+    expect(await debug.start()).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    expect(debug.timeline.current.kind).toBe('statement');
+    expect(await debug.move('continue')).toEqual({ kind: 'ended', exitCode: 0 });
+  });
+
+  it('start stops at a breakpoint on the first statement, before anything runs', async () => {
+    const { host, debug } = await launch();
+    debug.setBreakpoints([1]);
+    expect(await debug.start()).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    expect(host.operations()).not.toContain('session.debug');
+  });
+
+  it('a step stops at a breakpoint it passes', async () => {
+    const { debug } = await launch();
+    await debug.move('over');
+    await debug.move('over');
+    debug.setBreakpoints([6]);
+    // Over the read would end the program; the breakpoint on its select stops it there.
+    expect(await debug.move('over')).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    expect(debug.frames()[0]!.line).toBe(6);
+  });
+});

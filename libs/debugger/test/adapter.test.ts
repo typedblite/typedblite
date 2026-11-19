@@ -97,3 +97,59 @@ describe('the TypeQLite debug adapter over DAP', () => {
     expect(host.operations().at(-1)).toBe('session.close');
   });
 });
+
+describe('stages and rows over DAP (Phase 03)', () => {
+  it('step in shows the stage inside its statement, and its rows, paged', async () => {
+    const { client } = await open();
+    await Promise.all([client.configurationSequence(), client.launch({ ...LAUNCH, stopOnEntry: true }), client.waitForEvent('stopped')]);
+    for (const _ of [1, 2]) await Promise.all([client.nextRequest({ threadId: 1 }), client.waitForEvent('stopped')]);
+    await Promise.all([client.stepInRequest({ threadId: 1 }), client.assertStoppedLocation('step', { line: 5 })]);
+    const frames = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames;
+    expect(frames.map((f) => [f.name, f.line])).toEqual([
+      ['match · 1 → 3 row(s)', 5],
+      ['match $p isa person, has name $n;', 5],
+    ]);
+    const scopes = (await client.scopesRequest({ frameId: frames[0]!.id })).body.scopes;
+    expect(scopes.map((s) => [s.name, s.indexedVariables])).toEqual([
+      ['Rows', 3],
+      ['Stage', undefined],
+      ['Scope', undefined],
+    ]);
+    const page = (await client.variablesRequest({ variablesReference: scopes[0]!.variablesReference, filter: 'indexed', start: 1, count: 2 })).body.variables;
+    expect(page.map((v) => v.name)).toEqual(['2', '3']);
+    // A row opens to its bindings, and a thing to its attributes.
+    const bindings = (await client.variablesRequest({ variablesReference: page[0]!.variablesReference })).body.variables;
+    expect(bindings.map((v) => v.name)).toEqual(['$p', '$n']);
+    const thing = (await client.variablesRequest({ variablesReference: bindings[0]!.variablesReference })).body.variables;
+    expect(thing.map((v) => [v.name, v.value])).toContainEqual(['name', '"Ann"']);
+  });
+
+  it('breakpoints set before the launch are answered after it, and continue stops at a stage`s line', async () => {
+    const { client } = await open();
+    const changed: Array<[number | undefined, boolean]> = [];
+    client.on('breakpoint', (event) => changed.push([event.body.breakpoint.line, event.body.breakpoint.verified]));
+    await client.initializeRequest();
+    const set = await client.setBreakpointsRequest({ source: { path: `${WORK}/program.tql` }, breakpoints: [{ line: 7 }, { line: 4 }] });
+    expect(set.body.breakpoints.map((b) => [b.line, b.verified, b.message])).toEqual([
+      [7, false, 'Checked when the program starts.'],
+      [4, false, 'Checked when the program starts.'],
+    ]);
+    await Promise.all([client.configurationDoneRequest(), client.launchRequest({ ...LAUNCH } as never), client.assertStoppedLocation('breakpoint', { line: 7 })]);
+    // Line 4 is blank; line 7 waited for its statement, and held once it ran.
+    expect(changed).toEqual([
+      [7, false],
+      [4, false],
+      [7, true],
+    ]);
+    const exited = client.waitForEvent('exited');
+    await Promise.all([client.continueRequest({ threadId: 1 }), client.waitForEvent('terminated')]);
+    expect((await exited).body.exitCode).toBe(0);
+  });
+
+  it('a breakpoint in another file does not hold', async () => {
+    const { client } = await open();
+    await Promise.all([client.configurationSequence(), client.launch({ ...LAUNCH, stopOnEntry: true }), client.waitForEvent('stopped')]);
+    const set = await client.setBreakpointsRequest({ source: { path: `${WORK}/schema.tql` }, breakpoints: [{ line: 1 }] });
+    expect(set.body.breakpoints[0]).toMatchObject({ verified: false, message: 'Only the launched program stops: this file is not it.' });
+  });
+});

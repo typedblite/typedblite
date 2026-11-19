@@ -101,4 +101,16 @@ describe('the debug adapter, through the engine host', () => {
       expect(client.launch({ program, schema: ['schema.tql'], noDebug: true })).rejects.toThrow(/The schema file .*schema\.tql was refused at line 1/),
     ]);
   });
+  it('stops at a breakpoint on a stage`s line, and shows that stage`s rows (Phase 03)', async () => {
+    write('schema.tql', SCHEMA);
+    const program = write('program.tql', PROGRAM);
+    await client.initializeRequest();
+    await client.setBreakpointsRequest({ source: { path: program }, breakpoints: [{ line: 4 }] });
+    await Promise.all([client.configurationDoneRequest(), client.launchRequest({ program, schema: ['schema.tql'] } as never), client.assertStoppedLocation('breakpoint', { line: 4 })]);
+    const [frame] = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames;
+    expect(frame!.name).toBe('select · 1 → 1 row(s)');
+    const [rows] = (await client.scopesRequest({ frameId: frame!.id })).body.scopes;
+    const [row] = (await client.variablesRequest({ variablesReference: rows!.variablesReference })).body.variables;
+    expect(row!.value).toBe('{ $t: title "Dune" }');
+  });
 });
