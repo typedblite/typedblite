@@ -41,7 +41,9 @@
   },
   "main": "./out/extension.cjs",
   "activationEvents": [
-    "onLanguage:typeqlite"
+    "onLanguage:typeqlite",
+    "onNotebook:typeqlite-notebook",
+    "onNotebook:typeqlite-notebook-markdown"
   ],
   "contributes": {
     "languages": [
@@ -105,7 +107,29 @@
           "markdownDescription": "The `node` that runs the TypeDBLite engine host: a path, or empty for the one on PATH. It must be Node 22.16 or newer, which has `node:sqlite`."
         }
       }
-    }
+    },
+    "notebooks": [
+      {
+        "type": "typeqlite-notebook",
+        "displayName": "TypeQLite Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.tql.md"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "type": "typeqlite-notebook-markdown",
+        "displayName": "TypeQLite Notebook (any Markdown file)",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ]
   },
   "vsce": {
     "dependencies": false

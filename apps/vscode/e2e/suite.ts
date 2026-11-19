@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
@@ -457,6 +457,54 @@ const cases: Record<string, () => Promise<void>> = {
     // A fault is the host's own code, not a crash.
     await assert.rejects(api.host.call('session.get', { session: 's404' }), (error: { code?: string }) => error.code === 'SESSION_NOT_FOUND');
     await api.host.call('session.close', { session });
+  },
+
+  async 'a .tql.md file opens as a notebook: Markdown cells and TypeQLite cells, and no outputs'() {
+    const notebook = await vscode.workspace.openNotebookDocument(uriOf('reading.tql.md'));
+    assert.equal(notebook.notebookType, 'typeqlite-notebook');
+    assert.deepEqual(
+      notebook.getCells().map((cell) => [cell.kind, cell.document.languageId]),
+      [
+        [vscode.NotebookCellKind.Markup, 'markdown'],
+        [vscode.NotebookCellKind.Code, 'typeqlite'],
+        [vscode.NotebookCellKind.Markup, 'markdown'],
+        [vscode.NotebookCellKind.Code, 'typeqlite'],
+        [vscode.NotebookCellKind.Code, 'typeqlite'],
+      ],
+    );
+    assert.equal(notebook.cellAt(1).document.getText(), 'define\nattribute title, value string;\nentity book, owns title;');
+    assert.ok(notebook.getCells().every((cell) => cell.outputs.length === 0), 'a notebook has no outputs when it is opened');
+    assert.equal(notebook.isDirty, false);
+  },
+
+  async 'saving a notebook after editing one cell changes only that cell, and writes no output'() {
+    const notebook = await vscode.workspace.openNotebookDocument(uriOf('reading.tql.md'));
+    const before = readFileSync(join(WORKSPACE, 'reading.tql.md'), 'utf8');
+    const cell = notebook.cellAt(3);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(cell.document.uri, new vscode.Range(0, 0, cell.document.lineCount, 0), 'insert $b isa book, has title "Emma";');
+    assert.ok(await vscode.workspace.applyEdit(edit));
+    assert.ok(notebook.isDirty);
+    assert.ok(await notebook.save());
+    const after = readFileSync(join(WORKSPACE, 'reading.tql.md'), 'utf8');
+    assert.equal(after, before.replace('insert $b isa book, has title "Dune";', 'insert $b isa book, has title "Emma";'));
+  },
+
+  async 'a Markdown file is a notebook only when it is opened as one'() {
+    // `vscode.open` opens a file as a user's click does, with the editor that is the default for it.
+    await vscode.commands.executeCommand('vscode.open', uriOf('plain.md'));
+    const plain = vscode.window.activeTextEditor?.document;
+    assert.ok(plain, 'a plain .md file opens in the text editor');
+    assert.equal(plain.languageId, 'markdown');
+    assert.ok(!vscode.workspace.notebookDocuments.some((n) => n.uri.fsPath === plain.uri.fsPath), 'opening a .md file does not make it a notebook');
+    await vscode.commands.executeCommand('vscode.openWith', plain.uri, 'typeqlite-notebook-markdown');
+    const notebook = vscode.workspace.notebookDocuments.find((n) => n.uri.fsPath === plain.uri.fsPath);
+    assert.ok(notebook, 'Open With the notebook type opens it as one');
+    assert.equal(notebook.notebookType, 'typeqlite-notebook-markdown');
+    assert.deepEqual(
+      notebook.getCells().map((cell) => cell.kind),
+      [vscode.NotebookCellKind.Markup, vscode.NotebookCellKind.Code],
+    );
   },
 
   // Last, because it deletes a file from the workspace.

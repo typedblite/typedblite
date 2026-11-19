@@ -82,6 +82,27 @@ export const window = {
   },
 };
 
+export enum NotebookCellKind {
+  Markup = 1,
+  Code = 2,
+}
+
+/** The notebook data classes a serializer builds, as VS Code's are: plain holders. */
+export class NotebookCellData {
+  metadata?: Record<string, unknown>;
+  outputs?: unknown[];
+  constructor(
+    public kind: NotebookCellKind,
+    public value: string,
+    public languageId: string,
+  ) {}
+}
+
+export class NotebookData {
+  metadata?: Record<string, unknown>;
+  constructor(public cells: NotebookCellData[]) {}
+}
+
 export const commands = {
   async executeCommand<T>(command: string, ...args: unknown[]): Promise<T> {
     const handler = fake.commands.get(command);
