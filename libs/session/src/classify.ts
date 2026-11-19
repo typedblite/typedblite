@@ -49,11 +49,69 @@ function isRead(text: string): boolean {
  */
 export function splitStatements(source: string): string[] {
   const text = source.replace(/^\s*#[^\n]*$/gm, '');
-  const statements: string[] = [];
+  return statementBounds(text).map(([from, to]) => text.slice(from, to));
+}
+
+/** A statement of a source, as {@link locateStatements} finds it. */
+export interface LocatedStatement {
+  /** The statement as written, comments inside it kept: what to run. */
+  readonly text: string;
+  /** The line it starts on, counted from 0, as an LSP position is. */
+  readonly line: number;
+  /** The character it starts at on that line, counted from 0. */
+  readonly character: number;
+}
+
+/**
+ * The statements {@link splitStatements} finds, where they are: each one's text as written and its position, so a
+ * range the engine reports for a statement can be placed in the file it came from.
+ *
+ * @privateRemarks
+ * The same splitting loop, run over the source with each comment line blanked to spaces instead of removed, so every
+ * offset is the source's own. A comment line is whitespace to the loop either way, so the statements are the same.
+ */
+export function locateStatements(source: string): LocatedStatement[] {
+  const text = source.replace(/^[ \t]*#[^\n]*$/gm, (comment) => ' '.repeat(comment.length));
+  return statementBounds(text).map(([from, to]) => {
+    const before = source.slice(0, from);
+    const line = before.split('\n').length - 1;
+    return { text: source.slice(from, to), line, character: from - (before.lastIndexOf('\n') + 1) };
+  });
+}
+
+/** Where each statement of a comment-free text starts and ends: `[from, to)`, with no surrounding whitespace. */
+function statementBounds(text: string): Array<[number, number]> {
+  const bounds: Array<[number, number]> = [];
+  const trimmed = (from: number, to: number): [number, number] | undefined => {
+    while (from < to && /\s/.test(text[from]!)) from += 1;
+    while (to > from && /\s/.test(text[to - 1]!)) to -= 1;
+    return from < to ? [from, to] : undefined;
+  };
   let start = 0;
+  // 🔴 A `;` inside brackets or a string ends nothing: a `fetch` sub-query (`[ match …; fetch { … }; ]`) and a block
+  // (`not { …; }`) hold their own. An end-of-line `#` comment is skipped to the line's end.
+  let depth = 0;
+  let quote: string | undefined;
 
   for (let i = 0; i < text.length; i++) {
-    if (text[i] !== ';') continue;
+    const c = text[i]!;
+    if (quote !== undefined) {
+      if (c === '\\') i += 1;
+      else if (c === quote) quote = undefined;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      continue;
+    }
+    if (c === '#') {
+      const end = text.indexOf('\n', i);
+      i = end < 0 ? text.length : end;
+      continue;
+    }
+    if (c === '{' || c === '[' || c === '(') depth += 1;
+    else if (c === '}' || c === ']' || c === ')') depth = Math.max(0, depth - 1);
+    if (c !== ';' || depth > 0) continue;
     const statement = text.slice(start, i + 1);
     const body = statement.trim();
     if (!body) {
@@ -61,6 +119,10 @@ export function splitStatements(source: string): string[] {
       continue;
     }
     const rest = text.slice(i + 1);
+
+    // A statement never begins with a variable or a role list, so `insert $a isa a; $b isa b;` is one insert: what
+    // follows a `;` with `$` or `(` is another pattern of the same stage.
+    if (/^\s*[$(]/.test(rest)) continue;
 
     // A `define` block holds many definitions, each `;`-terminated, so it ends only where a
     // pipeline begins — or at the end of the input.
@@ -77,11 +139,11 @@ export function splitStatements(source: string): string[] {
       if (/^\s*(select|reduce|sort|offset|limit|distinct|require|fetch)\b/i.test(rest)) continue;
     }
 
-    statements.push(body);
+    bounds.push(trimmed(start, i + 1)!);
     start = i + 1;
   }
 
-  const tail = text.slice(start).trim();
-  if (tail) statements.push(tail);
-  return statements;
+  const tail = trimmed(start, text.length);
+  if (tail) bounds.push(tail);
+  return bounds;
 }

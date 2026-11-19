@@ -17,9 +17,11 @@
     "paths": {
       "@typedblite/language": ["./libs/language/src/index.ts"],
       "@typedblite/content-revision": ["./libs/content-revision/src/index.ts"],
+      "@typedblite/runtime/debug": ["./libs/runtime/src/debug.ts"],
       "@typedblite/runtime": ["./libs/runtime/src/index.ts"],
       "@typedblite/session": ["./libs/session/src/index.ts"],
-      "@typedblite/notebook": ["./libs/notebook/src/index.ts"]
+      "@typedblite/notebook": ["./libs/notebook/src/index.ts"],
+      "@typedblite/debugger": ["./libs/debugger/src/index.ts"]
     }
   }
 }

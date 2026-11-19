@@ -43,9 +43,111 @@
   "activationEvents": [
     "onLanguage:typeqlite",
     "onNotebook:typeqlite-notebook",
-    "onNotebook:typeqlite-notebook-markdown"
+    "onNotebook:typeqlite-notebook-markdown",
+    "onDebugResolve:typeqlite",
+    "onDebugDynamicConfigurations:typeqlite"
   ],
   "contributes": {
+    "breakpoints": [
+      {
+        "language": "typeqlite"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "typeqlite",
+        "label": "TypeQLite",
+        "languages": [
+          "typeqlite"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "The .tql or .typeqlite file to run, statement by statement, in a fresh in-memory store.",
+                "default": "${file}"
+              },
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Files of define statements, run first, in this order. Relative to cwd.",
+                "default": []
+              },
+              "seed": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Files of data, run after the schema, in this order. Relative to cwd.",
+                "default": []
+              },
+              "cwd": {
+                "type": "string",
+                "description": "The folder schema and seed paths are relative to. The program's own folder when not given.",
+                "default": "${workspaceFolder}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Stop at the first statement, before it runs.",
+                "default": true
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "typeqlite",
+            "request": "launch",
+            "name": "Debug TypeQLite file",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}",
+            "schema": [],
+            "seed": [],
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "TypeQLite: Debug a file",
+            "description": "Run a TypeQLite file under the debugger, in a fresh in-memory store.",
+            "body": {
+              "type": "typeqlite",
+              "request": "launch",
+              "name": "Debug TypeQLite file",
+              "program": "^\"\\${file}\"",
+              "cwd": "^\"\\${workspaceFolder}\"",
+              "schema": [],
+              "seed": [],
+              "stopOnEntry": true
+            }
+          },
+          {
+            "label": "TypeQLite: Debug with a schema and seed data",
+            "description": "Run the schema and seed files first, then debug the program.",
+            "body": {
+              "type": "typeqlite",
+              "request": "launch",
+              "name": "Debug TypeQLite with data",
+              "program": "^\"\\${workspaceFolder}/${1:program.tql}\"",
+              "cwd": "^\"\\${workspaceFolder}\"",
+              "schema": [
+                "${2:schema.tql}"
+              ],
+              "seed": [
+                "${3:seed.tql}"
+              ],
+              "stopOnEntry": false
+            }
+          }
+        ]
+      }
+    ],
     "languages": [
       {
         "id": "typeqlite",
@@ -223,6 +325,7 @@
   },
   "dependencies": {
     "@devx-micro/app-sidecar": "0.2.1",
+    "@typedblite/debugger": "*",
     "@typedblite/language": "*",
     "@typedblite/notebook": "*",
     "jsonc-parser": "~3.3.1",
@@ -233,6 +336,7 @@
   "devDependencies": {
     "@types/markdown-it": "~14.1.2",
     "@types/vscode": "~1.91.0",
+    "@vscode/debugadapter-testsupport": "1.68.0",
     "@vscode/test-electron": "~3.1.0",
     "@vscode/vsce": "~3.9.2",
     "esbuild": "~0.28.1",

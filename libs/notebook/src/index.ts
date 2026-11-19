@@ -13,5 +13,5 @@ export {
 export { exportMarkdown, exportScript, type ExportCell } from './export.js';
 export { hasCode, type Diagnostic, type HostCaller, type Row, type RunResult } from './host-types.js';
 export { markdownTable, notShown, plainOutput, plainTable, type OutputBlock, type PlainOptions } from './outputs.js';
-export { runCell, type CellResult, type RunCellOptions, type StatementRunner } from './cell-runner.js';
+export { outputsOf, runCell, type CellResult, type RunCellOptions, type StatementRunner } from './cell-runner.js';
 export { describeStore, NotebookSessions, type EndOutcome, type StoreChoice, type StoreMode } from './notebook-sessions.js';

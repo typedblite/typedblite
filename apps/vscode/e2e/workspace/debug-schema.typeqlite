@@ -1,0 +1,4 @@
+define
+  attribute debug-title, value string;
+  attribute debug-pages, value integer;
+  entity debug-book, owns debug-title, owns debug-pages;

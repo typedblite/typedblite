@@ -16,7 +16,7 @@ export class HostError extends Error {
   }
 }
 
-export type HostErrorCode = 'SESSION_NOT_FOUND' | 'SESSION_CLOSED' | 'OPEN_FAILED' | 'SCHEMA_REFUSED';
+export type HostErrorCode = 'SESSION_NOT_FOUND' | 'SESSION_CLOSED' | 'OPEN_FAILED' | 'SCHEMA_REFUSED' | 'NOT_IN_MEMORY';
 
 /** Exit codes follow the app-runtime convention: 2 usage, 3 conflict, 5 not found, 10 infrastructure. */
 export const sessionNotFound = (id: string): HostError => new HostError('SESSION_NOT_FOUND', `No session '${id}'.`, 5);
@@ -25,3 +25,5 @@ export const openFailed = (location: string, reason: string): HostError =>
   new HostError('OPEN_FAILED', `Could not open '${location}': ${reason}`, 10);
 export const schemaRefused = (message: string): HostError =>
   new HostError('SCHEMA_REFUSED', `The schema was refused: ${message}`, 2);
+export const notInMemory = (id: string, location: string): HostError =>
+  new HostError('NOT_IN_MEMORY', `Session '${id}' is at '${location}'. A statement is debugged only on a session at ':memory:'.`, 2);

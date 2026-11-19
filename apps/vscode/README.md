@@ -115,6 +115,45 @@ memory**, kept from cell to cell: a schema defined in one cell is there for the 
   empty one. If the engine host itself was restarted, the next cell says so and starts a new, empty store.
 - Nothing is saved: outputs are not written to the file, and running a cell does not mark the notebook changed.
 
+## Debugging
+
+Run a `.tql` or `.typeqlite` file under the debugger, and watch where its rows go
+([ADR-014](../../docs/architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)).
+Press **F5** in a TypeQLite file with no `launch.json`, or add a **TypeQLite** configuration:
+
+```jsonc
+{
+  "type": "typeqlite",
+  "request": "launch",
+  "name": "Debug TypeQLite",
+  "program": "${workspaceFolder}/queries.tql",
+  "cwd": "${workspaceFolder}",
+  "schema": ["schema.tql"], // define statements, run first
+  "seed": ["seed.tql"],     // data, run next
+  "stopOnEntry": true
+}
+```
+
+- **Nothing you keep is ever opened.** Every session runs in a fresh **in-memory** store: the `schema` files, then the
+  `seed` files, then the program, statement by statement. Its writes, commits included, vanish when the session ends.
+- **Each statement is recorded as it runs**, then stepped through: the call stack is the statement, its stage, the
+  step of its `match`, and any function or `fetch` sub-query inside. **Step into** a `match` to go one step at a time
+  **in the order the engine runs them, which is not always the order of the lines**: a step's every line is
+  highlighted, and a breakpoint on any of them stops there.
+- **Variables** at a stage or step: its **Rows** (paged; open a row for its bindings, a thing for its attributes as they
+  were at that point), its counts, each `let` and comparison with how many rows it **dropped**, and the rows each
+  incoming row gave.
+- **Breakpoints:** on a line; with a **condition** on the counts (`rowsOut == 0`, `rowsIn > 0 && rowsOut == 0`); and two
+  exception breakpoints: **On refusal** (on by default; stops where TypeQLite refused, with its code) and **When a step
+  empties** (stops where the rows ran out). A breakpoint on a line inside a statement is checked when that statement
+  runs.
+- **Step back** and **Reverse Continue** move through what was recorded; nothing runs twice. **Run Without Debugging**
+  runs the file and prints its answers.
+- Answers and facts are printed to the Debug Console. A refusal ends the program after you continue from it, as
+  `typedblite --file` does.
+
+Not yet: evaluating expressions in the Debug Console, changing a value, and debugging against a store on disk.
+
 ## The engine host
 
 The extension ships the TypeDBLite **engine host**, a separate process that runs TypeQLite statements in sessions
@@ -122,7 +161,8 @@ The extension ships the TypeDBLite **engine host**, a separate process that runs
 is a bundle inside the `.vsix` (`out/host/sidecar.cjs`), and the extension **never imports it**: it runs it with a
 `node` and sends it operations over the sidecar (JSON lines on stdio).
 
-- **It starts on the first request**, not when a `.tql` file opens, so using the editor costs nothing.
+- **It starts on the first request**, not when a `.tql` file opens, so using the editor costs nothing. The notebook and
+  the debugger use the same host process, each with sessions of its own.
 - **It needs Node 22.16 or newer**, which has `node:sqlite`. The extension uses the `node` on PATH, or the path in
   the **`typedblite.host.node`** setting (a machine setting: a repository cannot choose what runs). It asks that
   `node` before using it, and says what is wrong if it is missing, too old, or has no `node:sqlite`.

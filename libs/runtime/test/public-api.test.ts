@@ -10,6 +10,7 @@ import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 
 import * as browser from '../src/index.browser.js';
+import * as debug from '../src/debug.js';
 import * as node from '../src/index.js';
 import * as wasm from '../src/wasm.js';
 
@@ -44,5 +45,10 @@ describe('the public API', () => {
 
   it('is the binding and the OPFS pool, from @typedblite/runtime/wasm', () => {
     assert.deepEqual(Object.keys(wasm).sort(), ['initWasmSqlite', 'openWasmSqlite', 'poolInfo', 'wipeOpfsPool']);
+  });
+
+  // Internal and unstable (ADR-014 B5): pinned so that what it exports changes on purpose, not covered by semver.
+  it('is the step hook and the recorder, from @typedblite/runtime/debug', () => {
+    assert.deepEqual(Object.keys(debug).sort(), ['DEFAULT_RECORDING_LIMITS', 'StepRecorder', 'attachStepHook']);
   });
 });

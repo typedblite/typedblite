@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyStatement, splitStatements } from '../src/index.js';
+import { classifyStatement, locateStatements, splitStatements } from '../src/index.js';
 
 describe('classifyStatement', () => {
   it.each([
@@ -39,5 +39,60 @@ describe('splitStatements', () => {
 
   it('drops comment lines and keeps an unterminated tail', () => {
     expect(splitStatements('# note\ninsert $a isa a;\ninsert $b isa b')).toEqual(['insert $a isa a;', 'insert $b isa b']);
+  });
+});
+
+describe('splitStatements keeps a statement whole', () => {
+  it('across a fetch sub-query and a block, whose semicolons are their own', () => {
+    const fetch = 'match $p isa person, has name $n;\nfetch { "n": $n, "others": [ match $p has name $o; $o != $n; fetch { "o": $o }; ] };';
+    expect(splitStatements(`${fetch}\ninsert $x isa a;`)).toEqual([fetch, 'insert $x isa a;']);
+    const negated = 'match $p isa person; not { $p has age $a; $a < 20; }; select $p;';
+    expect(splitStatements(negated)).toEqual([negated]);
+  });
+
+  it('across the patterns of one write: no statement begins with a variable or a role list', () => {
+    const insert = 'insert $a isa person, has name "Ann";\n  $b isa person, has name "Bob";\n  (friend: $a, friend: $b) isa friendship;';
+    expect(splitStatements(`${insert}\ninsert $c isa person;`)).toEqual([insert, 'insert $c isa person;']);
+  });
+
+  it('across a semicolon in a string, or in a comment at the end of a line', () => {
+    expect(splitStatements('insert $n isa note, has text "a; b";\ninsert $m isa note;')).toEqual(['insert $n isa note, has text "a; b";', 'insert $m isa note;']);
+    expect(splitStatements("insert $n isa note, has text 'it\\'s; here';")).toEqual(["insert $n isa note, has text 'it\\'s; here';"]);
+    expect(splitStatements('match $p isa person; # one; two\nselect $p;')).toEqual(['match $p isa person; # one; two\nselect $p;']);
+  });
+});
+
+describe('locateStatements', () => {
+  const SOURCES = [
+    'match $s isa project;\ninsert $x isa task;\ninsert $y isa task;',
+    'define entity a; entity b;\ninsert $x isa a;',
+    '# a heading\n\nmatch $p isa person;\n  # why this filter\n  $p has age $a;\nselect $a;\n\n  insert $q isa person;',
+    'match $p isa person; select $p; sort $p; limit 1;\nmatch $q isa person; reduce $n = count;',
+    'insert $x isa a;\n\n   insert $y isa b; # trailing\n',
+    '',
+  ];
+
+  it('finds the statements splitStatements finds, comment lines aside', () => {
+    for (const source of SOURCES) {
+      const withoutComments = (text: string): string => text.replace(/^\s*#[^\n]*$/gm, '');
+      expect(locateStatements(source).map((statement) => withoutComments(statement.text))).toEqual(splitStatements(source).map(withoutComments));
+    }
+  });
+
+  it('says where each starts, and keeps the comments inside one as written', () => {
+    expect(locateStatements(SOURCES[2]!)).toEqual([
+      { text: 'match $p isa person;\n  # why this filter\n  $p has age $a;\nselect $a;', line: 2, character: 0 },
+      { text: 'insert $q isa person;', line: 7, character: 2 },
+    ]);
+  });
+
+  it('places each statement at its own text in the source', () => {
+    for (const source of SOURCES) {
+      const lines = source.split('\n');
+      for (const statement of locateStatements(source)) {
+        const first = statement.text.split('\n')[0]!;
+        expect(lines[statement.line]!.slice(statement.character, statement.character + first.length)).toBe(first);
+      }
+    }
   });
 });

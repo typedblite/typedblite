@@ -99,7 +99,9 @@ import { attributeIid, decodeIid, thingIid } from './iid.js';
 import { checkSchemaRules, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import { applyRedefine, applyUndefine } from './schema-mutation.js';
 import { type SchemaContext } from './expressions.js';
-import { applyValueStatements, useSchemaFunctions, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
+import type { BlockKind, ScopeVariable, StageInfo, StageKind, StepHook, ThingDescription } from './step-hook.js';
+import { SelfCheckingRecorder } from './recorder.js';
+import { applyValueStatements, type ValueStatementObserver, useSchemaFunctions, compareStrings, compareValues, temporalKey, variablesOf, inferValueType, letVariables, type ValueStatements, numericOf, orderValueStatements, valueOf, INTEGER_MAX, INTEGER_MIN, type ValueBinding } from './expressions.js';
 import { applyReduce, checkReduce } from './reduce.js';
 import { canonicalTemporal } from './temporal.js';
 import { checkFetch, fetchDocument, ownershipMax, roleMax, type FetchContext, type FetchScope, type JsonValue } from './fetch.js';
@@ -708,6 +710,8 @@ export class TypeDBLiteInterpreter {
   private trace: QueryTrace | undefined;
   private lastTrace: QueryTrace | undefined;
   private readonly tracing: boolean;
+  /** The debugger's step hook, while one is attached (`setStepHook`); `undefined`, and free, otherwise. */
+  private stepHook: StepHook | undefined;
   private readonly planJoins: boolean;
 
   /**
@@ -730,6 +734,10 @@ export class TypeDBLiteInterpreter {
     this.planJoins = options.planJoins ?? processEnv['TYPEDBLITE_PLAN_JOINS'] !== '0';
     this.tracing = options.trace ?? (env !== undefined && env !== '' && env !== '0' && env !== 'false');
     this.db = this.tracing ? tracingDatabase(raw, () => this.trace) : raw;
+    // `TYPEDBLITE_STEP_HOOK=record` records every statement this interpreter runs, and throws each recording away:
+    // how a whole suite (the conformance run, the runtime's own) is run with the debugger's hook on, to prove it
+    // changes no answer (the debugger feature's invariant 1).
+    if (processEnv['TYPEDBLITE_STEP_HOOK'] === 'record') this.setStepHook(new SelfCheckingRecorder());
     // 🔴 SQLite permits one writer at a time, and `node:sqlite` sets **no busy timeout** — so a
     // second process attempting a write fails immediately with SQLITE_BUSY rather than waiting for
     // the lock. Found by making a concurrency test genuinely concurrent: an earlier version used
@@ -1536,12 +1544,17 @@ export class TypeDBLiteInterpreter {
       // docs/development/performance.md). Taking the write lock first turns that into a wait.
       this.db.exec(savepoint ? `SAVEPOINT ${savepoint}` : 'BEGIN IMMEDIATE');
       try {
+        const hook = this.stepHook;
+        hook?.frameStart({ kind: 'statement', name: 'statement', range: rangeOf(pipeline) });
         const streamed = this.runStages(pipeline, scopes, start);
         // Read inside the transaction, after every write the pipeline made.
+        if (pipeline.fetch !== undefined) hook?.stageStart(this.stageInfo(pipeline.stages.length, 'fetch', rangeOf(pipeline.fetch), false, final), streamed);
         answered =
           pipeline.fetch !== undefined && fetchContext !== undefined && fetchScope !== undefined
             ? { rows: [], documents: streamed.map((row) => fetchDocument((pipeline.fetch as FetchStage).body, row, fetchScope, fetchContext)) }
             : { rows: this.projectRows(streamed, final) };
+        if (pipeline.fetch !== undefined) hook?.stageEnd(streamed);
+        hook?.frameEnd();
         // After the answers, which may name an attribute the statement left with no owner — the insert
         // answers it, a later query does not find it (ADR-006 D4, match.feature L4214).
         sweepAttributes(this.db);
@@ -1605,6 +1618,43 @@ export class TypeDBLiteInterpreter {
   }
 
   /**
+   * Attach a step hook, or detach it with `undefined`. Not part of the API: `@typedblite/runtime/debug` is the way in
+   * (ADR-014 B5).
+   * @internal
+   */
+  setStepHook(hook: StepHook | undefined): void {
+    this.stepHook = hook;
+    hook?.attached({ describe: (iid) => this.describeThing(iid) });
+  }
+
+  /** A thing as the step hook shows it. Reads only, and never refuses: a deleted thing has no type and no attributes. */
+  private describeThing(iid: number): ThingDescription {
+    // Not the query's work, so not in its `QueryTrace`: a trace's counts are the same with the hook on as off.
+    const trace = this.trace;
+    this.trace = undefined;
+    try {
+      const type = this.typeOfThing(iid);
+      const relation = this.schema.relations.has(type);
+      return { iid: thingIid(relation, iid), type, relation, attributes: type === '' ? [] : this.readAttributes(iid, undefined) };
+    } finally {
+      this.trace = trace;
+    }
+  }
+
+  /** A stage as the step hook reports it, with what is bound after it. */
+  private stageInfo(index: number, kind: StageKind, range: Range | undefined, writes: boolean, after: StreamScope): StageInfo {
+    const scope: ScopeVariable[] = [...after.available]
+      .filter((variable) => !variable.startsWith('__'))
+      .map((variable) => ({
+        name: variable,
+        kind: after.kinds.get(variable),
+        valueType: after.valueTypes.get(variable),
+        optional: after.optional.has(variable),
+      }));
+    return { index, kind, range, writes, scope };
+  }
+
+  /**
    * Run a read pipeline and project its `select` — or, when it ends in `fetch`, answer one JSON
    * document per answer in `documents` (fetch.feature), with `rows` empty.
    */
@@ -1661,12 +1711,21 @@ export class TypeDBLiteInterpreter {
         const scope = context.scopeFor(final);
         checkFetch(pipeline.fetch.body, scope, context);
         const body = pipeline.fetch.body;
-        const fetched = this.runStages(pipeline, scopes, start).map((row) => fetchDocument(body, row, scope, context));
+        const hook = this.stepHook;
+        hook?.frameStart({ kind: 'statement', name: 'statement', range: rangeOf(pipeline) });
+        const streamed = this.runStages(pipeline, scopes, start);
+        hook?.stageStart(this.stageInfo(pipeline.stages.length, 'fetch', rangeOf(pipeline.fetch), false, final), streamed);
+        const fetched = streamed.map((row) => fetchDocument(body, row, scope, context));
+        hook?.stageEnd(streamed);
+        hook?.frameEnd();
         documents = [...(documents ?? []), ...fetched];
         this.diagnostics.fact(DiagnosticCode.projected, `Fetched ${fetched.length} document(s).`, rangeOf(pipeline.fetch));
         continue;
       }
-      const projected = this.projectRows(this.runStages(pipeline, scopes, start), final);
+      this.stepHook?.frameStart({ kind: 'statement', name: 'statement', range: rangeOf(pipeline) });
+      const streamed = this.runStages(pipeline, scopes, start);
+      this.stepHook?.frameEnd();
+      const projected = this.projectRows(streamed, final);
       rows.push(...projected);
       const firstMatch = pipeline.stages.find(isMatchStage);
       const select = [...pipeline.stages].reverse().find(isSelectStage);
@@ -1811,10 +1870,19 @@ export class TypeDBLiteInterpreter {
         const scopes = plan(pipeline, parent);
         return scopeFor(scopes[scopes.length - 1], parent);
       },
-      rows: (pipeline, parent, seed) => this.runStages(pipeline, plan(pipeline, parent), [seed]),
+      rows: (pipeline, parent, seed) => {
+        const scopes = plan(pipeline, parent);
+        this.stepHook?.frameStart({ kind: 'fetch', name: 'fetch', range: rangeOf(pipeline) });
+        const rows = this.runStages(pipeline, scopes, [seed]);
+        this.stepHook?.frameEnd();
+        return rows;
+      },
       returned: (pipeline, parent, seed) => {
         const scopes = plan(pipeline, parent);
-        return this.returned(pipeline.returnStage as ReturnStage, this.runStages(pipeline, scopes, [seed]), scopes[scopes.length - 1], rangeOf(pipeline));
+        this.stepHook?.frameStart({ kind: 'fetch', name: 'fetch', range: rangeOf(pipeline) });
+        const rows = this.runStages(pipeline, scopes, [seed]);
+        this.stepHook?.frameEnd();
+        return this.returned(pipeline.returnStage as ReturnStage, rows, scopes[scopes.length - 1], rangeOf(pipeline));
       },
       contextFor: (combination) => this.evaluationContext(combination),
       attributes: (owner, attribute) =>
@@ -2039,7 +2107,10 @@ export class TypeDBLiteInterpreter {
       if (argument !== undefined) seed[parameter.variable] = argument;
     });
     const plan = this.planFunction(definition);
-    return this.returned(definition.body.returnStage, this.runStages(definition.body, plan, [seed]), plan[plan.length - 1], at);
+    this.stepHook?.frameStart({ kind: 'function', name: definition.name, range: rangeOf(definition), at });
+    const rows = this.runStages(definition.body, plan, [seed]);
+    this.stepHook?.frameEnd();
+    return this.returned(definition.body.returnStage, rows, plan[plan.length - 1], at);
   }
 
   /**
@@ -2256,8 +2327,10 @@ export class TypeDBLiteInterpreter {
   /** Stream rows through each stage; `start` is the rows before the first (`[{}]`, or a parent answer). */
   private runStages(pipeline: Stages, scopes: readonly StreamScope[], start: Array<Record<string, Binding>>): Array<Record<string, Binding>> {
     let rows = start;
+    const hook = this.stepHook;
     pipeline.stages.forEach((stage, index) => {
       const before = scopes[index];
+      hook?.stageStart(this.stageInfo(index, stage.$type.replace(/Stage$/, '').toLowerCase() as StageKind, rangeOf(stage), isWriteStage(stage), scopes[index + 1]), rows);
       switch (stage.$type) {
         case 'MatchStage': {
           // Trimmed to what the stage makes available: a variable one disjunction branch alone
@@ -2307,6 +2380,7 @@ export class TypeDBLiteInterpreter {
           rows = this.reduceRows(stage, rows, before);
           break;
       }
+      hook?.stageEnd(rows);
     });
     return rows;
   }
@@ -2335,7 +2409,7 @@ export class TypeDBLiteInterpreter {
     const asMatch = stage.$type === 'PutStage' && required.length > 0 ? this.segmentFor(stage, required) : undefined;
     return uniqueRows(rows, valueVariablesReadBy(stage)).flatMap((row): Array<Record<string, Binding>> => {
       if (asMatch !== undefined) {
-        const found = this.combinations(asMatch, row);
+        const found = this.combinations(asMatch, row, 'put');
         if (found.length > 0) return found;
       }
       const scoped = singleBinding(row);
@@ -3965,7 +4039,20 @@ export class TypeDBLiteInterpreter {
    * (fetch.feature L1159). Every binding in it stays as it is: a thing variable is a filter, not a
    * fresh enumeration.
    */
-  private combinations(pipeline: Segment, seed: Record<string, Binding> = {}): Array<Record<string, Binding>> {
+  private combinations(pipeline: Segment, seed: Record<string, Binding> = {}, block: BlockKind = 'match'): Array<Record<string, Binding>> {
+    const hook = this.stepHook;
+    if (hook === undefined) return this.combine(pipeline, seed, undefined);
+    hook.blockStart({ kind: block, range: rangeOf(pipeline.match) }, seed);
+    const answered = this.combine(pipeline, seed, hook);
+    hook.blockEnd(answered);
+    return answered;
+  }
+
+  /**
+   * `combinations()`'s work. `hook` is the step hook while one is attached: each step below reports its start and
+   * end to it, in the order the steps run (ADR-014 B6).
+   */
+  private combine(pipeline: Segment, seed: Record<string, Binding>, hook: StepHook | undefined): Array<Record<string, Binding>> {
     const patterns = pipeline.match?.patterns ?? [];
     const constraints = this.constraintsOf(patterns);
     const things = constraints.filter((c) => c.roles.length === 0 && c.instance === undefined);
@@ -3978,7 +4065,10 @@ export class TypeDBLiteInterpreter {
 
     // Type variables first — they are answered from the schema alone, and a thing pattern's
     // `isa $t` reads the label they bound (Phase 05).
-    let combinations = solveTypes(typeConstraintsOf(patterns, this.refuse), this.schema, [seed], this.refuse);
+    const typeConstraints = typeConstraintsOf(patterns, this.refuse);
+    if (typeConstraints.length > 0) hook?.stepStart({ name: 'types', kind: 'types', ranges: rangesOf(typeConstraints.map((c) => c.range)) }, 1);
+    let combinations = solveTypes(typeConstraints, this.schema, [seed], this.refuse);
+    if (typeConstraints.length > 0) hook?.stepEnd(combinations);
     const note = (stage: string): void => {
       if (!this.trace) return;
       this.trace.stages.push({ stage, combinations: combinations.length });
@@ -3999,15 +4089,19 @@ export class TypeDBLiteInterpreter {
       for (const relation of relations) {
         if (filtered.has(relation) || !this.relationBound(relation, sample)) continue;
         filtered.add(relation);
+        hook?.stepStart({ name: `relation ${relation.variable} filter`, kind: 'relation-filter', ranges: relationRanges(relation) }, combinations.length);
         combinations = combinations.filter((combination) =>
           this.relationHolds({ ...relation, isas: resolveIsas(relation.isas, combination) }, combination),
         );
+        hook?.stepEnd(combinations);
         note(`relation ${relation.variable} early filter`);
       }
     };
     pushDownRelations();
     for (const constraint of things) {
+      hook?.stepStart({ name: `thing ${constraint.variable}`, kind: 'thing', ranges: thingRanges(constraint, patterns) }, combinations.length);
       combinations = combinations.flatMap((combination) => this.bindThing(constraint, combination, relations));
+      hook?.stepEnd(combinations);
       note(`thing ${constraint.variable}`);
       pushDownRelations();
     }
@@ -4032,9 +4126,11 @@ export class TypeDBLiteInterpreter {
       if (filtered.has(relation) && relation.variable.startsWith('__anon')) continue;
       // Bind any remaining role players and named relation variable. A relation already pushed
       // down was only checked, not expanded; named relations still need their ids.
+      hook?.stepStart({ name: `relation ${relation.variable}`, kind: 'relation', ranges: relationRanges(relation) }, combinations.length);
       combinations = combinations.flatMap((combination) =>
         this.relationBindings(withTypes(combination), combination),
       );
+      hook?.stepEnd(combinations);
       note(`relation ${relation.variable} bind`);
     }
 
@@ -4047,11 +4143,14 @@ export class TypeDBLiteInterpreter {
       // `$n isa name "John"` — an attribute instance, read from `attribute`, not through an owner.
       const instance = constraint.instance;
       if (instance !== undefined) {
+        hook?.stepStart({ name: `${instance.variable} isa ${instance.type}`, kind: 'attribute', ranges: rangesOf([instance.range, constraint.range]) }, combinations.length);
         combinations = combinations.flatMap((combination) => this.bindAttributeInstance(instance, combination));
+        hook?.stepEnd(combinations);
         note(`attribute ${instance.variable}`);
         continue;
       }
       for (const binding of constraint.bindings) {
+        hook?.stepStart({ name: `${constraint.variable} has ${binding.attribute === undefined ? '' : `${binding.attribute} `}${binding.variable}`, kind: 'has', ranges: rangesOf([binding.range]) }, combinations.length);
         combinations = combinations.flatMap((combination) => {
           const owner = combination[constraint.variable];
           if (typeof owner !== 'number') return [combination];
@@ -4070,6 +4169,7 @@ export class TypeDBLiteInterpreter {
             return [{ ...combination, [binding.variable]: bound }];
           });
         });
+        hook?.stepEnd(combinations);
       }
     }
     // `let`s and comparisons whose inputs the concepts already bind run BEFORE the nested blocks, so a
@@ -4087,7 +4187,7 @@ export class TypeDBLiteInterpreter {
       ([comparison.left, ...variablesOf(comparison.right)].every((variable) => ready.has(variable)) ? early : late).comparisons.push(comparison);
     }
     const either = new Set(constraints.filter(isBareTypeIsa).map((c) => c.variable));
-    combinations = this.applyStatements(early, combinations, either);
+    combinations = this.valuesStep(hook, early, combinations, either);
     // Nested blocks that EXTEND an answer, each a sub-match seeded with it: every branch of a
     // disjunction answers its own extensions (disjunction.feature L38), and a `try` extends the
     // answer when it matches and keeps it unextended when it does not (optional.feature L66).
@@ -4099,8 +4199,9 @@ export class TypeDBLiteInterpreter {
         const common = new Set(this.nestedBound([pattern]));
         const local = new Set(pattern.branches.flatMap((branch) => [...this.boundBy(this.segmentFor(branch, branch.patterns).match?.patterns ?? [])]).filter((v) => !common.has(v)));
         const seen = new Set<string>();
+        hook?.stepStart({ name: 'or', kind: 'or', ranges: rangesOf([rangeOf(pattern)]) }, combinations.length);
         combinations = combinations.flatMap((row) =>
-          pattern.branches.flatMap((branch) => this.combinations(this.segmentFor(branch, branch.patterns), row)).flatMap((answer) => {
+          pattern.branches.flatMap((branch) => this.combinations(this.segmentFor(branch, branch.patterns), row, 'branch')).flatMap((answer) => {
             const kept = Object.fromEntries(Object.entries(answer).filter(([variable]) => !local.has(variable) || variable in row));
             const key = rowKeyOf(kept);
             if (seen.has(key)) return [];
@@ -4108,12 +4209,14 @@ export class TypeDBLiteInterpreter {
             return [kept];
           }),
         );
+        hook?.stepEnd(combinations);
         note('disjunction');
       } else if (isOptionalPattern(pattern)) {
         const segment = this.segmentFor(pattern, pattern.patterns);
         const introduced = [...this.boundBy(segment.match?.patterns ?? [])];
+        hook?.stepStart({ name: 'try', kind: 'try', ranges: rangesOf([rangeOf(pattern)]) }, combinations.length);
         combinations = combinations.flatMap((row) => {
-          const extended = this.combinations(segment, row);
+          const extended = this.combinations(segment, row, 'try');
           if (extended.length > 0) return extended;
           // 🔴 Unmatched, its variables are EMPTY — present and unbound — not absent: a later stage
           // that uses one directly answers nothing for this row, where an absent one would be read as
@@ -4122,15 +4225,17 @@ export class TypeDBLiteInterpreter {
           for (const variable of introduced) if (!(variable in row)) (empty as Record<string, Binding | undefined>)[variable] = undefined;
           return [empty];
         });
+        hook?.stepEnd(combinations);
         note('optional');
       }
     }
-    combinations = this.applyStatements(late, combinations, either);
+    combinations = this.valuesStep(hook, late, combinations, either);
     // Then the FILTERS, last, so everything they read is bound: `$x is $y` holds when both are the
     // one concept (binding one from the other when only one is bound), and `not { … }` keeps the
     // answer only if its block, seeded with it, matches nothing (negation.feature).
     for (const pattern of patterns) {
       if (isIsPattern(pattern)) {
+        hook?.stepStart({ name: `${pattern.left} is ${pattern.right}`, kind: 'is', ranges: rangesOf([rangeOf(pattern)]) }, combinations.length);
         combinations = combinations.flatMap((row) => {
           const [left, right] = [row[pattern.left], row[pattern.right]];
           if (left === undefined && right === undefined) return [];
@@ -4138,9 +4243,12 @@ export class TypeDBLiteInterpreter {
           if (right === undefined) return [{ ...row, [pattern.right]: left }];
           return sameConcept(left, right) ? [row] : [];
         });
+        hook?.stepEnd(combinations);
       } else if (isNegationPattern(pattern)) {
         const segment = this.segmentFor(pattern, pattern.patterns);
-        combinations = combinations.filter((row) => this.combinations(segment, row).length === 0);
+        hook?.stepStart({ name: 'not', kind: 'not', ranges: rangesOf([rangeOf(pattern)]) }, combinations.length);
+        combinations = combinations.filter((row) => this.combinations(segment, row, 'not').length === 0);
+        hook?.stepEnd(combinations);
         note('negation');
       }
     }
@@ -4825,7 +4933,24 @@ export class TypeDBLiteInterpreter {
   }
 
   /** Each `let` (in dependency order) and comparison, per combination — see `applyValueStatements`. */
-  private applyStatements(statements: ValueStatements, combinations: Array<Record<string, Binding>>, either: ReadonlySet<string> = new Set()): Array<Record<string, Binding>> {
+  /**
+   * `applyStatements` as a step of its own, reported to the step hook when one is attached and the block has
+   * statements to apply; each `let` and comparison inside it is reported as a value.
+   */
+  private valuesStep(hook: StepHook | undefined, statements: ValueStatements, combinations: Array<Record<string, Binding>>, either: ReadonlySet<string>): Array<Record<string, Binding>> {
+    if (hook === undefined || (statements.lets.length === 0 && statements.comparisons.length === 0)) return this.applyStatements(statements, combinations, either);
+    const all = [...statements.lets, ...statements.comparisons];
+    hook.stepStart({ name: all.map(sourceText).join('; '), kind: 'values', ranges: rangesOf(all.map((s) => rangeOf(s))) }, combinations.length);
+    const observer: ValueStatementObserver = {
+      compared: (comparison, passed) => hook.valueCompared({ kind: 'comparison', name: sourceText(comparison), range: rangeOf(comparison) }, passed),
+      bound: (statement, rowsIn, rowsOut) => hook.valueBound({ kind: 'let', name: sourceText(statement), range: rangeOf(statement) }, rowsIn, rowsOut),
+    };
+    const answered = this.applyStatements(statements, combinations, either, observer);
+    hook.stepEnd(answered);
+    return answered;
+  }
+
+  private applyStatements(statements: ValueStatements, combinations: Array<Record<string, Binding>>, either: ReadonlySet<string> = new Set(), observer?: ValueStatementObserver): Array<Record<string, Binding>> {
     // `let $v = $a * 2; $v > 10;` — evaluated per combination, binding the value variables and
     // filtering (Phase 06).
     if (statements.lets.length === 0 && statements.comparisons.length === 0) return combinations;
@@ -4847,7 +4972,7 @@ export class TypeDBLiteInterpreter {
         const binding = combination[variable];
         return typeof binding === 'string' ? binding : undefined;
       };
-      return applyValueStatements(statements, values, concept, this.refuse, this.evaluationContext(combination)).map((answered) => {
+      return applyValueStatements(statements, values, concept, this.refuse, this.evaluationContext(combination), observer).map((answered) => {
         const extended: Record<string, Binding> = { ...combination };
         for (const [variable, binding] of answered) extended[variable] = binding;
         return extended;
@@ -5914,6 +6039,34 @@ let hasCounter = 0;
  * and a comparison, which the engine already evaluates (modifiers.feature, insert.feature L312). The
  * rewritten nodes keep the source's position, so a refusal still points at what was written.
  */
+/** The step hook's ranges: those that exist, in source order, leaving out any inside another. */
+function rangesOf(ranges: ReadonlyArray<Range | undefined>): Range[] {
+  const at = (p: { line: number; character: number }): number => p.line * 1_000_000 + p.character;
+  const present = ranges.filter((range): range is Range => range !== undefined);
+  const inside = (a: Range, b: Range): boolean => at(b.start) <= at(a.start) && at(a.end) <= at(b.end);
+  const kept = present.filter((range, i) => !present.some((other, j) => j !== i && inside(range, other) && (!inside(other, range) || j < i)));
+  return kept.sort((a, b) => at(a.start) - at(b.start));
+}
+
+/**
+ * What a thing step consumes: every pattern headed by its variable, as well as the one that introduced it, and every
+ * literal it is filtered by. `$p isa person;` on one line and `$p has name "Ann";` on another are one step.
+ */
+function thingRanges(constraint: ThingConstraint, patterns: readonly Pattern[]): Range[] {
+  const headed = patterns.filter((pattern) => isThingPattern(pattern) && pattern.variable === constraint.variable);
+  return rangesOf([constraint.range, ...constraint.literals.map((literal) => literal.range), ...headed.map((pattern) => rangeOf(pattern))]);
+}
+
+/** What a relation step consumes: the relation's pattern, and each role player. */
+function relationRanges(constraint: ThingConstraint): Range[] {
+  return rangesOf([constraint.range, ...constraint.roles.map((role) => role.range)]);
+}
+
+/** A node's own source text, as the step hook names a `let` or a comparison. */
+function sourceText(node: LangiumNode): string {
+  return node.$cstNode?.text.replace(/\s+/g, ' ').trim().replace(/;$/, '') ?? '';
+}
+
 function desugarHas(patterns: readonly Pattern[]): Pattern[] {
   const rewritten: Pattern[] = [];
   const comparisons: Pattern[] = [];

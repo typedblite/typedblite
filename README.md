@@ -85,12 +85,13 @@ Or try it in a browser, with three examples to start from: `npm run playground`,
 | [`@typedblite/runtime`](libs/runtime/) | The engine: query interpreter, storage, schema changes, change log, replication and full-text search. The working database lives here. |
 | [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
 | [`@typedblite/session`](libs/session/) | A TypeQLite session over the engine: one open store with transactions, a restart and a close, and the statement classifier the CLI and the engine host share. |
+| [`@typedblite/debugger`](libs/debugger/) (private) | The TypeQLite debug adapter (ADR-014): the Debug Adapter Protocol over recordings the engine host makes of each statement. The VS Code extension runs it inline. |
 | [`typedblite-conformance`](libs/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
 | [`typedblite`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
 | [`@typedblite/engine-host`](apps/engine-host/) (private) | The workbench's engine host: a NestJS CQRS app that runs statements in sessions, for the graph explorer, debugger and notebook (ADR-011). In progress: the core, and the CLI, REPL, sidecar, HTTP and MCP transports (HTTP loopback only, MCP read-only by default). |
 | [`typedblite-sync-demo`](apps/sync-demo/) | Offline-first sync, shown end to end: a browser, a desktop app and an Android phone, each with its own TypeDBLite store, replicating through a TypeDBLite hub. Cut any link or stop the hub, and watch them converge. |
 | [`typedblite-playground`](apps/playground/) | Try TypeQLite in a browser with nothing to install: the engine on WASM SQLite in a Web Worker, three examples, and a link that carries the whole program. `npm exec nx -- run playground:serve` |
-| [`typeqlite` (VS Code extension)](apps/vscode/) | The TypeQLite editor: diagnostics, cross-file navigation, hover, completion, rename, quick fixes, formatting and semantic highlighting, from a Langium language server that runs the language library unchanged (ADR-008). It also provides **TypeQLite notebooks**: a Markdown file whose `typeql` fences are cells that run on the engine host, against a store of the user's choice (ADR-012). |
+| [`typeqlite` (VS Code extension)](apps/vscode/) | The TypeQLite editor: diagnostics, cross-file navigation, hover, completion, rename, quick fixes, formatting and semantic highlighting, from a Langium language server that runs the language library unchanged (ADR-008). It also provides **TypeQLite notebooks**: a Markdown file whose `typeql` fences are cells that run on the engine host, against a store of the user's choice (ADR-012), and the **TypeQLite debugger**: step through a file's statements, stages and `match` steps, and break where its rows run out, in a fresh in-memory store (ADR-014). |
 
 ## Documentation
 
@@ -225,6 +226,10 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 | [ADR-008](docs/architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md) | The TypeQLite Editor Is a Langium Language Server in This Repository |
 | [ADR-009](docs/architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md) | TypeDBLite Runs in the Browser on WASM SQLite |
 | [ADR-010](docs/architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md) | The Markdown Preview Highlights TypeQLite Code Blocks as the Editor Does, in the Theme's Colours |
+| [ADR-011](docs/architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) | The Workbench Runs TypeQLite in a Separate Engine-Host Process |
+| [ADR-012](docs/architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) | The TypeQLite Notebook Is a Markdown File, Run on the Engine Host |
+| [ADR-013](docs/architecture/adr-013-the-browser-notebook-runs-the-notebook-in-a-page.md) | The Browser Notebook Runs the Notebook in a Page, on WASM SQLite |
+| [ADR-014](docs/architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md) | The TypeQLite Debugger Replays a Recording of Each Statement, Made on the Engine Host |
 
 **Standards:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md) · [Multi-Phase Lifecycle Standard](docs/standards/governance/multi-phase-lifecycle-standard.md)
 

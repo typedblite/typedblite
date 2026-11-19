@@ -1,7 +1,7 @@
 ---
 kind: feature
-status: proposed
-decided-by: []
+status: in-progress
+decided-by: [adr-014]
 title: TypeQLite Debugger
 feature: debugger
 branch: feat/debugger
@@ -11,9 +11,12 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Debugger — Feature Doc
 
-> **Status:** 📋 Proposed, not started · **Written:** 2026-11-12 · **Branch:** `feat/debugger`, from
-> `main`, not yet cut · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete) ·
-> **Governed by:** ADR-009, which Phase 00 writes
+> **Status:** ✅ Complete (2026-11-19): all seven phases merged into `feat/debugger`; the merge into `main` is the founder's call; [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)
+> accepted · **Written:** 2026-11-12 · **Branch:** `feat/debugger`, from `main`
+> (`4fa6d8d`), cut 2026-11-19 · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete),
+> [engine host](../engine-host/engine-host.feature.md) (complete) · **Governed by:**
+> [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md).
+> This document first named ADR-009, a number the WASM decision has since taken
 >
 > Request, 2026-11-12: *a debugger for TypeQLite, as a future feature. "I believe we should be able
 > to use the Interpreter to make this possible."*
@@ -93,24 +96,42 @@ down. A debugger has to work around this without rewriting the interpreter:
 
 **Recommendation: A first, with the hook shaped so that B can be added later without changing
 it.** Both consume the same sequence of step events. A only stores them, while B blocks on each
-one. Phase 00 settles this in ADR-009.
+one. Phase 00 settles this in ADR-014 (B1 recommends A, one statement at a time).
 
-## What already exists — verified on disk 2026-11-12
+### 🔴 What the interpreter makes harder — found in Phase 00, 2026-11-19
+
+The list above holds. Reading `combinations()` again found four things this plan did not account for. Each has a
+recommended answer in ADR-014.
+
+1. **A `match` does not run in source order.** It runs by kind: type variables, then one step per thing
+   *variable* (merging every pattern on it), then relations, attribute reads, `let`s and comparisons, `or` and
+   `try`, and last `is` and `not`. Relation filters move earlier when `planJoins` is on. One step can consume
+   several lines, and a later line can run first. `ThingConstraint.range` holds only the first pattern's range.
+   *(B6)*
+2. **Some steps have no `note()`:** attribute reads, `let`s, comparisons and `is`. A comparison is one of the
+   likeliest places for rows to disappear. *(B6)*
+3. **A `match` runs once per incoming row**, and a `fetch` sub-query once per parent answer, so each inner step
+   repeats N times. *(B7)*
+4. **A thing's type and attributes are read when asked.** Under replay they would show the store after the
+   statement, not as it was at the stop. *(B8)*
+
+## What already exists — verified on disk 2026-11-12, re-verified 2026-11-19
 
 This is load-bearing. Check it again before relying on it.
 
 | Thing | State |
 | ----- | ----- |
-| Interpreter | [`interpreter.ts`](../../../../libs/runtime/src/interpreter.ts), 6,060 lines, holding `TypeDBLiteInterpreter`. Its public entry points are `define(text)`, `execute(text, given?)` and `query(text, given?)`, plus `beginTransaction`, `commitTransaction` and `rollbackTransaction` |
+| Interpreter | [`interpreter.ts`](../../../../libs/runtime/src/interpreter.ts), 6,280 lines (6,060 when this was written), holding `TypeDBLiteInterpreter`. Its public entry points are `define(text)`, `execute(text, given?)` and `query(text, given?)`, plus `beginTransaction`, `commitTransaction` and `rollbackTransaction` |
 | Stage loop | `runStages(pipeline, scopes, start)` has one `switch` per stage type: match, insert, put, delete, update, select, sort, offset, limit, distinct, require and reduce. The rows array is replaced after each stage |
 | Stage plan | `planStages` returns one `StreamScope` per stage boundary, giving the variables `available`, their `kinds` and their `valueTypes`. **That is the static half of the Variables view**: what each variable is, as well as its value |
-| Steps inside a `match` | `combinations()` and its `note()` calls, at lines 3811–3968 |
+| Steps inside a `match` | `combinations()` and its `note()` calls, from line 3968 (2026-11-19). They run by kind, not in source order, and some steps have none: see *What the interpreter makes harder* above |
 | Trace precedent | `QueryTrace` and `lastQueryTrace()`, enabled by the `trace` option or `TYPEDBLITE_TRACE=1`, and tested in [`query-trace.test.ts`](../../../../libs/runtime/test/query-trace.test.ts) |
 | Differential precedent | [`relation-join-planning-differential.test.ts`](../../../../libs/runtime/test/relation-join-planning-differential.test.ts) runs `planJoins: false` and `planJoins: true` and asserts that the two produce the same rows in the same order. **This is the shape of test that proves the debug hook changes nothing** |
 | Execution facts | [`diagnostics.ts`](../../../../libs/runtime/src/diagnostics.ts) (ADR-004): facts are returned, never emitted, have stable codes, and are capped at `MAX_DIAGNOSTICS = 50` |
-| Statement classification | [`apps/cli/src/session.ts`](../../../../apps/cli/src/session.ts) chooses between `define`, `query` and `execute` by the statement's leading keyword, and whether it has a write stage. This is textual, and deliberately so. **This logic lives in the CLI, so a debugger cannot reuse it yet** |
-| SQLite | Only [`node-sqlite.ts`](../../../../libs/runtime/src/node-sqlite.ts) imports `node:sqlite`. The workspace's Node is ≥ 22.16. Whether the extension host's Electron Node includes `node:sqlite` is **not verified** |
-| Extension | [`apps/vscode`](../../../../apps/vscode) depends on `@typedblite/language` only. It contributes no `debuggers` and no `breakpoints`, and its language server never loads the runtime |
+| Statement classification | **Moved since this was written:** `classifyStatement` and `splitStatements` live in [`@typedblite/session`](../../../../libs/session/src/classify.ts), shared by the CLI, the engine host and the playground. Invariant 6's prerequisite is met |
+| Engine host | [`apps/engine-host`](../../../../apps/engine-host) (ADR-011): sessions, `session.run` of exactly one statement, `statement.split`, `statement.classify`. ADR-011 D7 leaves the debugger's route to this feature |
+| SQLite | Only [`node-sqlite.ts`](../../../../libs/runtime/src/node-sqlite.ts) imports `node:sqlite`. The workspace's Node is ≥ 22.16. VS Code 1.146's Electron Node **has** `node:sqlite` (measured in the engine-host feature) |
+| Extension | [`apps/vscode`](../../../../apps/vscode) depends on `@typedblite/language`, `@typedblite/notebook` and the sidecar client, and starts the engine host through its `HostClient`. It contributes no `debuggers` and no `breakpoints` |
 
 ## 🔴 The invariants every phase is bound by
 
@@ -132,8 +153,10 @@ ADR-004's rule ("returned, never emitted") and keeps the runtime usable wherever
 That includes a downstream application, which loads the runtime's `out/` folder.
 
 **4. A debug session runs against `:memory:` and never opens an existing database.** Decided by
-the founder on 2026-11-12. The adapter constructs the engine at `:memory:`, loads the workspace
-schema and the launch's seed files into it, and then runs the program. Writes in the program
+the founder on 2026-11-12. The adapter opens a `:memory:` session on the engine host, runs the
+`schema` files and then the `seed` files that the launch names, in order, and then runs the program
+(ADR-014 B9; there is no implicit workspace schema). 🔴 The host refuses `session.debug` on any
+session that is not at `:memory:` (B2), so this holds where the store is opened. Writes in the program
 behave as they would anywhere else, including commits, because they land in a store that
 disappears when the session ends. This needs no rollback rule and no `commit` setting, and it is
 not possible for a debugger to write to a real store by accident.
@@ -149,23 +172,24 @@ that logic moves somewhere both can import. It is not copied.
 
 ## What a TypeQLite debug session looks like
 
-How DAP's concepts map onto TypeQLite. Phase 00 confirms or changes this table.
+How DAP's concepts map onto TypeQLite. Settled in Phase 00 as
+[ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md) B11.
 
 | DAP | TypeQLite |
 | --- | --------- |
-| Program | A `.tql` or `.typeqlite` file, run from top to bottom (`define` blocks, write pipelines, reads) against a fresh `:memory:` store. The store first receives the workspace schema (ADR-008 D3), then any `seed` files the launch configuration names |
+| Program | `program`, a `.tql` or `.typeqlite` file run statement by statement, after the launch's `schema` and `seed` files (B9), in a fresh `:memory:` session on the engine host |
 | Thread | One. The interpreter is single-threaded |
-| Stack frames | Statement › stage › step inside the `match`. A function call or a `fetch` sub-query pushes a frame and runs its own stages |
-| Step over | The next stage, or the next statement when on a statement |
-| Step into | Into a `match`, one constraint at a time. Into a function body. Into a fetch sub-query |
-| Step out | Back to the enclosing stage or statement |
-| Step back / reverse continue | From the recording (approach A) |
-| Variables | **Rows**: the current row set, paged, where each row expands to its bindings and each concept to its type, iid and attributes. **Scope**: the `StreamScope` at this boundary, giving each variable's kind and value type. **Written**: things, attributes and roles written so far |
-| Line breakpoints | On a stage or a pattern, matched by range |
-| Conditional breakpoints | On the row count, for example `rows == 0` |
-| Exception breakpoints | *On refusal* (with its `DiagnosticCode`), and *when a stage empties* |
-| Debug console | Execution facts as output, as they are recorded. Evaluating expressions is a later phase |
-| Run Without Debugging | Free with DAP's `noDebug`: the file runs and its facts and rows go to the console |
+| Stack frames | Statement › stage › `match` step. A function call site or a `fetch` sub-query pushes a frame (B7) |
+| Step over | The next stage, or the next statement |
+| Step into | Into a `match`, one step at a time **in execution order, not source order** (B6); into a function or a `fetch` sub-query |
+| Step out | To the enclosing stage or statement |
+| Step back, reverse continue | Over every statement recorded so far (B1) |
+| Variables | **Rows** (paged; each row's bindings; each thing's type, iid and attributes **as at the step**, B8). **Scope** (`StreamScope`: kinds and value types). **By incoming row** (B7). **Dropped** (rows the cap left out, B10) |
+| Line breakpoints | On a stage, or on each `match` step that consumes the line (B6) |
+| Conditional breakpoints | On the step's row counts: `rowsIn`, `rowsOut` |
+| Exception breakpoints | *On refusal*, carrying its `DiagnosticCode`; *when a step empties* (`rowsIn > 0 && rowsOut == 0`) |
+| Debug console | Execution facts, in order. Evaluating expressions is out of scope (B1) |
+| Run Without Debugging | `noDebug`: each statement goes through `session.run`, not `session.debug` |
 
 ## Goals
 
@@ -179,7 +203,7 @@ How DAP's concepts map onto TypeQLite. Phase 00 confirms or changes this table.
 4. **Breakpoints that answer "where did my rows go?"**: line breakpoints on stages and patterns,
    row-count conditions, break when a stage empties, and break on refusal.
 5. **No existing database is touched:** every session runs in a fresh `:memory:` store, built from
-   the workspace schema and the launch's seed files (invariant 4).
+   the `schema` and `seed` files the launch names (invariant 4, ADR-014 B9).
 6. **The editor gains a debugger.** `apps/vscode` contributes the `typeqlite` debug type, launch
    configuration snippets, and breakpoints in `.tql` and `.typeqlite` files. F5 on a file runs it
    under the debugger.
@@ -189,22 +213,29 @@ How DAP's concepts map onto TypeQLite. Phase 00 confirms or changes this table.
 Each item names where it is to be proven. "e2e" means `nx run typeqlite-vscode:e2e` against the
 packaged `.vsix`.
 
-- [ ] The hook's differential spec: hook on and hook off give the same rows, documents, facts and
-      refusals, over the join-planning corpus and the pipeline-stage tests.
-- [ ] 🔴 The conformance run with the hook on scores **1742 of 1756**, the same as with it off, and
-      `baseline.json` is untouched.
-- [ ] Adapter specs over DAP (`@vscode/debugadapter-testsupport` or an equivalent client): launch,
+- [x] The hook's differential spec: hook on and hook off give the same rows, documents, facts and
+      refusals, over the join-planning corpus and the pipeline-stage tests. *(Phase 01: the join corpus and a
+      38-statement corpus of every stage and step kind, `planJoins` on and off; and the runtime's whole suite, the
+      pipeline-stage tests included, with `TYPEDBLITE_STEP_HOOK=record`: 753 of 753.)*
+- [x] 🔴 The conformance run with the hook on scores **1742 of 1756**, the same as with it off, and
+      `baseline.json` is untouched. *(Phase 01: the report byte-identical, 2,781 statements recorded.)*
+- [x] Adapter specs over DAP (`@vscode/debugadapter-testsupport` or an equivalent client): launch,
       stop on entry, step over, into and out across a function call, Variables at a stage
-      boundary, and a breakpoint hit by line.
-- [ ] A query whose rows disappear at the third pattern of its `match` stops there under "break
-      when a stage empties". Asserted in the adapter specs **and** in the e2e.
-- [ ] The adapter only ever constructs its engine at `:memory:`. A spec asserts this, and a session
-      whose program writes and commits leaves every file in the workspace byte-for-byte unchanged.
-- [ ] The e2e starts a session with `vscode.debug.startDebugging` on a fixture file, hits a
-      breakpoint, reads the variables, steps, and the session ends cleanly.
-- [ ] `AGENTS.md`'s layout and dependency graph, the README, and the project overview memory name
+      boundary, and a breakpoint hit by line. *(`libs/debugger/test/adapter.test.ts`, 16 specs; and
+      `apps/vscode/test/debug-adapter.test.ts` against the real host bundle.)*
+- [x] A query whose rows disappear at a comparison in its `match` stops at that comparison's step
+      under "break when a step empties", with the comparison's range highlighted. Asserted in the
+      adapter specs **and** in the e2e. *(Phases 05 and 06.)*
+- [x] The adapter only ever constructs its engine at `:memory:`. A spec asserts this, and a session
+      whose program writes and commits leaves every file in the workspace byte-for-byte unchanged. *(The launch opens
+      only `:memory:`; the host refuses `session.debug` anywhere else; a program that inserts and deletes beside a
+      `store.db` leaves every file's SHA-256 as it was.)*
+- [x] The e2e starts a session with `vscode.debug.startDebugging` on a fixture file, hits a
+      breakpoint, reads the variables, steps, and the session ends cleanly. *(Phase 06, against the installed `.vsix`.)*
+- [x] `AGENTS.md`'s layout and dependency graph, the README, and the project overview memory name
       the debugger.
-- [ ] Build, typecheck and test are green for everything touched, from a clean tree.
+- [x] Build, typecheck and test are green for everything touched, from a clean tree. *(The gate, all 14 steps, at
+      the end of every phase.)*
 
 ## Out of scope
 
@@ -220,7 +251,11 @@ packaged `.vsix`.
 
 ## Open questions for Phase 00
 
-These are for the founder.
+These are for the founder. **Each has a recommended answer in
+[ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md),
+accepted 2026-11-19:** 1 → B1; 2 → B9 (seed and schema files only; copying a store deferred); 3 → B2 and B3 (the
+engine runs in the host, the adapter inline in the extension host); 4 → B4 (`libs/debugger`); 5 → B5 (a
+`@typedblite/runtime/debug` subpath only, internal).
 
 1. **Execution model:** A (record, then replay), B (a worker that blocks), or A now and B later.
    The recommendation is A, then B if a real case needs it.
@@ -254,46 +289,51 @@ packaged `.vsix`.
 
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
-| 00 | Scope, the DAP mapping, and ADR-009 | Not started | |
-| 01 | The step hook: events, the recording, the cap, and proof that it is harmless | Not started | |
-| 02 | Adapter shell: launch a file, statement-level steps, output, Run Without Debugging | Not started | |
-| 03 | Stages and rows: stage steps, the Rows and Scope variables, line breakpoints | Not started | |
-| 04 | Inside a `match`: constraint steps, function and fetch frames, `or`/`not`/`try` | Not started | |
-| 05 | Breakpoints that answer "where did my rows go?": conditions, empty stage, refusal, step back | Not started | |
-| 06 | The editor: the debug type, launch snippets, breakpoints in `.tql`, e2e, packaging | Not started | |
+| 00 | [Scope, the DAP mapping, and ADR-014](phases/00-scope-and-adr/summary.md) | Complete | ADR-014 accepted, B1–B11 |
+| 01 | [The step hook: events, the recording, the cap, and proof that it is harmless](phases/01-step-hook/summary.md) | Complete | Conformance with the hook on: 1742 of 1756, byte-identical |
+| 02 | [Adapter shell: launch a file, statement-level steps, output, Run Without Debugging](phases/02-adapter-shell/summary.md) | Complete | `session.debug`, `statement.locate`, `libs/debugger` |
+| 03 | [Stages and rows: stage steps, the Rows and Scope variables, line breakpoints](phases/03-stages-and-rows/summary.md) | Complete | Stage stops, paged rows, line breakpoints |
+| 04 | [Inside a `match`: constraint steps, function and fetch frames, `or`/`not`/`try`](phases/04-inside-a-match/summary.md) | Complete | Steps in execution order; the splitter fixed |
+| 05 | [Breakpoints that answer "where did my rows go?": conditions, empty stage, refusal, step back](phases/05-breakpoints-that-matter/summary.md) | Complete | Conditions, both exception filters, step back |
+| 06 | [The editor: the debug type, launch snippets, breakpoints in `.tql`, e2e, packaging](phases/06-the-editor/summary.md) | Complete | The `typeqlite` debug type, inline adapter, e2e |
 
 ## Phase Intent
 
 This is a forward plan. Each phase's checklist is written when that phase starts.
 
-**00 — Scope, the DAP mapping, and ADR-009.** Answer the open questions. Fix the mapping table.
+**00 — Scope, the DAP mapping, and ADR-014.** Answer the open questions. Fix the mapping table.
 Settle the execution model, where the adapter runs and where it lives. Choose the debug-adapter
 library and its version, and decide whether there is upstream code to diff against, as ADR-008 D8
 did for the editor.
 
 **01 — The step hook.** 🔴 This is the only phase that touches the interpreter, and the only one in
-which invariants 1 and 2 can break. Add the hook interface. Call it at stage boundaries, at
-`combinations()`'s existing `note()` points, and around `callFunction` and fetch sub-queries. Add a
-recorder that implements it, with the cap. Exit: the differential spec, conformance with the hook
-on, and the performance suites unchanged with it off.
+which invariants 1 and 2 can break. Add the hook interface, exported from `@typedblite/runtime/debug`
+only (B5). Call it at stage boundaries, at `combinations()`'s existing `note()` points, at the new
+points B6 names (attribute reads, `let`s, each comparison, `is`), and around `callFunction` and fetch
+sub-queries. Each `match` step carries every range it consumes (B6). Add a recorder that implements
+it: totals per step across incoming rows (B7), things described when recorded (B8), and the caps
+(B10), whose numbers this phase measures. `@typedblite/session` gains a way to run one statement with
+the recorder. Exit: the differential spec with `planJoins` on and off, conformance with the hook on,
+and the performance suites unchanged with it off.
 
-**02 — Adapter shell.** A DAP session that launches a file, splits it into statements, and runs
-each through the interpreter: define, read or write, using classification shared with the CLI
-(invariant 6). It stops on entry and steps over statements. Facts go to the console. Run Without
-Debugging works. Every session runs in a fresh `:memory:` store, loaded with the workspace schema
-and the seed files.
+**02 — Adapter shell.** The engine host gains `session.debug` (B2), refused on any session not at
+`:memory:`. `libs/debugger` (B4) serves a DAP session that launches a file, runs the launch's `schema`
+and `seed` files (B9), splits the program with `statement.split`, and records one statement at a time
+(B1). It stops on entry and steps over statements. Facts go to the console. Run Without Debugging
+goes through `session.run`.
 
-**03 — Stages and rows.** Steps at stage boundaries. The Rows variables, paged, with concepts
-expanded through `attributesOf` and `typeOfThing`. The Scope variables from `StreamScope`. Line
+**03 — Stages and rows.** Stops at stage boundaries from the recording. The Rows variables, paged,
+with each thing's type and attributes as recorded (B8). The Scope variables from `StreamScope`. Line
 breakpoints matched to stages by range.
 
-**04 — Inside a `match`.** Step into a `match`, one constraint at a time, with the combination
-count at each step. Nested `or`, `not` and `try` blocks. A function call or a fetch sub-query
-pushes a frame.
+**04 — Inside a `match`.** Step into a `match`, one execution step at a time, with rows in and rows
+out summed over incoming rows (B7), and every range of the step highlighted (B6). Line breakpoints on
+the steps that consume a line. Nested `or`, `not` and `try` blocks. A function call site or a fetch
+sub-query pushes a frame.
 
-**05 — Breakpoints that matter.** Conditional breakpoints on the row count. Exception breakpoints
-for a stage that empties and for a refusal, carrying its code. Step back and reverse continue, if
-Phase 00 chose approach A.
+**05 — Breakpoints that matter.** Conditional breakpoints on `rowsIn` and `rowsOut`. Exception
+breakpoints for a step that empties and for a refusal, carrying its code. Step back and reverse
+continue across every statement recorded (B1).
 
 **06 — The editor.** `apps/vscode` contributes the `typeqlite` debug type, its launch snippets,
 and breakpoints in TypeQLite files. The adapter is bundled into the `.vsix`. The e2e drives a
@@ -303,7 +343,18 @@ session through `vscode.debug.startDebugging`.
 
 Anything a phase defers is recorded here, not only in a commit message.
 
-- *(none yet)*
+- **Copying an existing store into memory** (Phase 00, ADR-014 B9). `deserialize` is absent at the
+  Node 22.16 minimum, `backup()` writes to a path, and either one opens an existing database, which
+  invariant 4 rules out. Revisit when the Node minimum has `deserialize`, and decide then whether
+  opening a store read-only to copy it breaks invariant 4.
+- **A `with fun …` preamble is torn from its pipeline by the splitter** (Phase 04). A statement beginning with `with`
+  ends at its first `;`, in the CLI's `--file`, the notebook and the debugger alike. Fixing it means deciding where a
+  preamble ends, in `@typedblite/session`. Until then, a function to debug is defined in a schema file.
+- **Evaluating expressions in the debug console** (Phase 00, ADR-014 B1). It needs a store that is
+  still at the stop, which only a blocking worker (approach B) gives.
+- **Streaming a recording in parts** (Phase 00, ADR-014). Phase 01 measured the largest realistic recording at
+  2.1 MB (a 6,000-row join), an eighth of the 16 MB ceiling, so one JSON line is enough. Revisit only if a real
+  program passes the ceiling.
 
 ## Key Documents
 

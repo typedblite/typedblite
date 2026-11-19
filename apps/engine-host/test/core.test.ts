@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { Test, type TestingModule } from '@nestjs/testing';
-import type { ControlResult, RunResult, StatementKind } from '@typedblite/session';
+import type { ControlResult, DebugResult, LocatedStatement, RunResult, StatementKind } from '@typedblite/session';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -13,11 +13,13 @@ import {
   ClassifyStatementQuery,
   CloseSessionCommand,
   CommitTransactionCommand,
+  DebugStatementCommand,
   EngineHostModule,
   GetSchemaQuery,
   GetSessionQuery,
   HostError,
   ListSessionsQuery,
+  LocateStatementsQuery,
   OpenSessionCommand,
   RestartSessionCommand,
   RollbackTransactionCommand,
@@ -199,5 +201,46 @@ describe('the classifier', () => {
     expect(await queries.execute(new SplitStatementsQuery('define entity a;\ninsert $x isa a;\ninsert $y isa a;'))).toEqual({
       statements: ['define entity a;', 'insert $x isa a;', 'insert $y isa a;'],
     });
+  });
+});
+
+describe('the debugger\'s operations (ADR-014)', () => {
+  const debug = (id: string, statement: string, limits = {}) =>
+    commands.execute<DebugStatementCommand, DebugResult>(new DebugStatementCommand(id, statement, limits));
+
+  it('session.debug answers what session.run would, and a recording of it', async () => {
+    const { id } = await open(':memory:', SCHEMA);
+    await run(id, insert('Ada'));
+    const { result, recording } = await debug(id, 'match $p isa person, has name $n; select $n;');
+    expect(result).toMatchObject({ kind: 'rows', rows: [{ n: 'Ada' }] });
+    expect(recording.frames[0]!.stages.map((stage) => stage.kind)).toEqual(['match', 'select']);
+  });
+
+  it('session.debug passes its caps to the recorder, and records a refusal', async () => {
+    const { id } = await open(':memory:', SCHEMA);
+    await run(id, insert('Ada'));
+    await run(id, insert('Bo'));
+    const capped = await debug(id, 'match $p isa person; select $p;', { rowsPerStep: 1 });
+    expect(capped.recording.frames[0]!.stages[0]).toMatchObject({ rowsOut: 2, rowsDropped: 1 });
+    const refused = await debug(id, 'match $p isa nothing-of-the-kind; select $p;');
+    expect(refused.result.kind).toBe('refused');
+    expect(refused.recording.refusal?.message).toMatch(/nothing-of-the-kind/);
+  });
+
+  it('🔴 session.debug is refused on a session that is not at :memory:, and nothing runs', async () => {
+    const file = join(tmpdir(), `debug-refused-${process.pid}.db`);
+    files.push(file);
+    const { id } = await open(file, SCHEMA);
+    await expect(debug(id, insert('Ada'))).rejects.toMatchObject({ code: 'NOT_IN_MEMORY' });
+    expect(await run(id, 'match $p isa person; select $p;')).toMatchObject({ kind: 'rows', rows: [] });
+  });
+
+  it('statement.locate answers each statement as written, and where it starts', async () => {
+    const source = '# setup\ninsert $a isa person, has name "A", has code "A";\n\n  match $p isa person;\n  # why\n  select $p;';
+    const { statements } = await queries.execute<LocateStatementsQuery, { statements: LocatedStatement[] }>(new LocateStatementsQuery(source));
+    expect(statements).toEqual([
+      { text: 'insert $a isa person, has name "A", has code "A";', line: 1, character: 0 },
+      { text: 'match $p isa person;\n  # why\n  select $p;', line: 3, character: 2 },
+    ]);
   });
 });

@@ -1,0 +1,7 @@
+match $b isa debug-book, has debug-title $t;
+select $t;
+
+match
+  $b isa debug-book, has debug-pages $n;
+  $n > 1000;
+select $b;
