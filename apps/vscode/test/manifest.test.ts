@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TEXTMATE_OUT } from '../../../libs/language/src/typeqlite-textmate';
+import { HOST_NODE_SETTING, HOST_REQUEST_COMMAND } from '../src/host/constants';
 import { FENCE_LANGUAGES } from '../src/markdown/protocol';
 import { THEME_BRIDGE_ID, THEME_FILES_COMMAND } from '../src/markdown/theme-source';
 
@@ -93,6 +94,34 @@ describe('the manifest agrees with langium-config.json', () => {
   it('bundles its dependencies rather than shipping node_modules', () => {
     expect(manifest.vsce).toEqual({ dependencies: false });
     expect(manifest.main).toBe('./out/extension.cjs');
+  });
+
+  it('contributes the engine host command, hidden from the palette, and the setting that names its node', () => {
+    expect(manifest.contributes.commands).toEqual([expect.objectContaining({ command: HOST_REQUEST_COMMAND })]);
+    expect(manifest.contributes.menus.commandPalette).toEqual([{ command: HOST_REQUEST_COMMAND, when: 'false' }]);
+    const setting = manifest.contributes.configuration.properties[HOST_NODE_SETTING];
+    expect(setting).toMatchObject({ type: 'string', default: '' });
+    // A path to an executable is the machine's, not a workspace's: a repository must not choose what runs.
+    expect(setting.scope).toBe('machine');
+  });
+
+  it('ships the engine host bundle the client starts, where the client looks for it', () => {
+    expect(existsSync(resolve(APP, 'out/host/sidecar.cjs'))).toBe(true);
+    expect(readFileSync(resolve(APP, 'src/extension.ts'), 'utf8')).toContain("asAbsolutePath('out/host/sidecar.cjs')");
+    // `.vscodeignore` must not drop it from the package.
+    const ignored = readFileSync(resolve(APP, '.vscodeignore'), 'utf8').split('\n');
+    expect(ignored.filter((line) => /^\/?out\b/.test(line))).toEqual([]);
+  });
+
+  // 🔴 Feature invariant 6: the extension runs the host as a process and never imports it, so what runs a statement is
+  // the host's, and the extension defines nothing of TypeQLite.
+  it('never imports the engine host, the runtime or the session package', () => {
+    const files = readdirSync(resolve(APP, 'src'), { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith('.ts'));
+    expect(files.length).toBeGreaterThan(5);
+    for (const file of files) {
+      const source = readFileSync(resolve(file.parentPath, file.name), 'utf8');
+      expect(source, file.name).not.toMatch(/from\s+['"](@typedblite\/(engine-host|runtime|session)|[./]+\/.*engine-host)/);
+    }
   });
 
   it('leaves no relative require in any bundle, since nothing ships beside them', () => {

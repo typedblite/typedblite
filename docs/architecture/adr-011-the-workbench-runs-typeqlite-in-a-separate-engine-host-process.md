@@ -39,7 +39,11 @@ imports it and never loads the runtime. It starts the host and sends operations 
 (newline-delimited JSON on stdio). The host is launched with a `node` found on the user's PATH, or
 the path in a `typedblite.host.node` setting. Node ≥ 22.16, which the runtime already requires.
 Electron's own Node is a fallback only once `node:sqlite` has been verified there. A packaged binary
-is out of scope.
+is out of scope. **Phase 05 (2026-11-19):** the extension ships the host as a bundle (`out/host/sidecar.cjs`),
+probes the `node` before using it (version and `node:sqlite`), and says what is wrong. It does **not** fall back
+to Electron's Node: measured, VS Code 1.146 (Electron 43, Node 24.22) run as plain Node has `node:sqlite`, but
+`engines.vscode ^1.91` covers VS Code builds with Node 20, which has none, and `SidecarClient` cannot set
+`ELECTRON_RUN_AS_NODE` for a child. A fallback needs an `env` option there.
 
 **D2. NestJS enters the repository, fenced into that one app.** `@typedblite/runtime` and
 `@typedblite/language` take no dependency on it (feature invariant 7). The host is **not published**

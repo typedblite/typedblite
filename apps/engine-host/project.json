@@ -21,11 +21,25 @@
         "{projectRoot}/out"
       ]
     },
+    "bundle": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "^build"
+      ],
+      "options": {
+        "command": "node esbuild.mjs",
+        "cwd": "apps/engine-host"
+      },
+      "outputs": [
+        "{projectRoot}/dist"
+      ]
+    },
     "test": {
       "executor": "nx:run-commands",
       "dependsOn": [
         "typecheck",
-        "build"
+        "build",
+        "bundle"
       ],
       "outputs": [
         "{workspaceRoot}/coverage/{projectRoot}"
