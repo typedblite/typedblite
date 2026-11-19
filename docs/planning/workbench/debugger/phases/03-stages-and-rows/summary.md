@@ -52,7 +52,7 @@ Stops at stage boundaries from the recording, the rows and scope at each, and li
 - **Found running the extension's specs:** they load `@typedblite/debugger` from its built `out/`, so a stale build
   answered for the new adapter. Nx's `test` target builds first, so the gate is not affected; run the build before
   running those specs by hand.
-- The gate, from a clean tree.
+- The gate, from a clean tree: all 14 steps passed.
 
 ## For Phase 04
 
