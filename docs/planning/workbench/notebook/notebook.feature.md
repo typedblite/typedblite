@@ -11,7 +11,7 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Notebook — Feature Doc
 
-> **Status:** 🚧 Phase 04 complete (2026-11-19), Phase 05 next · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
+> **Status:** 🚧 Phase 05 complete (2026-11-19), Phase 06 next · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
 > `main` · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete)
 > · **Governed by:** [ADR-012](../../../architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) · **Shares work with:** [Graph Explorer](../graph-explorer/graph-explorer.feature.md) and
 > [Debugger](../debugger/debugger.feature.md)
@@ -190,7 +190,7 @@ fixture notebook, runs its cells and asserts the outputs. Pixel tests are not us
 | 02 | Format: the serializer and the notebook type | Complete | [summary](phases/02-format/summary.md) |
 | 03 | Run: the controller, run all, restart, outputs for rows, JSON, facts and refusals, **and the row limit** | Complete | [summary](phases/03-run/summary.md) |
 | 04 | Language services across cells | Complete | [summary](phases/04-language/summary.md) |
-| 05 | Store choice, export (the output bound moved to Phase 03) | Not started | |
+| 05 | Store choice, export (the output bound moved to Phase 03) | Complete | [summary](phases/05-store-export/summary.md) |
 | 06 | Packaging, e2e, a guide as a notebook, docs | Not started | |
 
 ## Phase Intent

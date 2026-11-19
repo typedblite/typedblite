@@ -4,6 +4,7 @@ import { TEXTMATE_OUT } from '../../../libs/language/src/typeqlite-textmate';
 import { HOST_NODE_SETTING, HOST_REQUEST_COMMAND } from '../src/host/constants';
 import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from '../src/notebook/constants';
 import { RESTART_COMMAND } from '../src/notebook/controller';
+import { COMMIT_COMMAND, EXPORT_MARKDOWN_COMMAND, EXPORT_SCRIPT_COMMAND, HOLDS_CHANGES_CONTEXT, OPEN_STORE_COMMAND, ROLLBACK_COMMAND } from '../src/notebook/store-commands';
 import { FENCE_LANGUAGES } from '../src/markdown/protocol';
 import { THEME_BRIDGE_ID, THEME_FILES_COMMAND } from '../src/markdown/theme-source';
 
@@ -107,6 +108,19 @@ describe('the manifest agrees with langium-config.json', () => {
     expect(manifest.contributes.notebooks).toHaveLength(2);
   });
 
+  // 🔴 Feature invariant 3: Commit and Rollback exist only for a notebook that holds its changes, so they are never offered
+  // against a store that commits each statement.
+  it('offers Commit and Rollback only while a notebook holds its changes, and the store and exports for notebooks', () => {
+    const palette: { command: string; when: string }[] = manifest.contributes.menus.commandPalette;
+    const whenOf = (command: string) => palette.find((entry) => entry.command === command)?.when;
+    for (const command of [COMMIT_COMMAND, ROLLBACK_COMMAND]) expect(whenOf(command), command).toContain(HOLDS_CHANGES_CONTEXT);
+    for (const command of [OPEN_STORE_COMMAND, EXPORT_SCRIPT_COMMAND, EXPORT_MARKDOWN_COMMAND, RESTART_COMMAND]) {
+      expect(whenOf(command), command).toMatch(/typeqlite-notebook/);
+    }
+    const toolbar: { command: string; when: string }[] = manifest.contributes.menus['notebook/toolbar'];
+    for (const command of [COMMIT_COMMAND, ROLLBACK_COMMAND]) expect(toolbar.find((e) => e.command === command)?.when, command).toBe(HOLDS_CHANGES_CONTEXT);
+  });
+
   it('registers one serializer for each notebook type, with outputs transient', () => {
     const source = readFileSync(resolve(APP, 'src/extension.ts'), 'utf8');
     expect(source).toContain('for (const type of [NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN])');
@@ -114,7 +128,15 @@ describe('the manifest agrees with langium-config.json', () => {
   });
 
   it('contributes the engine host command, hidden from the palette, and the setting that names its node', () => {
-    expect(manifest.contributes.commands.map((c: { command: string }) => c.command)).toEqual([HOST_REQUEST_COMMAND, RESTART_COMMAND]);
+    expect(manifest.contributes.commands.map((c: { command: string }) => c.command)).toEqual([
+      HOST_REQUEST_COMMAND,
+      RESTART_COMMAND,
+      OPEN_STORE_COMMAND,
+      COMMIT_COMMAND,
+      ROLLBACK_COMMAND,
+      EXPORT_SCRIPT_COMMAND,
+      EXPORT_MARKDOWN_COMMAND,
+    ]);
     expect(manifest.contributes.menus.commandPalette[0]).toEqual({ command: HOST_REQUEST_COMMAND, when: 'false' });
     const setting = manifest.contributes.configuration.properties[HOST_NODE_SETTING];
     expect(setting).toMatchObject({ type: 'string', default: '' });

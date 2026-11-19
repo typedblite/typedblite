@@ -14,6 +14,7 @@ import { HOST_NODE_SETTING, HOST_REQUEST_COMMAND } from './host/constants.js';
 import { HostClient, type HostEnvelope } from './host/host-client.js';
 import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from './notebook/constants.js';
 import { registerNotebookControllers } from './notebook/controller.js';
+import { registerNotebookStoreCommands } from './notebook/store-commands.js';
 import { NotebookSessions } from './notebook/notebook-sessions.js';
 import { TypeQLiteNotebookSerializer } from './notebook/serializer.js';
 
@@ -66,7 +67,10 @@ export async function activate(
     }),
   );
   // The notebook's kernel: its cells are run by the engine host, one session per open notebook (ADR-012 N3).
-  registerNotebookControllers(context, hostClient, new NotebookSessions(hostClient));
+  const notebookSessions = new NotebookSessions(hostClient);
+  registerNotebookControllers(context, hostClient, notebookSessions);
+  // The notebook's store (in memory until the user chooses a file, ADR-012 N5), and what leaves it.
+  registerNotebookStoreCommands(context, notebookSessions);
 
   const serverModule = context.asAbsolutePath('out/language-server/main.cjs');
   // The server is a separate process, so a debugger can only attach to it if ITS argv carries

@@ -170,7 +170,7 @@ describe('running a cell', () => {
   it('says so when the store was gone and a new one was opened', async () => {
     const { host } = scripted(split(['q;']));
     const result = await runCell('q;', host, runner([rows()], true), options);
-    expect(result.outputs[0]).toMatchObject({ kind: 'text', text: expect.stringContaining('new, empty store') });
+    expect(result.outputs[0]).toMatchObject({ kind: 'text', text: expect.stringContaining('session was opened again') });
   });
 
   it('answers an unreachable host as an output, not a throw, and stops', async () => {
