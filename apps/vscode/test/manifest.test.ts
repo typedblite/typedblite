@@ -6,6 +6,7 @@ import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from '../src/notebook/constants
 import { RESTART_COMMAND } from '../src/notebook/controller';
 import { COMMIT_COMMAND, EXPORT_MARKDOWN_COMMAND, EXPORT_SCRIPT_COMMAND, HOLDS_CHANGES_CONTEXT, OPEN_STORE_COMMAND, ROLLBACK_COMMAND } from '../src/notebook/store-commands';
 import { FENCE_LANGUAGES } from '../src/markdown/protocol';
+import { DEBUG_TYPE } from '../src/debug/constants';
 import { THEME_BRIDGE_ID, THEME_FILES_COMMAND } from '../src/markdown/theme-source';
 
 const APP = resolve(__dirname, '..');
@@ -33,8 +34,14 @@ describe('the manifest agrees with langium-config.json', () => {
     expect([...contributed.extensions].sort()).toEqual([...language.fileExtensions].sort());
   });
 
-  it('activates on that language, and on opening either notebook type', () => {
-    expect(manifest.activationEvents).toEqual([`onLanguage:${language.id}`, `onNotebook:${NOTEBOOK_TYPE}`, `onNotebook:${NOTEBOOK_TYPE_MARKDOWN}`]);
+  it('activates on that language, on opening either notebook type, and when a TypeQLite debug session starts', () => {
+    expect(manifest.activationEvents).toEqual([
+      `onLanguage:${language.id}`,
+      `onNotebook:${NOTEBOOK_TYPE}`,
+      `onNotebook:${NOTEBOOK_TYPE_MARKDOWN}`,
+      `onDebugResolve:${DEBUG_TYPE}`,
+      `onDebugDynamicConfigurations:${DEBUG_TYPE}`,
+    ]);
   });
 
   it('points its grammar at the generated TextMate file, under the scope that file declares', () => {
@@ -58,6 +65,18 @@ describe('the manifest agrees with langium-config.json', () => {
     expect(content.patterns).toEqual([{ include: manifest.contributes.grammars[0].scopeName }]);
     const languages = /\(\?i:\(([^)]*)\)/.exec(fence.begin)![1]!.split('|');
     expect(new Set(languages)).toEqual(FENCE_LANGUAGES);
+  });
+
+  it('contributes the TypeQLite debugger (ADR-014): its type, for the language, breakpoints in its files, and a launch that needs a program', () => {
+    const [debuggerContribution] = manifest.contributes.debuggers;
+    expect(manifest.contributes.debuggers).toHaveLength(1);
+    expect(debuggerContribution).toMatchObject({ type: DEBUG_TYPE, label: 'TypeQLite', languages: [language.id] });
+    expect(manifest.contributes.breakpoints).toEqual([{ language: language.id }]);
+    const launch = debuggerContribution.configurationAttributes.launch;
+    expect(launch.required).toEqual(['program']);
+    // The launch arguments are the adapter's own (`LaunchArguments` in @typedblite/debugger), less noDebug, which VS Code sets.
+    expect(Object.keys(launch.properties).sort()).toEqual(['cwd', 'program', 'schema', 'seed', 'stopOnEntry']);
+    for (const snippet of debuggerContribution.configurationSnippets) expect(snippet.body).toMatchObject({ type: DEBUG_TYPE, request: 'launch' });
   });
 
   it('has a language configuration file where it says', () => {

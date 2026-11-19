@@ -11,7 +11,7 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Debugger — Feature Doc
 
-> **Status:** 🚧 In progress (2026-11-19): phases 00–05 complete; [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)
+> **Status:** ✅ Complete (2026-11-19): all seven phases merged into `feat/debugger`; the merge into `main` is the founder's call; [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)
 > accepted · **Written:** 2026-11-12 · **Branch:** `feat/debugger`, from `main`
 > (`4fa6d8d`), cut 2026-11-19 · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete),
 > [engine host](../engine-host/engine-host.feature.md) (complete) · **Governed by:**
@@ -213,23 +213,29 @@ How DAP's concepts map onto TypeQLite. Settled in Phase 00 as
 Each item names where it is to be proven. "e2e" means `nx run typeqlite-vscode:e2e` against the
 packaged `.vsix`.
 
-- [ ] The hook's differential spec: hook on and hook off give the same rows, documents, facts and
-      refusals, over the join-planning corpus and the pipeline-stage tests.
-- [ ] 🔴 The conformance run with the hook on scores **1742 of 1756**, the same as with it off, and
-      `baseline.json` is untouched.
-- [ ] Adapter specs over DAP (`@vscode/debugadapter-testsupport` or an equivalent client): launch,
+- [x] The hook's differential spec: hook on and hook off give the same rows, documents, facts and
+      refusals, over the join-planning corpus and the pipeline-stage tests. *(Phase 01: the join corpus and a
+      38-statement corpus of every stage and step kind, `planJoins` on and off; and the runtime's whole suite, the
+      pipeline-stage tests included, with `TYPEDBLITE_STEP_HOOK=record`: 753 of 753.)*
+- [x] 🔴 The conformance run with the hook on scores **1742 of 1756**, the same as with it off, and
+      `baseline.json` is untouched. *(Phase 01: the report byte-identical, 2,781 statements recorded.)*
+- [x] Adapter specs over DAP (`@vscode/debugadapter-testsupport` or an equivalent client): launch,
       stop on entry, step over, into and out across a function call, Variables at a stage
-      boundary, and a breakpoint hit by line.
-- [ ] A query whose rows disappear at a comparison in its `match` stops at that comparison's step
+      boundary, and a breakpoint hit by line. *(`libs/debugger/test/adapter.test.ts`, 16 specs; and
+      `apps/vscode/test/debug-adapter.test.ts` against the real host bundle.)*
+- [x] A query whose rows disappear at a comparison in its `match` stops at that comparison's step
       under "break when a step empties", with the comparison's range highlighted. Asserted in the
-      adapter specs **and** in the e2e.
-- [ ] The adapter only ever constructs its engine at `:memory:`. A spec asserts this, and a session
-      whose program writes and commits leaves every file in the workspace byte-for-byte unchanged.
-- [ ] The e2e starts a session with `vscode.debug.startDebugging` on a fixture file, hits a
-      breakpoint, reads the variables, steps, and the session ends cleanly.
-- [ ] `AGENTS.md`'s layout and dependency graph, the README, and the project overview memory name
+      adapter specs **and** in the e2e. *(Phases 05 and 06.)*
+- [x] The adapter only ever constructs its engine at `:memory:`. A spec asserts this, and a session
+      whose program writes and commits leaves every file in the workspace byte-for-byte unchanged. *(The launch opens
+      only `:memory:`; the host refuses `session.debug` anywhere else; a program that inserts and deletes beside a
+      `store.db` leaves every file's SHA-256 as it was.)*
+- [x] The e2e starts a session with `vscode.debug.startDebugging` on a fixture file, hits a
+      breakpoint, reads the variables, steps, and the session ends cleanly. *(Phase 06, against the installed `.vsix`.)*
+- [x] `AGENTS.md`'s layout and dependency graph, the README, and the project overview memory name
       the debugger.
-- [ ] Build, typecheck and test are green for everything touched, from a clean tree.
+- [x] Build, typecheck and test are green for everything touched, from a clean tree. *(The gate, all 14 steps, at
+      the end of every phase.)*
 
 ## Out of scope
 
@@ -289,7 +295,7 @@ packaged `.vsix`.
 | 03 | [Stages and rows: stage steps, the Rows and Scope variables, line breakpoints](phases/03-stages-and-rows/summary.md) | Complete | Stage stops, paged rows, line breakpoints |
 | 04 | [Inside a `match`: constraint steps, function and fetch frames, `or`/`not`/`try`](phases/04-inside-a-match/summary.md) | Complete | Steps in execution order; the splitter fixed |
 | 05 | [Breakpoints that answer "where did my rows go?": conditions, empty stage, refusal, step back](phases/05-breakpoints-that-matter/summary.md) | Complete | Conditions, both exception filters, step back |
-| 06 | The editor: the debug type, launch snippets, breakpoints in `.tql`, e2e, packaging | Not started | |
+| 06 | [The editor: the debug type, launch snippets, breakpoints in `.tql`, e2e, packaging](phases/06-the-editor/summary.md) | Complete | The `typeqlite` debug type, inline adapter, e2e |
 
 ## Phase Intent
 

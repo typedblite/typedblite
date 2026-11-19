@@ -470,6 +470,81 @@ const cases: Record<string, () => Promise<void>> = {
     await api.host.call('session.close', { session });
   },
 
+  async 'a TypeQLite file runs under the debugger: a breakpoint on a stage, its rows, a step, an emptying step, and the end'() {
+    // ADR-014, through the installed extension: the inline adapter, the bundled host, `session.debug` in `:memory:`.
+    const folder = vscode.workspace.workspaceFolders![0]!;
+    const program = uriOf('debug-program.tql');
+    const before = readFileSync(program.fsPath, 'utf8');
+    const sent: Array<{ type: string; event?: string; body?: Record<string, unknown> }> = [];
+    const tracker = vscode.debug.registerDebugAdapterTrackerFactory('typeqlite', { createDebugAdapterTracker: () => ({ onDidSendMessage: (message) => sent.push(message) }) });
+    const stops = (): Array<Record<string, unknown>> => sent.filter((m) => m.type === 'event' && m.event === 'stopped').map((m) => m.body!);
+    const until = async <T>(found: () => T | undefined, what: string, timeout = 20_000): Promise<T> => {
+      const started = Date.now();
+      for (;;) {
+        const value = found();
+        if (value !== undefined) return value;
+        if (Date.now() - started > timeout) throw new Error(`timed out waiting for ${what}`);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    };
+    // `select $t;` is line 2 (index 1): a stage's own line, which holds once its statement has run.
+    const breakpoint = new vscode.SourceBreakpoint(new vscode.Location(program, new vscode.Position(1, 0)));
+    vscode.debug.addBreakpoints([breakpoint]);
+    const ended = new Promise<void>((resolve) => {
+      const done = vscode.debug.onDidTerminateDebugSession((session) => {
+        if (session.type === 'typeqlite') {
+          done.dispose();
+          resolve();
+        }
+      });
+    });
+    try {
+      const started = await vscode.debug.startDebugging(folder, {
+        type: 'typeqlite',
+        request: 'launch',
+        name: 'e2e',
+        program: program.fsPath,
+        cwd: folder.uri.fsPath,
+        schema: ['debug-schema.typeqlite'],
+        seed: ['debug-seed.tql'],
+        stopOnEntry: false,
+      });
+      assert.ok(started, 'the debug session started');
+      const session = await until(() => vscode.debug.activeDebugSession, 'the session');
+
+      const first = await until(() => stops()[0], 'the breakpoint');
+      assert.equal(first['reason'], 'breakpoint');
+      const stack = (await session.customRequest('stackTrace', { threadId: 1 })) as { stackFrames: Array<{ id: number; name: string; line: number }> };
+      assert.deepEqual(stack.stackFrames.map((f) => [f.name, f.line]), [
+        ['select · 2 → 2 row(s)', 2],
+        ['match $b isa debug-book, has debug-title $t;', 1],
+      ]);
+      const { scopes } = (await session.customRequest('scopes', { frameId: stack.stackFrames[0]!.id })) as { scopes: Array<{ name: string; variablesReference: number }> };
+      const rows = (await session.customRequest('variables', { variablesReference: scopes[0]!.variablesReference })) as { variables: Array<{ value: string }> };
+      assert.deepEqual(rows.variables.map((v) => v.value), ['{ $t: debug-title "Dune" }', '{ $t: debug-title "Emma" }']);
+
+      // Over, from the stage: to the next statement.
+      await session.customRequest('next', { threadId: 1 });
+      const second = await until(() => stops()[1], 'the step');
+      assert.equal(second['reason'], 'step');
+
+      // Where did the rows go? The comparison on line 6 took both.
+      await session.customRequest('setExceptionBreakpoints', { filters: ['refusal', 'empty'] });
+      await session.customRequest('continue', { threadId: 1 });
+      const third = await until(() => stops()[2], 'the emptying step');
+      assert.deepEqual([third['reason'], third['text']], ['exception', '$n > 1000: 2 row(s) in, none out.']);
+      const at = (await session.customRequest('stackTrace', { threadId: 1 })) as { stackFrames: Array<{ name: string; line: number }> };
+      assert.deepEqual([at.stackFrames[0]!.name, at.stackFrames[0]!.line], ['$n > 1000 · 2 → 0 row(s)', 6]);
+
+      await session.customRequest('continue', { threadId: 1 });
+      await ended;
+      assert.equal(readFileSync(program.fsPath, 'utf8'), before, 'the program file is as it was');
+    } finally {
+      tracker.dispose();
+      vscode.debug.removeBreakpoints([breakpoint]);
+    }
+  },
+
   async 'a .tql.md file opens as a notebook: Markdown cells and TypeQLite cells, and no outputs'() {
     const notebook = await vscode.workspace.openNotebookDocument(uriOf('reading.tql.md'));
     assert.equal(notebook.notebookType, 'typeqlite-notebook');

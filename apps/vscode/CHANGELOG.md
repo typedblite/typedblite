@@ -16,6 +16,10 @@ The first release. Nothing has been published to a marketplace yet.
 - The TypeDBLite mark as the icon of `.typeqlite` and `.tql` files, in light and dark forms. VS Code uses it
   when your file icon theme has no icon of its own for TypeQLite.
 - Formatting, and semantic highlighting that colours a label by what it resolves to and keywords by kind.
+- **The TypeQLite debugger.** F5 on a `.tql` or `.typeqlite` file runs it in a fresh in-memory store, after any
+  schema and seed files the launch names. Step through statements, stages, and a `match`'s steps in the order the engine
+  runs them; see each step's rows, counts and dropped rows; break on a line, on a row-count condition, where TypeQLite
+  refused, or where a step's rows ran out; step back through what was recorded. No store on disk is ever opened.
 - **TypeQLite notebooks.** A Markdown file whose `typeql` fences are code cells: `*.tql.md` opens as a notebook, and any `.md`
   file by "Open With". Run a cell, Run All, Run Above and Below, and Restart: the cells run on the TypeDBLite engine, in one
   store kept from cell to cell, and answer with a table, JSON, the engine's execution facts, or its own refusal on the cell. The

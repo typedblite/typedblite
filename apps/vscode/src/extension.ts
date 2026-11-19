@@ -16,6 +16,7 @@ import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from './notebook/constants.js';
 import { registerNotebookControllers } from './notebook/controller.js';
 import { registerNotebookStoreCommands } from './notebook/store-commands.js';
 import { NotebookSessions } from '@typedblite/notebook';
+import { registerDebugger } from './debug/register.js';
 import { TypeQLiteNotebookSerializer } from './notebook/serializer.js';
 
 let client: LanguageClient | undefined;
@@ -71,6 +72,8 @@ export async function activate(
   registerNotebookControllers(context, hostClient, notebookSessions);
   // The notebook's store (in memory until the user chooses a file, ADR-012 N5), and what leaves it.
   registerNotebookStoreCommands(context, notebookSessions);
+  // The debugger (ADR-014): an inline adapter over the same host, each session in a `:memory:` store of its own.
+  registerDebugger(context, hostClient);
 
   const serverModule = context.asAbsolutePath('out/language-server/main.cjs');
   // The server is a separate process, so a debugger can only attach to it if ITS argv carries

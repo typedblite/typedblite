@@ -24,6 +24,10 @@ export default defineConfig({
         // The language server's notebook capability: it runs in the bundled server, a separate process this runner's coverage
         // cannot see. `test/notebook-server.test.ts` drives that bundle over stdio.
         'src/language-server/notebook-sync.ts',
+        // The debugger's registration: the inline adapter factory and the configuration provider call `vscode.debug` and
+        // `vscode.workspace.fs`. The adapter itself is `@typedblite/debugger`, tested there and through the real host in
+        // `test/debug-adapter.test.ts`; `e2e/suite.ts` runs a session through `vscode.debug.startDebugging`.
+        'src/debug/register.ts',
       ],
     },
   },

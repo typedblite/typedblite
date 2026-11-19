@@ -177,6 +177,9 @@ describe('inside a match over DAP (Phase 04)', () => {
     expect(frames[0]).toMatchObject({ name: 'thing $p · 1 → 3 row(s)', presentationHint: 'subtle' });
     expect(frames[0]!.source).toBeUndefined();
     expect(frames[2]).toMatchObject({ name: 'adult_ages() · 1 call(s)', source: { path: '/work/program.tql' } });
+    // Out of the function, and of the step that called it: on to the next stage, on its own line.
+    await Promise.all([client.stepOutRequest({ threadId: 1 }), client.assertStoppedLocation('step', { line: 2 })]);
+    expect((await client.stackTraceRequest({ threadId: 1 })).body.stackFrames[0]!.name).toBe('select · 1 → 1 row(s)');
   });
 });
 
