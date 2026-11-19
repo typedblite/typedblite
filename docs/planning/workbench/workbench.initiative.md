@@ -119,5 +119,5 @@ Update this table when a feature changes state.
 | ------- | ------ |
 | engine-host | Complete, merged into `main` (PR #52) ([ADR-011](../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) accepted) |
 | graph-explorer | Proposed |
-| debugger | Phase 00 in progress on `feat/debugger` ([ADR-014](../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md) accepted) |
+| debugger | Complete: all seven phases in `feat/debugger`, awaiting the merge into `main` ([ADR-014](../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md) accepted) |
 | notebook | Complete, merged into `main` (PR #59) ([ADR-012](../../architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) accepted) |
