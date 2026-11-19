@@ -100,7 +100,7 @@ is what a version promises.
 ```bash
 npm run check-packages   # what `npm publish` would ship, read from `npm pack --dry-run` (after a build)
 npm run clean-room       # the tarballs installed in an empty directory and used (needs the registry)
-npm run tour             # docs/guides/five-minute-tour.md run as written, from the tarballs (needs the registry)
+npm run tour             # docs/guides/five-minute-tour.tql.md (a notebook): its shell and Node steps run as written, from the tarballs (needs the registry)
 npm run check-api        # the API reference builds cleanly, and every type the API mentions is exported
 npm run docs:api         # the standalone HTML API reference, in dist/api (the site builds its own: apps/website)
 ```
@@ -203,6 +203,7 @@ npm exec nx -- run typedblite-conformance:report   # the full card and a failure
 - Test files for `libs/language` live in `libs/language/test/` with `.spec.ts` extension.
 - Test files for `libs/runtime` live in `libs/runtime/test/` with `.test.ts` extension.
 - Test files for `apps/cli` live in `apps/cli/test/` with `.test.mts` extension.
+- The five-minute tour is a notebook and is played by `apps/vscode/test/tour-journey.test.ts` (one timeline: cells on the notebook's kernel, commands in a real shell), `tour-structure.test.ts` (the page), the e2e, and `npm run tour` (the tarballs); `tools/tour-doc.mjs` is the one parser. `TOUR_RECORD=1` rewrites the printed answers: read the diff. See [Testing](docs/development/testing.md#the-five-minute-tour).
 - Test files for the notebook (`apps/vscode/src/notebook/`) live in `apps/vscode/test/notebook-*.test.ts`. The format, the runner, the sessions, the outputs and the export are pure and tested there; `notebook-host.test.ts`, `notebook-store.test.ts` and `notebook-guide.test.ts` run cells through the **real host bundle** (`out/host/sidecar.cjs`) with no VS Code; `notebook-server.test.ts` drives the bundled language server with real notebook cells. The controller, the store commands and the server's notebook subclass run only in VS Code or the bundled server, so they are excluded from the unit coverage floor by name and covered by the e2e.
 - Test files for `libs/session` and `apps/engine-host` live in their `test/` directories with `.test.ts` extension. The host's specs call the CQRS buses through `@nestjs/testing`, with no transport and no VS Code.
 - 🔴 NestJS is allowed in `apps/engine-host` and nowhere else: `@typedblite/runtime`, `@typedblite/language` and `@typedblite/session` take no dependency on it (ADR-011 D2), so the published CLI does not either.

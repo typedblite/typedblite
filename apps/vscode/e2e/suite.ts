@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
 
+import { playTour, type Kernel, type Piece } from '../test/support/tour-player';
+
 /**
  * The cases, run inside a real VS Code's extension host. They assert through the `vscode.execute*`
  * and `vscode.provide*` commands, which go through the client, the IPC transport and the server:
@@ -630,23 +632,48 @@ const cases: Record<string, () => Promise<void>> = {
     assert.equal((text.match(/```typeql/g) ?? []).length, code.length);
   },
 
-  async 'the reading list guide runs as a notebook, to its deliberate refusal'() {
-    const notebook = await vscode.workspace.openNotebookDocument(uriOf('reading-list.tql.md'));
+  async 'the five-minute tour plays through the editor, top to bottom, as a reader plays it'() {
+    const notebook = await vscode.workspace.openNotebookDocument(uriOf('five-minute-tour.tql.md'));
+    // A `.tql.md` file opens as a notebook with no "Open With", and the kernel is chosen without the reader choosing it.
+    assert.equal(notebook.notebookType, 'typeqlite-notebook');
     await vscode.window.showNotebookDocument(notebook);
-    const code = notebook.getCells().filter((cell) => cell.kind === vscode.NotebookCellKind.Code);
-    assert.equal(code.length, 9);
-    await vscode.commands.executeCommand('notebook.execute');
-    await waitFor(() => code[8]!.executionSummary?.success !== undefined, 'the last cell to finish');
+    const codeCells = notebook.getCells().filter((cell) => cell.kind === vscode.NotebookCellKind.Code);
 
-    // Every cell before the last runs to completion; the last is refused, on purpose, with the engine's own message.
-    assert.deepEqual(code.slice(0, 8).map((cell) => cell.executionSummary?.success), Array(8).fill(true));
-    assert.equal(code[8]!.executionSummary?.success, false);
-    const refusal = JSON.parse(new TextDecoder().decode(code[8]!.outputs[0]!.items.find((i) => i.mime === 'application/vnd.code.notebook.error')!.data)) as { name: string };
-    assert.equal(refusal.name, 'TypeQLite refused this statement');
+    const decode = (item: vscode.NotebookCellOutputItem) => new TextDecoder().decode(item.data);
+    /** What a cell shows, as the tour prints it: a table or text as plain text, the engine's facts apart, a refusal as its name and message. */
+    const piecesOf = (cell: vscode.NotebookCell): Piece[] =>
+      cell.outputs.map((output): Piece => {
+        const by = (mime: string) => output.items.find((item) => item.mime === mime);
+        const facts = by('application/vnd.code.notebook.stdout');
+        if (facts) return { kind: 'facts', text: decode(facts).replace(/\n+$/, '') };
+        const error = by('application/vnd.code.notebook.error');
+        if (error) {
+          const { name, message } = JSON.parse(decode(error)) as { name: string; message: string };
+          return { kind: 'other', text: `${name}: ${message}` };
+        }
+        const plain = by('text/plain');
+        if (plain) return { kind: 'other', text: decode(plain) };
+        return { kind: 'other', text: JSON.stringify(JSON.parse(decode(by('application/json')!)), null, 2) };
+      });
 
-    // The list, after adding Piranesi and finishing Dune: the tour's answer.
-    const table = new TextDecoder().decode(code[5]!.outputs[0]!.items.find((i) => i.mime === 'text/markdown')!.data);
-    assert.ok(table.includes('Dune') && table.includes('Piranesi') && table.includes('done') && table.includes('to\\-read'));
+    const kernel: Kernel = {
+      async run(_source, index) {
+        const cell = codeCells[index]!;
+        const before = cell.executionSummary?.executionOrder;
+        await vscode.commands.executeCommand('notebook.cell.execute', { ranges: [{ start: cell.index, end: cell.index + 1 }], document: notebook.uri });
+        await waitFor(() => cell.executionSummary?.executionOrder !== before && cell.executionSummary?.success !== undefined, `cell ${index} to run`);
+        return piecesOf(cell);
+      },
+      async useStore(location, mode) {
+        await vscode.commands.executeCommand('typedblite.notebook.openStore', undefined, { kind: 'file', location, mode });
+      },
+    };
+
+    const repo = process.env['TYPEQLITE_E2E_REPO']!;
+    const work = mkdtempSync(join(tmpdir(), 'typeqlite-e2e-tour-'));
+    const report = await playTour(readFileSync(join(WORKSPACE, 'five-minute-tour.tql.md'), 'utf8'), kernel, work, repo);
+    assert.equal(report.failures.join('\n\n'), '', 'every answer the tour prints is what the editor shows, and every command does what it says');
+    assert.equal(report.cells, codeCells.length, 'every cell of the notebook was played');
   },
 
   // Last, because it deletes a file from the workspace.

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
 
 import { toCellOutput } from '../src/notebook/cell-output';
-import { markdownTable, notShown, plainTable } from '../src/notebook/outputs';
+import { markdownTable, notShown, plainOutput, plainTable } from '../src/notebook/outputs';
 
 const text = (item: vscode.NotebookCellOutputItem) => new TextDecoder().decode(item.data);
 
@@ -78,5 +78,39 @@ describe('an output block as VS Code output items', () => {
 
   it('a refusal with no place says none', () => {
     expect(JSON.parse(items({ kind: 'refusal', title: 'T', message: 'm' })[0]![1]!).message).toBe('m');
+  });
+});
+
+describe('a cell\'s output as plain text', () => {
+  const table = { kind: 'table' as const, columns: ['t'], rows: [['Dune']], total: 1 };
+  const facts = { kind: 'facts' as const, lines: ['Matched 1 row(s).'] };
+
+  it('is the blocks in order, a blank line apart', () => {
+    expect(plainOutput([table, facts])).toBe('t\n----\nDune\n\nMatched 1 row(s).');
+  });
+
+  it('can leave out the engine\'s facts, and keeps everything else', () => {
+    expect(plainOutput([table, facts], { facts: false })).toBe('t\n----\nDune');
+    expect(plainOutput([{ kind: 'text', text: 'OK.' }, facts], { facts: false })).toBe('OK.');
+  });
+
+  it('says how many rows were not shown, under the table', () => {
+    expect(plainOutput([{ ...table, total: 3 }])).toBe('t\n----\nDune\n\n2 more rows are not shown (3 in all).');
+  });
+
+  it('shows a refusal as its title, the engine\'s message and its place', () => {
+    expect(plainOutput([{ kind: 'refusal', title: 'TypeQLite refused this statement', message: 'nope', line: 2, column: 5 }])).toBe(
+      'TypeQLite refused this statement: nope (line 2, column 5)',
+    );
+    expect(plainOutput([{ kind: 'refusal', title: 'T', message: 'm' }])).toBe('T: m');
+  });
+
+  it('shows documents as JSON, and a heading as its text', () => {
+    expect(plainOutput([{ kind: 'json', documents: [{ a: 1 }] }])).toBe('{\n  "a": 1\n}');
+    expect(plainOutput([{ kind: 'heading', text: 'Statement 1 of 2' }, { kind: 'text', text: '(no rows)' }])).toBe('Statement 1 of 2\n\n(no rows)');
+  });
+
+  it('is empty for a cell that shows nothing', () => {
+    expect(plainOutput([])).toBe('');
   });
 });

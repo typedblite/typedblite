@@ -48,8 +48,8 @@ async function main(): Promise<void> {
   const userData = join(root, 'user-data');
   const extensions = join(root, 'extensions');
   cpSync(join(app, 'e2e/workspace'), workspace, { recursive: true });
-  // The guide that is a notebook, run as written: the repository's own copy, so the case cannot drift from it.
-  cpSync(join(app, '../../docs/guides/reading-list.tql.md'), join(workspace, 'reading-list.tql.md'));
+  // The five-minute tour, which is a notebook, run as written: the repository's own copy, so the case cannot drift from it.
+  cpSync(join(app, '../../docs/guides/five-minute-tour.tql.md'), join(workspace, 'five-minute-tour.tql.md'));
   // 🔴 VS Code puts its IPC socket in $XDG_RUNTIME_DIR, not in --user-data-dir. Where that directory is unset or
   // does not exist (WSL without a systemd user session points it at a /run/user/<uid> that is not there, and so do
   // some containers), VS Code stops on a dialog, "Unable to write program user data ... listen EACCES", and the
@@ -125,7 +125,7 @@ async function main(): Promise<void> {
         `--user-data-dir=${userData}`,
         `--extensions-dir=${extensions}`,
       ],
-      extensionTestsEnv: { TYPEQLITE_E2E_WORKSPACE: workspace, TYPEQLITE_E2E_EXTENSION: extension },
+      extensionTestsEnv: { TYPEQLITE_E2E_WORKSPACE: workspace, TYPEQLITE_E2E_EXTENSION: extension, TYPEQLITE_E2E_REPO: resolve(app, '../..') },
     });
   } finally {
     rmSync(root, { recursive: true, force: true });

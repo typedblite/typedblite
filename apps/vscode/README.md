@@ -83,8 +83,8 @@ and a notebook and the workspace's `.tql` files do not see each other.
 
 ### Choosing a store
 
-A notebook runs in **memory** until you choose a file: **"Choose the Notebook's Store…"** (the toolbar's database icon, or
-the status bar). Open an existing store file or create one, and then say **when a write becomes permanent**:
+A notebook runs in **memory** until you choose a file: **"Choose the Notebook's Store…"** (the status bar's store item, or the
+notebook toolbar's **…** menu). Open an existing store file or create one, and then say **when a write becomes permanent**:
 
 - **Hold changes until I commit** (listed first, the safer one): nothing is permanent until you choose Commit. Commit and
   Rollback appear on the toolbar while a notebook holds changes, and the next changes are held in turn. A commit the engine

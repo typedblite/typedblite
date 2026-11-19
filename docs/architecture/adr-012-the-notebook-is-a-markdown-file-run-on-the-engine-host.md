@@ -140,6 +140,14 @@ invariant 1). A cell is not wrapped in a transaction.
 - **The package carries everything the notebook needs:** the `.vsix` is 1.3 MB, with the host bundle, both notebook types and no
   test, source or map; the e2e runs against it.
 
+## Made exact afterwards: the tour is the notebook
+
+The reading-list guide of Phase 06 was a stepping stone. **The five-minute tour itself is now a notebook**
+(`docs/guides/five-minute-tour.tql.md`, one file for the page, the notebook and the test): its TypeQLite steps are cells with their
+answers printed beneath, and its command-line and Node steps are unchanged in kind. A shared parser (`tools/tour-doc.mjs`) reads it
+for every player: the tarball run (`npm run tour`), a journey test on the notebook's own kernel and the real command line in one
+timeline, and an e2e in a real VS Code. The reading-list guide was removed.
+
 ## Not decided here
 
 How a table and a refusal render (Phase 03), the export formats (Phase 05), and whether a Markdown cell's own

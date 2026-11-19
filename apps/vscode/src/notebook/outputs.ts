@@ -41,3 +41,35 @@ export function plainTable(columns: readonly string[], rows: readonly (readonly 
 /** "3 more rows are not shown" under a table that was cut: the count, never a silent cut (feature invariant 6). */
 export const notShown = (block: Extract<OutputBlock, { kind: 'table' }>): string | undefined =>
   block.total > block.rows.length ? `${block.total - block.rows.length} more ${block.total - block.rows.length === 1 ? 'row is' : 'rows are'} not shown (${block.total} in all).` : undefined;
+
+export interface PlainOptions {
+  /** Leave out the engine's execution facts: the answer alone. Default: everything a cell shows. */
+  readonly facts?: boolean;
+}
+
+/**
+ * What a cell shows, as plain text: its blocks in order, a blank line apart. This is the form a guide prints beneath a
+ * cell ("you should see"), so a test can hold what a reader is told to the exact text the notebook produces.
+ */
+export function plainOutput(blocks: readonly OutputBlock[], options: PlainOptions = {}): string {
+  return blocks
+    .filter((block) => options.facts !== false || block.kind !== 'facts')
+    .map((block): string => {
+      switch (block.kind) {
+        case 'table': {
+          const cut = notShown(block);
+          return plainTable(block.columns, block.rows) + (cut ? `\n\n${cut}` : '');
+        }
+        case 'json':
+          return JSON.stringify(block.documents.length === 1 ? block.documents[0] : block.documents, null, 2);
+        case 'facts':
+          return block.lines.join('\n');
+        case 'text':
+        case 'heading':
+          return block.text;
+        case 'refusal':
+          return `${block.title}: ${block.message}${block.line === undefined ? '' : ` (line ${block.line}, column ${block.column})`}`;
+      }
+    })
+    .join('\n\n');
+}

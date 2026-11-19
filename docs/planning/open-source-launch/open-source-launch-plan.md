@@ -78,7 +78,7 @@ To go back: fix billing, `gh workflow enable` the three workflows, restore the D
 
 - **2026-11-15, after the move** (`typedblite/typedblite` #1 to #4; the old repository's #62 to #64 did the
   handoff, the `@swc/core` and `playwright-core` bumps that replace Dependabot #30, and the URL change): **the
-  five-minute tour** (#1, `docs/guides/five-minute-tour.md`, run as written from the tarballs by `npm run tour`, a gate
+  five-minute tour** (#1, `docs/guides/five-minute-tour.tql.md`, run as written from the tarballs by `npm run tour`, a gate
   step; #2 matches a title with `has title == $t`); **a value read as an attribute is refused** (#3: found by running
   the tour's TypeQL on a live TypeDB; `given $t: string; … has title $t` matched nothing and said so only in an
   `empty-match` fact, and TypeDB refuses it, so TypeDBLite now does too: a behaviour change in the changelog); and
@@ -523,7 +523,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
 **Docs work**
 
 - [ ] A task-based "5-minute tour" ending in a working app, distinct from the existing getting-started
-      guide (which starts from a clone). *Written 2026-11-15, `docs/guides/five-minute-tour.md`, and run as written
+      guide (which starts from a clone). *Written 2026-11-15, `docs/guides/five-minute-tour.tql.md`, and run as written
       from the tarballs by `npm run tour` (a gate step); not linked from the README until the packages are on npm,
       then run it again against the registry.*
 - [ ] A **Known limitations & roadmap** page assembled from: `@range/@values/...` not enforced, `@card`

@@ -21,7 +21,7 @@ export const BRANCH = 'main';
 /** @type {Array<[source: string, route: string, label?: string]>} */
 export const PAGES = [
   ['docs/guides/getting-started.md', 'guide/getting-started', 'Getting started'],
-  ['docs/guides/five-minute-tour.md', 'guide/five-minute-tour', 'Five-minute tour'],
+  ['docs/guides/five-minute-tour.tql.md', 'guide/five-minute-tour', 'Five-minute tour'],
   ['docs/guides/embedding-the-runtime.md', 'guide/embedding-the-runtime', 'Embedding the runtime'],
   ['docs/guides/replication-and-search.md', 'guide/replication-and-search', 'Replication and search'],
   ['docs/guides/typeqlite-language.md', 'guide/typeqlite-language', 'The TypeQLite language'],
