@@ -6,8 +6,7 @@ import { describe, expect, it } from 'vitest';
 // @ts-expect-error -- a plain ES module with no declarations, shared with tools/tour.mjs.
 import { CELL_LANGUAGES, headingsOf, parseTour } from '../../../tools/tour-doc.mjs';
 import { FENCE_LANGUAGES } from '../src/markdown/protocol';
-import { parseNotebook, serializeNotebook } from '../src/notebook/format';
-import { describeStore } from '../src/notebook/notebook-sessions';
+import { describeStore, parseNotebook, serializeNotebook } from '@typedblite/notebook';
 
 /**
  * The shape of the five-minute tour (`docs/guides/five-minute-tour.tql.md`): that every block in it is accounted for, that a

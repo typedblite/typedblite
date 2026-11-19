@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { exportMarkdown, exportScript, type ExportCell } from '../src/notebook/export';
-import { parseNotebook } from '../src/notebook/format';
+import { exportMarkdown, exportScript, type ExportCell } from '../src/export.js';
+import { parseNotebook } from '../src/format.js';
 
 const md = (value: string): ExportCell => ({ kind: 'markup', value });
 const tql = (value: string): ExportCell => ({ kind: 'code', value });

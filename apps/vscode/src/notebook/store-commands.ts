@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
 
 import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from './constants.js';
-import { exportMarkdown, exportScript, type ExportCell } from './export.js';
-import { describeStore, type NotebookSessions, type StoreChoice, type StoreMode } from './notebook-sessions.js';
+import { describeStore, exportMarkdown, exportScript, type ExportCell, type NotebookSessions, type StoreChoice, type StoreMode } from '@typedblite/notebook';
 
 export const OPEN_STORE_COMMAND = 'typedblite.notebook.openStore';
 export const COMMIT_COMMAND = 'typedblite.notebook.commit';

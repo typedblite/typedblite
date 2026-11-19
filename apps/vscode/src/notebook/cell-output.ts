@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import { markdownTable, notShown, plainTable, type OutputBlock } from './outputs.js';
+import { markdownTable, notShown, plainTable, type OutputBlock } from '@typedblite/notebook';
 
 /** An output block as VS Code's output items: built-in MIME types only, so no renderer of our own is needed. */
 export function toCellOutput(block: OutputBlock): vscode.NotebookCellOutput {

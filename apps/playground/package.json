@@ -7,6 +7,7 @@
   "private": true,
   "dependencies": {
     "@typedblite/language": "*",
+    "@typedblite/notebook": "*",
     "@typedblite/runtime": "*",
     "langium": "~4.4.2",
     "vscode-languageserver": "~10.1.0"

@@ -5,9 +5,7 @@ import { join, resolve } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
 import { HostClient } from '../src/host/host-client';
-import { runCell, type CellResult } from '../src/notebook/cell-runner';
-import type { RunResult } from '../src/notebook/host-types';
-import { describeStore, NotebookSessions } from '../src/notebook/notebook-sessions';
+import { NotebookSessions, describeStore, runCell, type CellResult, type RunResult } from '@typedblite/notebook';
 
 /**
  * A notebook's store, through the real engine host with no VS Code (ADR-012 N5, feature invariant 3): in memory until a

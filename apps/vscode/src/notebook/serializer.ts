@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import { CODE_CELL_LANGUAGE, MARKUP_CELL_LANGUAGE } from './constants.js';
-import { newCodeCell, newMarkupCell, parseNotebook, serializeNotebook, type Cell, type CodeCell, type MarkupCell } from './format.js';
+import { newCodeCell, newMarkupCell, parseNotebook, serializeNotebook, type Cell, type CodeCell, type MarkupCell } from '@typedblite/notebook';
 
 /**
  * Reads and writes a notebook file (ADR-012 N2): VS Code's notebook model over the pure format in `format.ts`.

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { runCell, type StatementRunner } from '../src/notebook/cell-runner';
-import type { HostCaller, RunResult } from '../src/notebook/host-types';
-import { NotebookSessions } from '../src/notebook/notebook-sessions';
+import { runCell, type StatementRunner } from '../src/cell-runner.js';
+import type { HostCaller, RunResult } from '../src/host-types.js';
+import { NotebookSessions } from '../src/notebook-sessions.js';
 
 /** A scripted host: what it was asked, and what it answers. */
 function scripted(answers: Record<string, (input: Record<string, unknown>) => unknown>) {

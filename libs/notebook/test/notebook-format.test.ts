@@ -5,8 +5,8 @@ import { resolve } from 'node:path';
 import MarkdownIt from 'markdown-it';
 import { describe, expect, it } from 'vitest';
 
-import { FENCE_LANGUAGES, fenceLanguage } from '../src/markdown/protocol';
-import { newCodeCell, newMarkupCell, parseNotebook, serializeNotebook, type CodeCell, type Notebook } from '../src/notebook/format';
+import { FENCE_LANGUAGES, fenceLanguage } from '../src/fences.js';
+import { newCodeCell, newMarkupCell, parseNotebook, serializeNotebook, type CodeCell, type Notebook } from '../src/format.js';
 
 const ROOT = resolve(__dirname, '../../..');
 

@@ -1,4 +1,4 @@
-import { FENCE_LANGUAGES, fenceLanguage } from '../markdown/protocol.js';
+import { FENCE_LANGUAGES, fenceLanguage } from './fences.js';
 
 /**
  * The notebook file format (ADR-012 N2): a Markdown file in which each top-level fenced `typeql` block is a code
