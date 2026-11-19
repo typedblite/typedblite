@@ -47,6 +47,10 @@
     "./wasm": {
       "types": "./out/wasm.d.ts",
       "default": "./out/wasm.js"
+    },
+    "./debug": {
+      "types": "./out/debug.d.ts",
+      "default": "./out/debug.js"
     }
   },
   "dependencies": {

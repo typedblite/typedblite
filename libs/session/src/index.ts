@@ -4,6 +4,7 @@ export {
   Session,
   SessionClosedError,
   type ControlResult,
+  type DebugResult,
   type Diagnostics,
   type RefusalReason,
   type Row,
