@@ -7,6 +7,8 @@ import {
   type TypeDBLiteSchemaSnapshot,
 } from '@typedblite/runtime';
 
+import { attachStepHook, StepRecorder, type Recording, type RecordingLimits } from '@typedblite/runtime/debug';
+
 import { classifyStatement } from './classify.js';
 
 /** The diagnostics of a run: its execution facts (ADR-004), and the diagnostic of a refusal. */
@@ -41,6 +43,15 @@ export type RunResult =
       readonly diagnostics: Diagnostics;
     }
   | { readonly kind: 'refused'; readonly reason: RefusalReason; readonly message: string; readonly diagnostics: Diagnostics };
+
+/**
+ * What `Session.debug` answered: the statement's result, as `run` gives it, and what it did.
+ * @internal
+ */
+export interface DebugResult {
+  readonly result: RunResult;
+  readonly recording: Recording;
+}
 
 /** What `begin`, `commit` and `rollback` answered. */
 export type ControlResult =
@@ -150,6 +161,30 @@ export class Session {
     } catch (error) {
       return refusalOf(error);
     }
+  }
+
+  /**
+   * Run one statement as `run` does, with a step recorder attached: its result, and a recording of what it did
+   * (ADR-014 B1). A refusal is recorded with where it happened. Not part of the API: the engine host's
+   * `session.debug` is its caller, and it changes when the debugger does.
+   * @internal
+   */
+  async debug(source: string, limits?: Partial<RecordingLimits>): Promise<DebugResult> {
+    const recorder = new StepRecorder(limits);
+    const interpreter = this.interpreter;
+    if (!interpreter) return { result: refused('closed', 'The session is closed.'), recording: recorder.finish() };
+    attachStepHook(interpreter, recorder);
+    let result: RunResult;
+    try {
+      result = await this.run(source);
+    } finally {
+      attachStepHook(interpreter, undefined);
+    }
+    if (result.kind === 'refused') {
+      const diagnostic = result.diagnostics.at(-1);
+      recorder.refused(result.message, diagnostic?.code === undefined ? undefined : String(diagnostic.code), diagnostic?.range);
+    }
+    return { result, recording: recorder.finish() };
   }
 
   /** Open a transaction. Statements join it until `commit` or `rollback`. */

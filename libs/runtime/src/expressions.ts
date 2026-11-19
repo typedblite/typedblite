@@ -1046,6 +1046,15 @@ function checkLetShape(statement: LetPattern, refuse: Refuse): void {
 }
 
 /**
+ * Watches `applyValueStatements` for the step hook (`step-hook.ts`): each comparison as it is evaluated, and each
+ * `let` with the rows it received and left. Never changes what is evaluated, or in what order.
+ */
+export interface ValueStatementObserver {
+  compared(comparison: ComparisonPattern, passed: boolean): void;
+  bound(statement: LetPattern, rowsIn: number, rowsOut: number): void;
+}
+
+/**
  * Apply the value statements to one combination: each `let` (already in dependency order) binds
  * its variables; each comparison filters. Answers every extension that survives — none when a
  * comparison does not hold or a schema call answers nothing, several when one answers several
@@ -1058,6 +1067,7 @@ export function applyValueStatements(
   concept: (variable: string) => 'thing' | 'type' | undefined,
   refuse: Refuse,
   schema?: SchemaContext,
+  observer?: ValueStatementObserver,
 ): Array<Map<string, ValueBinding>> {
   const envOf = (values: ReadonlyMap<string, ValueBinding>): Environment => (variable) => {
     const bound = values.get(variable);
@@ -1106,12 +1116,15 @@ export function applyValueStatements(
         );
       }
       const right = evaluate(comparison.right, env, refuse, schema);
-      if (!compare(comparison.comparator, left, right, refuse, rangeOf(comparison))) return false;
+      const holds = compare(comparison.comparator, left, right, refuse, rangeOf(comparison));
+      observer?.compared(comparison, holds);
+      if (!holds) return false;
     }
     return true;
   };
   filterReady();
   for (const statement of statements.lets) {
+    const before = rows.length;
     rows = rows.flatMap((values) => {
       const env = envOf(values);
       if (isSchemaCall(statement.expression)) {
@@ -1134,6 +1147,7 @@ export function applyValueStatements(
       }
       return [bind(values, [statement.variable], [evaluate(statement.expression, env, refuse, schema)])];
     });
+    observer?.bound(statement, before, rows.length);
     filterReady();
   }
   return rows.filter((values) => passes(values, pending));
