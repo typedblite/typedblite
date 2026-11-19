@@ -75,9 +75,8 @@ that classify as reads. `--mcp-write` opts into writes. HTTP MCP is loopback onl
 `app-sidecar` and `app-http` for four transports, and `app-main` for the entry point and mode
 dispatch. The host declares its operations once and writes no transport of its own. The editor's
 client uses `SidecarClient`. Those packages have no MCP transport: **where MCP lives (in the host,
-or as a new `app-mcp` in devx-micro) is deferred** and is decided at Phase 04. Six of the seven
-packages are at 0.2.1 on the local registry (checked 2026-11-19). **`app-main` is not published
-there yet**, and none is on npmjs.org, so **a public `npm ci` needs all of them published first**.
+or as a new `app-mcp` in devx-micro) is deferred** and is decided at Phase 04. All seven
+packages are on the local registry (checked 2026-11-19), and none is on npmjs.org, so **a public `npm ci` needs all of them published first**.
 That blocks publishing the repository, not building the host.
 
 ## Consequences
