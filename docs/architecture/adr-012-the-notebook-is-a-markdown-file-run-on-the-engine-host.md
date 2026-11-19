@@ -43,7 +43,13 @@ cell. The notebook type is `typeqlite-notebook`, for `*.tql.md` by default, and 
 "Open With" (`priority: option`), so the existing guides open and run with no conversion, GitHub renders them, and
 a diff reads as prose. **Outputs are not stored.** The serializer round-trips exact bytes: a code cell keeps its own
 opening and closing fence lines, and an unedited notebook is written back unchanged. The fence languages are those
-of ADR-010 (`typeql`, `typeqlite`, `tql`).
+of ADR-010 (`typeql`, `typeqlite`, `tql`). **Made exact in Phase 02:** VS Code gives one `priority` to a notebook type,
+and `*.md` cannot be a default, so there are **two types over one serializer**: `typeqlite-notebook` for `*.tql.md`
+(the default editor) and `typeqlite-notebook-markdown` for any `*.md` (`priority: option`, "Open With"). Only a
+top-level fence with no indentation is a cell: a fence inside another fence, a block quote or a list is text.
+Blank lines belong to the cell before them (or to the head of the file), never the one after, so a cell inserted
+between two others takes its own spacing. A code cell whose text holds a closing-fence line is written inside a longer
+fence, so it reads back whole.
 
 **N3. The kernel is an engine-host session.** One session per open notebook, opened on the first run through the
 extension's `HostClient`. Restart is `session.restart`. A cell is run by the host and by nothing else (feature

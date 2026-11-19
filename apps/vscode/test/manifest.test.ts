@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TEXTMATE_OUT } from '../../../libs/language/src/typeqlite-textmate';
 import { HOST_NODE_SETTING, HOST_REQUEST_COMMAND } from '../src/host/constants';
+import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from '../src/notebook/constants';
 import { FENCE_LANGUAGES } from '../src/markdown/protocol';
 import { THEME_BRIDGE_ID, THEME_FILES_COMMAND } from '../src/markdown/theme-source';
 
@@ -30,8 +31,8 @@ describe('the manifest agrees with langium-config.json', () => {
     expect([...contributed.extensions].sort()).toEqual([...language.fileExtensions].sort());
   });
 
-  it('activates on that language', () => {
-    expect(manifest.activationEvents).toEqual([`onLanguage:${language.id}`]);
+  it('activates on that language, and on opening either notebook type', () => {
+    expect(manifest.activationEvents).toEqual([`onLanguage:${language.id}`, `onNotebook:${NOTEBOOK_TYPE}`, `onNotebook:${NOTEBOOK_TYPE_MARKDOWN}`]);
   });
 
   it('points its grammar at the generated TextMate file, under the scope that file declares', () => {
@@ -94,6 +95,21 @@ describe('the manifest agrees with langium-config.json', () => {
   it('bundles its dependencies rather than shipping node_modules', () => {
     expect(manifest.vsce).toEqual({ dependencies: false });
     expect(manifest.main).toBe('./out/extension.cjs');
+  });
+
+  // ADR-012 N2: `*.tql.md` is the notebook's own file and opens as one; any other `*.md` is a notebook only by choice, so
+  // no Markdown file is taken over.
+  it('contributes the notebook: `*.tql.md` by default, any `*.md` only as an option', () => {
+    const [own, any] = manifest.contributes.notebooks;
+    expect(own).toMatchObject({ type: NOTEBOOK_TYPE, priority: 'default', selector: [{ filenamePattern: '*.tql.md' }] });
+    expect(any).toMatchObject({ type: NOTEBOOK_TYPE_MARKDOWN, priority: 'option', selector: [{ filenamePattern: '*.md' }] });
+    expect(manifest.contributes.notebooks).toHaveLength(2);
+  });
+
+  it('registers one serializer for each notebook type, with outputs transient', () => {
+    const source = readFileSync(resolve(APP, 'src/extension.ts'), 'utf8');
+    expect(source).toContain('for (const type of [NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN])');
+    expect(source).toContain('registerNotebookSerializer(type, serializer, { transientOutputs: true })');
   });
 
   it('contributes the engine host command, hidden from the palette, and the setting that names its node', () => {

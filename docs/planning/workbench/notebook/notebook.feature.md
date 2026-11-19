@@ -11,7 +11,7 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Notebook — Feature Doc
 
-> **Status:** 🚧 Phase 00 complete (2026-11-19), Phase 02 next · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
+> **Status:** 🚧 Phase 02 complete (2026-11-19), Phase 03 next · **Written:** 2026-11-17 · **Branch:** `feat/notebook`, from
 > `main` · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete)
 > · **Governed by:** [ADR-012](../../../architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) · **Shares work with:** [Graph Explorer](../graph-explorer/graph-explorer.feature.md) and
 > [Debugger](../debugger/debugger.feature.md)
@@ -124,8 +124,8 @@ it did not show, so the editor does not freeze.
 Each item names where it is to be proven. "e2e" means `nx run typeqlite-vscode:e2e` against the
 packaged `.vsix`.
 
-- [ ] The serializer round-trips: parse then serialize gives the same bytes for a fixture notebook,
-      and records no outputs by default. *Spec, without VS Code.*
+- [x] The serializer round-trips: parse then serialize gives the same bytes for a fixture notebook,
+      and records no outputs by default. *Spec, without VS Code.* (Every tracked Markdown file in the repository, not one fixture.)
 - [ ] A cell runs through the engine host, and a later cell sees what an earlier cell defined and
       inserted. *Host spec, without VS Code.*
 - [ ] A schema defined in one cell resolves in another, in diagnostics and in completion. *Language
@@ -187,7 +187,7 @@ fixture notebook, runs its cells and asserts the outputs. Pixel tests are not us
 | - | ----- | ------ | ------- |
 | 00 | Scope, the file format, the shared engine host, and the ADR | Complete | [summary](phases/00-scope-and-adr/summary.md) |
 | 01 | ~~Engine host with a session~~ — now the [engine-host feature](../engine-host/engine-host.feature.md), built first | Moved | |
-| 02 | Format: the serializer and the notebook type | Not started | |
+| 02 | Format: the serializer and the notebook type | Complete | [summary](phases/02-format/summary.md) |
 | 03 | Run: the controller, run all, restart, outputs for rows, JSON, facts and refusals | Not started | |
 | 04 | Language services across cells | Not started | |
 | 05 | Store choice, output bounds, export | Not started | |

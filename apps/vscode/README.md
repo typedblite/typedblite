@@ -59,6 +59,23 @@ The engine never sees this warning. It is produced by the editor alone.
   colours instead. On GitHub, TypeQLite code blocks are plain: GitHub has no TypeQL grammar, and allows
   no colours of a page's own.
 
+## Notebooks
+
+A **TypeQLite notebook** is a Markdown file: each fenced `typeql` block is a code cell, and the text between them is
+a Markdown cell ([ADR-012](../../docs/architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md)).
+
+- **`*.tql.md`** opens as a notebook. **Any other `.md` file** stays a Markdown file, and opens as a notebook only
+  when you choose **Open With… → TypeQLite Notebook (any Markdown file)**, so the guides open and read as notebooks
+  without being renamed.
+- **Opening and saving changes nothing.** The file is written back byte for byte unless you edit a cell, and an edit
+  changes only that cell's lines, so a notebook diffs like prose. **Outputs are never saved**, and running a cell does
+  not mark the notebook changed.
+- A fence is a cell only at the top level of the document. A `typeql` fence inside another fenced block, a block
+  quote or a list item is text.
+- A cell whose text contains a line of three backticks is written inside a longer fence, so it reads back whole.
+
+**Running a cell is not built yet** (the notebook's next phase): for now a notebook opens, edits and saves.
+
 ## The engine host
 
 The extension ships the TypeDBLite **engine host**, a separate process that runs TypeQLite statements in sessions

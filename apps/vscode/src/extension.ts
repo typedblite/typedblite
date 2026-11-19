@@ -12,6 +12,8 @@ import { HIGHLIGHT_BLOCKS, type HighlightBlocksParams, type HighlightBlocksResul
 import { loadTheme, THEME_SETTINGS } from './markdown/theme-loader.js';
 import { HOST_NODE_SETTING, HOST_REQUEST_COMMAND } from './host/constants.js';
 import { HostClient, type HostEnvelope } from './host/host-client.js';
+import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from './notebook/constants.js';
+import { TypeQLiteNotebookSerializer } from './notebook/serializer.js';
 
 let client: LanguageClient | undefined;
 let host: HostClient | undefined;
@@ -47,6 +49,12 @@ export async function activate(
     configuredNode: () => vscode.workspace.getConfiguration().get<string>(HOST_NODE_SETTING) || undefined,
   });
   host = hostClient;
+  // The notebook file format (ADR-012 N2). `transientOutputs`: outputs are never saved, and running a cell does not mark
+  // the notebook changed. Registered before the language server starts, so opening a notebook does not wait for it.
+  const serializer = new TypeQLiteNotebookSerializer();
+  for (const type of [NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN]) {
+    context.subscriptions.push(vscode.workspace.registerNotebookSerializer(type, serializer, { transientOutputs: true }));
+  }
   context.subscriptions.push(
     hostClient,
     vscode.commands.registerCommand(HOST_REQUEST_COMMAND, (operation: string, input?: Record<string, unknown>): Promise<HostEnvelope> => hostClient.request(operation, input)),
