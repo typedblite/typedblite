@@ -83,7 +83,12 @@ export async function activate(
     },
   };
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: 'typeqlite' }],
+    // A notebook's code cells are TypeQLite documents too, under their own scheme (ADR-012 N4): the language features
+    // (diagnostics, completion, definition, rename) answer in a cell as they do in a file.
+    documentSelector: [
+      { scheme: 'file', language: 'typeqlite' },
+      { scheme: 'vscode-notebook-cell', language: 'typeqlite' },
+    ],
   };
   const started = new LanguageClient('typeqlite', 'TypeQLite', serverOptions, clientOptions);
   client = started;

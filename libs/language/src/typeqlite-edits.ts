@@ -244,7 +244,7 @@ export class TypeQLiteCodeActionProvider implements CodeActionProvider {
     const site = this.labels.siteAt(document, document.textDocument.offsetAt(diagnostic.range.start));
     if (!site) return [];
     return this.labels
-      .candidates(site.kind, site.relation)
+      .candidates(site.kind, site.relation, document.uri)
       .map((node) => (node as { name?: string }).name)
       .filter((name): name is string => name !== undefined);
   }
