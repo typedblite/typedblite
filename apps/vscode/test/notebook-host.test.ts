@@ -126,7 +126,7 @@ describe('cells through the engine host', () => {
     await run(SCHEMA);
     await client.stop();
     const result = await run('match $b isa book; select $b;');
-    expect(result.outputs[0]).toMatchObject({ kind: 'text', text: expect.stringContaining('new, empty store') });
+    expect(result.outputs[0]).toMatchObject({ kind: 'text', text: expect.stringContaining('session was opened again') });
     expect(refusal(result)).toMatchObject({ title: 'No schema yet' });
   });
 

@@ -582,6 +582,54 @@ const cases: Record<string, () => Promise<void>> = {
     assert.match(problems[0]!.message, /'title'/, '`title` is notebook A\'s, so notebook B cannot name it');
   },
 
+  async 'a notebook uses a file store only when told to, and a write is permanent only in the mode chosen'() {
+    const notebook = await vscode.workspace.openNotebookDocument(uriOf('store.tql.md'));
+    await vscode.window.showNotebookDocument(notebook);
+    const store = join(WORKSPACE, 'books.db');
+    const readerSees = async () => {
+      const envelope = await vscode.commands.executeCommand<{ data: { kind: string; reason?: string; rows?: { t: string }[] } }>('typedblite.host.request', 'session.run', {
+        location: store,
+        statement: 'match $b isa book, has title $t; select $t;',
+      });
+      return envelope.data;
+    };
+
+    // Nothing opens a file by itself: the notebook runs in memory until a store is chosen.
+    await vscode.commands.executeCommand('typedblite.notebook.openStore', undefined, { kind: 'file', location: store, mode: 'manual' });
+    await vscode.commands.executeCommand('notebook.execute');
+    await waitFor(() => notebook.cellAt(2).executionSummary?.success !== undefined, 'the cells to run');
+    assert.equal(notebook.cellAt(2).executionSummary?.success, true);
+
+    // Held, not committed: another connection to the file sees nothing, not even the schema.
+    const held = await readerSees();
+    assert.equal(held.kind, 'refused');
+    assert.equal(held.reason, 'no-schema');
+
+    await vscode.commands.executeCommand('typedblite.notebook.commit');
+    assert.deepEqual((await readerSees()).rows, [{ t: 'Dune' }], 'a commit makes it permanent');
+
+    // The choice is not in the notebook, and choosing it did not change it.
+    assert.equal(notebook.isDirty, false);
+    assert.ok(!readFileSync(join(WORKSPACE, 'store.tql.md'), 'utf8').includes('books.db'), 'the path is never written into the notebook');
+
+    await vscode.commands.executeCommand('typedblite.notebook.openStore', undefined, { kind: 'memory' });
+  },
+
+  async 'a notebook is exported as a script of its code cells, and as Markdown'() {
+    const notebook = await vscode.workspace.openNotebookDocument(uriOf('reading.tql.md'));
+    await vscode.window.showNotebookDocument(notebook);
+    const script = vscode.Uri.file(join(WORKSPACE, 'exported.tql'));
+    const markdown = vscode.Uri.file(join(WORKSPACE, 'exported.md'));
+    await vscode.commands.executeCommand('typedblite.notebook.exportScript', undefined, script);
+    await vscode.commands.executeCommand('typedblite.notebook.exportMarkdown', undefined, markdown);
+
+    const code = notebook.getCells().filter((c) => c.kind === vscode.NotebookCellKind.Code).map((c) => c.document.getText());
+    assert.equal(readFileSync(script.fsPath, 'utf8'), `${code.join('\n\n')}\n`);
+    const text = readFileSync(markdown.fsPath, 'utf8');
+    assert.ok(text.startsWith('# Reading list'));
+    assert.equal((text.match(/```typeql/g) ?? []).length, code.length);
+  },
+
   // Last, because it deletes a file from the workspace.
   async 'a schema split across files resolves, and deleting the defining file unresolves it'() {
     // `split-attributes.typeqlite` is never opened: the server found it by indexing the workspace.

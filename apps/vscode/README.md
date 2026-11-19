@@ -81,6 +81,26 @@ Diagnostics, completion, hover, go to definition, rename and quick fixes work in
 schema of its own.** A cell sees its own notebook's cells and nothing else, so two notebooks may define the same label,
 and a notebook and the workspace's `.tql` files do not see each other.
 
+### Choosing a store
+
+A notebook runs in **memory** until you choose a file: **"Choose the Notebook's Store…"** (the toolbar's database icon, or
+the status bar). Open an existing store file or create one, and then say **when a write becomes permanent**:
+
+- **Hold changes until I commit** (listed first, the safer one): nothing is permanent until you choose Commit. Commit and
+  Rollback appear on the toolbar while a notebook holds changes, and the next changes are held in turn. A commit the engine
+  refuses is rolled back, with its reason. Closing the notebook without committing makes nothing permanent.
+- **Commit each statement**: every successful statement is permanent at once.
+
+The status bar shows which file and which mode. **The choice is never saved in the notebook and never remembered**, so a
+notebook someone sends you runs in your memory, not on a path from their machine, and saving a notebook never touches a
+store. Switching asks first, because it ends the current session.
+
+### Exporting
+
+"Export the Notebook as a TypeQLite Script…" writes the code cells, one blank line apart, as a `.tql` file. "Export the
+Notebook as Markdown…" writes the prose and every code cell as a fenced `typeql` block. Both are of the notebook as it is in the
+editor, edits included, and neither has outputs.
+
 ### Running cells
 
 Run a cell, or use VS Code's own **Run All**, **Run Above** and **Run Below**. Each notebook has **one store, in

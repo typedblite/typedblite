@@ -93,6 +93,34 @@
         "title": "Restart the Notebook's Store",
         "category": "TypeQLite",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "typedblite.notebook.openStore",
+        "title": "Choose the Notebook's Store\u2026",
+        "category": "TypeQLite",
+        "icon": "$(database)"
+      },
+      {
+        "command": "typedblite.notebook.commit",
+        "title": "Commit the Notebook's Changes",
+        "category": "TypeQLite",
+        "icon": "$(check)"
+      },
+      {
+        "command": "typedblite.notebook.rollback",
+        "title": "Roll Back the Notebook's Changes",
+        "category": "TypeQLite",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "typedblite.notebook.exportScript",
+        "title": "Export the Notebook as a TypeQLite Script\u2026",
+        "category": "TypeQLite"
+      },
+      {
+        "command": "typedblite.notebook.exportMarkdown",
+        "title": "Export the Notebook as Markdown\u2026",
+        "category": "TypeQLite"
       }
     ],
     "menus": {
@@ -104,6 +132,26 @@
         {
           "command": "typedblite.notebook.restart",
           "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'"
+        },
+        {
+          "command": "typedblite.notebook.openStore",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'"
+        },
+        {
+          "command": "typedblite.notebook.exportScript",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'"
+        },
+        {
+          "command": "typedblite.notebook.exportMarkdown",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'"
+        },
+        {
+          "command": "typedblite.notebook.commit",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown' && typedblite.notebook.holdsChanges"
+        },
+        {
+          "command": "typedblite.notebook.rollback",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown' && typedblite.notebook.holdsChanges"
         }
       ],
       "notebook/toolbar": [
@@ -111,6 +159,21 @@
           "command": "typedblite.notebook.restart",
           "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'",
           "group": "navigation@1"
+        },
+        {
+          "command": "typedblite.notebook.openStore",
+          "when": "notebookType == 'typeqlite-notebook' || notebookType == 'typeqlite-notebook-markdown'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "typedblite.notebook.commit",
+          "when": "typedblite.notebook.holdsChanges",
+          "group": "navigation@3"
+        },
+        {
+          "command": "typedblite.notebook.rollback",
+          "when": "typedblite.notebook.holdsChanges",
+          "group": "navigation@4"
         }
       ]
     },

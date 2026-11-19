@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
 
-import { toCellOutput } from '../src/notebook/controller';
+import { toCellOutput } from '../src/notebook/cell-output';
 import { markdownTable, notShown, plainTable } from '../src/notebook/outputs';
 
 const text = (item: vscode.NotebookCellOutputItem) => new TextDecoder().decode(item.data);

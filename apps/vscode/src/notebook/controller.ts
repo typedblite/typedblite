@@ -4,7 +4,7 @@ import { runCell, type CellResult } from './cell-runner.js';
 import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from './constants.js';
 import type { HostCaller } from './host-types.js';
 import type { NotebookSessions } from './notebook-sessions.js';
-import { markdownTable, notShown, plainTable, type OutputBlock } from './outputs.js';
+import { toCellOutput } from './cell-output.js';
 
 /** The command that ends a notebook's store and opens it again (ADR-012 N3: restart is `session.restart`). */
 export const RESTART_COMMAND = 'typedblite.notebook.restart';
@@ -14,35 +14,6 @@ export const MAX_ROWS_SETTING = 'typedblite.notebook.maxRows';
 export const DEFAULT_MAX_ROWS = 1000;
 
 const NOTEBOOK_TYPES = [NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN] as const;
-
-/** An output block as VS Code's output items: built-in MIME types only, so no renderer of our own is needed. */
-export function toCellOutput(block: OutputBlock): vscode.NotebookCellOutput {
-  const { NotebookCellOutput, NotebookCellOutputItem } = vscode;
-  switch (block.kind) {
-    case 'table': {
-      const cut = notShown(block);
-      const markdown = markdownTable(block.columns, block.rows) + (cut ? `\n\n_${cut}_` : '');
-      const plain = plainTable(block.columns, block.rows) + (cut ? `\n\n${cut}` : '');
-      // The richest the output area can draw comes first, the plain table for anything that cannot.
-      return new NotebookCellOutput([NotebookCellOutputItem.text(markdown, 'text/markdown'), NotebookCellOutputItem.text(plain)]);
-    }
-    case 'json':
-      return new NotebookCellOutput([NotebookCellOutputItem.json(block.documents.length === 1 ? block.documents[0] : block.documents)]);
-    case 'facts':
-      return new NotebookCellOutput([NotebookCellOutputItem.stdout(`${block.lines.join('\n')}\n`)]);
-    case 'text':
-      return new NotebookCellOutput([NotebookCellOutputItem.text(block.text)]);
-    case 'heading':
-      return new NotebookCellOutput([NotebookCellOutputItem.text(`**${block.text}**`, 'text/markdown'), NotebookCellOutputItem.text(block.text)]);
-    case 'refusal': {
-      const where = block.line === undefined ? '' : ` (line ${block.line}, column ${block.column})`;
-      const error = new Error(`${block.message}${where}`);
-      error.name = block.title;
-      error.stack = '';
-      return new NotebookCellOutput([NotebookCellOutputItem.error(error)]);
-    }
-  }
-}
 
 const maxRows = (): number => {
   const configured = vscode.workspace.getConfiguration().get<number>(MAX_ROWS_SETTING, DEFAULT_MAX_ROWS);
@@ -61,7 +32,8 @@ export function registerNotebookControllers(context: vscode.ExtensionContext, ho
     const controller = vscode.notebooks.createNotebookController(`${type}-controller`, type, 'TypeQLite');
     controller.supportedLanguages = ['typeqlite'];
     controller.supportsExecutionOrder = true;
-    controller.description = 'In-memory store';
+    // Which store the notebook runs on is per notebook, so the status bar says it, not the kernel (store-commands.ts).
+    controller.description = 'Runs on the engine host';
     controller.executeHandler = async (cells, notebook) => {
       const runner = sessions.runnerFor(notebook.uri.toString());
       for (const cell of cells) {

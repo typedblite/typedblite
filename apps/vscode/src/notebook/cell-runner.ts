@@ -66,7 +66,7 @@ export async function runCell(source: string, host: HostCaller, session: Stateme
       return { outputs, failed: true };
     }
     if (answered.reopened) {
-      outputs.push({ kind: 'text', text: 'The engine host had stopped, so this notebook has a new, empty store: what earlier cells defined and inserted is gone.' });
+      outputs.push({ kind: 'text', text: 'The engine host had stopped, so this notebook\'s session was opened again. What was held in memory, or in a transaction not yet committed, is gone.' });
     }
     const { result } = answered;
 

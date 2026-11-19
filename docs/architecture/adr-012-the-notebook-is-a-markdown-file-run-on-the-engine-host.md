@@ -113,6 +113,24 @@ invariant 1). A cell is not wrapped in a transaction.
 - **The public API grew, and changed a little:** `schemaOwnerOf` and friends are exported, and `workspaceHasSchema`,
   `resolve` and `candidates` take an optional context (workspace by default). The changelog records it.
 
+## Made exact in Phase 05 (store and export)
+
+- **The store is chosen through a dialog, and an explicit argument for a script.** "Choose the Notebook's Store…" offers: open
+  an existing file, create one, or go back to memory. A file also needs a **mode**, picked by the user, with the safer
+  one first: **hold changes until I commit** (a transaction is held open; Commit and Rollback appear on the toolbar only
+  while a notebook holds its changes) or **commit each statement**. There is no default mode applied without the user
+  choosing one.
+- **It is shown, and never saved or remembered.** The status bar says which file and when a write is permanent. The choice is
+  not written into the notebook (a spec and the e2e check the path is not in the file) and not kept between sessions, so a
+  shared notebook runs in the reader's memory. Saving a notebook never touches a store.
+- **Switching ends the session** and what it held in memory or in an uncommitted transaction is lost, so the user is asked
+  first. A path that will not open costs the notebook nothing: the new session is opened before the old one is closed, except for
+  the same file, whose old session may hold its write lock.
+- **A commit the engine refuses is rolled back** and says why; the notebook goes on holding changes. Closing a notebook with
+  uncommitted changes makes none of them permanent. A host restarted under a notebook opens the file again in the same mode.
+- **Export** is of the notebook as the editor holds it, edits included: a **script** of the code cells, one blank line apart, and
+  **Markdown** with every code cell as a fenced `typeql` block (the guides' spelling), neither with outputs.
+
 ## Not decided here
 
 How a table and a refusal render (Phase 03), the export formats (Phase 05), and whether a Markdown cell's own
