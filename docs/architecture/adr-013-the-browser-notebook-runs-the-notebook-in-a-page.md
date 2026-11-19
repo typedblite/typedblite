@@ -20,7 +20,8 @@ extends: [adr-009, adr-012]
 
 ## Context
 
-A reader of the site could run TypeQLite in the playground, but only as an empty editor. The five-minute tour had become
+A reader of the site could run TypeQLite in the playground: three examples, or a program of their own, in one editor,
+but not a guided walk through the language. The five-minute tour had become
 a notebook (ADR-012) that needs VS Code and Node. The founder wanted a "try it in the browser" page: the tour's TypeQLite
 half, run in the page, with no installation and no server. Cloudflare cannot host a code-server, and this does not need
 one: everything the notebook needs runs in a browser already.
