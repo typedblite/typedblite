@@ -11,7 +11,7 @@ depends-on: [editor]
 
 # TypeQLite Engine Host — Feature Doc
 
-> **Status:** 🚧 Phase 00 complete (2026-11-19), Phase 01 next · **Written:** 2026-11-17 · **Branch:** `feat/engine-host`,
+> **Status:** 🚧 Phase 01 complete (2026-11-19), Phase 02 next · **Written:** 2026-11-17 · **Branch:** `feat/engine-host`,
 > from `main` · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md)
 > (complete) · **First feature of:** the [Workbench initiative](../workbench.initiative.md) ·
 > **Governed by:** [ADR-011](../../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md)
@@ -233,7 +233,7 @@ cannot drift from the core. The sidecar and CLI are driven as child processes fr
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
 | 00 | Scope, the NestJS and launch decisions, operation names, and the ADR | Complete | [summary](phases/00-scope-and-adr/summary.md) |
-| 01 | The core: the session aggregate, its commands and queries, the shared classifier | Not started | |
+| 01 | The core: the session aggregate, its commands and queries, the shared classifier | Complete | [summary](phases/01-core/summary.md) |
 | 02 | The host on `@devx-micro/app-*`: operations declared once, CLI, REPL and sidecar entry points, and the parity spec | Not started | |
 | 03 | HTTP through `app-http`, as generic dispatch | Not started | |
 | 04 | MCP transport: tools, the read-only default, the write tier. **Where it lives is deferred** (host or a new `app-mcp`) | Not started | |

@@ -5,7 +5,8 @@
     "libs/runtime/src/index.ts",
     "libs/runtime/src/wasm.ts",
     "libs/language/src/index.ts",
-    "libs/content-revision/src/index.ts"
+    "libs/content-revision/src/index.ts",
+    "libs/session/src/index.ts"
   ],
   "tsconfig": "tsconfig.typedoc.json",
   "readme": "none",

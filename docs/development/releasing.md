@@ -12,7 +12,7 @@ How the npm packages are versioned, checked and published. The promises a versio
 
 | Artifact | Where | Version |
 | --- | --- | --- |
-| `@typedblite/content-revision`, `@typedblite/language`, `@typedblite/runtime` | npm | One version for all four, released together |
+| `@typedblite/content-revision`, `@typedblite/language`, `@typedblite/runtime`, `@typedblite/session` | npm | One version for all five, released together |
 | `typedblite` (the CLI, `apps/cli`) | npm | The same version |
 | The `typeqlite` VS Code extension, and the TypeQLite Theme Bridge (`typeqlite-theme`) | VS Code Marketplace and Open VSX | Each its own version: [below](#the-vs-code-extensions) |
 | `typedblite-conformance`, the playground, the sync demo | Not published | `private: true` |
@@ -21,7 +21,7 @@ The list of published packages is [`tools/publishable.mjs`](../../tools/publisha
 in `nx.json` must name the same projects, and `npm run check-packages` fails if it doesn't.
 
 **The tool is Nx release** (`nx release`), not Changesets. The workspace already runs on Nx, so it adds no
-dependency. It versions the four packages as one fixed group, rewrites their dependencies on each other,
+dependency. It versions the five packages as one fixed group, rewrites their dependencies on each other,
 updates the lockfile, and publishes in dependency order. Its config is the `release` block in `nx.json`.
 The changelog stays hand-written ([CHANGELOG.md](../../CHANGELOG.md), Keep a Changelog), so Nx's changelog
 generation is off.
@@ -46,7 +46,7 @@ release workflow:
   than the one being released; or a private workspace package depends on a published one at anything but
   `"*"`. It also checks `nx.json`: the release projects, and that publishing goes to
   `https://registry.npmjs.org/`.
-- **`npm run clean-room`** ([`tools/clean-room.mjs`](../../tools/clean-room.mjs)) packs the four tarballs and
+- **`npm run clean-room`** ([`tools/clean-room.mjs`](../../tools/clean-room.mjs)) packs the five tarballs and
   installs them in an empty directory outside the repository, with their dependencies from the registry, and
   then: runs the CLI through its `bin` link against a file database; runs the runtime on `node:sqlite` with the
   language and content-revision packages; runs it on WASM SQLite in Node; type-checks the published
@@ -69,7 +69,7 @@ Only the maintainer can do these, once, before the first release:
 3. **Create a GitHub environment named `npm`** (Settings → Environments) with yourself as a required
    reviewer, so that a pushed tag waits for your approval before anything is published.
 4. **The first publish of each package needs a token**, because npm only lets a package that exists have a
-   trusted publisher. Create a granular access token limited to the four packages (and the org, to create
+   trusted publisher. Create a granular access token limited to the five packages (and the org, to create
    them), with a short expiry. Save it as the repository secret `NPM_TOKEN`.
 5. **After the first publish, switch to trusted publishing.** On npmjs.com, for each package: Settings →
    Trusted publishing → GitHub Actions, repository `typedblite/typedblite`, workflow `release.yml`, environment `npm`. Then delete the `NPM_TOKEN` secret,
@@ -84,7 +84,7 @@ Only the maintainer can do these, once, before the first release:
    npm exec nx -- release version 0.1.0-rc.1
    ```
 
-   That builds, runs `check-packages`, sets the version in the four manifests and their dependencies on each
+   That builds, runs `check-packages`, sets the version in the five manifests and their dependencies on each
    other, updates the lockfile, and commits `chore(release): v0.1.0-rc.1`. It does **not** tag. Run
    `npm run gate`, and open a pull request.
 2. **Merge it** (a merge commit, as always).
@@ -163,7 +163,7 @@ and `ovsx` 1.3.0's source. **Not checked:** the workflow, the tokens, and a real
 Run by hand on Linux, Node 24.19, on 2026-11-15:
 
 - `check-packages` and `clean-room` pass, and each of their checks has been seen to fail on a broken package.
-- `nx release version 0.1.0-rc.1` for real, without the commit: the four manifests, their internal
+- `nx release version 0.1.0-rc.1` for real, without the commit: the five manifests, their internal
   dependencies and the lockfile moved to `0.1.0-rc.1`, and every private workspace package still linked the
   local copy. The clean room passed at that version. Then back to `0.0.1`.
 - `nx release publish --dry-run --tag next`: three packages (the CLI is private) to

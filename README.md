@@ -84,8 +84,10 @@ Or try it in a browser, with three examples to start from: `npm run playground`,
 | [`@typedblite/language`](libs/language/) | Langium grammar, generated AST, and language services for TypeQLite. Parsing, validation, formatting, semantic tokens, and scope resolution live here. |
 | [`@typedblite/runtime`](libs/runtime/) | The engine: query interpreter, storage, schema changes, change log, replication and full-text search. The working database lives here. |
 | [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
+| [`@typedblite/session`](libs/session/) | A TypeQLite session over the engine: one open store with transactions, a restart and a close, and the statement classifier the CLI and the engine host share. |
 | [`typedblite-conformance`](libs/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
 | [`typedblite`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
+| [`@typedblite/engine-host`](apps/engine-host/) (private) | The workbench's engine host: a NestJS CQRS app that runs statements in sessions, for the graph explorer, debugger and notebook (ADR-011). In progress: the core only, no transport yet. |
 | [`typedblite-sync-demo`](apps/sync-demo/) | Offline-first sync, shown end to end: a browser, a desktop app and an Android phone, each with its own TypeDBLite store, replicating through a TypeDBLite hub. Cut any link or stop the hub, and watch them converge. |
 | [`typedblite-playground`](apps/playground/) | Try TypeQLite in a browser with nothing to install: the engine on WASM SQLite in a Web Worker, three examples, and a link that carries the whole program. `npm exec nx -- run playground:serve` |
 | [`typeqlite` (VS Code extension)](apps/vscode/) | The TypeQLite editor: diagnostics, cross-file navigation, hover, completion, rename, quick fixes, formatting and semantic highlighting, from a Langium language server that runs the language library unchanged (ADR-008). |
@@ -201,7 +203,7 @@ npm exec nx -- run typedblite-runtime:build
 npm exec nx -- run typedblite-runtime:test
 ```
 
-Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode`, `sync-demo` and `playground`. Set `CI=true` to collect coverage into `coverage/`. **`npm run gate`** runs the whole check, from a clean tree: build, type-check, the tests with the 80% coverage floor, and the WASM, browser and VS Code suites. GitHub Actions is off for now, so it is the check before a pull request. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
+Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-session`, `engine-host`, `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode`, `sync-demo` and `playground`. Set `CI=true` to collect coverage into `coverage/`. **`npm run gate`** runs the whole check, from a clean tree: build, type-check, the tests with the 80% coverage floor, and the WASM, browser and VS Code suites. GitHub Actions is off for now, so it is the check before a pull request. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
 
 ## Test fixtures
 
