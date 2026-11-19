@@ -31,6 +31,7 @@ nothing to decide. This phase writes no code.
 - [x] D1 launch, D2 NestJS, D3 replace the CLI session, D4 names, D5 two sessions, D6 one statement
       per run, D7 debugger left open, D8 MCP tiers, D9 internal operation set (all accepted by the
       founder, 2026-11-19)
+- [x] D10 build on `@devx-micro/app-*` (founder, 2026-11-19); the MCP location is deferred to Phase 04
 
 ## Outputs
 

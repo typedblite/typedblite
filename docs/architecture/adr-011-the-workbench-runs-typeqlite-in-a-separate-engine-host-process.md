@@ -9,7 +9,7 @@ extends: [adr-008]
 # ADR-011: The workbench runs TypeQLite in a separate engine-host process
 
 - **Status:** Accepted on 2026-11-19. The founder decided on 2026-11-17 that the host is a standalone
-  NestJS CQRS app with five transports, and on 2026-11-19 accepted the nine answers below.
+  NestJS CQRS app with five transports, and on 2026-11-19 accepted the nine answers below, and on 2026-11-19 chose `@devx-micro/app-*` (D10).
 - **Date:** 2026-11-19
 - **Decision owners:** Founder; TypeDBLite maintainers
 - **Extends:** [ADR-008](adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md).
@@ -69,6 +69,15 @@ that classify as reads. `--mcp-write` opts into writes. HTTP MCP is loopback onl
 
 **D9. The operation set is internal.** It is not public API until the host is published. The
 `@typedblite/runtime` exports do not change.
+
+**D10. The host is built on `@devx-micro/app-*`** (the founder's own shared libraries, MPL-2.0):
+`app-runtime` for the one dispatch path and its result envelope, `app-cli`, `app-repl`,
+`app-sidecar` and `app-http` for four transports, and `app-main` for the entry point and mode
+dispatch. The host declares its operations once and writes no transport of its own. The editor's
+client uses `SidecarClient`. Those packages have no MCP transport: **where MCP lives (in the host,
+or as a new `app-mcp` in devx-micro) is deferred** and is decided at Phase 04. The packages are
+at 0.2.1 and not yet published to npm, so **a public `npm ci` needs them published first**. That
+is open, and it blocks publishing the repository, not building the host.
 
 ## Consequences
 

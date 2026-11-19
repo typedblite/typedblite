@@ -234,9 +234,9 @@ cannot drift from the core. The sidecar and CLI are driven as child processes fr
 | - | ----- | ------ | ------- |
 | 00 | Scope, the NestJS and launch decisions, operation names, and the ADR | In progress | [checklist](phases/00-scope-and-adr/checklist.md) |
 | 01 | The core: the session aggregate, its commands and queries, the shared classifier | Not started | |
-| 02 | CLI, REPL and sidecar transports, and the parity spec | Not started | |
-| 03 | HTTP transport, as generic dispatch | Not started | |
-| 04 | MCP transport: tools, the read-only default, the write tier | Not started | |
+| 02 | The host on `@devx-micro/app-*`: operations declared once, CLI, REPL and sidecar entry points, and the parity spec | Not started | |
+| 03 | HTTP through `app-http`, as generic dispatch | Not started | |
+| 04 | MCP transport: tools, the read-only default, the write tier. **Where it lives is deferred** (host or a new `app-mcp`) | Not started | |
 | 05 | The client in `apps/vscode`, packaging, e2e smoke test, docs | Not started | |
 
 ## Phase Intent
@@ -251,10 +251,10 @@ whether NestJS enters the repository. Write the ADR.
 classifier moved out of the CLI. The `typedblite` CLI moves onto them with no change to its specs.
 No transport yet: the specs call the bus.
 
-**02 — CLI, REPL and sidecar.** The three transports that need no server. The sidecar is what the
+**02 — CLI, REPL and sidecar.** Built on `@devx-micro/app-main`, `app-runtime`, `app-cli`, `app-repl` and `app-sidecar` (ADR-011 D10), so the work is declaring the operations and composing them. The three transports that need no server. The sidecar is what the
 editor will use, so it comes first. The unknown-mode-flag refusal and the parity spec land here.
 
-**03 — HTTP.** One generic dispatch route over the operation list.
+**03 — HTTP.** One generic dispatch route over the operation list, through `app-http`.
 
 **04 — MCP.** Stdio and loopback Streamable HTTP. Tools only, reads by default, the write tier
 opt-in, and a spec that a non-loopback host is refused.
@@ -266,7 +266,8 @@ Packaging, the e2e smoke test, `AGENTS.md` and the README.
 
 Anything a phase defers is recorded here, not only in a commit message.
 
-- *(none yet)*
+- **Where MCP lives**, in the host or as `app-mcp` in devx-micro: decided at Phase 04 (2026-11-19).
+- **Publishing `@devx-micro/app-*` to npm**, which a public `npm ci` of this repository needs (ADR-011 D10). Not blocking the build.
 
 ## Key Documents
 
