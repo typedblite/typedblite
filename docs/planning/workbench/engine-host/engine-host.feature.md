@@ -267,7 +267,7 @@ Packaging, the e2e smoke test, `AGENTS.md` and the README.
 Anything a phase defers is recorded here, not only in a commit message.
 
 - **Where MCP lives**, in the host or as `app-mcp` in devx-micro: decided at Phase 04 (2026-11-19).
-- **Publishing `@devx-micro/app-*` to npm**, which a public `npm ci` of this repository needs (ADR-011 D10). Not blocking the build.
+- **Publishing `@devx-micro/app-*`**: `app-main` is not on the local registry yet, and none is on npmjs.org. A public `npm ci` of this repository needs them (ADR-011 D10). Phase 01 needs the local ones only.
 
 ## Key Documents
 
