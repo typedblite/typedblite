@@ -1,7 +1,7 @@
 ---
 kind: feature
-status: proposed
-decided-by: []
+status: in-progress
+decided-by: [adr-011]
 title: TypeQLite Engine Host (a standalone NestJS CQRS app)
 feature: engine-host
 branch: feat/engine-host
@@ -11,10 +11,10 @@ depends-on: [editor]
 
 # TypeQLite Engine Host — Feature Doc
 
-> **Status:** 📋 Proposed, not started · **Written:** 2026-11-17 · **Branch:** `feat/engine-host`,
-> from `main`, not yet cut · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md)
+> **Status:** 🚧 Phase 00 in progress (opened 2026-11-19) · **Written:** 2026-11-17 · **Branch:** `feat/engine-host`,
+> from `main` · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md)
 > (complete) · **First feature of:** the [Workbench initiative](../workbench.initiative.md) ·
-> **Governed by:** an ADR that Phase 00 writes
+> **Governed by:** [ADR-011](../../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md)
 >
 > Request, 2026-11-17: *an initiative covering the graph explorer, debugger and notebook, with the
 > engine host and its session construct.*
@@ -192,7 +192,7 @@ write tier is opt-in. A host that holds real stores must not let an agent write 
 
 ## Open questions for Phase 00
 
-These are for the founder.
+**All nine were answered on 2026-11-19 in [ADR-011](../../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md)** (D1 to D9, in this order). The text below is kept as asked. One check is left: `node:sqlite` in the desktop Electron's Node (Phase 05).
 
 1. ~~**Where the engine runs.**~~ **Largely decided 2026-11-17: a separate process, the host.** What
    remains is **how the editor launches it.** The extension needs a `node` on the user's PATH, or
@@ -232,7 +232,7 @@ cannot drift from the core. The sidecar and CLI are driven as child processes fr
 
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
-| 00 | Scope, the NestJS and launch decisions, operation names, and the ADR | Not started | |
+| 00 | Scope, the NestJS and launch decisions, operation names, and the ADR | In progress | [checklist](phases/00-scope-and-adr/checklist.md) |
 | 01 | The core: the session aggregate, its commands and queries, the shared classifier | Not started | |
 | 02 | CLI, REPL and sidecar transports, and the parity spec | Not started | |
 | 03 | HTTP transport, as generic dispatch | Not started | |
