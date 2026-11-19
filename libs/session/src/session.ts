@@ -3,6 +3,7 @@ import {
   TypeDBLiteInterpreter,
   type ExecutionReport,
   type JsonValue,
+  type SqliteOpener,
   type TypeDBLiteSchemaSnapshot,
 } from '@typedblite/runtime';
 
@@ -56,6 +57,12 @@ export type SessionMode = 'auto' | 'manual';
 export interface SessionOptions {
   /** How long a write waits for another connection's lock before it is refused as `locked`. Default 5000. */
   readonly busyTimeoutMs?: number;
+  /**
+   * How the store is opened. The default is Node's `node:sqlite`; a browser passes the runtime's WASM opener
+   * (`openWasmSqlite` from `@typedblite/runtime/wasm`), so the same session runs there, with the same classifier and the
+   * same refusals.
+   */
+  readonly openDatabase?: SqliteOpener;
 }
 
 /** Thrown by the accessors that return data, when the session is closed. A run returns a refusal instead. */
@@ -210,7 +217,7 @@ export class Session {
   }
 
   private open(): TypeDBLiteInterpreter {
-    return new TypeDBLiteInterpreter(this.location, this.options.busyTimeoutMs ?? 5000);
+    return new TypeDBLiteInterpreter(this.location, this.options.busyTimeoutMs ?? 5000, this.options.openDatabase ? { openDatabase: this.options.openDatabase } : {});
   }
 
   private release(): void {

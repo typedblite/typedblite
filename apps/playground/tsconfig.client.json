@@ -6,5 +6,5 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"], "strict": true, "skipLibCheck": true, "noEmit": true,
     "types": []
   },
-  "include": ["src/main.ts", "src/editor.ts", "src/highlighting.ts", "src/run.ts", "src/share.ts", "src/examples.ts", "src/runner-client.ts", "src/protocol.ts"]
+  "include": ["src/main.ts", "src/editor.ts", "src/highlighting.ts", "src/run.ts", "src/share.ts", "src/examples.ts", "src/runner-client.ts", "src/protocol.ts", "src/notebook/kernel-client.ts", "src/notebook/kernel-protocol.ts", "src/notebook/notebook.ts", "src/notebook/notebook-page.ts", "src/notebook/cell-editor.ts"]
 }

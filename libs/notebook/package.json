@@ -1,0 +1,18 @@
+{
+  "name": "@typedblite/notebook",
+  "description": "The TypeQLite notebook's pure logic, shared by the VS Code extension and the browser notebook: the Markdown file format, running a cell, a notebook's sessions, and how an answer is shown",
+  "version": "0.0.1",
+  "license": "MPL-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "main": "./out/index.js",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "default": "./out/index.js"
+    }
+  }
+}

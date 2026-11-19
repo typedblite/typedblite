@@ -22,6 +22,12 @@ export default defineConfig({
         'src/worker.ts',
         'src/language-worker.ts',
         'src/polyfills.ts',
+        // The browser notebook's page, its cell editors and its kernel's worker: DOM, Monaco and a Worker. Run in Chromium by
+        // `test-browser/notebook.test.ts`. Its kernel (`kernel-core.ts`) and client (`kernel-client.ts`) are unit tested.
+        'src/notebook/notebook.ts',
+        'src/notebook/notebook-page.ts',
+        'src/notebook/cell-editor.ts',
+        'src/notebook/kernel-worker.ts',
         // The `serve` target's entry: it starts the static server, which is tested.
         'src/dev/serve.ts',
       ],

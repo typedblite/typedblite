@@ -1,0 +1,52 @@
+---
+/**
+ * The browser notebook, inside the site's shell: Starlight's header, search, theme switch and sidebar around it.
+ * The page's markup is the notebook's own fragment (`apps/playground/src/notebook.html`, put in `.build/` by the
+ * playground's build); the cells and the prose around them are `try-data.json`, built from
+ * `docs/guides/try-it.tql.md`, and its scripts, workers and `.wasm` are the playground's build output, copied beside
+ * this page's neighbour `/playground/` by `scripts/assemble.mjs` (in `astro dev`, `src/integrations/mount-built.mjs`
+ * serves them in place). Only the colours are the site's: the notebook reads `--pg-*` custom properties, mapped to
+ * Starlight's below.
+ */
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import notebook from '../../../playground/.build/notebook.html?raw';
+import { REPO_PUBLIC, REPO_URL } from '../../scripts/content-map.mjs';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Try it in your browser',
+    description: 'A notebook that runs TypeQLite in your browser: TypeDBLite on WASM SQLite, with nothing to install.',
+    tableOfContents: false,
+    editUrl: REPO_PUBLIC ? `${REPO_URL}/edit/main/docs/guides/try-it.tql.md` : false,
+    head: [
+      { tag: 'link', attrs: { rel: 'stylesheet', href: '/playground/notebook.css' } },
+      { tag: 'link', attrs: { rel: 'stylesheet', href: '/playground/nb.css' } },
+    ],
+  }}
+>
+  <div class="not-content try-it" set:html={notebook} />
+  <script is:inline type="module" src="/playground/notebook.js"></script>
+</StarlightPage>
+
+<style is:global>
+  /* A notebook wants more room than a page of prose. */
+  :root {
+    --sl-content-width: 60rem;
+  }
+  .try-it .nb {
+    --pg-ink: var(--sl-color-text);
+    --pg-muted: var(--sl-color-gray-3);
+    --pg-line: var(--sl-color-hairline);
+    --pg-panel: var(--sl-color-bg);
+    --pg-code: var(--sl-color-gray-6);
+    --pg-accent: var(--sl-color-text-accent);
+    --pg-accent-ink: var(--sl-color-text-invert);
+    --pg-error: var(--sl-color-red);
+    --pg-error-bg: var(--sl-color-red-low);
+    font-family: var(--sl-font-system);
+  }
+  .try-it {
+    margin-top: 1.5rem;
+  }
+</style>

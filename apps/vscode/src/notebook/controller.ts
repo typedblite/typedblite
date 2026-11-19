@@ -1,9 +1,7 @@
 import * as vscode from 'vscode';
 
-import { runCell, type CellResult } from './cell-runner.js';
+import { runCell, type CellResult, type HostCaller, type NotebookSessions } from '@typedblite/notebook';
 import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from './constants.js';
-import type { HostCaller } from './host-types.js';
-import type { NotebookSessions } from './notebook-sessions.js';
 import { toCellOutput } from './cell-output.js';
 
 /** The command that ends a notebook's store and opens it again (ADR-012 N3: restart is `session.restart`). */

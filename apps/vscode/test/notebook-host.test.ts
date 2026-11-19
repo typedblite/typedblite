@@ -2,10 +2,8 @@ import { resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { runCell, type CellResult } from '../src/notebook/cell-runner';
+import { NotebookSessions, runCell, type CellResult, type OutputBlock } from '@typedblite/notebook';
 import { HostClient } from '../src/host/host-client';
-import { NotebookSessions } from '../src/notebook/notebook-sessions';
-import type { OutputBlock } from '../src/notebook/outputs';
 
 /**
  * Cells run through the real engine host, with no VS Code: the bundle the `.vsix` ships (`out/host/sidecar.cjs`), a

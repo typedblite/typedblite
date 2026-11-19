@@ -37,7 +37,7 @@ const PROGRAM_URI = 'file:///playground.tql';
 let environmentReady = false;
 
 /** Monaco asks for its editor worker (word-based features, diffing) through this global. */
-function prepareEnvironment(): void {
+export function prepareEnvironment(): void {
   if (environmentReady) return;
   environmentReady = true;
   (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
@@ -66,7 +66,7 @@ function prepareEnvironment(): void {
  * background and `--pg-ink` for the text, read from the page, so the editor sits in whatever page hosts it.
  * `SURFACE` is only the fallback for a browser that gives no value.
  */
-function applyTheme(container: HTMLElement, scheme: Scheme): void {
+export function applyTheme(container: HTMLElement, scheme: Scheme): void {
   monaco.editor.defineTheme(`typeqlite-${scheme}`, {
     base: scheme === 'dark' ? 'vs-dark' : 'vs',
     inherit: true,
@@ -77,6 +77,19 @@ function applyTheme(container: HTMLElement, scheme: Scheme): void {
     },
   });
   monaco.editor.setTheme(`typeqlite-${scheme}`);
+}
+
+let languageClientStarted = false;
+
+/**
+ * The language server, in its own worker, and Monaco's client for it. The client attaches its providers to Monaco and
+ * syncs every model to the server, so there is nothing more to wire per editor. Started once, however many editors the
+ * page has: the playground's one, or a notebook's cells (`cell-editor.ts`).
+ */
+export function startLanguageClient(): void {
+  if (languageClientStarted) return;
+  languageClientStarted = true;
+  new MonacoLspClient(createTransportToWorker(new Worker(new URL('language-worker.js', import.meta.url), { type: 'module' })));
 }
 
 export function createProgramEditor(container: HTMLElement, options: { onRun: () => void }): ProgramEditor {
@@ -104,9 +117,7 @@ export function createProgramEditor(container: HTMLElement, options: { onRun: ()
     run: () => options.onRun(),
   });
 
-  // The language server, in its own worker. The client attaches its providers to Monaco, and syncs the
-  // model to the server, so there is nothing more to wire.
-  new MonacoLspClient(createTransportToWorker(new Worker(new URL('language-worker.js', import.meta.url), { type: 'module' })));
+  startLanguageClient();
 
   return {
     getValue: () => model.getValue(),

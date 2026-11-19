@@ -23,7 +23,7 @@ if (!existsSync(DIST)) {
   process.exit(1);
 }
 
-for (const required of ['index.html', 'playground/index.html', 'playground/worker.js', 'playground/sqlite3.wasm', 'sync-demo/index.html', 'sync-demo/device.html', 'sync-demo/devices.css', 'sync-demo/hub.js', 'sync-demo/device-worker.js', 'sync-demo/sqlite3.wasm', 'api/index.html', 'sitemap-index.xml', 'pagefind/pagefind.js', 'favicon.svg', '404.html']) {
+for (const required of ['index.html', 'try/index.html', 'playground/notebook.js', 'playground/notebook.css', 'playground/nb.css', 'playground/kernel-worker.js', 'playground/try-data.json', 'playground/index.html', 'playground/worker.js', 'playground/sqlite3.wasm', 'sync-demo/index.html', 'sync-demo/device.html', 'sync-demo/devices.css', 'sync-demo/hub.js', 'sync-demo/device-worker.js', 'sync-demo/sqlite3.wasm', 'api/index.html', 'sitemap-index.xml', 'pagefind/pagefind.js', 'favicon.svg', '404.html']) {
   if (!existsSync(join(DIST, required))) problems.push(`dist/${required} is missing`);
 }
 

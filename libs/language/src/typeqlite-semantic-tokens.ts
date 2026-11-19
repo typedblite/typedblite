@@ -1,11 +1,20 @@
-import { AstUtils, type AstNode } from 'langium';
+import { AstUtils, type AstNode, type LangiumDocument } from 'langium';
 import {
   AbstractSemanticTokenProvider,
   type LangiumServices,
   type SemanticTokenAcceptor,
 } from 'langium/lsp';
 import type { TypeQLiteLabels } from './typeqlite-labels.js';
-import { SemanticTokenTypes, SemanticTokenModifiers } from 'vscode-languageserver';
+import {
+  SemanticTokenTypes,
+  SemanticTokenModifiers,
+  type CancellationToken,
+  type SemanticTokens,
+  type SemanticTokensDelta,
+  type SemanticTokensDeltaParams,
+  type SemanticTokensParams,
+  type SemanticTokensRangeParams,
+} from 'vscode-languageserver';
 import {
   isAttributeDef,
   isEntityDef,
@@ -48,6 +57,33 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
   constructor(services: LangiumServices & { labels: { Labels: TypeQLiteLabels } }) {
     super(services);
     this.labels = services.labels.Labels;
+  }
+
+  /**
+   * 🔴 One highlighting at a time. Langium keeps the document and token builder being worked on in
+   * fields of the provider, and a walk yields between nodes, so two requests in flight (a notebook
+   * asks for every cell at once, each a document of its own) write each other's tokens into one
+   * response. A cell then came back with another cell's tokens in front of its own, and the editor
+   * rejected them as out of range.
+   */
+  private queue: Promise<unknown> = Promise.resolve();
+
+  private serial<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(work, work);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  override semanticHighlight(document: LangiumDocument, params: SemanticTokensParams, cancelToken?: CancellationToken): Promise<SemanticTokens> {
+    return this.serial(() => super.semanticHighlight(document, params, cancelToken));
+  }
+
+  override semanticHighlightRange(document: LangiumDocument, params: SemanticTokensRangeParams, cancelToken?: CancellationToken): Promise<SemanticTokens> {
+    return this.serial(() => super.semanticHighlightRange(document, params, cancelToken));
+  }
+
+  override semanticHighlightDelta(document: LangiumDocument, params: SemanticTokensDeltaParams, cancelToken?: CancellationToken): Promise<SemanticTokens | SemanticTokensDelta> {
+    return this.serial(() => super.semanticHighlightDelta(document, params, cancelToken));
   }
 
   protected highlightElement(

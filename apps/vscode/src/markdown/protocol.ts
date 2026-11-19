@@ -35,11 +35,5 @@ export interface BlockHighlight {
 
 export type HighlightBlocksResult = readonly BlockHighlight[];
 
-/**
- * The fence languages highlighted as TypeQLite. The docs write `typeql`, the extension's language id
- * is `typeqlite`, and `tql` is the file extension.
- */
-export const FENCE_LANGUAGES: ReadonlySet<string> = new Set(['typeql', 'typeqlite', 'tql']);
-
-/** The language of a fence's info string, `typeql title="x"` → `typeql`. */
-export const fenceLanguage = (info: string): string => info.trim().split(/\s+/)[0]!.toLowerCase();
+/** The fence languages highlighted as TypeQLite, and the language of a fence's info string: the notebook's own list (`@typedblite/notebook`). */
+export { FENCE_LANGUAGES, fenceLanguage } from '@typedblite/notebook';

@@ -6,9 +6,7 @@ import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { HostClient } from '../src/host/host-client';
-import { runCell } from '../src/notebook/cell-runner';
-import { NotebookSessions } from '../src/notebook/notebook-sessions';
-import { plainOutput, type OutputBlock } from '../src/notebook/outputs';
+import { NotebookSessions, plainOutput, runCell, type OutputBlock } from '@typedblite/notebook';
 import { playTour, readTour, recorded, type Kernel, type Piece } from './support/tour-player';
 
 /**

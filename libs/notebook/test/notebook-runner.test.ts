@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { runCell, type StatementRunner } from '../src/notebook/cell-runner';
-import type { HostCaller, RunResult } from '../src/notebook/host-types';
-import { NotebookSessions } from '../src/notebook/notebook-sessions';
+import { runCell, type StatementRunner } from '../src/cell-runner.js';
+import type { HostCaller, RunResult } from '../src/host-types.js';
+import { NotebookSessions } from '../src/notebook-sessions.js';
 
 /** A scripted host: what it was asked, and what it answers. */
 function scripted(answers: Record<string, (input: Record<string, unknown>) => unknown>) {
@@ -180,6 +180,17 @@ describe('running a cell', () => {
     const { host: ok2 } = scripted(split(['x;']));
     const dead: StatementRunner = { run: async () => { throw new Error('the sidecar exited'); } };
     expect((await runCell('x;', ok2, dead, options)).failed).toBe(true);
+  });
+
+  // The browser has no "engine host", so it names what stopped in its own words, on both ways a cell can find the engine gone.
+  it('titles an unreachable engine with the caller\'s words when it has some', async () => {
+    const title = 'The engine stopped';
+    const { host } = scripted({ 'statement.split': () => new Error('worker gone') });
+    expect((await runCell('x;', host, runner([]), { ...options, unavailableTitle: title })).outputs).toEqual([{ kind: 'refusal', title, message: 'worker gone' }]);
+
+    const { host: ok } = scripted(split(['x;']));
+    const dead: StatementRunner = { run: async () => { throw new Error('worker gone'); } };
+    expect((await runCell('x;', ok, dead, { ...options, unavailableTitle: title })).outputs.at(-1)).toEqual({ kind: 'refusal', title, message: 'worker gone' });
   });
 
   // 🔴 Feature invariant 1: a cell is run by the host and by nothing else.

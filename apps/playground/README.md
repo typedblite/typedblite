@@ -58,6 +58,24 @@ for nothing this page needs. Two build details follow from how Monaco is package
 client lives outside `esm/vs`, where no public subpath reaches it, so `build.mjs` aliases it and
 `tsconfig.client.json` maps its types.
 
+## The notebook
+
+`try.html` (and the website's `/try/`) is a notebook: `docs/guides/try-it.tql.md`, the TypeQLite half of the five-minute tour, with
+each code block an editor you can run (ADR-013). It is the same file VS Code opens as a notebook, and `build.mjs` turns it into
+`try-data.json` (prose as Markdown, cells with their text; the printed answers are left out, because the page shows the real ones).
+
+| File | What it is |
+| --- | --- |
+| `src/notebook/kernel-core.ts` | `createKernel`: the engine host's operations (`statement.split`, `session.open`, `session.run`, `session.restart`, `session.close`) answered over a `Session`. It opens only `:memory:` |
+| `src/notebook/kernel-worker.ts`, `kernel-client.ts` | That kernel in a worker on WASM SQLite, and the client that calls it, with a timeout that ends a run that does not finish |
+| `src/notebook/cell-editor.ts` | One Monaco editor per cell, a document of the notebook under a `vscode-notebook-cell:` URI, so the language server knows the cells above |
+| `src/notebook/notebook-page.ts`, `notebook.ts` | The page: cells, Run all, Stop, Restart, and the outputs, which are drawn with `textContent` |
+| `src/notebook.html`, `src/nb.css`, `src/try.html` | The markup, the styles, and the standalone page |
+
+A cell is run by the shared `@typedblite/notebook` runner, so it behaves as in VS Code. Tests: `test/kernel-*.test.ts`,
+`try-it-journey.test.ts` (the document played on the kernel) and `try-it-structure.test.ts`, and `test-browser/notebook.test.ts`
+plays it through the page in Chromium.
+
 ## Tests
 
 ```bash

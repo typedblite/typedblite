@@ -15,7 +15,7 @@ import { HostClient, type HostEnvelope } from './host/host-client.js';
 import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from './notebook/constants.js';
 import { registerNotebookControllers } from './notebook/controller.js';
 import { registerNotebookStoreCommands } from './notebook/store-commands.js';
-import { NotebookSessions } from './notebook/notebook-sessions.js';
+import { NotebookSessions } from '@typedblite/notebook';
 import { TypeQLiteNotebookSerializer } from './notebook/serializer.js';
 
 let client: LanguageClient | undefined;

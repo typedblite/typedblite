@@ -4,6 +4,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { openNodeSqlite, type SqliteOpener } from '@typedblite/runtime';
+
 import { Session, SessionClosedError, type RunResult } from '../src/index.js';
 
 const SCHEMA =
@@ -237,5 +239,26 @@ describe('two sessions', () => {
     expect(await early.run(insert('x'))).toMatchObject({ kind: 'refused', reason: 'no-schema' });
     ok(await early.restart());
     expect(early.hasSchema).toBe(true);
+  });
+});
+
+describe('how a store is opened', () => {
+  it('uses the opener it is given, for the first open and for every restart', async () => {
+    const opened: string[] = [];
+    const openDatabase: SqliteOpener = (location) => {
+      opened.push(location);
+      return openNodeSqlite(location);
+    };
+    const session = track(new Session(':memory:', { openDatabase }));
+    await session.run(SCHEMA);
+    ok(await session.run(insert('ada')));
+    expect(await names(session)).toEqual(['ada']);
+    ok(await session.restart());
+    expect(opened).toEqual([':memory:', ':memory:']);
+  });
+
+  it('defaults to node:sqlite when none is given', async () => {
+    const session = track(new Session());
+    ok(await session.run(SCHEMA));
   });
 });
