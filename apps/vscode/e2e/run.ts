@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { accessSync, constants, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import {
@@ -48,6 +48,27 @@ async function main(): Promise<void> {
   const userData = join(root, 'user-data');
   const extensions = join(root, 'extensions');
   cpSync(join(app, 'e2e/workspace'), workspace, { recursive: true });
+  // 🔴 VS Code puts its IPC socket in $XDG_RUNTIME_DIR, not in --user-data-dir. Where that directory is unset or
+  // does not exist (WSL without a systemd user session points it at a /run/user/<uid> that is not there, and so do
+  // some containers), VS Code stops on a dialog, "Unable to write program user data ... listen EACCES", and the
+  // run hangs behind a window nobody sees. A fresh one beside the other folders, private to this run.
+  if (process.platform === 'linux') {
+    const runtime = process.env['XDG_RUNTIME_DIR'];
+    const usable = ((): boolean => {
+      if (!runtime) return false;
+      try {
+        accessSync(runtime, constants.W_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+    if (!usable) {
+      const own = join(root, 'runtime');
+      mkdirSync(own, { mode: 0o700 });
+      process.env['XDG_RUNTIME_DIR'] = own;
+    }
+  }
   try {
     const vscode = await downloadAndUnzipVSCode();
     let extension = app;
