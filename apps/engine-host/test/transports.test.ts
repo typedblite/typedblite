@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import type { INestApplication } from '@nestjs/common';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { runCli, runRepl, runSidecar } from '../src/main.js';
+import { runApi, runCli, runRepl, runSidecar } from '../src/main.js';
 
 /** What every transport answers, with the one field that is a fresh id each time left out. */
 interface Answer {
@@ -71,6 +72,34 @@ const repl: Send = async (operation, input) => {
   };
 };
 
+let httpApp: INestApplication;
+beforeAll(async () => {
+  vi.stubEnv('TYPEDBLITE_HOST_PORT', '0');
+  httpApp = await runApi();
+  vi.unstubAllEnvs();
+});
+afterAll(async () => {
+  await httpApp.close();
+});
+
+/** HTTP: a POST per operation. The body is the operation's data, and the status stands for the exit code. */
+const http: Send = async (operation, input) => {
+  const { port } = httpApp.getHttpServer().address() as { port: number };
+  const response = await fetch(`http://127.0.0.1:${port}/api/typedblite-host/ops/${operation}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const body = (await response.json()) as { code?: string };
+  return {
+    operation,
+    // The status line carries no kind or exit code either: those are compared between the CLI and the sidecar.
+    kind: undefined as unknown as string,
+    exitCode: undefined as unknown as number,
+    ...(response.ok ? { status: 'success', data: body } : { status: 'error', error: { code: body.code! } }),
+  };
+};
+
 const dir = mkdtempSync(join(tmpdir(), 'typedblite-host-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -92,14 +121,20 @@ const flow = async (send: Send, name: string): Promise<Answer[]> => {
   ];
 };
 
-describe('one operation, three transports: the same answer', () => {
-  it('the CLI, the sidecar and the REPL answer the same flow the same way', async () => {
-    const [viaCli, viaSidecar, viaRepl] = await Promise.all([flow(cli, 'cli'), flow(sidecar, 'sidecar'), flow(repl, 'repl')]);
+describe('one operation, four transports: the same answer', () => {
+  it('the CLI, the sidecar, the REPL and HTTP answer the same flow the same way', async () => {
+    const [viaCli, viaSidecar, viaRepl, viaHttp] = await Promise.all([
+      flow(cli, 'cli'),
+      flow(sidecar, 'sidecar'),
+      flow(repl, 'repl'),
+      flow(http, 'http'),
+    ]);
 
     // The data and the status are the same in all three, step by step.
     const reduce = (answers: Answer[]) => answers.map(({ operation, status, data, error }) => ({ operation, status, data, error }));
     expect(reduce(viaSidecar)).toEqual(reduce(viaCli));
     expect(reduce(viaRepl)).toEqual(reduce(viaCli));
+    expect(reduce(viaHttp)).toEqual(reduce(viaCli));
     // The CLI and the sidecar also agree on the exit code and the kind, which the REPL's prose does not carry.
     expect(viaSidecar).toEqual(viaCli);
   });

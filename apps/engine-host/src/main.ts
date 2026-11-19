@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { defineApp } from '@devx-micro/app-main';
 
+import { createHostHttp } from './http.js';
 import { createHostTool } from './host-tool.js';
 
 /**
@@ -14,12 +15,18 @@ import { createHostTool } from './host-tool.js';
  * | `--repl` | an interactive prompt over the operations |
  * | `--sidecar` | newline-delimited JSON on stdio: how the editor talks to the host |
  * | an operation name | one operation, one envelope on stdout, an exit code |
+ * | none | HTTP on `127.0.0.1`, port `TYPEDBLITE_HOST_PORT` (default 3470) |
  * | an unrecognised flag first | refused by name, exit 2 |
  *
- * 🔴 There is no HTTP mode yet (Phase 03), so a bare `typedblite-host` prints its help and starts nothing.
+ * 🔴 A bare `typedblite-host` starts a server, so an unrecognised flag must never fall through to it: `defineApp`
+ * refuses one by name. The server answers loopback only.
  */
-export const app = defineApp({ name: 'typedblite-host', createTool: createHostTool });
-export const { runCli, runRepl, runSidecar } = app;
+export const app = defineApp({
+  name: 'typedblite-host',
+  createTool: createHostTool,
+  http: { createApp: createHostHttp, portEnv: 'TYPEDBLITE_HOST_PORT', defaultPort: 3470, helpPath: '/api/typedblite-host/help' },
+});
+export const { runCli, runRepl, runSidecar, runApi } = app;
 
 /** Whether this module is the script Node was asked to run, by real path, so a `bin` link still counts. */
 function isEntryPoint(script: string | undefined): boolean {
