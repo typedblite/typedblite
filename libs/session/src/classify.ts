@@ -88,9 +88,30 @@ function statementBounds(text: string): Array<[number, number]> {
     return from < to ? [from, to] : undefined;
   };
   let start = 0;
+  // 🔴 A `;` inside brackets or a string ends nothing: a `fetch` sub-query (`[ match …; fetch { … }; ]`) and a block
+  // (`not { …; }`) hold their own. An end-of-line `#` comment is skipped to the line's end.
+  let depth = 0;
+  let quote: string | undefined;
 
   for (let i = 0; i < text.length; i++) {
-    if (text[i] !== ';') continue;
+    const c = text[i]!;
+    if (quote !== undefined) {
+      if (c === '\\') i += 1;
+      else if (c === quote) quote = undefined;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      continue;
+    }
+    if (c === '#') {
+      const end = text.indexOf('\n', i);
+      i = end < 0 ? text.length : end;
+      continue;
+    }
+    if (c === '{' || c === '[' || c === '(') depth += 1;
+    else if (c === '}' || c === ']' || c === ')') depth = Math.max(0, depth - 1);
+    if (c !== ';' || depth > 0) continue;
     const statement = text.slice(start, i + 1);
     const body = statement.trim();
     if (!body) {
@@ -98,6 +119,10 @@ function statementBounds(text: string): Array<[number, number]> {
       continue;
     }
     const rest = text.slice(i + 1);
+
+    // A statement never begins with a variable or a role list, so `insert $a isa a; $b isa b;` is one insert: what
+    // follows a `;` with `$` or `(` is another pattern of the same stage.
+    if (/^\s*[$(]/.test(rest)) continue;
 
     // A `define` block holds many definitions, each `;`-terminated, so it ends only where a
     // pipeline begins — or at the end of the input.

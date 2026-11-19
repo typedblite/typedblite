@@ -28,5 +28,11 @@ export function filesOf(entries: Record<string, string>): Files & { read: string
   };
 }
 
-export const standardFiles = (program = PROGRAM) =>
-  filesOf({ [`${WORK}/schema.tql`]: SCHEMA, [`${WORK}/seed.tql`]: SEED, [`${WORK}/program.tql`]: program });
+export const standardFiles = (program = PROGRAM, seed = SEED) =>
+  filesOf({ [`${WORK}/schema.tql`]: SCHEMA, [`${WORK}/seed.tql`]: seed, [`${WORK}/program.tql`]: program });
+
+/**
+ * Three people, for a step that keeps some and drops others: one `insert` each, because the shared splitter ends an
+ * `insert` at its first `;` (a pipeline that is not a `define` or a `match` ends there).
+ */
+export const PEOPLE = ['insert $a isa person, has name "Ann", has age 30;', 'insert $b isa person, has name "Bob", has age 17;', 'insert $c isa person, has name "Cid", has age 45;'].join('\n');

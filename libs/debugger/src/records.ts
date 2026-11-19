@@ -47,13 +47,55 @@ export function inFile(range: Range, at: LocatedStatement): Range {
 }
 
 /**
- * The stops inside a statement, in the order a person reads them: each stage of each of its pipelines (ADR-014 B11).
- * A stop's path runs from the statement's frame to the stage.
+ * The stops inside a statement, in the order a person reads them (ADR-014 B6, B11): each stage of each of its
+ * pipelines, and inside a stage each step of its `match`, in the order the steps ran. Inside a step, the steps of the
+ * blocks it ran (an `or`'s branches, a `try`, a `not`) and the stages of the functions it called; inside a `fetch`
+ * stage, its sub-queries. Each level is one deeper. A stop's path holds the ids of the frames, stages and steps from
+ * the statement's frame down to its own record.
  */
 export function stopsOf(statement: number, recording: Recording): Stop[] {
-  return recording.frames.flatMap((frame) =>
-    frame.stages.map((stage): Stop => ({ statement, depth: 1, kind: 'stage', path: [frame.id, stage.id] })),
-  );
+  const stops: Stop[] = [];
+  const stagesOf = (frame: FrameRecord, path: readonly number[], depth: number): void => {
+    for (const stage of frame.stages) {
+      const at = [...path, stage.id];
+      stops.push({ statement, depth, kind: 'stage', path: at });
+      blocksOf(stage.blocks, at, depth + 1);
+      framesOf(stage.frames, at, depth + 1);
+    }
+  };
+  const blocksOf = (blocks: readonly BlockRecord[], path: readonly number[], depth: number): void => {
+    for (const block of blocks) {
+      for (const step of block.steps) {
+        const at = [...path, step.id];
+        stops.push({ statement, depth, kind: 'step', path: at });
+        blocksOf(step.blocks, at, depth + 1);
+        framesOf(step.frames, at, depth + 1);
+      }
+    }
+  };
+  const framesOf = (frames: readonly FrameRecord[], path: readonly number[], depth: number): void => {
+    for (const frame of frames) stagesOf(frame, [...path, frame.id], depth);
+  };
+  for (const frame of recording.frames) stagesOf(frame, [frame.id], 1);
+  return stops;
+}
+
+/**
+ * Whether a record's ranges are in the statement's own text. A function defined in the schema reports ranges in the
+ * text that defined it, not the program's, so it and everything inside it has no place in the program's file: the
+ * stack shows it without a position, and no line breakpoint stops in it. A function the statement defines itself
+ * (`with fun …`) is placed as any other record is.
+ */
+export function placedIn(path: readonly number[], index: Map<number, IndexedRecord>, text: string): boolean {
+  return path.every((id) => {
+    const entry = index.get(id);
+    if (entry?.kind !== 'frame' || entry.record.kind !== 'function') return true;
+    const range = entry.record.range;
+    if (range === undefined) return false;
+    const lines = text.split('\n');
+    const from = lines[range.start.line]?.slice(range.start.character) ?? '';
+    return new RegExp(`^fun\\s+${entry.record.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(from);
+  });
 }
 
 /** The record a stop is at: the last of its path. */

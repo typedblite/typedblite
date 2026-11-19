@@ -113,4 +113,17 @@ describe('the debug adapter, through the engine host', () => {
     const [row] = (await client.variablesRequest({ variablesReference: rows!.variablesReference })).body.variables;
     expect(row!.value).toBe('{ $t: title "Dune" }');
   });
+  it('stops at a breakpoint on a comparison`s line, at the step that holds it, with what it dropped (Phase 04)', async () => {
+    write('schema.tql', 'define attribute title, value string; attribute pages, value integer; entity book, owns title, owns pages;');
+    write('seed.tql', 'insert $a isa book, has title "Dune", has pages 412;\ninsert $b isa book, has title "Emma", has pages 90;');
+    const program = write('program.tql', 'match\n  $b isa book, has pages $n;\n  $n > 100;\nselect $b;\n');
+    await client.initializeRequest();
+    await client.setBreakpointsRequest({ source: { path: program }, breakpoints: [{ line: 3 }] });
+    await Promise.all([client.configurationDoneRequest(), client.launchRequest({ program, schema: ['schema.tql'], seed: ['seed.tql'] } as never), client.assertStoppedLocation('breakpoint', { line: 3 })]);
+    const [frame] = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames;
+    expect(frame!.name).toBe('$n > 100 · 2 → 1 row(s)');
+    const scopes = (await client.scopesRequest({ frameId: frame!.id })).body.scopes;
+    const values = scopes.find((scope) => scope.name === 'Lets and comparisons')!;
+    expect((await client.variablesRequest({ variablesReference: values.variablesReference })).body.variables.map((v) => [v.name, v.value])).toEqual([['$n > 100', '2 → 1 kept, 1 dropped here']]);
+  });
 });

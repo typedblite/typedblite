@@ -117,7 +117,15 @@ export class TypeQLiteDebugSession extends DebugSession {
     if (program !== undefined) {
       const source = new Source(basename(program.path), this.convertDebuggerPathToClient(program.path));
       for (const frame of program.frames()) {
-        frames.push(new StackFrame(this.frameHandles.create(frame), frame.name, source, this.convertDebuggerLineToClient(frame.line), this.convertDebuggerColumnToClient(frame.character)));
+        const id = this.frameHandles.create(frame);
+        if (frame.placed) {
+          frames.push(new StackFrame(id, frame.name, source, this.convertDebuggerLineToClient(frame.line), this.convertDebuggerColumnToClient(frame.character)));
+        } else {
+          // Inside a function defined in another file: shown, with no place in this one.
+          const shown = new StackFrame(id, frame.name) as DebugProtocol.StackFrame;
+          shown.presentationHint = 'subtle';
+          frames.push(shown);
+        }
       }
     }
     response.body = { stackFrames: frames, totalFrames: frames.length };

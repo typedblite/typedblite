@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { InProcessHost } from './support/in-process-host.js';
 import { connect } from './support/dap.js';
-import { standardFiles, WORK } from './support/fixtures.js';
+import { PEOPLE, SCHEMA, standardFiles, WORK } from './support/fixtures.js';
 
 let close: (() => Promise<void>) | undefined;
 afterEach(async () => {
@@ -13,9 +13,10 @@ afterEach(async () => {
 
 const LAUNCH = { program: `${WORK}/program.tql`, schema: ['schema.tql'], seed: ['seed.tql'] };
 
-async function open(program?: string): Promise<{ client: DebugClient; host: InProcessHost }> {
+async function open(program?: string, seed?: string, schema?: string): Promise<{ client: DebugClient; host: InProcessHost }> {
   const host = new InProcessHost();
-  const connected = await connect(host, standardFiles(program));
+  const files = standardFiles(program, seed);
+  const connected = await connect(host, schema === undefined ? files : { readFile: async (path) => (path.endsWith('schema.tql') ? schema : files.readFile(path)) });
   close = connected.close;
   return { client: connected.client, host };
 }
@@ -151,5 +152,30 @@ describe('stages and rows over DAP (Phase 03)', () => {
     await Promise.all([client.configurationSequence(), client.launch({ ...LAUNCH, stopOnEntry: true }), client.waitForEvent('stopped')]);
     const set = await client.setBreakpointsRequest({ source: { path: `${WORK}/schema.tql` }, breakpoints: [{ line: 1 }] });
     expect(set.body.breakpoints[0]).toMatchObject({ verified: false, message: 'Only the launched program stops: this file is not it.' });
+  });
+});
+
+describe('inside a match over DAP (Phase 04)', () => {
+  it('step in walks a match`s steps in the order they ran', async () => {
+    const { client } = await open(['match', '  $p has age $a;', '  $a > 20;', '  $p isa person;', 'select $p;'].join('\n'), PEOPLE);
+    await Promise.all([client.configurationSequence(), client.launch({ ...LAUNCH, stopOnEntry: true }), client.waitForEvent('stopped')]);
+    const names: string[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      await Promise.all([client.stepInRequest({ threadId: 1 }), client.waitForEvent('stopped')]);
+      const [top] = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames;
+      names.push(`${top!.line}: ${top!.name}`);
+    }
+    expect(names).toEqual(['1: match · 1 → 2 row(s)', '2: thing $p · 1 → 3 row(s)', '2: $p has age $a · 3 → 3 row(s)', '3: $a > 20 · 3 → 2 row(s)']);
+  });
+
+  it('a frame inside a function defined in the schema is shown with no source', async () => {
+    const schema = `${SCHEMA}\nfun adult_ages() -> { integer }:\n  match $p isa person, has age $a; $a >= 18;\n  return { $a };`;
+    const { client } = await open('match let $g in adult_ages(); $g > 40;\nselect $g;', PEOPLE, schema);
+    await Promise.all([client.configurationSequence(), client.launch({ ...LAUNCH, stopOnEntry: true }), client.waitForEvent('stopped')]);
+    for (let i = 0; i < 4; i += 1) await Promise.all([client.stepInRequest({ threadId: 1 }), client.waitForEvent('stopped')]);
+    const frames = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames;
+    expect(frames[0]).toMatchObject({ name: 'thing $p · 1 → 3 row(s)', presentationHint: 'subtle' });
+    expect(frames[0]!.source).toBeUndefined();
+    expect(frames[2]).toMatchObject({ name: 'adult_ages() · 1 call(s)', source: { path: '/work/program.tql' } });
   });
 });
