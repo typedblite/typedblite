@@ -247,13 +247,15 @@ describe('the devices’ colours', () => {
     }
   });
 
-  it('tints the row that flashes when a sync brings a task in with the colour of the device that made it, and keeps the chip on the card', () => {
+  it('tints the row that flashes when a sync brings a change in with the colour of the device that made the change, and keeps the chip on the card', () => {
     const device = read('device.html');
-    for (const name of names) expect(device).toContain(`li[data-origin="${name}"] { --flash: color-mix(in srgb, var(--device-${name}) 28%, var(--card)); }`);
+    for (const name of names) expect(device).toContain(`li[data-editor="${name}"] { --flash: color-mix(in srgb, var(--device-${name}) 28%, var(--card)); }`);
     expect(device).toContain('li .origin { background: var(--card); }');
     // The shipped page's own highlight is what an unknown device falls back to, and it still fades.
     expect(device).toMatch(/li\.flash \{ background: var\(--flash\)/);
-    expect(read('device.js')).toMatch(/item\.dataset\["origin"\]\s*=\s*task\.origin/);
+    // The row carries who made the latest change (the chip carries who made the task), and a change of editor is a change worth flashing.
+    expect(read('device.js')).toMatch(/row\.item\.dataset\["editor"\]\s*=\s*task\.editedBy/);
+    expect(read('device-worker.js')).toMatch(/task\.editedBy/);
   });
 
   it.each(['light', 'dark'] as const)('keeps a task’s text readable (6.5:1, past AA’s 4.5:1) on every device’s tint, in the %s theme', (theme) => {

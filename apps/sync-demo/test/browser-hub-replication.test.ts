@@ -119,6 +119,91 @@ describe('devices through the hub', () => {
   });
 });
 
+describe('who made the latest change', () => {
+  const NAMES = ['a', 'b', 'c'];
+  const editors = (): Record<string, string[]> => ({
+    ...Object.fromEntries(NAMES.map((name) => [name, device(name).tasks().map((task) => task.editedBy)])),
+    hub: (core.tasks() as Task[]).map((task) => task.editedBy),
+  });
+  const everyone = (editor: string): Record<string, string[]> => Object.fromEntries([...NAMES, 'hub'].map((name) => [name, [editor]]));
+
+  it('shows the device that did each thing, as every device and the hub see it: added on A, checked on B, unchecked on C', async () => {
+    device('a').addTask('Task 1');
+    await converge(NAMES);
+    expect(editors()).toEqual(everyone('a'));
+
+    const id = device('b').tasks()[0]!.id;
+    device('b').setDone(id, true);
+    await converge(NAMES);
+    // B made the change, not A, though A made the task.
+    expect(editors()).toEqual(everyone('b'));
+    expect(device('a').tasks()[0]).toMatchObject({ origin: 'a', done: true, editedBy: 'b' });
+
+    device('c').setDone(id, false);
+    await converge(NAMES);
+    expect(editors()).toEqual(everyone('c'));
+    expect(device('a').tasks()[0]).toMatchObject({ origin: 'a', done: false, editedBy: 'c' });
+    expect(device('b').tasks()[0]).toMatchObject({ origin: 'a', done: false, editedBy: 'c' });
+  });
+
+  it('attributes each change to its device when A, B and C take turns on the same task', async () => {
+    device('a').addTask('Task 1');
+    await converge(NAMES);
+    const id = device('a').tasks()[0]!.id;
+    const turns: Array<[string, boolean]> = [['b', true], ['a', false], ['c', true], ['b', false], ['a', true]];
+    for (const [name, done] of turns) {
+      device(name).setDone(id, done);
+      await converge(NAMES);
+      expect(editors()).toEqual(everyone(name));
+      expect(device('c').tasks()[0]!.done).toBe(done);
+    }
+  });
+
+  it('tells each device what it received: a sync that brings a change shows the editor, not the maker', async () => {
+    device('a').addTask('Task 1');
+    await converge(NAMES);
+    const id = device('a').tasks()[0]!.id;
+    device('b').setDone(id, true);
+    await sync('b');
+    await sync('a');
+    // What A's sync applied is B's change to A's task.
+    expect(device('a').tasks()[0]).toMatchObject({ origin: 'a', editedBy: 'b', done: true });
+  });
+
+  it('does not make C the latest editor by C checking a task that is already checked', async () => {
+    device('a').addTask('Task 1');
+    await converge(NAMES);
+    const id = device('a').tasks()[0]!.id;
+    device('b').setDone(id, true);
+    await converge(NAMES);
+    device('c').setDone(id, true);
+    await converge(NAMES);
+    expect(editors()).toEqual(everyone('b'));
+  });
+
+  it('settles two devices changing a task at once on one change and its author together, the same everywhere', async () => {
+    device('a').addTask('Contested');
+    await converge(NAMES);
+    const id = device('a').tasks()[0]!.id;
+    for (const name of ['a', 'b']) await sync(name, false);
+    device('a').setDone(id, true); // A checks it…
+    device('c').setDone(id, true); // …and C checks it, and B unchecks nothing: B has it unchecked already
+    device('b').setDone(id, true);
+    await converge(NAMES);
+    const finals = NAMES.map((name) => device(name).tasks()[0]!);
+    // One winner: every device agrees on the pair, and the pair is one somebody actually wrote.
+    for (const task of finals) expect([task.done, task.editedBy]).toEqual([finals[0]!.done, finals[0]!.editedBy]);
+    expect(['a', 'b', 'c']).toContain(finals[0]!.editedBy);
+    expect(finals[0]!.done).toBe(true);
+  });
+
+  it('reads a task as made last by its maker when the device that made it is the only one that ever wrote it', async () => {
+    device('b').addTask('Mine');
+    await converge(NAMES);
+    expect(editors()).toEqual(everyone('b'));
+  });
+});
+
 describe('a cut line', () => {
   it('shows the device offline with the no-network error, and keeps its writes locally and counted', async () => {
     await sync('a');
@@ -219,6 +304,8 @@ describe('the same as the Node hub', () => {
   /** What a scenario leaves behind, with nothing in it that differs between two runs (ids, times). */
   interface Outcome {
     tasks: string;
+    /** Who made the latest change to each task, sorted. */
+    editors: string[];
     hubChanges: number;
     perDevice: Record<string, string>;
     applied: Array<number | undefined>;
@@ -244,6 +331,7 @@ describe('the same as the Node hub', () => {
     await round(3);
     return {
       tasks: view(hub.tasks()),
+      editors: hub.tasks().map((task) => `${task.title}:${task.editedBy}`).sort(), // tasks made in one millisecond have no fixed order
       hubChanges: hub.changes(),
       perDevice: Object.fromEntries(names.map((name) => [name, view(deviceFor(name).tasks())])),
       applied,
@@ -267,10 +355,13 @@ describe('the same as the Node hub', () => {
       const onNode = await scenario(nodeDevice, (name) => nodeDevice(name).syncOnce(), { tasks: () => readTasks(nodeDb), changes: () => nodeDb.changeLog.since(0, 10_000).length });
 
       expect(inBrowser.tasks).toBe(onNode.tasks);
+      expect(inBrowser.editors).toEqual(onNode.editors);
       expect(inBrowser.hubChanges).toBe(onNode.hubChanges);
       expect(inBrowser.perDevice).toEqual(onNode.perDevice);
       expect(inBrowser.applied).toEqual(onNode.applied);
       expect(JSON.parse(inBrowser.tasks)).toEqual([['One', false], ['Three', false], ['Two', true]]);
+      // A made One and Two, B made Three, and C checked Two: so C is the latest editor of Two, and not A.
+      expect(inBrowser.editors).toEqual(['One:a', 'Three:b', 'Two:c']);
     } finally {
       await served.close();
     }
