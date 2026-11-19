@@ -56,8 +56,9 @@ export function splitStatements(source: string): string[] {
 export interface LocatedStatement {
   /** The statement as written, comments inside it kept: what to run. */
   readonly text: string;
-  /** Where it starts in the source, both counted from 0, as an LSP position is. */
+  /** The line it starts on, counted from 0, as an LSP position is. */
   readonly line: number;
+  /** The character it starts at on that line, counted from 0. */
   readonly character: number;
 }
 
