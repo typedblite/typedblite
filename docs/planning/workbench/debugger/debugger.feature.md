@@ -1,7 +1,7 @@
 ---
 kind: feature
-status: proposed
-decided-by: []
+status: in-progress
+decided-by: [adr-014]
 title: TypeQLite Debugger
 feature: debugger
 branch: feat/debugger
@@ -11,9 +11,12 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Debugger — Feature Doc
 
-> **Status:** 📋 Proposed, not started · **Written:** 2026-11-12 · **Branch:** `feat/debugger`, from
-> `main`, not yet cut · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete) ·
-> **Governed by:** ADR-009, which Phase 00 writes
+> **Status:** 🚧 Phase 00 in progress (2026-11-19): [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)
+> accepted · **Written:** 2026-11-12 · **Branch:** `feat/debugger`, from `main`
+> (`4fa6d8d`), cut 2026-11-19 · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete),
+> [engine host](../engine-host/engine-host.feature.md) (complete) · **Governed by:**
+> [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md).
+> This document first named ADR-009, a number the WASM decision has since taken
 >
 > Request, 2026-11-12: *a debugger for TypeQLite, as a future feature. "I believe we should be able
 > to use the Interpreter to make this possible."*
@@ -93,24 +96,42 @@ down. A debugger has to work around this without rewriting the interpreter:
 
 **Recommendation: A first, with the hook shaped so that B can be added later without changing
 it.** Both consume the same sequence of step events. A only stores them, while B blocks on each
-one. Phase 00 settles this in ADR-009.
+one. Phase 00 settles this in ADR-014 (B1 recommends A, one statement at a time).
 
-## What already exists — verified on disk 2026-11-12
+### 🔴 What the interpreter makes harder — found in Phase 00, 2026-11-19
+
+The list above holds. Reading `combinations()` again found four things this plan did not account for. Each has a
+recommended answer in ADR-014.
+
+1. **A `match` does not run in source order.** It runs by kind: type variables, then one step per thing
+   *variable* (merging every pattern on it), then relations, attribute reads, `let`s and comparisons, `or` and
+   `try`, and last `is` and `not`. Relation filters move earlier when `planJoins` is on. One step can consume
+   several lines, and a later line can run first. `ThingConstraint.range` holds only the first pattern's range.
+   *(B6)*
+2. **Some steps have no `note()`:** attribute reads, `let`s, comparisons and `is`. A comparison is one of the
+   likeliest places for rows to disappear. *(B6)*
+3. **A `match` runs once per incoming row**, and a `fetch` sub-query once per parent answer, so each inner step
+   repeats N times. *(B7)*
+4. **A thing's type and attributes are read when asked.** Under replay they would show the store after the
+   statement, not as it was at the stop. *(B8)*
+
+## What already exists — verified on disk 2026-11-12, re-verified 2026-11-19
 
 This is load-bearing. Check it again before relying on it.
 
 | Thing | State |
 | ----- | ----- |
-| Interpreter | [`interpreter.ts`](../../../../libs/runtime/src/interpreter.ts), 6,060 lines, holding `TypeDBLiteInterpreter`. Its public entry points are `define(text)`, `execute(text, given?)` and `query(text, given?)`, plus `beginTransaction`, `commitTransaction` and `rollbackTransaction` |
+| Interpreter | [`interpreter.ts`](../../../../libs/runtime/src/interpreter.ts), 6,280 lines (6,060 when this was written), holding `TypeDBLiteInterpreter`. Its public entry points are `define(text)`, `execute(text, given?)` and `query(text, given?)`, plus `beginTransaction`, `commitTransaction` and `rollbackTransaction` |
 | Stage loop | `runStages(pipeline, scopes, start)` has one `switch` per stage type: match, insert, put, delete, update, select, sort, offset, limit, distinct, require and reduce. The rows array is replaced after each stage |
 | Stage plan | `planStages` returns one `StreamScope` per stage boundary, giving the variables `available`, their `kinds` and their `valueTypes`. **That is the static half of the Variables view**: what each variable is, as well as its value |
-| Steps inside a `match` | `combinations()` and its `note()` calls, at lines 3811–3968 |
+| Steps inside a `match` | `combinations()` and its `note()` calls, from line 3968 (2026-11-19). They run by kind, not in source order, and some steps have none: see *What the interpreter makes harder* above |
 | Trace precedent | `QueryTrace` and `lastQueryTrace()`, enabled by the `trace` option or `TYPEDBLITE_TRACE=1`, and tested in [`query-trace.test.ts`](../../../../libs/runtime/test/query-trace.test.ts) |
 | Differential precedent | [`relation-join-planning-differential.test.ts`](../../../../libs/runtime/test/relation-join-planning-differential.test.ts) runs `planJoins: false` and `planJoins: true` and asserts that the two produce the same rows in the same order. **This is the shape of test that proves the debug hook changes nothing** |
 | Execution facts | [`diagnostics.ts`](../../../../libs/runtime/src/diagnostics.ts) (ADR-004): facts are returned, never emitted, have stable codes, and are capped at `MAX_DIAGNOSTICS = 50` |
-| Statement classification | [`apps/cli/src/session.ts`](../../../../apps/cli/src/session.ts) chooses between `define`, `query` and `execute` by the statement's leading keyword, and whether it has a write stage. This is textual, and deliberately so. **This logic lives in the CLI, so a debugger cannot reuse it yet** |
-| SQLite | Only [`node-sqlite.ts`](../../../../libs/runtime/src/node-sqlite.ts) imports `node:sqlite`. The workspace's Node is ≥ 22.16. Whether the extension host's Electron Node includes `node:sqlite` is **not verified** |
-| Extension | [`apps/vscode`](../../../../apps/vscode) depends on `@typedblite/language` only. It contributes no `debuggers` and no `breakpoints`, and its language server never loads the runtime |
+| Statement classification | **Moved since this was written:** `classifyStatement` and `splitStatements` live in [`@typedblite/session`](../../../../libs/session/src/classify.ts), shared by the CLI, the engine host and the playground. Invariant 6's prerequisite is met |
+| Engine host | [`apps/engine-host`](../../../../apps/engine-host) (ADR-011): sessions, `session.run` of exactly one statement, `statement.split`, `statement.classify`. ADR-011 D7 leaves the debugger's route to this feature |
+| SQLite | Only [`node-sqlite.ts`](../../../../libs/runtime/src/node-sqlite.ts) imports `node:sqlite`. The workspace's Node is ≥ 22.16. VS Code 1.146's Electron Node **has** `node:sqlite` (measured in the engine-host feature) |
+| Extension | [`apps/vscode`](../../../../apps/vscode) depends on `@typedblite/language`, `@typedblite/notebook` and the sidecar client, and starts the engine host through its `HostClient`. It contributes no `debuggers` and no `breakpoints` |
 
 ## 🔴 The invariants every phase is bound by
 
@@ -220,7 +241,11 @@ packaged `.vsix`.
 
 ## Open questions for Phase 00
 
-These are for the founder.
+These are for the founder. **Each has a recommended answer in
+[ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md),
+accepted 2026-11-19:** 1 → B1; 2 → B9 (seed and schema files only; copying a store deferred); 3 → B2 and B3 (the
+engine runs in the host, the adapter inline in the extension host); 4 → B4 (`libs/debugger`); 5 → B5 (a
+`@typedblite/runtime/debug` subpath only, internal).
 
 1. **Execution model:** A (record, then replay), B (a worker that blocks), or A now and B later.
    The recommendation is A, then B if a real case needs it.
@@ -254,7 +279,7 @@ packaged `.vsix`.
 
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
-| 00 | Scope, the DAP mapping, and ADR-009 | Not started | |
+| 00 | Scope, the DAP mapping, and ADR-014 | In progress | [checklist](phases/00-scope-and-adr/checklist.md); ADR-014 accepted |
 | 01 | The step hook: events, the recording, the cap, and proof that it is harmless | Not started | |
 | 02 | Adapter shell: launch a file, statement-level steps, output, Run Without Debugging | Not started | |
 | 03 | Stages and rows: stage steps, the Rows and Scope variables, line breakpoints | Not started | |
@@ -266,7 +291,7 @@ packaged `.vsix`.
 
 This is a forward plan. Each phase's checklist is written when that phase starts.
 
-**00 — Scope, the DAP mapping, and ADR-009.** Answer the open questions. Fix the mapping table.
+**00 — Scope, the DAP mapping, and ADR-014.** Answer the open questions. Fix the mapping table.
 Settle the execution model, where the adapter runs and where it lives. Choose the debug-adapter
 library and its version, and decide whether there is upstream code to diff against, as ADR-008 D8
 did for the editor.
