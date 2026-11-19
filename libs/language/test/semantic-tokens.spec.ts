@@ -105,3 +105,35 @@ describe('the production schemas are fully classified', () => {
     expect(tokens.some((t) => t.text.startsWith('#'))).toBe(false);
   });
 });
+
+/**
+ * 🔴 A notebook asks for the tokens of every cell at once, and each cell is a document. Langium's provider
+ * keeps the document it is working on in a field, so overlapping requests used to write one another's
+ * tokens into their responses.
+ */
+describe('requests that overlap', () => {
+  it('each answer is the tokens of its own document', async () => {
+    const { parseHelper } = await import('langium/test');
+    const { SemanticTokensDecoder } = await import('langium/lsp');
+    const { EmptyFileSystem } = await import('langium');
+    const { createTypeQLiteServices } = await import('../src/typeqlite-module.js');
+    const { TypeQLite } = createTypeQLiteServices(EmptyFileSystem);
+    const helper = parseHelper(TypeQLite);
+    const provider = TypeQLite.lsp.SemanticTokenProvider!;
+    const texts = [
+      'define\n  entity book, owns title;\n  attribute title, value string;',
+      'match $b isa book, has title "Dune"; select $b;',
+      'match $b isa book; select $b;',
+    ];
+    const documents = await Promise.all(texts.map((text) => helper(text, { validation: true })));
+    const decode = (document: (typeof documents)[number], tokens: Awaited<ReturnType<typeof provider.semanticHighlight>>) =>
+      SemanticTokensDecoder.decode(tokens, provider.tokenTypes, document).map((t) => t.text);
+    const together = await Promise.all(
+      documents.map((document) => provider.semanticHighlight(document, { textDocument: { uri: document.textDocument.uri } })),
+    );
+    for (const [index, document] of documents.entries()) {
+      const alone = await provider.semanticHighlight(document, { textDocument: { uri: document.textDocument.uri } });
+      expect(decode(document, together[index]!)).toEqual(decode(document, alone));
+    }
+  });
+});
