@@ -36,6 +36,15 @@ export class SessionRegistry implements OnApplicationShutdown {
     return infoOf(id, session);
   }
 
+  /** A store opened for one call and not registered: the caller closes it. */
+  once(location: string): Session {
+    try {
+      return new Session(location);
+    } catch (error) {
+      throw openFailed(location, error instanceof Error ? error.message : String(error));
+    }
+  }
+
   get(id: string): Session {
     const session = this.sessions.get(id);
     if (!session) throw sessionNotFound(id);

@@ -117,7 +117,7 @@ Update this table when a feature changes state.
 
 | Feature | Status |
 | ------- | ------ |
-| engine-host | Phase 01 complete, Phase 02 next ([ADR-011](../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) accepted) |
+| engine-host | Phase 02 complete, Phase 03 next ([ADR-011](../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) accepted) |
 | graph-explorer | Proposed |
 | debugger | Proposed |
 | notebook | Proposed |

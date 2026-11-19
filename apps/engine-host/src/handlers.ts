@@ -52,8 +52,14 @@ export class RunStatementHandler implements ICommandHandler<RunStatementCommand,
    * A refusal, the engine's own included, is the answer and not an exception. An unknown id is an exception.
    * 🔴 Every handler is `async`, so an exception is always a rejection and never a synchronous throw.
    */
-  async execute({ sessionId, statement }: RunStatementCommand): Promise<RunResult> {
-    return this.registry.get(sessionId).run(statement);
+  async execute({ sessionId, statement, location }: RunStatementCommand): Promise<RunResult> {
+    if (sessionId !== undefined) return this.registry.get(sessionId).run(statement);
+    const session = this.registry.once(location ?? ':memory:');
+    try {
+      return await session.run(statement);
+    } finally {
+      await session.close();
+    }
   }
 }
 
