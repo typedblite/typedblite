@@ -126,4 +126,20 @@ describe('the debug adapter, through the engine host', () => {
     const values = scopes.find((scope) => scope.name === 'Lets and comparisons')!;
     expect((await client.variablesRequest({ variablesReference: values.variablesReference })).body.variables.map((v) => [v.name, v.value])).toEqual([['$n > 100', '2 → 1 kept, 1 dropped here']]);
   });
+  it('🔴 a query whose rows disappear at a comparison stops at that comparison under "when a step empties" (Phase 05)', async () => {
+    write('schema.tql', 'define attribute title, value string; attribute pages, value integer; entity book, owns title, owns pages;');
+    write('seed.tql', 'insert $a isa book, has title "Dune", has pages 412;\ninsert $b isa book, has title "Emma", has pages 90;');
+    const program = write('program.tql', 'match\n  $b isa book, has title $t;\n  $b has pages $n;\n  $n > 1000;\nselect $t;\n');
+    await client.initializeRequest();
+    await client.setExceptionBreakpointsRequest({ filters: ['refusal', 'empty'] });
+    const [, , stopped] = await Promise.all([
+      client.configurationDoneRequest(),
+      client.launchRequest({ program, schema: ['schema.tql'], seed: ['seed.tql'] } as never),
+      client.waitForEvent('stopped'),
+    ]);
+    expect(stopped.body).toMatchObject({ reason: 'exception', text: '$n > 1000: 2 row(s) in, none out.' });
+    const [frame] = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames;
+    // The third pattern of the match, on its own line: where the rows ran out.
+    expect(frame).toMatchObject({ name: '$n > 1000 · 2 → 0 row(s)', line: 4 });
+  });
 });

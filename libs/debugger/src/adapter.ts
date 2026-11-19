@@ -17,7 +17,7 @@ import {
 } from '@vscode/debugadapter';
 import type { DebugProtocol } from '@vscode/debugprotocol';
 
-import { DebugProgram, LaunchError, type BreakpointState, type Files, type FrameView, type LaunchArguments, type Outcome } from './program.js';
+import { DebugProgram, LaunchError, type BreakpointSpec, type BreakpointState, type Files, type FrameView, type LaunchArguments, type Outcome } from './program.js';
 import type { VariableNode } from './values.js';
 import type { Motion } from './timeline.js';
 import type { HostCaller } from './wire.js';
@@ -34,7 +34,9 @@ export class TypeQLiteDebugSession extends DebugSession {
   private readonly variables = new Handles<VariableNode>();
   private readonly frameHandles = new Handles<FrameView>();
   /** Breakpoints set before the launch had located the program, by file. */
-  private readonly pendingBreakpoints = new Map<string, number[]>();
+  private readonly pendingBreakpoints = new Map<string, BreakpointSpec[]>();
+  /** The exception filters, which a client may set before the launch. */
+  private exceptionFilters: string[] = ['refusal'];
   private configured!: () => void;
   private readonly configurationDone = new Promise<void>((resolve) => (this.configured = resolve));
 
@@ -53,6 +55,13 @@ export class TypeQLiteDebugSession extends DebugSession {
       ...response.body,
       supportsConfigurationDoneRequest: true,
       supportsTerminateRequest: true,
+      supportsConditionalBreakpoints: true,
+      supportsStepBack: true,
+      supportsExceptionInfoRequest: true,
+      exceptionBreakpointFilters: [
+        { filter: 'refusal', label: 'On refusal', description: 'Stop where TypeQLite refused a statement.', default: true },
+        { filter: 'empty', label: 'When a step empties', description: 'Stop at the stage or step where the rows ran out.', default: false },
+      ],
     };
     this.sendResponse(response);
     this.sendEvent(new InitializedEvent());
@@ -98,16 +107,17 @@ export class TypeQLiteDebugSession extends DebugSession {
   }
 
   protected override async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): Promise<void> {
-    const lines = (args.breakpoints ?? []).map((breakpoint) => this.convertClientLineToDebugger(breakpoint.line));
+    const specs = (args.breakpoints ?? []).map((breakpoint): BreakpointSpec => ({ line: this.convertClientLineToDebugger(breakpoint.line), ...(breakpoint.condition === undefined ? {} : { condition: breakpoint.condition }) }));
+    const lines = specs.map((spec) => spec.line);
     const path = args.source.path === undefined ? undefined : this.convertClientPathToDebugger(args.source.path);
     if (this.program === undefined) {
       // Before the launch has located the program: kept, and answered once it has (`applyBreakpoints`).
-      if (path !== undefined) this.pendingBreakpoints.set(path, lines);
+      if (path !== undefined) this.pendingBreakpoints.set(path, specs);
       response.body = { breakpoints: lines.map((line) => ({ verified: false, line: this.convertDebuggerLineToClient(line), message: 'Checked when the program starts.' })) };
       this.sendResponse(response);
       return;
     }
-    response.body = { breakpoints: path === this.program.path ? this.program.setBreakpoints(lines).map((b) => this.toClient(b)) : lines.map((line) => this.elsewhere(line)) };
+    response.body = { breakpoints: path === this.program.path ? this.program.setBreakpoints(specs).map((b) => this.toClient(b)) : lines.map((line) => this.elsewhere(line)) };
     this.sendResponse(response);
   }
 
@@ -160,6 +170,28 @@ export class TypeQLiteDebugSession extends DebugSession {
     this.sendResponse(response);
   }
 
+  protected override setExceptionBreakPointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetExceptionBreakpointsArguments): void {
+    this.exceptionFilters = [...args.filters];
+    this.program?.setExceptionFilters(this.exceptionFilters);
+    this.sendResponse(response);
+  }
+
+  protected override exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse): void {
+    const exception = this.program?.exception;
+    response.body = { exceptionId: exception?.id ?? 'none', description: exception?.description ?? '', breakMode: 'always' };
+    this.sendResponse(response);
+  }
+
+  protected override stepBackRequest(response: DebugProtocol.StepBackResponse): void {
+    this.sendResponse(response);
+    if (this.program !== undefined) this.finish(this.program.back('step'));
+  }
+
+  protected override reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse): void {
+    this.sendResponse(response);
+    if (this.program !== undefined) this.finish(this.program.back('reverse'));
+  }
+
   protected override async nextRequest(response: DebugProtocol.NextResponse): Promise<void> {
     this.sendResponse(response);
     await this.go('over');
@@ -201,8 +233,9 @@ export class TypeQLiteDebugSession extends DebugSession {
   /** The breakpoints set before the launch, answered now the program is located. */
   private applyBreakpoints(): void {
     const program = this.program!;
-    for (const [path, lines] of this.pendingBreakpoints) {
-      const states = path === program.path ? program.setBreakpoints(lines).map((b) => this.toClient(b)) : lines.map((line) => this.elsewhere(line));
+    program.setExceptionFilters(this.exceptionFilters);
+    for (const [path, specs] of this.pendingBreakpoints) {
+      const states = path === program.path ? program.setBreakpoints(specs).map((b) => this.toClient(b)) : specs.map((spec) => this.elsewhere(spec.line));
       for (const state of states) this.sendEvent(new BreakpointEvent('changed', state));
     }
     this.pendingBreakpoints.clear();
