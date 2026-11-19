@@ -98,6 +98,21 @@ invariant 1). A cell is not wrapped in a transaction.
   opens a new, empty store and says so in the cell, instead of failing every cell.
 - **Restart** is a command (`typedblite.notebook.restart`, on the notebook toolbar) over `session.restart`.
 
+## Made exact in Phase 04 (language services across cells)
+
+- **The schema owner is one rule, `schemaOwnerOf`**, in `@typedblite/language`: a `vscode-notebook-cell:` URI's owner is the URI
+  without its fragment (its notebook), and every other document's is the workspace. Every place that reads the index
+  filters by it: the scope provider's global scope and a relation's re-opens, the labels service (resolve, candidates, "does
+  this schema define anything", the uses of a definition), and the hover's list of re-opens. Completion, rename, the
+  nearest-label quick fix and the unknown-label check follow from those.
+- **The server advertises notebooks through a subclass of Langium's server**, passed to `createTypeQLiteServices` as a second
+  argument (a new optional parameter), and listens for notebook documents. The client's document selector gains the cell scheme.
+- **A cell's language comes from its synced `languageId`**, not its URI: a real cell's path ends `.tql.md`, an extension no
+  language claims. The library's harness has no synced documents, so its notebooks are named `.tql`; the bundled-server spec
+  uses real `.tql.md` cells and `languageId`.
+- **The public API grew, and changed a little:** `schemaOwnerOf` and friends are exported, and `workspaceHasSchema`,
+  `resolve` and `candidates` take an optional context (workspace by default). The changelog records it.
+
 ## Not decided here
 
 How a table and a refusal render (Phase 03), the export formats (Phase 05), and whether a Markdown cell's own

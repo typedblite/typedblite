@@ -4,6 +4,7 @@ import {
   EMPTY_SCOPE,
   type AstNode,
   type AstNodeDescription,
+  MapScope,
   type AstNodeLocator,
   type LangiumDocuments,
   type ReferenceInfo,
@@ -11,6 +12,7 @@ import {
   type Stream,
 } from 'langium';
 import type { LangiumServices } from 'langium/lsp';
+import { schemaOwnerOf } from './typeqlite-schema-owner.js';
 import {
   isRelatesTrait,
   isRoleRef,
@@ -77,8 +79,11 @@ export class TypeQLiteScopeProvider extends DefaultScopeProvider {
   }
 
   /**
-   * The workspace's definitions of a type, with the current document's first. A workspace is one schema, but when two
+   * The schema's definitions of a type, with the current document's first. A workspace is one schema, but when two
    * files define one label, the definition beside the reference is the one its author meant.
+   *
+   * A **notebook is a schema of its own** (ADR-012 N4): a cell sees its notebook's cells and nothing else, and a file
+   * sees no cell. See {@link schemaOwnerOf}.
    *
    * @privateRemarks
    * 🔴 The current document's definitions come before the rest of the workspace's. A workspace is
@@ -89,14 +94,25 @@ export class TypeQLiteScopeProvider extends DefaultScopeProvider {
   protected override getGlobalScope(referenceType: string, context: ReferenceInfo): Scope {
     const uri = AstUtils.getDocument(context.container).uri.toString();
     const own = this.indexManager.allElements(referenceType, new Set([uri]));
-    return this.createScope(own, super.getGlobalScope(referenceType, context));
+    return this.createScope(own, this.schemaScope(referenceType, schemaOwnerOf(uri)));
   }
 
-  /** The contents of every `TypeExtensionDef` re-opening this relation, anywhere in the workspace. */
+  /**
+   * Every definition of a type in one schema, cached until the workspace changes. The default global scope is the whole
+   * index; this is the part of it that belongs to `owner`.
+   */
+  private schemaScope(referenceType: string, owner: string): Scope {
+    return this.globalScopeCache.get(`${owner}|${referenceType}`, () =>
+      new MapScope(this.indexManager.allElements(referenceType).filter((description) => schemaOwnerOf(description.documentUri) === owner)),
+    );
+  }
+
+  /** The contents of every `TypeExtensionDef` re-opening this relation, anywhere in its schema. */
   private reopensOf(relation: RelationDef): Stream<AstNode> {
+    const owner = schemaOwnerOf(AstUtils.getDocument(relation).uri);
     return this.indexManager
       .allElements(TypeExtensionDef.$type)
-      .filter((description) => description.name === relation.name)
+      .filter((description) => description.name === relation.name && schemaOwnerOf(description.documentUri) === owner)
       .map((description) => this.nodeOf(description))
       .nonNullable()
       .flatMap((extension) => AstUtils.streamContents(extension));

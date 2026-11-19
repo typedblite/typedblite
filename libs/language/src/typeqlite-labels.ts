@@ -6,8 +6,10 @@ import {
   type IndexManager,
   type LangiumDocument,
   type LangiumDocuments,
+  type URI,
 } from 'langium';
 import type { LangiumServices } from 'langium/lsp';
+import { schemaOwnerOf, WORKSPACE_OWNER } from './typeqlite-schema-owner.js';
 import type { Range } from 'vscode-languageserver';
 import {
   AttributeDef,
@@ -50,6 +52,9 @@ import {
  * @category Language features
  */
 export type LabelKind = 'type' | 'entity' | 'relation' | 'attribute' | 'role';
+
+/** The owner a caller's context names: the workspace's when it names none. */
+const ownerOf = (context: URI | string | undefined): string => (context === undefined ? WORKSPACE_OWNER : schemaOwnerOf(context));
 
 /**
  * A position in a document where TypeQLite names a type or a role with a plain `ID`.
@@ -137,18 +142,23 @@ export class TypeQLiteLabels {
     );
   }
 
-  /** Whether the workspace defines any type at all. Without one, nothing can be unknown (ADR-008 D6). */
-  workspaceHasSchema(): boolean {
-    return TARGETS.type.some((type) => !this.index.allElements(type).isEmpty());
+  /**
+   * Whether the schema defines any type at all. Without one, nothing can be unknown (ADR-008 D6). The schema is the
+   * workspace's, or, given a notebook cell's URI, that notebook's (ADR-012 N4).
+   */
+  workspaceHasSchema(context?: URI | string): boolean {
+    const owner = ownerOf(context);
+    return TARGETS.type.some((type) => !this.visible(type, owner).isEmpty());
   }
 
   /** The definitions a label names. Empty when nothing in the workspace defines it. */
-  resolve(site: Pick<LabelSite, 'name' | 'kind' | 'relation'>): AstNode[] {
-    if (site.kind !== 'role') return this.definitionsOf(site.name, TARGETS[site.kind]);
+  resolve(site: Pick<LabelSite, 'name' | 'kind' | 'relation'> & { readonly document?: LangiumDocument }): AstNode[] {
+    const owner = ownerOf(site.document?.uri);
+    if (site.kind !== 'role') return this.definitionsOf(site.name, TARGETS[site.kind], owner);
     const relations =
       site.relation !== undefined
-        ? this.relationChain(site.relation)
-        : this.definitionsOf(undefined, [RelationDef.$type]).filter(isRelationDef);
+        ? this.relationChain(site.relation, owner)
+        : this.definitionsOf(undefined, [RelationDef.$type], owner).filter(isRelationDef);
     return relations
       .flatMap((relation) => this.rolesOf(relation))
       .filter((role) => role.name === site.name);
@@ -158,29 +168,36 @@ export class TypeQLiteLabels {
    * Every definition a label of this kind could name: what completion offers (ADR-008 D5). A role
    * whose relation is known offers that relation's roles, inherited ones included.
    */
-  candidates(kind: LabelKind, relation?: string): AstNode[] {
-    if (kind !== 'role') return this.definitionsOf(undefined, TARGETS[kind]);
+  candidates(kind: LabelKind, relation?: string, context?: URI | string): AstNode[] {
+    const owner = ownerOf(context);
+    if (kind !== 'role') return this.definitionsOf(undefined, TARGETS[kind], owner);
     const relations =
       relation !== undefined
-        ? this.relationChain(relation)
-        : this.definitionsOf(undefined, [RelationDef.$type]).filter(isRelationDef);
+        ? this.relationChain(relation, owner)
+        : this.definitionsOf(undefined, [RelationDef.$type], owner).filter(isRelationDef);
     return relations.flatMap((each) => this.rolesOf(each));
   }
 
-  /** Every label site in the workspace that names this definition. */
+  /** Every label site in the definition's schema that names it: the workspace's, or its notebook's. */
   usesOf(target: AstNode): LabelSite[] {
     const name = (target as { name?: string }).name;
     if (name === undefined) return [];
+    const owner = schemaOwnerOf(AstUtils.getDocument(target).uri);
     return this.documents.all
+      .filter((document) => schemaOwnerOf(document.uri) === owner)
       .toArray()
       .flatMap((document) => this.sitesIn(document))
       .filter((site) => site.name === name && this.resolve(site).includes(target));
   }
 
-  private definitionsOf(name: string | undefined, types: readonly string[]): AstNode[] {
+  /** The index's descriptions of a type that belong to one schema. */
+  private visible(type: string, owner: string) {
+    return this.index.allElements(type).filter((description) => schemaOwnerOf(description.documentUri) === owner);
+  }
+
+  private definitionsOf(name: string | undefined, types: readonly string[], owner: string): AstNode[] {
     return types.flatMap((type) =>
-      this.index
-        .allElements(type)
+      this.visible(type, owner)
         .filter((description) => name === undefined || description.name === name)
         .map((description) => {
           if (description.node) return description.node;
@@ -193,21 +210,22 @@ export class TypeQLiteLabels {
   }
 
   /** A relation, and every relation it is a subtype of: a role may be inherited. */
-  private relationChain(name: string, seen = new Set<string>()): RelationDef[] {
+  private relationChain(name: string, owner: string, seen = new Set<string>()): RelationDef[] {
     if (seen.has(name)) return [];
     seen.add(name);
-    const relations = this.definitionsOf(name, [RelationDef.$type]).filter(isRelationDef);
+    const relations = this.definitionsOf(name, [RelationDef.$type], owner).filter(isRelationDef);
     return relations.concat(
       relations.flatMap((relation) => {
         const parent = relation.superTypes[0]?.$refText;
-        return parent ? this.relationChain(parent, seen) : [];
+        return parent ? this.relationChain(parent, owner, seen) : [];
       }),
     );
   }
 
   /** A relation's roles: its own `relates`, and those every re-open of it adds. */
   private rolesOf(relation: RelationDef): RelatesTrait[] {
-    const reopens = this.definitionsOf(relation.name, [TypeExtensionDef.$type]);
+    // The re-opens are the relation's own schema's: a notebook's cells, or the workspace's files.
+    const reopens = this.definitionsOf(relation.name, [TypeExtensionDef.$type], schemaOwnerOf(AstUtils.getDocument(relation).uri));
     return [relation, ...reopens]
       .flatMap((node) => AstUtils.streamContents(node).toArray())
       .filter(isRelatesTrait);

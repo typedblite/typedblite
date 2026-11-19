@@ -50,6 +50,7 @@ export * from './typeqlite-module.js';
 export * from './typeqlite-validator.js';
 export * from './typeqlite-validate-sync.js';
 export * from './typeqlite-validation-codes.js';
+export * from './typeqlite-schema-owner.js';
 export * from './typeqlite-scope.js';
 export * from './typeqlite-scope-computation.js';
 export * from './typeqlite-doc-comments.js';

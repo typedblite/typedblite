@@ -74,6 +74,13 @@ a Markdown cell ([ADR-012](../../docs/architecture/adr-012-the-notebook-is-a-mar
   quote or a list item is text.
 - A cell whose text contains a line of three backticks is written inside a longer fence, so it reads back whole.
 
+### Language features in cells
+
+Diagnostics, completion, hover, go to definition, rename and quick fixes work in a notebook's code cells as they do in a
+`.tql` file, **across the cells of one notebook**: a schema defined in one cell resolves in the next. **A notebook is a
+schema of its own.** A cell sees its own notebook's cells and nothing else, so two notebooks may define the same label,
+and a notebook and the workspace's `.tql` files do not see each other.
+
 ### Running cells
 
 Run a cell, or use VS Code's own **Run All**, **Run Above** and **Run Below**. Each notebook has **one store, in

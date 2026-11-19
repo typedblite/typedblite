@@ -125,10 +125,15 @@ export const TypeQLiteSharedModule: Module<LangiumSharedServices, PartialLangium
  *
  * @param context The file system and, for a language server, the connection. Use `EmptyFileSystem` from Langium
  * where there is no disk.
+ * @param sharedOverrides Services of the workspace to replace, for a host with its own: a language server that
+ * advertises more than Langium's does (the editor's notebooks, ADR-012 N4) passes its own `LanguageServer`.
  * @returns `shared`, the services of the workspace, and `TypeQLite`, those of the language.
  * @category Setup
  */
-export function createTypeQLiteServices(context: DefaultSharedModuleContext): {
+export function createTypeQLiteServices(
+  context: DefaultSharedModuleContext,
+  sharedOverrides: Module<LangiumSharedServices, PartialLangiumSharedServices> = {},
+): {
   shared: LangiumSharedServices;
   TypeQLite: TypeQLiteServices;
 } {
@@ -136,6 +141,7 @@ export function createTypeQLiteServices(context: DefaultSharedModuleContext): {
     createDefaultSharedModule(context),
     TypeQLiteGeneratedSharedModule,
     TypeQLiteSharedModule,
+    sharedOverrides,
   );
   const TypeQLite = inject(
     createDefaultModule({ shared }),

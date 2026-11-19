@@ -553,6 +553,35 @@ const cases: Record<string, () => Promise<void>> = {
     assert.match(refusal.message, /no schema has been applied/);
   },
 
+  async 'a label defined in one cell resolves in another: diagnostics, definition and completion'() {
+    const notebook = await vscode.workspace.openNotebookDocument(uriOf('scope-a.tql.md'));
+    await vscode.window.showNotebookDocument(notebook);
+    // Cell 0 is the heading; the three code cells follow it with only blank lines between them.
+    const [schema, entity, query] = [notebook.cellAt(1), notebook.cellAt(2), notebook.cellAt(3)];
+
+    // `title` resolved into the cell before; only `missing`, which no cell defines, is refused.
+    const problems = await settledOn(entity!.document.uri, 1);
+    assert.equal(problems.length, 1);
+    assert.match(problems[0]!.message, /'missing'/);
+    assert.equal(vscode.languages.getDiagnostics(schema!.document.uri).length, 0);
+
+    const at = entity!.document.positionAt(entity!.document.getText().indexOf('title, owns') + 1);
+    const found = await vscode.commands.executeCommand<(vscode.Location | vscode.LocationLink)[]>('vscode.executeDefinitionProvider', entity!.document.uri, at);
+    const target = (found[0] as vscode.LocationLink).targetUri ?? (found[0] as vscode.Location).uri;
+    assert.equal(target.toString(), schema!.document.uri.toString(), 'go to definition crosses cells');
+
+    const list = await vscode.commands.executeCommand<vscode.CompletionList>('vscode.executeCompletionItemProvider', query!.document.uri, query!.document.positionAt(query!.document.getText().indexOf('bo') + 2));
+    const labels = list.items.map((item) => (typeof item.label === 'string' ? item.label : item.label.label));
+    assert.ok(labels.includes('book'), 'completion offers a definition from another cell');
+  },
+
+  async 'a notebook\'s schema is its own: another notebook does not see it, nor does a file'() {
+    const other = await vscode.workspace.openNotebookDocument(uriOf('scope-b.tql.md'));
+    await vscode.window.showNotebookDocument(other);
+    const problems = await settledOn(other.cellAt(1).document.uri, 1);
+    assert.match(problems[0]!.message, /'title'/, '`title` is notebook A\'s, so notebook B cannot name it');
+  },
+
   // Last, because it deletes a file from the workspace.
   async 'a schema split across files resolves, and deleting the defining file unresolves it'() {
     // `split-attributes.typeqlite` is never opened: the server found it by indexing the workspace.

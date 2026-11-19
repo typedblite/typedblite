@@ -159,9 +159,10 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
    * there, a label is coloured by its position, as it was before labels could resolve.
    */
   private labelTokens(node: AstNode, acceptor: SemanticTokenAcceptor): void {
-    const sites = this.labels.sitesOfNode(AstUtils.getDocument(node), node);
+    const document = AstUtils.getDocument(node);
+    const sites = this.labels.sitesOfNode(document, node);
     if (sites.length === 0) return;
-    const resolving = this.labels.workspaceHasSchema();
+    const resolving = this.labels.workspaceHasSchema(document.uri);
     for (const site of sites) {
       let type: string;
       if (resolving) {
