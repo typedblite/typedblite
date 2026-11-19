@@ -42,6 +42,26 @@ describe('splitStatements', () => {
   });
 });
 
+describe('splitStatements keeps a statement whole', () => {
+  it('across a fetch sub-query and a block, whose semicolons are their own', () => {
+    const fetch = 'match $p isa person, has name $n;\nfetch { "n": $n, "others": [ match $p has name $o; $o != $n; fetch { "o": $o }; ] };';
+    expect(splitStatements(`${fetch}\ninsert $x isa a;`)).toEqual([fetch, 'insert $x isa a;']);
+    const negated = 'match $p isa person; not { $p has age $a; $a < 20; }; select $p;';
+    expect(splitStatements(negated)).toEqual([negated]);
+  });
+
+  it('across the patterns of one write: no statement begins with a variable or a role list', () => {
+    const insert = 'insert $a isa person, has name "Ann";\n  $b isa person, has name "Bob";\n  (friend: $a, friend: $b) isa friendship;';
+    expect(splitStatements(`${insert}\ninsert $c isa person;`)).toEqual([insert, 'insert $c isa person;']);
+  });
+
+  it('across a semicolon in a string, or in a comment at the end of a line', () => {
+    expect(splitStatements('insert $n isa note, has text "a; b";\ninsert $m isa note;')).toEqual(['insert $n isa note, has text "a; b";', 'insert $m isa note;']);
+    expect(splitStatements("insert $n isa note, has text 'it\\'s; here';")).toEqual(["insert $n isa note, has text 'it\\'s; here';"]);
+    expect(splitStatements('match $p isa person; # one; two\nselect $p;')).toEqual(['match $p isa person; # one; two\nselect $p;']);
+  });
+});
+
 describe('locateStatements', () => {
   const SOURCES = [
     'match $s isa project;\ninsert $x isa task;\ninsert $y isa task;',

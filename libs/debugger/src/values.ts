@@ -1,4 +1,4 @@
-import type { RecordedRow, RecordedThing, RecordedValue, Recording, ScopeVariable, StageRecord } from './wire.js';
+import type { RecordedRow, RecordedThing, RecordedValue, Recording, ScopeVariable, StageRecord, StepRecord, ValueRecord } from './wire.js';
 
 /**
  * A line of the Variables view: a name, a value, and what it opens to. Pure, so what a person sees at a stop is
@@ -90,4 +90,34 @@ export function stageNodes(stage: StageRecord): VariableNode[] {
     { name: 'rows out', value: String(stage.rowsOut) },
     ...(stage.writes ? [{ name: 'writes', value: 'yes: the rows after it are described after the write' }] : []),
   ];
+}
+
+/** A step's counts, summed over every incoming row (ADR-014 B7). */
+export function stepNodes(step: StepRecord): VariableNode[] {
+  return [
+    { name: 'step', value: step.name },
+    { name: 'kind', value: step.kind },
+    { name: 'rows in', value: String(step.rowsIn) },
+    { name: 'rows out', value: String(step.rowsOut) },
+    { name: 'incoming rows', value: String(step.byCall.length + step.byCallDropped) },
+  ];
+}
+
+/** Each `let` and comparison of a `values` step: how many combinations it saw, and kept. */
+export function valuesNodes(values: readonly ValueRecord[]): VariableNode[] {
+  return values.map((value) => ({
+    name: value.name,
+    value: value.kind === 'comparison' ? `${value.rowsIn} → ${value.rowsOut} kept, ${value.rowsIn - value.rowsOut} dropped here` : `${value.rowsIn} → ${value.rowsOut}`,
+  }));
+}
+
+/** A step's breakdown by incoming row: what each call of its block received and left. */
+export function byCallNode(step: StepRecord): VariableNode {
+  const notKept: VariableNode[] = step.byCallDropped === 0 ? [] : [{ name: '…', value: `${step.byCallDropped} more incoming row(s), not broken down` }];
+  return {
+    name: 'By incoming row',
+    value: `${step.byCall.length + step.byCallDropped} incoming row(s)`,
+    indexed: step.byCall.length + notKept.length,
+    children: () => [...step.byCall.map((call, i) => ({ name: String(i + 1), value: `${call.rowsIn} → ${call.rowsOut}` })), ...notKept],
+  };
 }

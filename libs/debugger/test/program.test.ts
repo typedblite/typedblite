@@ -2,15 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import { DebugProgram, LaunchError, type OutputCategory } from '../src/program.js';
 import { InProcessHost } from './support/in-process-host.js';
-import { standardFiles, WORK } from './support/fixtures.js';
+import { PEOPLE, SCHEMA, standardFiles, WORK } from './support/fixtures.js';
 
-const launch = async (program?: string, extra: Record<string, unknown> = {}) => {
+const SCHEMA_WITH_FUNCTION = `${SCHEMA}\nfun adult_ages() -> { integer }:\n  match $p isa person, has age $a; $a >= 18;\n  return { $a };`;
+
+const launch = async (program?: string, extra: Record<string, unknown> = {}, seed?: string) => {
   const host = new InProcessHost();
   const output: Array<[string, OutputCategory]> = [];
   const debug = await DebugProgram.launch(
     { program: `${WORK}/program.tql`, schema: ['schema.tql'], seed: ['seed.tql'], ...extra },
     host,
-    standardFiles(program),
+    standardFiles(program, seed),
     (text, category) => output.push([text, category]),
   );
   return { host, debug, output, text: () => output.map(([text]) => text).join('') };
@@ -173,13 +175,13 @@ describe('line breakpoints (Phase 03)', () => {
     expect(await debug.move('continue')).toEqual({ kind: 'ended', exitCode: 0 });
   });
 
-  it('a line with no stage on it is settled as not holding', async () => {
+  it('a line with no stage or step on it (a comment) is settled as not holding', async () => {
     const { debug } = await launch();
     const settled: Array<[number, boolean, string | undefined]> = [];
     debug.breakpointChanged = (b) => settled.push([b.line, b.verified, b.message]);
     debug.setBreakpoints([5]);
     expect(await debug.start()).toEqual({ kind: 'ended', exitCode: 0 });
-    expect(settled).toEqual([[5, false, 'No stage of this statement starts on this line.']]);
+    expect(settled).toEqual([[5, false, 'No stage or step of this statement is on this line.']]);
   });
 
   it('stops once in a statement on a line: before it runs, not again at its first stage on the same line', async () => {
@@ -205,5 +207,95 @@ describe('line breakpoints (Phase 03)', () => {
     // Over the read would end the program; the breakpoint on its select stops it there.
     expect(await debug.move('over')).toEqual({ kind: 'stopped', reason: 'breakpoint' });
     expect(debug.frames()[0]!.line).toBe(6);
+  });
+});
+
+/** A read whose `isa` is on a later line than the step that runs first (lines from 0). */
+const OUT_OF_ORDER = ['match', '  $p has age $a;', '  $a > 20;', '  $p isa person;', 'select $p;'].join('\n');
+
+/** Step in until the stop's first frame is named as given, and return the frames there. */
+const stepInTo = async (debug: DebugProgram, name: RegExp) => {
+  for (let i = 0; i < 40; i += 1) {
+    const frames = debug.frames();
+    if (name.test(frames[0]?.name ?? '')) return frames;
+    const outcome = await debug.move('in');
+    if (outcome.kind === 'ended') break;
+  }
+  throw new Error(`never reached ${name}`);
+};
+
+describe('inside a match (Phase 04)', () => {
+  it('in: through each step, in the order they ran, not the order of the lines', async () => {
+    const { debug } = await launch(OUT_OF_ORDER, {}, PEOPLE);
+    const seen: Array<[string, number]> = [];
+    for (;;) {
+      const outcome = await debug.move('in');
+      if (outcome.kind === 'ended') break;
+      seen.push([debug.frames()[0]!.name, debug.frames()[0]!.line]);
+    }
+    expect(seen).toEqual([
+      ['match · 1 → 2 row(s)', 0],
+      // `$p`'s step consumes lines 1 and 3, and runs first.
+      ['thing $p · 1 → 3 row(s)', 1],
+      ['$p has age $a · 3 → 3 row(s)', 1],
+      ['$a > 20 · 3 → 2 row(s)', 2],
+      ['select · 2 → 2 row(s)', 4],
+    ]);
+    expect(debug.linesOf({ statement: 0, depth: 2, kind: 'step', path: debug.timeline.at(2)!.path })).toEqual([1, 3]);
+  });
+
+  it('a breakpoint on any line a step consumes stops at that step: line 3 stops before line 2`s comparison runs', async () => {
+    const { debug } = await launch(OUT_OF_ORDER, {}, PEOPLE);
+    debug.setBreakpoints([3, 2]);
+    expect(await debug.start()).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    expect(debug.frames()[0]!.name).toBe('thing $p · 1 → 3 row(s)');
+    expect(await debug.move('continue')).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    expect(debug.frames()[0]!.name).toBe('$a > 20 · 3 → 2 row(s)');
+  });
+
+  it('shows a step`s rows, its counts, each comparison`s, and its breakdown by incoming row', async () => {
+    const { debug } = await launch('match $p isa person, has name $n;\nmatch $p has age $a; $a < 40;\nselect $n;', {}, PEOPLE);
+    const frames = await stepInTo(debug, /^\$a < 40/);
+    const scopes = debug.scopes(frames[0]!);
+    expect(scopes.map((s) => s.name)).toEqual(['Rows', 'Step', 'Lets and comparisons', 'By incoming row']);
+    expect(scopes[0]!.node.value).toBe('2 row(s)');
+    expect(scopes[2]!.node.children!().map((n) => [n.name, n.value])).toEqual([['$a < 40', '3 → 2 kept, 1 dropped here']]);
+    // The second match ran once per row the first passed on: three calls, one of which the comparison emptied.
+    expect(scopes[3]!.node.children!().map((n) => n.value)).toEqual(['1 → 1', '1 → 1', '1 → 0']);
+    expect(scopes[1]!.node.children!().find((n) => n.name === 'incoming rows')?.value).toBe('3');
+  });
+
+  it('in: into a not block, whose steps are inside the step that ran them', async () => {
+    const { debug } = await launch('match $p isa person, has name $n; not { $p has age $a; $a < 20; };\nselect $n;', {}, PEOPLE);
+    const frames = await stepInTo(debug, /^\$a < 20/);
+    expect(frames.map((f) => f.name.split(' · ')[0])).toEqual(['$a < 20', 'not', 'match', 'match $p isa person, has name $n; not { $p has age $a; $a <…']);
+    expect(debug.timeline.current.depth).toBe(3);
+    // Out of the block, back to the step after `not`: here, the next stage.
+    expect(await debug.move('out')).toEqual({ kind: 'stopped', reason: 'step' });
+    expect(debug.frames()[0]!.name).toMatch(/^select/);
+  });
+
+  it('a function defined in the schema has no place in the program`s file: no line, and no breakpoint stops in it', async () => {
+    const host = new InProcessHost();
+    const files = standardFiles('match let $g in adult_ages(); $g > 40;\nselect $g;', PEOPLE);
+    const schema = { ...files, readFile: async (path: string) => (path.endsWith('schema.tql') ? `${SCHEMA_WITH_FUNCTION}` : files.readFile(path)) };
+    const debug = await DebugProgram.launch({ program: `${WORK}/program.tql`, schema: ['schema.tql'], seed: ['seed.tql'] }, host, schema, () => undefined);
+    const frames = await stepInTo(debug, /^\$a >= 18/);
+    expect(frames.map((f) => [f.name.split(' · ')[0], f.placed])).toEqual([
+      ['$a >= 18', false],
+      ['match', false],
+      ['adult_ages()', true],
+      ['let $g in adult_ages(); $g > 40', true],
+      ['match', true],
+      ['match let $g in adult_ages(); $g > 40;', true],
+    ]);
+    expect(debug.linesOf(debug.timeline.current)).toEqual([]);
+  });
+
+  it('a fetch sub-query is a frame inside the fetch stage', async () => {
+    const { debug } = await launch('match $p isa person, has name $n;\nfetch { "n": $n, "names": [ match $p has name $o; fetch { "o": $o }; ] };', {}, PEOPLE);
+    const frames = await stepInTo(debug, /^\$p has name \$o/);
+    expect(frames.map((f) => f.name.split(' · ')[0])).toEqual(['$p has name $o', 'match', 'fetch', 'fetch', 'match $p isa person, has name $n;']);
+    expect(frames[2]!.name).toBe('fetch · 3 call(s)');
   });
 });

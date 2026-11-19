@@ -2,9 +2,9 @@ import { dirname, resolve } from 'node:path';
 
 import { outputsOf, plainOutput } from '@typedblite/notebook';
 
-import { indexRecording, inFile, recordAt, stopsOf, type IndexedRecord } from './records.js';
+import { indexRecording, inFile, placedIn, recordAt, stopsOf, type IndexedRecord } from './records.js';
 import { accepts, Timeline, type Motion, type Stop } from './timeline.js';
-import { rowsNode, scopeNodes, stageNodes, type VariableNode } from './values.js';
+import { byCallNode, rowsNode, scopeNodes, stageNodes, stepNodes, valuesNodes, type VariableNode } from './values.js';
 import type { DebugResult, HostCaller, LocatedStatement, Range, Recording, RunResult } from './wire.js';
 
 /**
@@ -68,8 +68,10 @@ export interface FrameView {
   readonly line: number;
   readonly character: number;
   readonly statement: number;
-  /** The stage it is; nothing for the statement's own frame. */
+  /** The stage, step, function or sub-query it is; nothing for the statement's own frame. */
   readonly record?: IndexedRecord;
+  /** Whether `line` and `character` are its own: a record inside a function defined elsewhere has no place here. */
+  readonly placed: boolean;
 }
 
 /** A scope of the Variables view, at one frame. */
@@ -199,42 +201,77 @@ export class DebugProgram {
     return this.breakpoints;
   }
 
-  /** The lines a stop is on, in the program's file: where a line breakpoint stops it. */
+  /**
+   * The lines a stop is on, in the program's file: where a line breakpoint stops it. A statement is on its first line; a
+   * stage on its own first line; a step on every line its ranges cover (ADR-014 B6), which may be several and need not
+   * be in order. A record inside a function defined elsewhere is on no line of this file.
+   */
   linesOf(stop: Stop): number[] {
     const statement = this.statements[stop.statement];
-    if (statement === undefined) return [];
+    if (statement === undefined || stop.kind === 'end') return [];
     if (stop.kind === 'statement') return [statement.line];
-    const record = statement.records === undefined ? undefined : recordAt(stop, statement.records);
-    const range = record?.kind === 'stage' ? record.record.range : undefined;
-    return range === undefined ? [] : [inFile(range, statement).start.line];
+    const records = statement.records;
+    const record = records === undefined ? undefined : recordAt(stop, records);
+    if (record === undefined || records === undefined || !placedIn(stop.path, records, statement.text)) return [];
+    if (record.kind === 'stage') return record.record.range === undefined ? [] : [inFile(record.record.range, statement).start.line];
+    if (record.kind !== 'step') return [];
+    const lines = new Set<number>();
+    for (const range of record.record.ranges) {
+      const placed = inFile(range, statement);
+      for (let line = placed.start.line; line <= placed.end.line; line += 1) lines.add(line);
+    }
+    return [...lines];
   }
 
-  /** The frames of the call stack at the current stop, innermost first. Nothing at the end. */
+  /**
+   * The frames of the call stack at the current stop, innermost first: the step, the steps and stages around it, any
+   * function or sub-query it is inside, and the statement. Nothing at the end.
+   */
   frames(): FrameView[] {
     const stop = this.timeline.current;
     const statement = this.statements[stop.statement];
     if (statement === undefined) return [];
     const frames: FrameView[] = [];
-    const record = statement.records === undefined ? undefined : recordAt(stop, statement.records);
-    if (record?.kind === 'stage') {
-      const stage = record.record;
-      const at = this.place(statement, stage.range);
-      frames.push({ name: `${stage.kind} · ${stage.rowsIn} → ${stage.rowsOut} row(s)`, ...at, statement: stop.statement, record });
+    const records = statement.records;
+    if (records !== undefined) {
+      stop.path.forEach((id, i) => {
+        const record = records.get(id);
+        if (record === undefined || (record.kind === 'frame' && i === 0)) return;
+        const placed = placedIn(stop.path.slice(0, i + 1), records, statement.text);
+        const enclosing = placedIn(stop.path.slice(0, i), records, statement.text);
+        const view = this.frameOf(record, statement, stop.statement, placed, enclosing);
+        if (view !== undefined) frames.unshift(view);
+      });
     }
-    frames.push({ name: firstLine(statement.text), line: statement.line, character: statement.character, statement: stop.statement });
+    frames.push({ name: firstLine(statement.text), line: statement.line, character: statement.character, statement: stop.statement, placed: true });
     return frames;
   }
 
   /** The scopes of the Variables view at a frame. */
   scopes(frame: FrameView): ScopeView[] {
     const statement = this.statements[frame.statement]!;
-    if (frame.record?.kind === 'stage' && statement.recording !== undefined) {
-      const stage = frame.record.record;
+    const recording = statement.recording;
+    const record = frame.record;
+    if (record?.kind === 'stage' && recording !== undefined) {
+      const stage = record.record;
       return [
-        { name: 'Rows', node: rowsNode('Rows', stage.rows, stage.rowsDropped, stage.rowsOut, statement.recording) },
+        { name: 'Rows', node: rowsNode('Rows', stage.rows, stage.rowsDropped, stage.rowsOut, recording) },
         { name: 'Stage', node: { name: 'Stage', value: stage.kind, children: () => stageNodes(stage) } },
         { name: 'Scope', node: { name: 'Scope', value: `${stage.scope.length} variable(s)`, children: () => scopeNodes(stage.scope) } },
       ];
+    }
+    if (record?.kind === 'step' && recording !== undefined) {
+      const step = record.record;
+      return [
+        { name: 'Rows', node: rowsNode('Rows', step.rows, step.rowsDropped, step.rowsOut, recording) },
+        { name: 'Step', node: { name: 'Step', value: step.name, children: () => stepNodes(step) } },
+        ...(step.values.length === 0 ? [] : [{ name: 'Lets and comparisons', node: { name: 'Lets and comparisons', value: `${step.values.length}`, children: () => valuesNodes(step.values) } }]),
+        { name: 'By incoming row', node: byCallNode(step), expensive: step.byCall.length > 20 },
+      ];
+    }
+    if (record?.kind === 'frame') {
+      const called = record.record;
+      return [{ name: called.kind === 'function' ? 'Function' : 'Sub-query', node: { name: called.name, value: `${called.calls} call(s)`, children: () => [{ name: 'calls', value: String(called.calls) }] } }];
     }
     return [
       {
@@ -249,6 +286,28 @@ export class DebugProgram {
         },
       },
     ];
+  }
+
+  /** A record of a stop's path as a frame of the call stack. */
+  private frameOf(record: IndexedRecord, statement: ProgramStatement, index: number, placed: boolean, enclosing: boolean): FrameView | undefined {
+    const position = (range: Range | undefined, inText: boolean): { line: number; character: number; placed: boolean } =>
+      inText && range !== undefined ? { ...inFile(range, statement).start, placed: true } : { line: statement.line, character: statement.character, placed: false };
+    switch (record.kind) {
+      case 'stage':
+        return { name: `${record.record.kind} · ${record.record.rowsIn} → ${record.record.rowsOut} row(s)`, ...position(record.record.range, placed), statement: index, record };
+      case 'step':
+        return { name: `${record.record.name} · ${record.record.rowsIn} → ${record.record.rowsOut} row(s)`, ...position(record.record.ranges[0], placed), statement: index, record };
+      case 'frame':
+        // Shown at its call site, which is in the text around it.
+        return {
+          name: record.record.kind === 'function' ? `${record.record.name}() · ${record.record.calls} call(s)` : `fetch · ${record.record.calls} call(s)`,
+          ...position(record.record.at ?? record.record.range, enclosing),
+          statement: index,
+          record,
+        };
+      default:
+        return undefined;
+    }
   }
 
   /**
@@ -280,7 +339,7 @@ export class DebugProgram {
     if (statement.records === undefined) return { ...breakpoint, verified: false, message: 'Checked when its statement runs.' };
     return this.stopsIn(index).some((stop) => this.linesOf(stop).includes(breakpoint.line))
       ? { ...breakpoint, verified: true }
-      : { ...breakpoint, verified: false, message: 'No stage of this statement starts on this line.' };
+      : { ...breakpoint, verified: false, message: 'No stage or step of this statement is on this line.' };
   }
 
   /** A position in the program's file, for a range the engine reported in a statement. */
