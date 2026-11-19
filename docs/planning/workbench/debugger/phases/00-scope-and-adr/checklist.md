@@ -1,6 +1,6 @@
 ---
 kind: checklist
-status: in-progress
+status: complete
 feature: debugger
 phase: 00-scope-and-adr
 ---
@@ -65,10 +65,10 @@ Recommended in ADR-014, all accepted by the founder as written, 2026-11-19:
 - [x] ADR-014 accepted as written (founder, 2026-11-19)
 - [x] The feature document updated: status, the governing ADR's number, what exists, the four gaps, the open
       questions pointed at ADR-014
-- [ ] The feature document updated **after acceptance**: the mapping table, Goals 5 and invariant 4 (B9), the
+- [x] The feature document updated **after acceptance**: the mapping table, Goals 5 and invariant 4 (B9), the
       Phase Plan intent for phases 01–05 (B6, B7, B8), and the Deferred section (copying a store into memory)
 - [x] The initiative's status table
-- [ ] The root README's ADR table, **after acceptance**. It stops at ADR-010 today, so ADR-011, 012 and 013 go
+- [x] The root README's ADR table, **after acceptance**. It stopped at ADR-010, so ADR-011, 012 and 013 went
       in with it
-- [ ] `summary.md`
-- [ ] Merged into `feat/debugger`, and the Phase Plan row reads `Complete` with a link to the summary
+- [x] `summary.md`
+- [x] Merged into `feat/debugger`, and the Phase Plan row reads `Complete` with a link to the summary

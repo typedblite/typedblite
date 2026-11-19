@@ -153,8 +153,10 @@ ADR-004's rule ("returned, never emitted") and keeps the runtime usable wherever
 That includes a downstream application, which loads the runtime's `out/` folder.
 
 **4. A debug session runs against `:memory:` and never opens an existing database.** Decided by
-the founder on 2026-11-12. The adapter constructs the engine at `:memory:`, loads the workspace
-schema and the launch's seed files into it, and then runs the program. Writes in the program
+the founder on 2026-11-12. The adapter opens a `:memory:` session on the engine host, runs the
+`schema` files and then the `seed` files that the launch names, in order, and then runs the program
+(ADR-014 B9; there is no implicit workspace schema). 🔴 The host refuses `session.debug` on any
+session that is not at `:memory:` (B2), so this holds where the store is opened. Writes in the program
 behave as they would anywhere else, including commits, because they land in a store that
 disappears when the session ends. This needs no rollback rule and no `commit` setting, and it is
 not possible for a debugger to write to a real store by accident.
@@ -170,23 +172,24 @@ that logic moves somewhere both can import. It is not copied.
 
 ## What a TypeQLite debug session looks like
 
-How DAP's concepts map onto TypeQLite. Phase 00 confirms or changes this table.
+How DAP's concepts map onto TypeQLite. Settled in Phase 00 as
+[ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md) B11.
 
 | DAP | TypeQLite |
 | --- | --------- |
-| Program | A `.tql` or `.typeqlite` file, run from top to bottom (`define` blocks, write pipelines, reads) against a fresh `:memory:` store. The store first receives the workspace schema (ADR-008 D3), then any `seed` files the launch configuration names |
+| Program | `program`, a `.tql` or `.typeqlite` file run statement by statement, after the launch's `schema` and `seed` files (B9), in a fresh `:memory:` session on the engine host |
 | Thread | One. The interpreter is single-threaded |
-| Stack frames | Statement › stage › step inside the `match`. A function call or a `fetch` sub-query pushes a frame and runs its own stages |
-| Step over | The next stage, or the next statement when on a statement |
-| Step into | Into a `match`, one constraint at a time. Into a function body. Into a fetch sub-query |
-| Step out | Back to the enclosing stage or statement |
-| Step back / reverse continue | From the recording (approach A) |
-| Variables | **Rows**: the current row set, paged, where each row expands to its bindings and each concept to its type, iid and attributes. **Scope**: the `StreamScope` at this boundary, giving each variable's kind and value type. **Written**: things, attributes and roles written so far |
-| Line breakpoints | On a stage or a pattern, matched by range |
-| Conditional breakpoints | On the row count, for example `rows == 0` |
-| Exception breakpoints | *On refusal* (with its `DiagnosticCode`), and *when a stage empties* |
-| Debug console | Execution facts as output, as they are recorded. Evaluating expressions is a later phase |
-| Run Without Debugging | Free with DAP's `noDebug`: the file runs and its facts and rows go to the console |
+| Stack frames | Statement › stage › `match` step. A function call site or a `fetch` sub-query pushes a frame (B7) |
+| Step over | The next stage, or the next statement |
+| Step into | Into a `match`, one step at a time **in execution order, not source order** (B6); into a function or a `fetch` sub-query |
+| Step out | To the enclosing stage or statement |
+| Step back, reverse continue | Over every statement recorded so far (B1) |
+| Variables | **Rows** (paged; each row's bindings; each thing's type, iid and attributes **as at the step**, B8). **Scope** (`StreamScope`: kinds and value types). **By incoming row** (B7). **Dropped** (rows the cap left out, B10) |
+| Line breakpoints | On a stage, or on each `match` step that consumes the line (B6) |
+| Conditional breakpoints | On the step's row counts: `rowsIn`, `rowsOut` |
+| Exception breakpoints | *On refusal*, carrying its `DiagnosticCode`; *when a step empties* (`rowsIn > 0 && rowsOut == 0`) |
+| Debug console | Execution facts, in order. Evaluating expressions is out of scope (B1) |
+| Run Without Debugging | `noDebug`: each statement goes through `session.run`, not `session.debug` |
 
 ## Goals
 
@@ -200,7 +203,7 @@ How DAP's concepts map onto TypeQLite. Phase 00 confirms or changes this table.
 4. **Breakpoints that answer "where did my rows go?"**: line breakpoints on stages and patterns,
    row-count conditions, break when a stage empties, and break on refusal.
 5. **No existing database is touched:** every session runs in a fresh `:memory:` store, built from
-   the workspace schema and the launch's seed files (invariant 4).
+   the `schema` and `seed` files the launch names (invariant 4, ADR-014 B9).
 6. **The editor gains a debugger.** `apps/vscode` contributes the `typeqlite` debug type, launch
    configuration snippets, and breakpoints in `.tql` and `.typeqlite` files. F5 on a file runs it
    under the debugger.
@@ -217,8 +220,9 @@ packaged `.vsix`.
 - [ ] Adapter specs over DAP (`@vscode/debugadapter-testsupport` or an equivalent client): launch,
       stop on entry, step over, into and out across a function call, Variables at a stage
       boundary, and a breakpoint hit by line.
-- [ ] A query whose rows disappear at the third pattern of its `match` stops there under "break
-      when a stage empties". Asserted in the adapter specs **and** in the e2e.
+- [ ] A query whose rows disappear at a comparison in its `match` stops at that comparison's step
+      under "break when a step empties", with the comparison's range highlighted. Asserted in the
+      adapter specs **and** in the e2e.
 - [ ] The adapter only ever constructs its engine at `:memory:`. A spec asserts this, and a session
       whose program writes and commits leaves every file in the workspace byte-for-byte unchanged.
 - [ ] The e2e starts a session with `vscode.debug.startDebugging` on a fixture file, hits a
@@ -279,7 +283,7 @@ packaged `.vsix`.
 
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
-| 00 | Scope, the DAP mapping, and ADR-014 | In progress | [checklist](phases/00-scope-and-adr/checklist.md); ADR-014 accepted |
+| 00 | [Scope, the DAP mapping, and ADR-014](phases/00-scope-and-adr/summary.md) | Complete | ADR-014 accepted, B1–B11 |
 | 01 | The step hook: events, the recording, the cap, and proof that it is harmless | Not started | |
 | 02 | Adapter shell: launch a file, statement-level steps, output, Run Without Debugging | Not started | |
 | 03 | Stages and rows: stage steps, the Rows and Scope variables, line breakpoints | Not started | |
@@ -297,28 +301,33 @@ library and its version, and decide whether there is upstream code to diff again
 did for the editor.
 
 **01 — The step hook.** 🔴 This is the only phase that touches the interpreter, and the only one in
-which invariants 1 and 2 can break. Add the hook interface. Call it at stage boundaries, at
-`combinations()`'s existing `note()` points, and around `callFunction` and fetch sub-queries. Add a
-recorder that implements it, with the cap. Exit: the differential spec, conformance with the hook
-on, and the performance suites unchanged with it off.
+which invariants 1 and 2 can break. Add the hook interface, exported from `@typedblite/runtime/debug`
+only (B5). Call it at stage boundaries, at `combinations()`'s existing `note()` points, at the new
+points B6 names (attribute reads, `let`s, each comparison, `is`), and around `callFunction` and fetch
+sub-queries. Each `match` step carries every range it consumes (B6). Add a recorder that implements
+it: totals per step across incoming rows (B7), things described when recorded (B8), and the caps
+(B10), whose numbers this phase measures. `@typedblite/session` gains a way to run one statement with
+the recorder. Exit: the differential spec with `planJoins` on and off, conformance with the hook on,
+and the performance suites unchanged with it off.
 
-**02 — Adapter shell.** A DAP session that launches a file, splits it into statements, and runs
-each through the interpreter: define, read or write, using classification shared with the CLI
-(invariant 6). It stops on entry and steps over statements. Facts go to the console. Run Without
-Debugging works. Every session runs in a fresh `:memory:` store, loaded with the workspace schema
-and the seed files.
+**02 — Adapter shell.** The engine host gains `session.debug` (B2), refused on any session not at
+`:memory:`. `libs/debugger` (B4) serves a DAP session that launches a file, runs the launch's `schema`
+and `seed` files (B9), splits the program with `statement.split`, and records one statement at a time
+(B1). It stops on entry and steps over statements. Facts go to the console. Run Without Debugging
+goes through `session.run`.
 
-**03 — Stages and rows.** Steps at stage boundaries. The Rows variables, paged, with concepts
-expanded through `attributesOf` and `typeOfThing`. The Scope variables from `StreamScope`. Line
+**03 — Stages and rows.** Stops at stage boundaries from the recording. The Rows variables, paged,
+with each thing's type and attributes as recorded (B8). The Scope variables from `StreamScope`. Line
 breakpoints matched to stages by range.
 
-**04 — Inside a `match`.** Step into a `match`, one constraint at a time, with the combination
-count at each step. Nested `or`, `not` and `try` blocks. A function call or a fetch sub-query
-pushes a frame.
+**04 — Inside a `match`.** Step into a `match`, one execution step at a time, with rows in and rows
+out summed over incoming rows (B7), and every range of the step highlighted (B6). Line breakpoints on
+the steps that consume a line. Nested `or`, `not` and `try` blocks. A function call site or a fetch
+sub-query pushes a frame.
 
-**05 — Breakpoints that matter.** Conditional breakpoints on the row count. Exception breakpoints
-for a stage that empties and for a refusal, carrying its code. Step back and reverse continue, if
-Phase 00 chose approach A.
+**05 — Breakpoints that matter.** Conditional breakpoints on `rowsIn` and `rowsOut`. Exception
+breakpoints for a step that empties and for a refusal, carrying its code. Step back and reverse
+continue across every statement recorded (B1).
 
 **06 — The editor.** `apps/vscode` contributes the `typeqlite` debug type, its launch snippets,
 and breakpoints in TypeQLite files. The adapter is bundled into the `.vsix`. The e2e drives a
@@ -328,7 +337,14 @@ session through `vscode.debug.startDebugging`.
 
 Anything a phase defers is recorded here, not only in a commit message.
 
-- *(none yet)*
+- **Copying an existing store into memory** (Phase 00, ADR-014 B9). `deserialize` is absent at the
+  Node 22.16 minimum, `backup()` writes to a path, and either one opens an existing database, which
+  invariant 4 rules out. Revisit when the Node minimum has `deserialize`, and decide then whether
+  opening a store read-only to copy it breaks invariant 4.
+- **Evaluating expressions in the debug console** (Phase 00, ADR-014 B1). It needs a store that is
+  still at the stop, which only a blocking worker (approach B) gives.
+- **Streaming a recording in parts** (Phase 00, ADR-014). Decided only if Phase 01's measurements show
+  that one JSON line is too large.
 
 ## Key Documents
 
