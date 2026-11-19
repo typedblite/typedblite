@@ -67,10 +67,26 @@ const worker = new Worker(new URL('./device-worker.js', import.meta.url), { type
  */
 type HubHost = { connect(): MessagePort };
 let disconnected = false;
-function connectHub(): void {
+let waiting: ReturnType<typeof setTimeout> | undefined;
+const HOST_POLL_MS = 100;
+const HOST_POLL_FOR_MS = 60_000;
+
+/**
+ * 🔴 The embedding page may not have run its script yet. The page and its frames load at the same time, and a slow
+ * network can deliver the frame's script first: with no `browserHub` to ask, a device used to give up for good and stay
+ * offline ("Failed to fetch") until someone reconnected it by hand. So an embedded device keeps asking, every 100 ms for
+ * a minute. Only a *missing* host is waited for: a host whose hub is down answers with no port, and the page's "up"
+ * signal brings that device back, so it is not polled.
+ */
+function connectHub(waited = 0): void {
+  clearTimeout(waiting); // one pending ask at a time, and a signal from the page supersedes it
   if (disconnected) return;
   const host = (window.parent as unknown as { browserHub?: HubHost }).browserHub;
-  const port = host?.connect() ?? null;
+  if (!host) {
+    if (window.parent !== window && waited < HOST_POLL_FOR_MS) waiting = setTimeout(() => connectHub(waited + HOST_POLL_MS), HOST_POLL_MS);
+    return;
+  }
+  const port = host.connect();
   worker.postMessage({ type: 'hub-port', port }, port ? [port] : []);
 }
 control.onmessage = (event: MessageEvent<{ type: 'up' | 'down' }>) => {

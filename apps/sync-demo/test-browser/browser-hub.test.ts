@@ -470,6 +470,70 @@ describe('a second tab of the same page', () => {
   }, 150_000);
 });
 
+describe('whatever order the page, its devices and its hub arrive in', () => {
+  // The page and its frames load at the same time, so on a slow network any of them can arrive first. These delay one
+  // file, or all of them, and ask only that the demo still starts and still syncs, not that it starts fast.
+  const slow = (page: Page, pattern: string, ms: number): Promise<void> =>
+    page.route(pattern, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      await route.continue();
+    });
+
+  async function startsAndSyncs(delays: Record<string, number>): Promise<void> {
+    const context = await browser.newContext();
+    try {
+      const page = await context.newPage();
+      const problems = watch(page);
+      for (const [pattern, ms] of Object.entries(delays)) await slow(page, pattern, ms);
+      await page.goto(site.url);
+      await until('all three devices online', () => online(page), 45_000);
+      await until('the hub counts its panel and three devices', async () => (await hub(page)).info?.peers === 4, 20_000);
+      // Online is a claim; a task reaching another device is the proof that the hub is really connected.
+      await add(page, 'a', 'Arrived late');
+      await until('it reaches B and C', async () => (await Promise.all(['b', 'c'].map((name) => titles(page, name)))).every((list) => list.includes('Arrived late')), 30_000);
+      expect(problems.errors).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  }
+
+  it.each([[1_500], [4_000]])('the embedding page’s script arrives %d ms after its frames', async (ms) => {
+    await startsAndSyncs({ '**/page.js': ms });
+  }, 90_000);
+
+  it('the devices’ own script arrives late, after the page has started the hub', async () => {
+    await startsAndSyncs({ '**/device.js': 3_000 });
+  }, 90_000);
+
+  it('the hub’s Worker script arrives late, so its first requests wait for it', async () => {
+    await startsAndSyncs({ '**/hub.js': 3_000 });
+  }, 90_000);
+
+  it('the .wasm arrives late for everyone at once', async () => {
+    await startsAndSyncs({ '**/sqlite3.wasm': 3_000 });
+  }, 90_000);
+
+  it('everything is slow at once, each by a different amount', async () => {
+    await startsAndSyncs({ '**/page.js': 2_500, '**/device.js': 1_000, '**/hub.js': 3_500, '**/device-worker.js': 1_500, '**/sqlite3.wasm': 2_000 });
+  }, 120_000);
+
+  it('a hub that is down when a late page finally arrives is still waited for, and joined when it comes up', async () => {
+    const context = await browser.newContext();
+    try {
+      const page = await context.newPage();
+      await slow(page, '**/page.js', 2_000);
+      await page.goto(site.url);
+      await until('the devices are online', () => online(page), 45_000);
+      await page.click('#bh-toggle');
+      await until('they are offline', () => offline(page));
+      await page.click('#bh-toggle');
+      await until('and online again', () => online(page), 30_000);
+    } finally {
+      await context.close();
+    }
+  }, 120_000);
+});
+
 describe('the theme', () => {
   const background = (page: Page, name: string): Promise<string> => frame(page, name).evaluate(() => getComputedStyle(document.body).backgroundColor);
   const LIGHT = 'rgb(246, 247, 249)'; // #f6f7f9
