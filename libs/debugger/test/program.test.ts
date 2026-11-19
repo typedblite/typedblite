@@ -299,3 +299,73 @@ describe('inside a match (Phase 04)', () => {
     expect(frames[2]!.name).toBe('fetch · 3 call(s)');
   });
 });
+
+/** A read whose comparison drops every row, over three lines (from 0). */
+const EMPTIED = ['match', '  $p isa person, has age $a;', '  $a > 100;', 'select $p;'].join('\n');
+
+describe('breakpoints that matter (Phase 05)', () => {
+  it('a conditional breakpoint stops only at a stage or step on its line whose counts meet it', async () => {
+    const { debug } = await launch(EMPTIED, {}, PEOPLE);
+    const [onPattern, onComparison] = debug.setBreakpoints([
+      { line: 1, condition: 'rowsOut == 0' },
+      { line: 2, condition: 'rowsOut == 0' },
+    ]);
+    expect([onPattern!.verified, onComparison!.verified]).toEqual([false, false]);
+    expect(await debug.start()).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    // Line 1's steps passed rows on; line 2's comparison dropped them all.
+    expect(debug.frames()[0]!.name).toBe('$a > 100 · 3 → 0 row(s)');
+    expect(await debug.move('continue')).toEqual({ kind: 'ended', exitCode: 0 });
+  });
+
+  it('a condition that cannot be read never holds, and says why', async () => {
+    const { debug } = await launch(EMPTIED, {}, PEOPLE);
+    expect(debug.setBreakpoints([{ line: 2, condition: 'rows = 0' }])[0]).toMatchObject({ verified: false, message: expect.stringMatching(/^Cannot read 'rows = 0'/) });
+  });
+
+  it('when a step empties: stops at the step where the rows ran out, not at the stage around it', async () => {
+    const { debug } = await launch(EMPTIED, {}, PEOPLE);
+    debug.setExceptionFilters(['refusal', 'empty']);
+    expect(await debug.start()).toEqual({ kind: 'stopped', reason: 'exception', text: '$a > 100: 3 row(s) in, none out.' });
+    expect(debug.frames()[0]!.line).toBe(2);
+    expect(debug.exception).toEqual({ id: 'emptied', description: '$a > 100: 3 row(s) in, none out.' });
+    // Rows that never arrive cannot run out: nothing after it stops.
+    expect(await debug.move('continue')).toEqual({ kind: 'ended', exitCode: 0 });
+  });
+
+  it('without the filter, an emptying step does not stop the program', async () => {
+    const { debug } = await launch(EMPTIED, {}, PEOPLE);
+    expect(await debug.start()).toEqual({ kind: 'ended', exitCode: 0 });
+  });
+
+  it('on refusal: stops at the record that was open when it was refused, with its code', async () => {
+    const program = 'insert $z isa person, has name "Zed", has age 0;\nmatch $p isa person, has age $a;\n  let $x = 10 / $a;\nselect $x;';
+    const { debug } = await launch(program, {}, PEOPLE);
+    expect(await debug.start()).toEqual({ kind: 'stopped', reason: 'exception', text: 'Division failed: division by zero.' });
+    expect(debug.frames()[0]).toMatchObject({ name: expect.stringMatching(/^let \$x = 10 \/ \$a · /), line: 2 });
+    expect(debug.exception).toEqual({ id: 'typedblite.value-out-of-range', description: 'Division failed: division by zero.' });
+    expect(await debug.move('continue')).toEqual({ kind: 'ended', exitCode: 1 });
+  });
+
+  it('with the refusal filter off, a refusal ends the program at once, with exit code 1', async () => {
+    const { debug } = await launch('insert $x isa nobody;\ninsert $a isa person;', {}, PEOPLE);
+    debug.setExceptionFilters([]);
+    expect(await debug.start()).toEqual({ kind: 'ended', exitCode: 1 });
+  });
+
+  it('step back and reverse continue walk what was recorded, and nothing runs again', async () => {
+    const { host, debug } = await launch(EMPTIED, {}, PEOPLE);
+    debug.setBreakpoints([2]);
+    expect(await debug.start()).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    const at = debug.timeline.index;
+    await debug.move('over');
+    expect(debug.back('step')).toEqual({ kind: 'stopped', reason: 'step' });
+    expect(debug.timeline.index).toBe(at);
+    expect(debug.back('step')).toEqual({ kind: 'stopped', reason: 'step' });
+    expect(debug.frames()[0]!.name).toBe('$p has age $a · 3 → 3 row(s)');
+    expect(debug.back('reverse')).toEqual({ kind: 'stopped', reason: 'entry' });
+    expect(debug.timeline.index).toBe(0);
+    // Forward again over what has already run: the recording, not the store.
+    expect(await debug.move('continue')).toEqual({ kind: 'stopped', reason: 'breakpoint' });
+    expect(host.operations().filter((o) => o === 'session.debug')).toHaveLength(1);
+  });
+});

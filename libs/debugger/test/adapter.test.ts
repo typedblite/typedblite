@@ -179,3 +179,39 @@ describe('inside a match over DAP (Phase 04)', () => {
     expect(frames[2]).toMatchObject({ name: 'adult_ages() · 1 call(s)', source: { path: '/work/program.tql' } });
   });
 });
+
+describe('breakpoints that matter over DAP (Phase 05)', () => {
+  const EMPTIED = ['match', '  $p isa person, has age $a;', '  $a > 100;', 'select $p;'].join('\n');
+
+  it('offers conditional breakpoints, step back, exception info and the two exception filters', async () => {
+    const { client } = await open();
+    const { body } = await client.initializeRequest();
+    expect(body).toMatchObject({ supportsConditionalBreakpoints: true, supportsStepBack: true, supportsExceptionInfoRequest: true });
+    expect(body!.exceptionBreakpointFilters!.map((f) => [f.filter, f.default])).toEqual([
+      ['refusal', true],
+      ['empty', false],
+    ]);
+  });
+
+  it('when a step empties, set before the launch: stops at the comparison, and says why', async () => {
+    const { client } = await open(EMPTIED, PEOPLE);
+    await client.initializeRequest();
+    await client.setExceptionBreakpointsRequest({ filters: ['refusal', 'empty'] });
+    const [, , stopped] = await Promise.all([client.configurationDoneRequest(), client.launchRequest({ ...LAUNCH } as never), client.waitForEvent('stopped')]);
+    expect(stopped.body).toMatchObject({ reason: 'exception', text: '$a > 100: 3 row(s) in, none out.' });
+    expect(await line(client)).toBe(3);
+    const info = await client.exceptionInfoRequest({ threadId: 1 });
+    expect(info.body).toMatchObject({ exceptionId: 'emptied', description: '$a > 100: 3 row(s) in, none out.', breakMode: 'always' });
+  });
+
+  it('a conditional breakpoint, and step back to the step before it', async () => {
+    const { client } = await open(EMPTIED, PEOPLE);
+    await client.initializeRequest();
+    await client.setBreakpointsRequest({ source: { path: `${WORK}/program.tql` }, breakpoints: [{ line: 2, condition: 'rowsOut == 0' }, { line: 3, condition: 'rowsOut == 0' }] });
+    await Promise.all([client.configurationDoneRequest(), client.launchRequest({ ...LAUNCH } as never), client.assertStoppedLocation('breakpoint', { line: 3 })]);
+    await Promise.all([client.stepBackRequest({ threadId: 1 }), client.assertStoppedLocation('step', { line: 2 })]);
+    const [top] = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames;
+    expect(top!.name).toBe('$p has age $a · 3 → 3 row(s)');
+    await Promise.all([client.reverseContinueRequest({ threadId: 1 }), client.assertStoppedLocation('entry', { line: 1 })]);
+  });
+});

@@ -11,7 +11,7 @@ depends-on: [editor, engine-host]
 
 # TypeQLite Debugger — Feature Doc
 
-> **Status:** 🚧 In progress (2026-11-19): phases 00–04 complete; [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)
+> **Status:** 🚧 In progress (2026-11-19): phases 00–05 complete; [ADR-014](../../../architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)
 > accepted · **Written:** 2026-11-12 · **Branch:** `feat/debugger`, from `main`
 > (`4fa6d8d`), cut 2026-11-19 · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md) (complete),
 > [engine host](../engine-host/engine-host.feature.md) (complete) · **Governed by:**
@@ -288,7 +288,7 @@ packaged `.vsix`.
 | 02 | [Adapter shell: launch a file, statement-level steps, output, Run Without Debugging](phases/02-adapter-shell/summary.md) | Complete | `session.debug`, `statement.locate`, `libs/debugger` |
 | 03 | [Stages and rows: stage steps, the Rows and Scope variables, line breakpoints](phases/03-stages-and-rows/summary.md) | Complete | Stage stops, paged rows, line breakpoints |
 | 04 | [Inside a `match`: constraint steps, function and fetch frames, `or`/`not`/`try`](phases/04-inside-a-match/summary.md) | Complete | Steps in execution order; the splitter fixed |
-| 05 | Breakpoints that answer "where did my rows go?": conditions, empty stage, refusal, step back | Not started | |
+| 05 | [Breakpoints that answer "where did my rows go?": conditions, empty stage, refusal, step back](phases/05-breakpoints-that-matter/summary.md) | Complete | Conditions, both exception filters, step back |
 | 06 | The editor: the debug type, launch snippets, breakpoints in `.tql`, e2e, packaging | Not started | |
 
 ## Phase Intent

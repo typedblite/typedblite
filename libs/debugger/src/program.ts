@@ -3,9 +3,10 @@ import { dirname, resolve } from 'node:path';
 import { outputsOf, plainOutput } from '@typedblite/notebook';
 
 import { indexRecording, inFile, placedIn, recordAt, stopsOf, type IndexedRecord } from './records.js';
+import { parseCondition, type Counts } from './conditions.js';
 import { accepts, Timeline, type Motion, type Stop } from './timeline.js';
 import { byCallNode, rowsNode, scopeNodes, stageNodes, stepNodes, valuesNodes, type VariableNode } from './values.js';
-import type { DebugResult, HostCaller, LocatedStatement, Range, Recording, RunResult } from './wire.js';
+import type { BlockRecord, DebugResult, HostCaller, LocatedStatement, Range, Recording, RunResult } from './wire.js';
 
 /**
  * What a `typeqlite` launch configuration says (ADR-014 B9). Paths are resolved against `cwd`, or the program's own
@@ -57,8 +58,26 @@ export interface BreakpointState {
   readonly id: number;
   /** From 0. */
   readonly line: number;
+  /** A condition on the row counts (`rowsOut == 0`): it then stops only at a stage or step whose counts meet it. */
+  readonly condition?: string;
   readonly verified: boolean;
   readonly message?: string;
+}
+
+/** A line breakpoint as the client sets it: a line, from 0, and a condition on the row counts. */
+export interface BreakpointSpec {
+  readonly line: number;
+  readonly condition?: string;
+}
+
+/** The exception breakpoints (ADR-014 B11): a refusal, and a stage or step that empties. */
+export type ExceptionFilter = 'refusal' | 'empty';
+
+/** Why the program stopped with reason `exception`, for the client's exception view. */
+export interface ExceptionView {
+  /** The refusal's `DiagnosticCode`, or `emptied`. */
+  readonly id: string;
+  readonly description: string;
 }
 
 /** A frame of the call stack at a stop, innermost first: a stage, then its statement. */
@@ -83,7 +102,7 @@ export interface ScopeView {
 
 /** Where a move ended: at a stop, and why; or at the end of the program, with the exit code `typedblite --file` gives. */
 export type Outcome =
-  | { readonly kind: 'stopped'; readonly reason: 'step' | 'breakpoint' | 'exception'; readonly text?: string }
+  | { readonly kind: 'stopped'; readonly reason: 'entry' | 'step' | 'breakpoint' | 'exception'; readonly text?: string }
   | { readonly kind: 'ended'; readonly exitCode: number };
 
 /** The most rows of an answer the console prints. */
@@ -102,7 +121,11 @@ export class DebugProgram {
   private failed: number | undefined;
   private closed = false;
   private breakpoints: BreakpointState[] = [];
+  private readonly conditions = new Map<number, (counts: Counts) => boolean>();
   private nextBreakpoint = 1;
+  private exceptionFilters = new Set<ExceptionFilter>(['refusal']);
+  /** Why the program last stopped with reason `exception`. */
+  exception: ExceptionView | undefined;
   /** Told when a waiting breakpoint is settled, once its statement has run. */
   breakpointChanged: (breakpoint: BreakpointState) => void = () => undefined;
 
@@ -161,29 +184,61 @@ export class DebugProgram {
 
   /**
    * Move forward from the current stop. Each statement the move passes is run first, recorded through
-   * `session.debug`; a refusal stops the move at that statement. A move past the refused statement ends the program.
+   * `session.debug`. A refusal stops the move where it happened, when the refusal filter is on, and ends the program
+   * otherwise; nothing after a refused statement runs, as `typedblite --file` stops there. A stage or step that empties
+   * stops it when that filter is on.
    */
   async move(motion: Motion): Promise<Outcome> {
     const from = this.timeline.current;
     let index = this.timeline.index;
     for (;;) {
       const here = this.timeline.at(index)!;
-      if (here.kind === 'end' || (this.failed !== undefined && here.statement >= this.failed)) return this.end();
+      if (here.kind === 'end') return this.end();
       if (here.kind === 'statement' && !this.timeline.isExpanded(here.statement)) {
+        if (this.failed !== undefined) return this.end();
         const refused = await this.record(here.statement);
         if (refused !== undefined) {
-          this.timeline.moveTo(index);
+          if (!this.exceptionFilters.has('refusal')) return this.end();
+          this.timeline.moveTo(this.refusalStop(here.statement));
           return { kind: 'stopped', reason: 'exception', text: refused };
         }
       }
       index += 1;
       const next = this.timeline.at(index)!;
+      if (this.failed !== undefined && next.statement > this.failed) return this.end();
       const stepped = accepts(motion, from, next);
-      if (stepped || this.hits(next)) {
+      const emptied = this.emptied(next);
+      if (stepped || this.hits(next) || emptied !== undefined) {
         this.timeline.moveTo(index);
-        return next.kind === 'end' ? this.end() : { kind: 'stopped', reason: stepped && motion !== 'continue' ? 'step' : 'breakpoint' };
+        if (next.kind === 'end') return this.end();
+        if (emptied !== undefined && !stepped) {
+          this.exception = { id: 'emptied', description: emptied };
+          return { kind: 'stopped', reason: 'exception', text: emptied };
+        }
+        return { kind: 'stopped', reason: stepped && motion !== 'continue' ? 'step' : 'breakpoint' };
       }
     }
+  }
+
+  /**
+   * Move back through what has been recorded (ADR-014 B1): one stop, or to the last stop where a breakpoint holds, or
+   * to the start. Nothing runs again; what is shown is what was recorded then.
+   */
+  back(motion: 'step' | 'reverse'): Outcome {
+    let index = this.timeline.index;
+    if (index === 0) return { kind: 'stopped', reason: 'entry' };
+    if (motion === 'step') {
+      this.timeline.moveTo(index - 1);
+      return { kind: 'stopped', reason: 'step' };
+    }
+    for (index -= 1; index > 0; index -= 1) {
+      if (this.hits(this.timeline.at(index)!)) {
+        this.timeline.moveTo(index);
+        return { kind: 'stopped', reason: 'breakpoint' };
+      }
+    }
+    this.timeline.moveTo(0);
+    return { kind: 'stopped', reason: 'entry' };
   }
 
   /** Begin a launch that does not stop on entry: at the first statement if a breakpoint holds there, else on. */
@@ -194,11 +249,29 @@ export class DebugProgram {
 
   /**
    * Replace the program file's breakpoints. Each is checked against what is known: a statement's first line holds at
-   * once, a line in no statement never does, and any other line of a statement waits until that statement has run.
+   * once, a line in no statement never does, and any other line of a statement waits until that statement has run. A
+   * breakpoint with a condition stops only at a stage or step, so it always waits for its statement; one whose
+   * condition cannot be read never holds, and says why.
    */
-  setBreakpoints(lines: readonly number[]): BreakpointState[] {
-    this.breakpoints = lines.map((line) => this.check({ id: this.nextBreakpoint++, line, verified: false }));
+  setBreakpoints(specs: ReadonlyArray<number | BreakpointSpec>): BreakpointState[] {
+    this.conditions.clear();
+    this.breakpoints = specs.map((spec) => {
+      const { line, condition } = typeof spec === 'number' ? { line: spec, condition: undefined } : spec;
+      const id = this.nextBreakpoint++;
+      if (condition !== undefined && condition.trim() !== '') {
+        const parsed = parseCondition(condition);
+        if (!parsed.ok) return { id, line, condition, verified: false, message: parsed.message };
+        this.conditions.set(id, parsed.test);
+        return this.check({ id, line, condition, verified: false });
+      }
+      return this.check({ id, line, verified: false });
+    });
     return this.breakpoints;
+  }
+
+  /** Which exception breakpoints are on. */
+  setExceptionFilters(filters: readonly string[]): void {
+    this.exceptionFilters = new Set(filters.filter((filter): filter is ExceptionFilter => filter === 'refusal' || filter === 'empty'));
   }
 
   /**
@@ -319,7 +392,58 @@ export class DebugProgram {
     const lines = this.linesOf(stop);
     const earlier = this.stopsIn(stop.statement);
     const before = earlier.slice(0, earlier.findIndex((other) => sameStop(other, stop)));
-    return this.breakpoints.some((breakpoint) => lines.includes(breakpoint.line) && !before.some((other) => this.linesOf(other).includes(breakpoint.line)));
+    return this.breakpoints.some((breakpoint) => {
+      if (!lines.includes(breakpoint.line)) return false;
+      // A conditional breakpoint stops at each stage or step on its line whose counts meet its condition.
+      const condition = this.conditions.get(breakpoint.id);
+      if (condition !== undefined) {
+        const counts = this.countsAt(stop);
+        return counts !== undefined && condition(counts);
+      }
+      if (breakpoint.condition !== undefined) return false;
+      return !before.some((other) => this.linesOf(other).includes(breakpoint.line));
+    });
+  }
+
+  /** A stage's or step's row counts, summed over every call. Nothing for a statement or the end. */
+  private countsAt(stop: Stop): Counts | undefined {
+    const statement = this.statements[stop.statement];
+    const record = statement?.records === undefined ? undefined : recordAt(stop, statement.records);
+    if (record?.kind !== 'stage' && record?.kind !== 'step') return undefined;
+    return { rowsIn: record.record.rowsIn, rowsOut: record.record.rowsOut };
+  }
+
+  /**
+   * Why a stop stops for the "when a step empties" filter, or nothing: a stage or step that received rows and passed
+   * none on, and inside which no step did the same, so it stops where the rows ran out and not around it. Not in a
+   * refused statement, whose unfinished records passed nothing on because they never finished.
+   */
+  private emptied(stop: Stop): string | undefined {
+    if (!this.exceptionFilters.has('empty') || stop.statement === this.failed) return undefined;
+    const statement = this.statements[stop.statement];
+    const record = statement?.records === undefined ? undefined : recordAt(stop, statement.records);
+    if (record?.kind !== 'stage' && record?.kind !== 'step') return undefined;
+    if (!(record.record.rowsIn > 0 && record.record.rowsOut === 0) || anyStepEmpties(record.record.blocks)) return undefined;
+    const name = record.kind === 'stage' ? record.record.kind : record.record.name;
+    return `${name}: ${record.record.rowsIn} row(s) in, none out.`;
+  }
+
+  /** The stop to show a refusal at: the deepest stop of the statement at the record that was open, or around it. */
+  private refusalStop(index: number): number {
+    const statement = this.statements[index]!;
+    const at = statement.recording?.refusal?.at;
+    const first = this.timeline.statementIndex(index);
+    this.exception = { id: statement.recording?.refusal?.code ?? 'refused', description: statement.result?.kind === 'refused' ? statement.result.message : 'Refused' };
+    if (at === undefined || statement.records === undefined) return first;
+    const around = new Set<number>();
+    for (let id: number | undefined = at; id !== undefined; id = statement.records.get(id)?.parent) around.add(id);
+    let best = first;
+    for (let i = first + 1; this.timeline.at(i)?.statement === index; i += 1) {
+      const stop = this.timeline.at(i)!;
+      const last = stop.path[stop.path.length - 1];
+      if (last !== undefined && around.has(last) && stop.depth >= this.timeline.at(best)!.depth) best = i;
+    }
+    return best;
   }
 
   /** A statement's stops, in order: its own, then those its recording holds once it has run. */
@@ -329,15 +453,15 @@ export class DebugProgram {
   }
 
   /** A breakpoint checked against what is known now. */
-  private check({ id, line }: BreakpointState): BreakpointState {
+  private check({ id, line, condition }: BreakpointState): BreakpointState {
     // Built afresh: a settled breakpoint must not keep the message it waited with.
-    const breakpoint = { id, line };
+    const breakpoint = condition === undefined ? { id, line } : { id, line, condition };
     const index = this.statements.findIndex((statement) => breakpoint.line >= statement.line && breakpoint.line < statement.line + statement.text.split('\n').length);
     if (index < 0) return { ...breakpoint, verified: false, message: 'No statement is on this line.' };
     const statement = this.statements[index]!;
-    if (breakpoint.line === statement.line) return { ...breakpoint, verified: true };
+    if (breakpoint.line === statement.line && condition === undefined) return { ...breakpoint, verified: true };
     if (statement.records === undefined) return { ...breakpoint, verified: false, message: 'Checked when its statement runs.' };
-    return this.stopsIn(index).some((stop) => this.linesOf(stop).includes(breakpoint.line))
+    return this.stopsIn(index).some((stop) => (condition === undefined || stop.kind !== 'statement') && this.linesOf(stop).includes(breakpoint.line))
       ? { ...breakpoint, verified: true }
       : { ...breakpoint, verified: false, message: 'No stage or step of this statement is on this line.' };
   }
@@ -420,4 +544,9 @@ export function statusOf(result: RunResult | undefined): string {
 
 function sameStop(a: Stop, b: Stop): boolean {
   return a.statement === b.statement && a.kind === b.kind && a.path.length === b.path.length && a.path.every((id, i) => id === b.path[i]);
+}
+
+/** Whether any step in these blocks, or in the blocks inside them, received rows and passed none on. */
+function anyStepEmpties(blocks: readonly BlockRecord[]): boolean {
+  return blocks.some((block) => block.steps.some((step) => (step.rowsIn > 0 && step.rowsOut === 0) || anyStepEmpties(step.blocks)));
 }
