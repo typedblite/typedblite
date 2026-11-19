@@ -54,7 +54,7 @@ describe('HTTP', () => {
     const body = (await (await fetch(`${base}/help`)).json()) as { operations: { name: string }[] };
     const names = body.operations.map((operation) => operation.name);
     expect(names).toContain('session.run');
-    expect(names).toHaveLength(12);
+    expect(names).toHaveLength(14);
   });
 
   it('dispatches any operation through one route, and keeps a session across requests', async () => {

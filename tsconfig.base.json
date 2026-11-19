@@ -20,7 +20,8 @@
       "@typedblite/runtime/debug": ["./libs/runtime/src/debug.ts"],
       "@typedblite/runtime": ["./libs/runtime/src/index.ts"],
       "@typedblite/session": ["./libs/session/src/index.ts"],
-      "@typedblite/notebook": ["./libs/notebook/src/index.ts"]
+      "@typedblite/notebook": ["./libs/notebook/src/index.ts"],
+      "@typedblite/debugger": ["./libs/debugger/src/index.ts"]
     }
   }
 }

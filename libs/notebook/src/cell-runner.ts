@@ -82,6 +82,14 @@ export async function runCell(source: string, host: HostCaller, session: Stateme
   return { outputs, failed: false };
 }
 
+/**
+ * What one statement's result shows, outside a cell: its rows or documents and its facts, or its refusal (with no
+ * location, since there is no cell to place it in). The debugger's console uses it.
+ */
+export function outputsOf(result: RunResult, maxRows: number): OutputBlock[] {
+  return result.kind === 'refused' ? [refusal(result, '', -1)] : answer(result, maxRows);
+}
+
 /** The shown form of a statement that ran: its rows or documents, or a line saying it ran, then its execution facts. */
 function answer(result: Exclude<RunResult, { kind: 'refused' }>, maxRows: number): OutputBlock[] {
   const blocks: OutputBlock[] = [];

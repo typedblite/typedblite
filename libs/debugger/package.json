@@ -1,0 +1,26 @@
+{
+  "name": "@typedblite/debugger",
+  "description": "The TypeQLite debugger's adapter: a Debug Adapter Protocol session over the engine host's recordings (ADR-014)",
+  "version": "0.0.1",
+  "license": "MPL-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "main": "./out/index.js",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "default": "./out/index.js"
+    }
+  },
+  "dependencies": {
+    "@typedblite/notebook": "*",
+    "@vscode/debugadapter": "1.68.0",
+    "@vscode/debugprotocol": "1.68.0"
+  },
+  "devDependencies": {
+    "@vscode/debugadapter-testsupport": "1.68.0"
+  }
+}

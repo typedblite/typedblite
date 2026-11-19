@@ -18,6 +18,11 @@ export class ClassifyStatementQuery {
   constructor(readonly statement: string) {}
 }
 
+/** `statement.locate`: the statements `statement.split` finds, each as written and where it starts. */
+export class LocateStatementsQuery {
+  constructor(readonly source: string) {}
+}
+
 /** `statement.split`: a source split into statements a session can run one at a time. */
 export class SplitStatementsQuery {
   constructor(readonly source: string) {}

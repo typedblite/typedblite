@@ -10,6 +10,7 @@ import {
   BeginTransactionCommand,
   CloseSessionCommand,
   CommitTransactionCommand,
+  DebugStatementCommand,
   OpenSessionCommand,
   RestartSessionCommand,
   RollbackTransactionCommand,
@@ -20,6 +21,7 @@ import {
   GetSchemaQuery,
   GetSessionQuery,
   ListSessionsQuery,
+  LocateStatementsQuery,
   SplitStatementsQuery,
 } from './queries.js';
 
@@ -81,9 +83,44 @@ export function createHostOperations(): ToolOperationDescriptor<any>[] {
     },
   };
 
+  const LIMITS = ['rowsPerStep', 'callsPerSite', 'bytes'] as const;
+  const debug: ToolOperationDescriptor<{ session: string; statement: string; limits?: Record<string, number> }> = {
+    name: 'session.debug',
+    summary: "Run one statement as session.run does, on a session at ':memory:', and answer a recording of what it did.",
+    kind: 'command',
+    validate: (input) => {
+      const session = requiredString(input, 'session', 'session.debug');
+      const statement = requiredString(input, 'statement', 'session.debug');
+      const raw = input['limits'];
+      if (raw === undefined) return { session, statement };
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) invalidInput("session.debug's 'limits' must be an object.");
+      const limits: Record<string, number> = {};
+      for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+        if (!(LIMITS as readonly string[]).includes(key)) invalidInput(`session.debug's 'limits' has no '${key}'.`);
+        if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) invalidInput(`session.debug's 'limits.${key}' must be a whole number, 0 or more.`);
+        limits[key] = value;
+      }
+      return { session, statement, limits };
+    },
+    createRequest: ({ session, statement, limits }) => new DebugStatementCommand(session, statement, limits),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session: string(),
+        statement: string(),
+        limits: {
+          type: 'object',
+          properties: Object.fromEntries(LIMITS.map((key) => [key, { type: 'integer', minimum: 0 }])),
+        },
+      },
+      required: ['session', 'statement'],
+    },
+  };
+
   return [
     open,
     run,
+    debug,
     bySession('session.begin', 'Open a transaction: statements join it until commit or rollback.', 'command', (s) => new BeginTransactionCommand(s)),
     bySession('session.commit', "Make the transaction's writes permanent.", 'command', (s) => new CommitTransactionCommand(s)),
     bySession('session.rollback', "Discard the transaction's writes.", 'command', (s) => new RollbackTransactionCommand(s)),
@@ -106,6 +143,14 @@ export function createHostOperations(): ToolOperationDescriptor<any>[] {
       validate: (input) => ({ statement: requiredString(input, 'statement', 'statement.classify') }),
       createRequest: ({ statement }: { statement: string }) => new ClassifyStatementQuery(statement),
       inputSchema: { type: 'object', properties: { statement: string() }, required: ['statement'] },
+    },
+    {
+      name: 'statement.locate',
+      summary: 'The statements statement.split finds, each as written and where it starts (line and character, from 0).',
+      kind: 'query',
+      validate: (input) => ({ source: requiredString(input, 'source', 'statement.locate') }),
+      createRequest: ({ source }: { source: string }) => new LocateStatementsQuery(source),
+      inputSchema: { type: 'object', properties: { source: string() }, required: ['source'] },
     },
     {
       name: 'statement.split',

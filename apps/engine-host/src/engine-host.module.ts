@@ -6,9 +6,11 @@ import {
   ClassifyStatementHandler,
   CloseSessionHandler,
   CommitTransactionHandler,
+  DebugStatementHandler,
   GetSchemaHandler,
   GetSessionHandler,
   ListSessionsHandler,
+  LocateStatementsHandler,
   OpenSessionHandler,
   RestartSessionHandler,
   RollbackTransactionHandler,
@@ -20,6 +22,7 @@ import { SessionRegistry } from './session.registry.js';
 const HANDLERS = [
   OpenSessionHandler,
   RunStatementHandler,
+  DebugStatementHandler,
   BeginTransactionHandler,
   CommitTransactionHandler,
   RollbackTransactionHandler,
@@ -29,6 +32,7 @@ const HANDLERS = [
   ListSessionsHandler,
   GetSchemaHandler,
   ClassifyStatementHandler,
+  LocateStatementsHandler,
   SplitStatementsHandler,
 ];
 

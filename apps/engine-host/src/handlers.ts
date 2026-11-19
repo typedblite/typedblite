@@ -2,9 +2,12 @@ import { Inject } from '@nestjs/common';
 import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler } from '@nestjs/cqrs';
 import {
   classifyStatement,
+  locateStatements,
   splitStatements,
   SessionClosedError,
   type ControlResult,
+  type DebugResult,
+  type LocatedStatement,
   type RunResult,
   type StatementKind,
 } from '@typedblite/session';
@@ -14,17 +17,19 @@ import {
   BeginTransactionCommand,
   CloseSessionCommand,
   CommitTransactionCommand,
+  DebugStatementCommand,
   OpenSessionCommand,
   RestartSessionCommand,
   RollbackTransactionCommand,
   RunStatementCommand,
 } from './commands.js';
-import { schemaRefused, sessionClosed } from './errors.js';
+import { notInMemory, schemaRefused, sessionClosed } from './errors.js';
 import {
   ClassifyStatementQuery,
   GetSchemaQuery,
   GetSessionQuery,
   ListSessionsQuery,
+  LocateStatementsQuery,
   SplitStatementsQuery,
 } from './queries.js';
 import { SessionRegistry, type SessionInfo } from './session.registry.js';
@@ -61,6 +66,18 @@ export class RunStatementHandler implements ICommandHandler<RunStatementCommand,
     } finally {
       await session.close();
     }
+  }
+}
+
+@CommandHandler(DebugStatementCommand)
+export class DebugStatementHandler implements ICommandHandler<DebugStatementCommand, DebugResult> {
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
+
+  /** As `session.run`, with a recording. 🔴 Refused on a session that is not at `:memory:` (ADR-014 B2). */
+  async execute({ sessionId, statement, limits }: DebugStatementCommand): Promise<DebugResult> {
+    const session = this.registry.get(sessionId);
+    if (session.location !== ':memory:') throw notInMemory(sessionId, session.location);
+    return session.debug(statement, limits);
   }
 }
 
@@ -138,6 +155,13 @@ export class GetSchemaHandler implements IQueryHandler<GetSchemaQuery, TypeDBLit
 export class ClassifyStatementHandler implements IQueryHandler<ClassifyStatementQuery, { kind: StatementKind }> {
   async execute({ statement }: ClassifyStatementQuery): Promise<{ kind: StatementKind }> {
     return { kind: classifyStatement(statement) };
+  }
+}
+
+@QueryHandler(LocateStatementsQuery)
+export class LocateStatementsHandler implements IQueryHandler<LocateStatementsQuery, { statements: LocatedStatement[] }> {
+  async execute({ source }: LocateStatementsQuery): Promise<{ statements: LocatedStatement[] }> {
+    return { statements: locateStatements(source) };
   }
 }
 

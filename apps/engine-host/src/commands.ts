@@ -25,6 +25,25 @@ export class RunStatementCommand {
   ) {}
 }
 
+/** The caps of a recording (ADR-014 B10); what is not given takes the recorder's default. */
+export interface DebugLimits {
+  readonly rowsPerStep?: number;
+  readonly callsPerSite?: number;
+  readonly bytes?: number;
+}
+
+/**
+ * `session.debug`: exactly one statement, as `session.run` runs it, with a recording of what it did (ADR-014 B2).
+ * 🔴 Only on a session at `:memory:`: a debugger never runs against a store anyone keeps (the debugger's invariant 4).
+ */
+export class DebugStatementCommand {
+  constructor(
+    readonly sessionId: string,
+    readonly statement: string,
+    readonly limits: DebugLimits = {},
+  ) {}
+}
+
 /** `session.begin` */
 export class BeginTransactionCommand {
   constructor(readonly sessionId: string) {}

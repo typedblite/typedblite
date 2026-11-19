@@ -49,7 +49,43 @@ function isRead(text: string): boolean {
  */
 export function splitStatements(source: string): string[] {
   const text = source.replace(/^\s*#[^\n]*$/gm, '');
-  const statements: string[] = [];
+  return statementBounds(text).map(([from, to]) => text.slice(from, to));
+}
+
+/** A statement of a source, as {@link locateStatements} finds it. */
+export interface LocatedStatement {
+  /** The statement as written, comments inside it kept: what to run. */
+  readonly text: string;
+  /** Where it starts in the source, both counted from 0, as an LSP position is. */
+  readonly line: number;
+  readonly character: number;
+}
+
+/**
+ * The statements {@link splitStatements} finds, where they are: each one's text as written and its position, so a
+ * range the engine reports for a statement can be placed in the file it came from.
+ *
+ * @privateRemarks
+ * The same splitting loop, run over the source with each comment line blanked to spaces instead of removed, so every
+ * offset is the source's own. A comment line is whitespace to the loop either way, so the statements are the same.
+ */
+export function locateStatements(source: string): LocatedStatement[] {
+  const text = source.replace(/^[ \t]*#[^\n]*$/gm, (comment) => ' '.repeat(comment.length));
+  return statementBounds(text).map(([from, to]) => {
+    const before = source.slice(0, from);
+    const line = before.split('\n').length - 1;
+    return { text: source.slice(from, to), line, character: from - (before.lastIndexOf('\n') + 1) };
+  });
+}
+
+/** Where each statement of a comment-free text starts and ends: `[from, to)`, with no surrounding whitespace. */
+function statementBounds(text: string): Array<[number, number]> {
+  const bounds: Array<[number, number]> = [];
+  const trimmed = (from: number, to: number): [number, number] | undefined => {
+    while (from < to && /\s/.test(text[from]!)) from += 1;
+    while (to > from && /\s/.test(text[to - 1]!)) to -= 1;
+    return from < to ? [from, to] : undefined;
+  };
   let start = 0;
 
   for (let i = 0; i < text.length; i++) {
@@ -77,11 +113,11 @@ export function splitStatements(source: string): string[] {
       if (/^\s*(select|reduce|sort|offset|limit|distinct|require|fetch)\b/i.test(rest)) continue;
     }
 
-    statements.push(body);
+    bounds.push(trimmed(start, i + 1)!);
     start = i + 1;
   }
 
-  const tail = text.slice(start).trim();
-  if (tail) statements.push(tail);
-  return statements;
+  const tail = trimmed(start, text.length);
+  if (tail) bounds.push(tail);
+  return bounds;
 }

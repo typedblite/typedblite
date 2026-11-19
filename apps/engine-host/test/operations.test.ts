@@ -25,10 +25,13 @@ const EXAMPLES: Record<string, Record<string, unknown>> = {
   'schema.get': { session: 's1' },
   'statement.classify': { statement: 'insert $a isa a;' },
   'statement.split': { source: 'insert $a isa a;' },
+  // ADR-014: the debugger's two.
+  'session.debug': { session: 's1', statement: 'match $a isa a;', limits: { rowsPerStep: 10, callsPerSite: 5, bytes: 1000 } },
+  'statement.locate': { source: 'insert $a isa a;' },
 };
 
 describe('the operation list', () => {
-  it('names the twelve operations of ADR-011 D4, once each', () => {
+  it('names the twelve operations of ADR-011 D4 and the debugger\'s two of ADR-014, once each', () => {
     expect(operations.map((o) => o.name).sort()).toEqual(Object.keys(EXAMPLES).sort());
   });
 
@@ -44,7 +47,7 @@ describe('the operation list', () => {
   });
 
   it('reads and writes the right bus', () => {
-    const commands = ['session.open', 'session.run', 'session.begin', 'session.commit', 'session.rollback', 'session.restart', 'session.close'];
+    const commands = ['session.open', 'session.run', 'session.debug', 'session.begin', 'session.commit', 'session.rollback', 'session.restart', 'session.close'];
     for (const operation of operations) expect(operation.kind).toBe(commands.includes(operation.name) ? 'command' : 'query');
   });
 });
@@ -61,5 +64,22 @@ describe('session.run input', () => {
   it('refuses neither, and both', () => {
     expect(() => validate({ statement: 'x' })).toThrow(/exactly one/);
     expect(() => validate({ session: 's1', location: 'a.db', statement: 'x' })).toThrow(/exactly one/);
+  });
+});
+
+describe('session.debug input', () => {
+  const debug = named('session.debug');
+  const validate = (input: Record<string, unknown>) => debug.validate!(probeInput(input).input);
+
+  it('takes a session, a statement and optional caps', () => {
+    expect(debug.createRequest(validate({ session: 's1', statement: 'x' }))).toMatchObject({ sessionId: 's1', statement: 'x', limits: {} });
+    expect(debug.createRequest(validate({ session: 's1', statement: 'x', limits: { rowsPerStep: 3 } }))).toMatchObject({ limits: { rowsPerStep: 3 } });
+  });
+
+  it('refuses a cap it does not know, or one that is not a whole number', () => {
+    expect(() => validate({ session: 's1', statement: 'x', limits: { rows: 3 } })).toThrow(/no 'rows'/);
+    expect(() => validate({ session: 's1', statement: 'x', limits: { bytes: -1 } })).toThrow(/whole number/);
+    expect(() => validate({ session: 's1', statement: 'x', limits: { bytes: 1.5 } })).toThrow(/whole number/);
+    expect(() => validate({ session: 's1', statement: 'x', limits: 'all' })).toThrow(/must be an object/);
   });
 });

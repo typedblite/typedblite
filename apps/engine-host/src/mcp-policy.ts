@@ -18,10 +18,19 @@ export type McpTier = 'read' | 'write';
  */
 export const READ_TIER = ['session.list', 'session.get', 'schema.get', 'statement.classify', 'statement.split', 'session.run'] as const;
 
+/**
+ * Operations that are never tools, in either tier. `session.debug` is the debugger's (ADR-014 B2): an agent has
+ * `session.run`, and a recording is for a person stepping through it.
+ */
+export const NOT_TOOLS = ['session.debug'] as const;
+
 /** The operations to offer as tools in a tier. Only an operation that declares an input schema can be a tool. */
 export function toolsFor(tier: McpTier, operations: readonly ToolOperationDescriptor<any>[]): ToolOperationDescriptor<any>[] {
   return operations.filter(
-    (operation) => operation.inputSchema !== undefined && (tier === 'write' || (READ_TIER as readonly string[]).includes(operation.name)),
+    (operation) =>
+      operation.inputSchema !== undefined &&
+      !(NOT_TOOLS as readonly string[]).includes(operation.name) &&
+      (tier === 'write' || (READ_TIER as readonly string[]).includes(operation.name)),
   );
 }
 
