@@ -1,3 +1,4 @@
+import { Inject } from '@nestjs/common';
 import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler } from '@nestjs/cqrs';
 import {
   classifyStatement,
@@ -30,7 +31,7 @@ import { SessionRegistry, type SessionInfo } from './session.registry.js';
 
 @CommandHandler(OpenSessionCommand)
 export class OpenSessionHandler implements ICommandHandler<OpenSessionCommand, SessionInfo> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
 
   async execute({ location, schema }: OpenSessionCommand): Promise<SessionInfo> {
     const info = this.registry.open(location);
@@ -46,7 +47,7 @@ export class OpenSessionHandler implements ICommandHandler<OpenSessionCommand, S
 
 @CommandHandler(RunStatementCommand)
 export class RunStatementHandler implements ICommandHandler<RunStatementCommand, RunResult> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
 
   /**
    * A refusal, the engine's own included, is the answer and not an exception. An unknown id is an exception.
@@ -65,7 +66,7 @@ export class RunStatementHandler implements ICommandHandler<RunStatementCommand,
 
 @CommandHandler(BeginTransactionCommand)
 export class BeginTransactionHandler implements ICommandHandler<BeginTransactionCommand, ControlResult> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
   async execute({ sessionId }: BeginTransactionCommand): Promise<ControlResult> {
     return this.registry.get(sessionId).begin();
   }
@@ -73,7 +74,7 @@ export class BeginTransactionHandler implements ICommandHandler<BeginTransaction
 
 @CommandHandler(CommitTransactionCommand)
 export class CommitTransactionHandler implements ICommandHandler<CommitTransactionCommand, ControlResult> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
   async execute({ sessionId }: CommitTransactionCommand): Promise<ControlResult> {
     return this.registry.get(sessionId).commit();
   }
@@ -81,7 +82,7 @@ export class CommitTransactionHandler implements ICommandHandler<CommitTransacti
 
 @CommandHandler(RollbackTransactionCommand)
 export class RollbackTransactionHandler implements ICommandHandler<RollbackTransactionCommand, ControlResult> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
   async execute({ sessionId }: RollbackTransactionCommand): Promise<ControlResult> {
     return this.registry.get(sessionId).rollback();
   }
@@ -89,7 +90,7 @@ export class RollbackTransactionHandler implements ICommandHandler<RollbackTrans
 
 @CommandHandler(RestartSessionCommand)
 export class RestartSessionHandler implements ICommandHandler<RestartSessionCommand, ControlResult> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
   async execute({ sessionId }: RestartSessionCommand): Promise<ControlResult> {
     return this.registry.get(sessionId).restart();
   }
@@ -97,7 +98,7 @@ export class RestartSessionHandler implements ICommandHandler<RestartSessionComm
 
 @CommandHandler(CloseSessionCommand)
 export class CloseSessionHandler implements ICommandHandler<CloseSessionCommand, SessionInfo> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
   async execute({ sessionId }: CloseSessionCommand): Promise<SessionInfo> {
     await this.registry.get(sessionId).close();
     return this.registry.info(sessionId);
@@ -106,7 +107,7 @@ export class CloseSessionHandler implements ICommandHandler<CloseSessionCommand,
 
 @QueryHandler(GetSessionQuery)
 export class GetSessionHandler implements IQueryHandler<GetSessionQuery, SessionInfo> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
   async execute({ sessionId }: GetSessionQuery): Promise<SessionInfo> {
     return this.registry.info(sessionId);
   }
@@ -114,7 +115,7 @@ export class GetSessionHandler implements IQueryHandler<GetSessionQuery, Session
 
 @QueryHandler(ListSessionsQuery)
 export class ListSessionsHandler implements IQueryHandler<ListSessionsQuery, SessionInfo[]> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
   async execute(): Promise<SessionInfo[]> {
     return this.registry.list();
   }
@@ -122,7 +123,7 @@ export class ListSessionsHandler implements IQueryHandler<ListSessionsQuery, Ses
 
 @QueryHandler(GetSchemaQuery)
 export class GetSchemaHandler implements IQueryHandler<GetSchemaQuery, TypeDBLiteSchemaSnapshot> {
-  constructor(private readonly registry: SessionRegistry) {}
+  constructor(@Inject(SessionRegistry) private readonly registry: SessionRegistry) {}
   async execute({ sessionId }: GetSchemaQuery): Promise<TypeDBLiteSchemaSnapshot> {
     try {
       return this.registry.get(sessionId).schema();

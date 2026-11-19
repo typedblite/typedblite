@@ -8,7 +8,7 @@ features: [engine-host, graph-explorer, debugger, notebook]
 
 # TypeQLite Workbench — Initiative
 
-> **Status:** 🚧 Started 2026-11-19, engine-host Phase 00 done · **Written:** 2026-11-17 · **Branch:** none. An
+> **Status:** 🚧 Started 2026-11-19; the engine host is built, the three consumers are next · **Written:** 2026-11-17 · **Branch:** none. An
 > initiative has no branch; each feature is cut from `main`
 > ([lifecycle standard](../../standards/governance/multi-phase-lifecycle-standard.md#branches)).
 >
@@ -117,7 +117,7 @@ Update this table when a feature changes state.
 
 | Feature | Status |
 | ------- | ------ |
-| engine-host | Phase 04 complete, Phase 05 next ([ADR-011](../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) accepted) |
+| engine-host | Complete: six phases in `feat/engine-host`, awaiting the merge into `main` ([ADR-011](../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) accepted) |
 | graph-explorer | Proposed |
 | debugger | Proposed |
 | notebook | Proposed |

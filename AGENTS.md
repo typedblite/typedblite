@@ -31,6 +31,7 @@ flowchart LR
   engine-host --> session
   engine-host -.->|devx-micro app-*| transports[CLI, REPL, sidecar, HTTP]
   engine-host -.->|MCP SDK| mcp[MCP: stdio, HTTP]
+  vscode -.->|ships the host's bundle, runs it as a process| engine-host
   engine-host --> runtime
   sync-demo --> runtime
   conformance --> runtime
@@ -76,8 +77,8 @@ Nx project names (not the npm package names):
 - `typedblite-conformance` — also has `report`
 - `typedblite` — the CLI, npm package `typedblite` (it was `typedblite-cli`; `npx typedblite` needs the unscoped name)
 - `typedblite-session` — `@typedblite/session`, a session over the engine (transactions, restart) and the statement classifier, shared by the CLI and the host; no NestJS
-- `engine-host` — `@typedblite/engine-host` (private), the workbench's NestJS CQRS host (ADR-011), built on `@devx-micro/app-*`: the core, and the CLI, REPL, sidecar, HTTP and MCP transports (`typedblite-host`; HTTP and HTTP MCP are loopback only, and MCP is read-only unless `--mcp-write`). Its process specs run the built `out/main.js`, so `test` builds first
-- `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`
+- `engine-host` — `@typedblite/engine-host` (private), the workbench's NestJS CQRS host (ADR-011), built on `@devx-micro/app-*`: the core, and the CLI, REPL, sidecar, HTTP and MCP transports (`typedblite-host`; HTTP and HTTP MCP are loopback only, and MCP is read-only unless `--mcp-write`). Its process specs run the built `out/main.js` and the bundle `dist/sidecar.cjs` (target `bundle`, which the extension ships), so `test` builds and bundles first
+- `typeqlite-vscode` — the VS Code extension `typeqlite`; also has `package` and `e2e`. It bundles the engine host's sidecar (`sync-host` copies `engine-host:bundle`'s `dist/sidecar.cjs` to `out/host/`) and starts it as a process with a `node` it probes; 🔴 it never *imports* the host, the runtime or the session package (`manifest.test.ts` checks)
 - `playground` — `typedblite-playground`, TypeQLite in a browser: the engine on WASM SQLite in a worker, and Monaco with the real language server over LSP in another; also has `test-browser` and `serve`
 - `website` — `typedblite-website`, the `typedblite.dev` static site (Astro Starlight): pages generated from the repository's Markdown, the API reference (starlight-typedoc), the playground and the sync demo; targets `build-site`, `check`, `dev`, `serve` (it has no `build`, so `npm run build` does not build it; [docs/development/website.md](docs/development/website.md))
 - `sync-demo` — `typedblite-sync-demo`, the offline-first sync demo; also has `smoke`, `test-browser`, `serve`, `demo` and `android-setup`/`android-apk`/`android-emulator`; and the in-browser hub (the hub in a Worker, three devices in one page, which the website serves at `/sync-demo/`): `build-browser`, `browser-hub` (serve, `npm run demo:browser`) and `test-browser-hub`

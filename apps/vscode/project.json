@@ -37,11 +37,25 @@
         "{projectRoot}/theme-bridge/images"
       ]
     },
+    "sync-host": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "engine-host:bundle"
+      ],
+      "options": {
+        "command": "node ../../tools/copy-file.mjs ../engine-host/dist/sidecar.cjs out/host/sidecar.cjs",
+        "cwd": "apps/vscode"
+      },
+      "outputs": [
+        "{projectRoot}/out/host"
+      ]
+    },
     "build": {
       "executor": "nx:run-commands",
       "dependsOn": [
         "sync-grammar",
         "sync-icon",
+        "sync-host",
         "^build"
       ],
       "options": {
@@ -89,6 +103,7 @@
       "dependsOn": [
         "sync-grammar",
         "sync-icon",
+        "sync-host",
         "^build"
       ],
       "options": {

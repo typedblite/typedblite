@@ -79,12 +79,39 @@
         }
       }
     ],
-    "markdown.markdownItPlugins": true
+    "markdown.markdownItPlugins": true,
+    "commands": [
+      {
+        "command": "typedblite.host.request",
+        "title": "TypeDBLite: Run an engine host operation",
+        "category": "TypeDBLite"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "typedblite.host.request",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "TypeDBLite",
+      "properties": {
+        "typedblite.host.node": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "The `node` that runs the TypeDBLite engine host: a path, or empty for the one on PATH. It must be Node 22.16 or newer, which has `node:sqlite`."
+        }
+      }
+    }
   },
   "vsce": {
     "dependencies": false
   },
   "dependencies": {
+    "@devx-micro/app-sidecar": "0.2.1",
     "@typedblite/language": "*",
     "jsonc-parser": "~3.3.1",
     "langium": "~4.4.2",

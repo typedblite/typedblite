@@ -16,8 +16,10 @@ TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) gr
 | `libs/runtime/` | `@typedblite/runtime` | interpreter, SQLite generator, change log |
 | `libs/content-revision/` | `@typedblite/content-revision` | revision identifiers |
 | `libs/conformance/` | `typedblite-conformance` | TypeDB behaviour spec vendored as Cucumber features |
+| `libs/session/` | `@typedblite/session` | A session over the engine (transactions, restart) and the statement classifier, shared by the CLI and the engine host |
 | `apps/cli/` | `typedblite` | The CLI: REPL and file runner |
-| `apps/vscode/` | `typeqlite` (private) | VS Code extension: the TypeQLite editor, a Langium language server (ADR-008) |
+| `apps/vscode/` | `typeqlite` (private) | VS Code extension: the TypeQLite editor, a Langium language server (ADR-008); it also bundles and starts the engine host |
+| `apps/engine-host/` | `@typedblite/engine-host` (private) | The workbench's NestJS CQRS host that runs statements in sessions, over the CLI, REPL, sidecar, HTTP and MCP (ADR-011) |
 | `apps/sync-demo/` | `typedblite-sync-demo` (private) | Offline-first sync demo: PWA, Electron and Android devices and a TypeDBLite hub (ADR-009) |
 
 ## Key architectural invariants
@@ -25,6 +27,7 @@ TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) gr
 - **SQLite boundary** — only `node-sqlite.ts` imports `node:sqlite`; all other code uses the `SqliteDatabase` interface (`libs/runtime/src/sqlite-database.ts`)
 - **Sync interpreter** — the `SqliteDatabase` interface is synchronous by design; no async in the interpreter's inner loop
 - **Revision parity** — `computeRevision` in `@typedblite/content-revision` must not be duplicated. The CouchDB oracle that once proved parity was removed (2026-09) and no suite re-checks it, so a change to the algorithm needs its own tests and an ADR-003 amendment; the hash itself is pinned to the `node:crypto` digest by `sha256.spec.ts`
+- **NestJS stays in the host** — `apps/engine-host` is the only place that depends on NestJS; the runtime, the language library and `@typedblite/session` do not, and the extension never imports the host (it runs it as a process)
 - **Caller-first grammar** — a TypeQLite construct is added to the grammar only when a real caller needs it ("find the caller first")
 - **Conformance oracle** — `libs/conformance/` vendors TypeDB's `typedb/typedb-behaviour` spec (MPL-2.0); pass count per feature may never go down (ADR-005)
 
@@ -50,4 +53,5 @@ The repo is completely self-contained and self-referential:
 | ADR-006 | An attribute is stored once per type and value |
 | ADR-007 | A scenario TypeDB itself fails is a deviation, and the oracle decides which |
 | ADR-008 | The TypeQLite editor is a Langium language server in this repository; nothing it knows reaches the runtime |
+| ADR-011 | The workbench runs TypeQLite in a separate engine-host process: NestJS fenced into `apps/engine-host`, built on `@devx-micro/app-*`, MCP read-only by default |
 | ADR-009 | TypeDBLite runs in the browser on WASM SQLite: `@typedblite/runtime/wasm`, a browser entry, synchronous SHA-256 revisions |
