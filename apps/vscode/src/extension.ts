@@ -13,6 +13,8 @@ import { loadTheme, THEME_SETTINGS } from './markdown/theme-loader.js';
 import { HOST_NODE_SETTING, HOST_REQUEST_COMMAND } from './host/constants.js';
 import { HostClient, type HostEnvelope } from './host/host-client.js';
 import { NOTEBOOK_TYPE, NOTEBOOK_TYPE_MARKDOWN } from './notebook/constants.js';
+import { registerNotebookControllers } from './notebook/controller.js';
+import { NotebookSessions } from './notebook/notebook-sessions.js';
 import { TypeQLiteNotebookSerializer } from './notebook/serializer.js';
 
 let client: LanguageClient | undefined;
@@ -63,6 +65,8 @@ export async function activate(
       if (event.affectsConfiguration(HOST_NODE_SETTING)) void hostClient.stop();
     }),
   );
+  // The notebook's kernel: its cells are run by the engine host, one session per open notebook (ADR-012 N3).
+  registerNotebookControllers(context, hostClient, new NotebookSessions(hostClient));
 
   const serverModule = context.asAbsolutePath('out/language-server/main.cjs');
   // The server is a separate process, so a debugger can only attach to it if ITS argv carries

@@ -98,6 +98,30 @@ export class NotebookCellData {
   ) {}
 }
 
+/** An output item, as VS Code's: bytes and a MIME type, with the constructors a controller uses. */
+export class NotebookCellOutputItem {
+  constructor(
+    public data: Uint8Array,
+    public mime: string,
+  ) {}
+  static text(value: string, mime = 'text/plain'): NotebookCellOutputItem {
+    return new NotebookCellOutputItem(new TextEncoder().encode(value), mime);
+  }
+  static json(value: unknown, mime = 'application/json'): NotebookCellOutputItem {
+    return new NotebookCellOutputItem(new TextEncoder().encode(JSON.stringify(value)), mime);
+  }
+  static stdout(value: string): NotebookCellOutputItem {
+    return NotebookCellOutputItem.text(value, 'application/vnd.code.notebook.stdout');
+  }
+  static error(value: Error): NotebookCellOutputItem {
+    return NotebookCellOutputItem.json({ name: value.name, message: value.message, stack: value.stack }, 'application/vnd.code.notebook.error');
+  }
+}
+
+export class NotebookCellOutput {
+  constructor(public items: NotebookCellOutputItem[]) {}
+}
+
 export class NotebookData {
   metadata?: Record<string, unknown>;
   constructor(public cells: NotebookCellData[]) {}

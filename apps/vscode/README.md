@@ -74,7 +74,19 @@ a Markdown cell ([ADR-012](../../docs/architecture/adr-012-the-notebook-is-a-mar
   quote or a list item is text.
 - A cell whose text contains a line of three backticks is written inside a longer fence, so it reads back whole.
 
-**Running a cell is not built yet** (the notebook's next phase): for now a notebook opens, edits and saves.
+### Running cells
+
+Run a cell, or use VS Code's own **Run All**, **Run Above** and **Run Below**. Each notebook has **one store, in
+memory**, kept from cell to cell: a schema defined in one cell is there for the next. The cells are run by the
+[engine host](#the-engine-host), which splits a cell into statements and runs them in order.
+
+- **Answers** are a table for rows, JSON for a `fetch`, and the engine's own execution facts ("Wrote 1 thing(s)…").
+  A table shows the first **1,000** rows (`typedblite.notebook.maxRows`) and says how many it did not show.
+- **A refusal is the engine's own message**, on the cell that was refused, with its line and column. It ends the run: later
+  cells are not started, and the statements of the cell that ran before it **stay committed**.
+- **Restart** (the notebook toolbar, or "TypeQLite: Restart the Notebook's Store") closes the store and opens a fresh,
+  empty one. If the engine host itself was restarted, the next cell says so and starts a new, empty store.
+- Nothing is saved: outputs are not written to the file, and running a cell does not mark the notebook changed.
 
 ## The engine host
 
