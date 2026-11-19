@@ -2,8 +2,10 @@ import { dirname, resolve } from 'node:path';
 
 import { outputsOf, plainOutput } from '@typedblite/notebook';
 
+import { indexRecording, inFile, recordAt, stopsOf, type IndexedRecord } from './records.js';
 import { accepts, Timeline, type Motion, type Stop } from './timeline.js';
-import type { DebugResult, HostCaller, LocatedStatement, Recording, RunResult } from './wire.js';
+import { rowsNode, scopeNodes, stageNodes, type VariableNode } from './values.js';
+import type { DebugResult, HostCaller, LocatedStatement, Range, Recording, RunResult } from './wire.js';
 
 /**
  * What a `typeqlite` launch configuration says (ADR-014 B9). Paths are resolved against `cwd`, or the program's own
@@ -42,6 +44,39 @@ export class LaunchError extends Error {
 export interface ProgramStatement extends LocatedStatement {
   result?: RunResult;
   recording?: Recording;
+  /** Its recording's records by id, once it has run. */
+  records?: Map<number, IndexedRecord>;
+}
+
+/**
+ * A line breakpoint, as the client is told of it. A breakpoint on a statement's first line is known to hold at once.
+ * One on another line of a statement is known only once that statement has run and its stops are in, so until then it
+ * waits, unverified, and the adapter reports the answer when it comes.
+ */
+export interface BreakpointState {
+  readonly id: number;
+  /** From 0. */
+  readonly line: number;
+  readonly verified: boolean;
+  readonly message?: string;
+}
+
+/** A frame of the call stack at a stop, innermost first: a stage, then its statement. */
+export interface FrameView {
+  readonly name: string;
+  /** From 0, in the program's file. */
+  readonly line: number;
+  readonly character: number;
+  readonly statement: number;
+  /** The stage it is; nothing for the statement's own frame. */
+  readonly record?: IndexedRecord;
+}
+
+/** A scope of the Variables view, at one frame. */
+export interface ScopeView {
+  readonly name: string;
+  readonly node: VariableNode;
+  readonly expensive?: boolean;
 }
 
 /** Where a move ended: at a stop, and why; or at the end of the program, with the exit code `typedblite --file` gives. */
@@ -64,6 +99,10 @@ export class DebugProgram {
   /** The statement that was refused. Nothing after it runs, as `typedblite --file` stops there. */
   private failed: number | undefined;
   private closed = false;
+  private breakpoints: BreakpointState[] = [];
+  private nextBreakpoint = 1;
+  /** Told when a waiting breakpoint is settled, once its statement has run. */
+  breakpointChanged: (breakpoint: BreakpointState) => void = () => undefined;
 
   private constructor(
     private readonly host: HostCaller,
@@ -137,11 +176,117 @@ export class DebugProgram {
       }
       index += 1;
       const next = this.timeline.at(index)!;
-      if (accepts(motion, from, next)) {
+      const stepped = accepts(motion, from, next);
+      if (stepped || this.hits(next)) {
         this.timeline.moveTo(index);
-        return next.kind === 'end' ? this.end() : { kind: 'stopped', reason: 'step' };
+        return next.kind === 'end' ? this.end() : { kind: 'stopped', reason: stepped && motion !== 'continue' ? 'step' : 'breakpoint' };
       }
     }
+  }
+
+  /** Begin a launch that does not stop on entry: at the first statement if a breakpoint holds there, else on. */
+  async start(): Promise<Outcome> {
+    if (this.hits(this.timeline.current)) return { kind: 'stopped', reason: 'breakpoint' };
+    return this.move('continue');
+  }
+
+  /**
+   * Replace the program file's breakpoints. Each is checked against what is known: a statement's first line holds at
+   * once, a line in no statement never does, and any other line of a statement waits until that statement has run.
+   */
+  setBreakpoints(lines: readonly number[]): BreakpointState[] {
+    this.breakpoints = lines.map((line) => this.check({ id: this.nextBreakpoint++, line, verified: false }));
+    return this.breakpoints;
+  }
+
+  /** The lines a stop is on, in the program's file: where a line breakpoint stops it. */
+  linesOf(stop: Stop): number[] {
+    const statement = this.statements[stop.statement];
+    if (statement === undefined) return [];
+    if (stop.kind === 'statement') return [statement.line];
+    const record = statement.records === undefined ? undefined : recordAt(stop, statement.records);
+    const range = record?.kind === 'stage' ? record.record.range : undefined;
+    return range === undefined ? [] : [inFile(range, statement).start.line];
+  }
+
+  /** The frames of the call stack at the current stop, innermost first. Nothing at the end. */
+  frames(): FrameView[] {
+    const stop = this.timeline.current;
+    const statement = this.statements[stop.statement];
+    if (statement === undefined) return [];
+    const frames: FrameView[] = [];
+    const record = statement.records === undefined ? undefined : recordAt(stop, statement.records);
+    if (record?.kind === 'stage') {
+      const stage = record.record;
+      const at = this.place(statement, stage.range);
+      frames.push({ name: `${stage.kind} · ${stage.rowsIn} → ${stage.rowsOut} row(s)`, ...at, statement: stop.statement, record });
+    }
+    frames.push({ name: firstLine(statement.text), line: statement.line, character: statement.character, statement: stop.statement });
+    return frames;
+  }
+
+  /** The scopes of the Variables view at a frame. */
+  scopes(frame: FrameView): ScopeView[] {
+    const statement = this.statements[frame.statement]!;
+    if (frame.record?.kind === 'stage' && statement.recording !== undefined) {
+      const stage = frame.record.record;
+      return [
+        { name: 'Rows', node: rowsNode('Rows', stage.rows, stage.rowsDropped, stage.rowsOut, statement.recording) },
+        { name: 'Stage', node: { name: 'Stage', value: stage.kind, children: () => stageNodes(stage) } },
+        { name: 'Scope', node: { name: 'Scope', value: `${stage.scope.length} variable(s)`, children: () => scopeNodes(stage.scope) } },
+      ];
+    }
+    return [
+      {
+        name: 'Statement',
+        node: {
+          name: 'Statement',
+          value: statusOf(statement.result),
+          children: () => [
+            { name: 'status', value: statusOf(statement.result) },
+            { name: 'text', value: statement.text },
+          ],
+        },
+      },
+    ];
+  }
+
+  /**
+   * Whether a breakpoint holds at a stop. A line breakpoint stops once in a statement, at its first stop on that line:
+   * a statement and its first stage usually start on one line, and a breakpoint there stops before the statement runs.
+   */
+  private hits(stop: Stop): boolean {
+    if (stop.kind === 'end' || this.breakpoints.length === 0) return false;
+    const lines = this.linesOf(stop);
+    const earlier = this.stopsIn(stop.statement);
+    const before = earlier.slice(0, earlier.findIndex((other) => sameStop(other, stop)));
+    return this.breakpoints.some((breakpoint) => lines.includes(breakpoint.line) && !before.some((other) => this.linesOf(other).includes(breakpoint.line)));
+  }
+
+  /** A statement's stops, in order: its own, then those its recording holds once it has run. */
+  private stopsIn(index: number): Stop[] {
+    const recording = this.statements[index]?.recording;
+    return [{ statement: index, depth: 0, kind: 'statement', path: [] }, ...(recording === undefined ? [] : stopsOf(index, recording))];
+  }
+
+  /** A breakpoint checked against what is known now. */
+  private check({ id, line }: BreakpointState): BreakpointState {
+    // Built afresh: a settled breakpoint must not keep the message it waited with.
+    const breakpoint = { id, line };
+    const index = this.statements.findIndex((statement) => breakpoint.line >= statement.line && breakpoint.line < statement.line + statement.text.split('\n').length);
+    if (index < 0) return { ...breakpoint, verified: false, message: 'No statement is on this line.' };
+    const statement = this.statements[index]!;
+    if (breakpoint.line === statement.line) return { ...breakpoint, verified: true };
+    if (statement.records === undefined) return { ...breakpoint, verified: false, message: 'Checked when its statement runs.' };
+    return this.stopsIn(index).some((stop) => this.linesOf(stop).includes(breakpoint.line))
+      ? { ...breakpoint, verified: true }
+      : { ...breakpoint, verified: false, message: 'No stage of this statement starts on this line.' };
+  }
+
+  /** A position in the program's file, for a range the engine reported in a statement. */
+  private place(statement: ProgramStatement, range: Range | undefined): { line: number; character: number } {
+    if (range === undefined) return { line: statement.line, character: statement.character };
+    return inFile(range, statement).start;
   }
 
   /** Run Without Debugging: every statement through `session.run`, stopping at the first refusal. The exit code. */
@@ -173,8 +318,16 @@ export class DebugProgram {
     const { result, recording } = await this.host.call<DebugResult>('session.debug', { session: this.session, statement: statement.text });
     statement.result = result;
     statement.recording = recording;
-    this.timeline.expand(index, []);
+    statement.records = indexRecording(recording);
+    this.timeline.expand(index, stopsOf(index, recording));
     this.print(index, result);
+    // Breakpoints waiting on this statement are settled now its stops are in.
+    this.breakpoints = this.breakpoints.map((breakpoint) => {
+      if (breakpoint.verified || breakpoint.message !== 'Checked when its statement runs.') return breakpoint;
+      const settled = this.check(breakpoint);
+      if (settled.verified !== breakpoint.verified || settled.message !== breakpoint.message) this.breakpointChanged(settled);
+      return settled;
+    });
     if (result.kind !== 'refused') return undefined;
     this.failed = index;
     return result.message;
@@ -196,4 +349,16 @@ export class DebugProgram {
 export function firstLine(text: string, width = 60): string {
   const line = text.split('\n')[0]!.trim();
   return line.length > width ? `${line.slice(0, width - 1)}…` : line;
+}
+
+/** What a statement did, on one line. */
+export function statusOf(result: RunResult | undefined): string {
+  if (result === undefined) return 'not run yet';
+  if (result.kind === 'refused') return `refused: ${result.message}`;
+  if (result.kind === 'rows') return `${result.documents?.length ?? result.rows.length} ${result.documents ? 'document(s)' : 'row(s)'}`;
+  return result.statement === 'define' ? 'schema applied' : `written, ${result.rows.length} row(s)`;
+}
+
+function sameStop(a: Stop, b: Stop): boolean {
+  return a.statement === b.statement && a.kind === b.kind && a.path.length === b.path.length && a.path.every((id, i) => id === b.path[i]);
 }
