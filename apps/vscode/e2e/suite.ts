@@ -630,6 +630,25 @@ const cases: Record<string, () => Promise<void>> = {
     assert.equal((text.match(/```typeql/g) ?? []).length, code.length);
   },
 
+  async 'the reading list guide runs as a notebook, to its deliberate refusal'() {
+    const notebook = await vscode.workspace.openNotebookDocument(uriOf('reading-list.tql.md'));
+    await vscode.window.showNotebookDocument(notebook);
+    const code = notebook.getCells().filter((cell) => cell.kind === vscode.NotebookCellKind.Code);
+    assert.equal(code.length, 9);
+    await vscode.commands.executeCommand('notebook.execute');
+    await waitFor(() => code[8]!.executionSummary?.success !== undefined, 'the last cell to finish');
+
+    // Every cell before the last runs to completion; the last is refused, on purpose, with the engine's own message.
+    assert.deepEqual(code.slice(0, 8).map((cell) => cell.executionSummary?.success), Array(8).fill(true));
+    assert.equal(code[8]!.executionSummary?.success, false);
+    const refusal = JSON.parse(new TextDecoder().decode(code[8]!.outputs[0]!.items.find((i) => i.mime === 'application/vnd.code.notebook.error')!.data)) as { name: string };
+    assert.equal(refusal.name, 'TypeQLite refused this statement');
+
+    // The list, after adding Piranesi and finishing Dune: the tour's answer.
+    const table = new TextDecoder().decode(code[5]!.outputs[0]!.items.find((i) => i.mime === 'text/markdown')!.data);
+    assert.ok(table.includes('Dune') && table.includes('Piranesi') && table.includes('done') && table.includes('to\\-read'));
+  },
+
   // Last, because it deletes a file from the workspace.
   async 'a schema split across files resolves, and deleting the defining file unresolves it'() {
     // `split-attributes.typeqlite` is never opened: the server found it by indexing the workspace.
