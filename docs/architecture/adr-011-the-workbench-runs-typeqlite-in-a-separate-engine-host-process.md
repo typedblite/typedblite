@@ -69,7 +69,11 @@ as `session.trace` and the adapter loading the runtime. The host stays neutral.
 
 **D8. MCP exposes tools only, reads by default.** Reads are `schema.get`, `session.get`,
 `session.list`, `statement.classify`, `statement.split`, and `session.run` limited to statements
-that classify as reads. `--mcp-write` opts into writes. HTTP MCP is loopback only.
+that classify as reads. `--mcp-write` opts into writes. HTTP MCP is loopback only. **Made exact in Phase 04:** `session.open` and the
+transaction and close operations are not read-tier tools; a read-tier `session.run` runs only a statement the
+host's own classifier calls a read (the classifier that routes it to the interpreter's `query`, which cannot
+write), and refuses a `location` that does not exist, because opening a missing path creates a file. `--mcp-write`
+is a tier and not a mode, so it is refused alone.
 
 **D9. The operation set is internal.** It is not public API until the host is published. The
 `@typedblite/runtime` exports do not change.
@@ -78,8 +82,9 @@ that classify as reads. `--mcp-write` opts into writes. HTTP MCP is loopback onl
 `app-runtime` for the one dispatch path and its result envelope, `app-cli`, `app-repl`,
 `app-sidecar` and `app-http` for four transports, and `app-main` for the entry point and mode
 dispatch. The host declares its operations once and writes no transport of its own. The editor's
-client uses `SidecarClient`. Those packages have no MCP transport: **where MCP lives (in the host,
-or as a new `app-mcp` in devx-micro) is deferred** and is decided at Phase 04. All seven
+client uses `SidecarClient`. Those packages have no MCP transport. **Decided 2026-11-19 (Phase 04): MCP is written in the host**,
+not as an `app-mcp` in devx-micro. The read-tier policy is specific to this host's operations, and it can be
+lifted into devx-micro once a second app wants it. All seven
 packages are on the local registry (checked 2026-11-19), and none is on npmjs.org, so **a public `npm ci` needs all of them published first**.
 That blocks publishing the repository, not building the host.
 

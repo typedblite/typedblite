@@ -6,6 +6,7 @@ import { defineApp } from '@devx-micro/app-main';
 
 import { createHostHttp } from './http.js';
 import { createHostTool } from './host-tool.js';
+import { mcpModes } from './mcp-modes.js';
 
 /**
  * `typedblite-host`: the TypeQLite engine host, over the transports that need no server.
@@ -14,6 +15,7 @@ import { createHostTool } from './host-tool.js';
  * | --- | --- |
  * | `--repl` | an interactive prompt over the operations |
  * | `--sidecar` | newline-delimited JSON on stdio: how the editor talks to the host |
+ * | `--mcp`, `--mcp-http` | an MCP server over stdio, or over HTTP on loopback; reads only unless `--mcp-write` |
  * | an operation name | one operation, one envelope on stdout, an exit code |
  * | none | HTTP on `127.0.0.1`, port `TYPEDBLITE_HOST_PORT` (default 3470) |
  * | an unrecognised flag first | refused by name, exit 2 |
@@ -24,6 +26,7 @@ import { createHostTool } from './host-tool.js';
 export const app = defineApp({
   name: 'typedblite-host',
   createTool: createHostTool,
+  extraModes: mcpModes(),
   http: { createApp: createHostHttp, portEnv: 'TYPEDBLITE_HOST_PORT', defaultPort: 3470, helpPath: '/api/typedblite-host/help' },
 });
 export const { runCli, runRepl, runSidecar, runApi } = app;

@@ -13,6 +13,7 @@
     "@devx-micro/app-main": "0.2.1",
     "@devx-micro/app-runtime": "0.2.1",
     "@devx-micro/app-sidecar": "0.2.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/cqrs": "^11.0.3",
