@@ -38,9 +38,12 @@ The session aggregate, its commands and queries, and the shared classifier, prov
   loads a file's schema at open. Pinned by a spec, recorded in ADR-011, and left to the engine.
 - **Lock behaviour through the engine** matches the Phase 00 measurement: the second writer waits for
   `busyTimeoutMs` and is refused as `locked`; its reads see committed rows.
-- **Not changed, only noticed:** the classifier sends `undefine` and `redefine` to the read path, as the CLI
-  always did. The interpreter's `define` handles them, so they may be misrouted. Moved unchanged (invariant 3);
-  worth a look in its own change.
+- **A defect moved unchanged, and left for its own change:** the classifier only recognises a leading
+  `define`, so `undefine` and `redefine` take the read path and are refused with a parse error, in the CLI as
+  they always were. The interpreter's `define()` accepts `undefine b;` and `undefine owns n from a;` (checked),
+  so a user cannot run them from the CLI, the REPL or the host. `redefine entity a;` is refused by `define()`
+  itself, so the form that works is unchecked. Fixing it changes the CLI's behaviour (invariant 3), so it is a
+  decision, not part of the move.
 
 ## What was not done
 
