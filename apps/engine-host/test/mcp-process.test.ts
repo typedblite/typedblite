@@ -41,7 +41,8 @@ describe('--mcp: stdio', () => {
   });
 
   it('serves every operation with --mcp-write, in either order', async () => {
-    expect((await (await connect('--mcp-write')).listTools()).tools).toHaveLength(12);
+    // Every operation but session.debug, which is never a tool (ADR-014 B2).
+    expect((await (await connect('--mcp-write')).listTools()).tools).toHaveLength(13);
   });
 
   it('ends when its input ends', async () => {

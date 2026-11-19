@@ -17,7 +17,7 @@ import type * as Wire from '../src/wire.js';
  * read-only, so the assignment runs from the runtime's to the wire's, the direction that matters: what is sent must be
  * readable. Mutation-checked: a retyped, renamed or added field each fails the typecheck.
  */
-declare const runtime: {
+interface RuntimeRecords {
   recording: Runtime.Recording;
   frame: Runtime.FrameRecord;
   stage: Runtime.StageRecord;
@@ -29,15 +29,9 @@ declare const runtime: {
   recorded: Runtime.RecordedValue;
   scope: Runtime.ScopeVariable;
   limits: Runtime.RecordingLimits;
-};
-declare const located: SessionLocated;
-declare const sent: SessionDebugResult;
+}
 
-/**
- * What the host sends, read as the debugger reads it: each record on its own, because a field of a record reached only
- * through the recursion (a step inside a block inside a stage) is not compared at all.
- */
-export const readable: {
+interface WireRecords {
   recording: Wire.Recording;
   frame: Wire.FrameRecord;
   stage: Wire.StageRecord;
@@ -51,7 +45,17 @@ export const readable: {
   limits: Wire.RecordingLimits;
   located: Wire.LocatedStatement;
   recordingOfResult: Wire.DebugResult['recording'];
-} = { ...runtime, located, recordingOfResult: sent.recording };
+}
+
+/**
+ * What the host sends, read as the debugger reads it: each record on its own, because a field of a record reached only
+ * through the recursion (a step inside a block inside a stage) is not compared at all. Typechecked, never called.
+ */
+export const readable = (runtime: RuntimeRecords, located: SessionLocated, sent: SessionDebugResult): WireRecords => ({
+  ...runtime,
+  located,
+  recordingOfResult: sent.recording,
+});
 
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const proven = <T extends true>(): T => true as T;

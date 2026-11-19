@@ -85,8 +85,8 @@ describe('the debug adapter, through the engine host', () => {
   it('stops at a refusal, the engine`s own message, and exits 1', async () => {
     write('schema.tql', SCHEMA);
     const program = write('program.tql', 'insert $b isa book, has title "Dune";\ninsert $x isa nothing-of-the-kind;\n');
-    await Promise.all([client.configurationSequence(), client.launch({ program, schema: ['schema.tql'] })]);
-    const stopped = await client.waitForEvent('stopped');
+    // Listening before the launch: the stop can come before the launch's answer is read.
+    const [, , stopped] = await Promise.all([client.configurationSequence(), client.launch({ program, schema: ['schema.tql'] }), client.waitForEvent('stopped')]);
     expect(stopped.body).toMatchObject({ reason: 'exception', text: expect.stringMatching(/nothing-of-the-kind/) });
     const exited = client.waitForEvent('exited');
     await Promise.all([client.continueRequest({ threadId: 1 }), client.waitForEvent('terminated')]);

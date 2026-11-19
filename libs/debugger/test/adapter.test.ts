@@ -69,8 +69,8 @@ describe('the TypeQLite debug adapter over DAP', () => {
 
   it('stops at a refusal with its message, and ends with exit code 1 on the next move', async () => {
     const { client } = await open('insert $a isa person, has name "Ann";\nmatch $p isa person, has age $a; $a > "x"; select $a;');
-    await Promise.all([client.configurationSequence(), client.launch(LAUNCH)]);
-    const stopped = await client.waitForEvent('stopped');
+    // Listening before the launch: the stop can come before the launch's answer is read.
+    const [, , stopped] = await Promise.all([client.configurationSequence(), client.launch(LAUNCH), client.waitForEvent('stopped')]);
     expect(stopped.body).toMatchObject({ reason: 'exception', description: 'Refused by TypeQLite', text: 'Cannot compare a integer with a string.' });
     expect(await line(client)).toBe(2);
     const exited = client.waitForEvent('exited');
