@@ -225,6 +225,10 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 | [ADR-008](docs/architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md) | The TypeQLite Editor Is a Langium Language Server in This Repository |
 | [ADR-009](docs/architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md) | TypeDBLite Runs in the Browser on WASM SQLite |
 | [ADR-010](docs/architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md) | The Markdown Preview Highlights TypeQLite Code Blocks as the Editor Does, in the Theme's Colours |
+| [ADR-011](docs/architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) | The Workbench Runs TypeQLite in a Separate Engine-Host Process |
+| [ADR-012](docs/architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) | The TypeQLite Notebook Is a Markdown File, Run on the Engine Host |
+| [ADR-013](docs/architecture/adr-013-the-browser-notebook-runs-the-notebook-in-a-page.md) | The Browser Notebook Runs the Notebook in a Page, on WASM SQLite |
+| [ADR-014](docs/architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md) | The TypeQLite Debugger Replays a Recording of Each Statement, Made on the Engine Host |
 
 **Standards:** [TypeDBLite Conformance Standard](docs/standards/governance/typedblite-conformance-standard.md) · [Multi-Phase Lifecycle Standard](docs/standards/governance/multi-phase-lifecycle-standard.md)
 
