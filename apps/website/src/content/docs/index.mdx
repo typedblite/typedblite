@@ -39,6 +39,7 @@ import { Aside, Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlig
   <Card title="Offline-first sync" icon="random">
     Every write goes in a change log. Stores replicate hub-and-spoke and converge without conflict when two
     nodes make the same edit, and a conflicting edit is kept, not discarded.
+    [Watch three devices and their hub do it](/sync-demo/), in your browser.
   </Card>
   <Card title="Measured, not claimed" icon="approve-check">
     It passes 1,742 of the 1,756 scenarios in TypeDB's own behaviour specification. Twelve of the 14 that do not
@@ -93,7 +94,8 @@ db.close();
 </Tabs>
 
 The [five-minute tour](/guide/five-minute-tour/) builds this into a small program, and the
-[playground](/playground/) lets you run it now.
+[playground](/playground/) lets you run it now. The [sync demo](/sync-demo/) shows stores replicating: three devices
+and their hub, offline and back, in your browser.
 
 ## Where to go
 
