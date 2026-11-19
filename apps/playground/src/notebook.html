@@ -1,0 +1,16 @@
+<div class="nb" id="nb">
+  <div class="nb-toolbar" role="group" aria-label="Notebook controls">
+    <button id="nb-run-all" class="primary" type="button">Run all</button>
+    <button id="nb-stop" type="button" hidden>Stop</button>
+    <button id="nb-restart" type="button">Restart</button>
+    <span id="nb-status" role="status" aria-live="polite"></span>
+  </div>
+
+  <div id="nb-cells"></div>
+
+  <noscript><p>This notebook runs in your browser, so it needs JavaScript.</p></noscript>
+
+  <div class="nb-notes">
+    <p>Everything runs in your browser, in a worker, on WASM SQLite. Nothing you type is sent anywhere, and closing the page forgets the store. <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>Enter</kbd> runs a cell, and <kbd>Shift</kbd> + <kbd>Enter</kbd> runs it and moves on. In a cell, <kbd>Ctrl</kbd> + <kbd>Space</kbd> completes, and the editor knows the schema you defined in the cells above it.</p>
+  </div>
+</div>

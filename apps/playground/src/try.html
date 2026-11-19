@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Try TypeDBLite in your browser</title>
+<meta name="description" content="A notebook that runs TypeQLite in your browser: TypeDBLite on WASM SQLite, with nothing to install.">
+<link rel="icon" href="logo-icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="notebook.css">
+<link rel="stylesheet" href="nb.css">
+<style>
+  /* Headings are set in Nunito, the wordmark's typeface, as on the website. */
+  @font-face { font-family: 'Nunito Variable'; font-style: normal; font-display: swap; font-weight: 200 1000; src: url(nunito.woff2) format('woff2-variations'); }
+  h1, h2, h3, h4, h5, h6 { font-family: 'Nunito Variable', system-ui, sans-serif; }
+  :root {
+    --bg: #f4f2ee;
+    --pg-panel: #ffffff; --pg-ink: #15171c; --pg-muted: #55575e; --pg-line: #d9d5cc;
+    --pg-accent: #c2410c; --pg-accent-ink: #ffffff; --pg-error: #b42318; --pg-error-bg: #fef3f2; --pg-code: #f7f5f1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171c;
+      --pg-panel: #1d2026; --pg-ink: #f4f2ee; --pg-muted: #a5a8b0; --pg-line: #343842;
+      --pg-accent: #f97316; --pg-accent-ink: #15171c; --pg-error: #fda29b; --pg-error-bg: #3b1d1a; --pg-code: #14161b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--pg-ink); font: 16px/1.5 system-ui, sans-serif; }
+  .page { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; margin-bottom: 16px; }
+  header.top img { height: 40px; width: auto; }
+  header.top .logo-dark { display: none; }
+  @media (prefers-color-scheme: dark) { header.top .logo-light { display: none; } header.top .logo-dark { display: inline; } }
+  header.top p { margin: 0; color: var(--pg-muted); }
+  footer { margin-top: 16px; color: var(--pg-muted); font-size: .875rem; }
+  footer a { color: var(--pg-accent); }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <img class="logo-light" src="logo.svg" alt="TypeDBLite">
+    <img class="logo-dark" src="logo-dark.svg" alt="TypeDBLite">
+    <p>Try it in your browser: a notebook, with nothing to install.</p>
+  </header>
+
+  <!--@APP-->
+
+  <footer>
+    <p>TypeDBLite is an independent open-source project, not affiliated with, sponsored by, or endorsed by TypeDB Ltd. It is built on <a href="https://typedb.com">TypeDB</a>, with thanks.</p>
+  </footer>
+</div>
+<script type="module" src="notebook.js"></script>
+</body>
+</html>

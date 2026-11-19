@@ -205,3 +205,15 @@ When the tour or the engine changes on purpose, `TOUR_RECORD=1 npx vitest run te
 rewrites the printed answers to what ran. Read the diff: it is the page a reader will see, and a changed answer is a changed
 experience.
 
+### The browser notebook
+
+`docs/guides/try-it.tql.md` is the tour's TypeQLite half, run in a page (ADR-013). It is played by the same player, in three layers:
+
+| Test | What it plays | Where |
+| ---- | ------------- | ----- |
+| `try-it-structure.test.ts` | The page: marked up completely, an answer under every cell, nine cells, no shell step or mention of a command line before "Where next", byte-exact round trip | `apps/playground/test/` |
+| `try-it-journey.test.ts` | The whole document on the browser's kernel (`createKernel`, the host's operations over a `Session`) through the shared runner | `apps/playground/test/` |
+| `test-browser/notebook.test.ts` | The same document **through the page in Chromium**, on WASM SQLite in a worker: every cell run with its play button, Run all, Restart, `<img onerror>` as text, the language server knowing the cells as one notebook, and no Monaco complaint about semantic tokens | `apps/playground/test-browser/` |
+
+`TOUR_RECORD=1 npx vitest run test/try-it-journey.test.ts` (from `apps/playground`) rewrites the printed answers.
+

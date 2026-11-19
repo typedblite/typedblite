@@ -74,6 +74,7 @@ export default defineConfig({
           items: [
             { slug: 'guide/getting-started' },
             { slug: 'guide/five-minute-tour' },
+            { label: 'Try it in your browser', link: '/try/', attrs: { target: '_self' } },
             { label: 'Playground', link: '/playground/', attrs: { target: '_self' } },
             { label: 'Sync demo', link: '/sync-demo/', attrs: { target: '_self' } },
           ],

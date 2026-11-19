@@ -182,6 +182,17 @@ describe('running a cell', () => {
     expect((await runCell('x;', ok2, dead, options)).failed).toBe(true);
   });
 
+  // The browser has no "engine host", so it names what stopped in its own words, on both ways a cell can find the engine gone.
+  it('titles an unreachable engine with the caller\'s words when it has some', async () => {
+    const title = 'The engine stopped';
+    const { host } = scripted({ 'statement.split': () => new Error('worker gone') });
+    expect((await runCell('x;', host, runner([]), { ...options, unavailableTitle: title })).outputs).toEqual([{ kind: 'refusal', title, message: 'worker gone' }]);
+
+    const { host: ok } = scripted(split(['x;']));
+    const dead: StatementRunner = { run: async () => { throw new Error('worker gone'); } };
+    expect((await runCell('x;', ok, dead, { ...options, unavailableTitle: title })).outputs.at(-1)).toEqual({ kind: 'refusal', title, message: 'worker gone' });
+  });
+
   // 🔴 Feature invariant 1: a cell is run by the host and by nothing else.
   it('asks the host for nothing but splitting; the statements go through the session', async () => {
     const { host, calls } = scripted(split(['a;', 'b;']));

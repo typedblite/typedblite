@@ -1,0 +1,41 @@
+/*
+ * The browser notebook's own styles, shared by the two pages that host it: the standalone page (try.html, which defines the
+ * colours below) and the website's (apps/website/src/pages/try.astro, which maps them onto Starlight's). Everything is scoped
+ * to `.nb`, so it cannot reach the page around it, and it reads colours only from the playground's custom properties:
+ *
+ *   --pg-ink --pg-muted --pg-line --pg-panel --pg-code --pg-accent --pg-accent-ink --pg-error --pg-error-bg
+ */
+.nb { color: var(--pg-ink); font: 16px/1.5 system-ui, sans-serif; }
+.nb * { box-sizing: border-box; }
+.nb-toolbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; margin-bottom: 8px; background: var(--pg-panel); border-bottom: 1px solid var(--pg-line); }
+.nb button { font: inherit; min-height: 44px; padding: 0 16px; border: 1px solid var(--pg-line); border-radius: 8px; background: var(--pg-panel); color: var(--pg-ink); cursor: pointer; }
+.nb button.primary { background: var(--pg-accent); border-color: var(--pg-accent); color: var(--pg-accent-ink); font-weight: 600; }
+.nb button:disabled { opacity: .55; cursor: not-allowed; }
+.nb :focus-visible { outline: 3px solid var(--pg-accent); outline-offset: 2px; }
+.nb a { color: var(--pg-accent); }
+.nb #nb-status { color: var(--pg-muted); margin-left: auto; }
+.nb-markup { max-width: 52rem; }
+.nb-markup h2 { margin: 1.5em 0 .4em; }
+.nb-markup p, .nb-markup ul { margin: .5em 0; }
+.nb-markup code { font: .9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--pg-code); padding: 1px 4px; border-radius: 4px; }
+.nb-cell { display: flex; gap: 8px; margin: 12px 0; }
+.nb-gutter { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 56px; flex: none; }
+.nb-gutter .nb-play { width: 44px; padding: 0; }
+.nb-label { color: var(--pg-muted); font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.nb-body { flex: 1 1 0; min-width: 0; }
+.nb-editor { width: 100%; border: 1px solid var(--pg-line); border-radius: 8px; overflow: hidden; }
+.nb-cell[data-state="running"] .nb-editor { border-color: var(--pg-accent); }
+.nb-cell[data-state="failed"] .nb-editor { border-color: var(--pg-error); }
+.nb-outputs { margin-top: 6px; }
+.nb-outputs > * { margin: 6px 0; }
+.nb-table { overflow-x: auto; }
+.nb table { border-collapse: collapse; margin: 0; font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.nb th, .nb td { text-align: left; padding: 4px 16px 4px 8px; border: 0; border-bottom: 1px solid var(--pg-line); background: none; vertical-align: top; }
+.nb th { color: var(--pg-muted); font-weight: 600; }
+.nb pre { margin: 0; padding: 8px; background: var(--pg-code); border-radius: 6px; overflow-x: auto; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.nb pre.nb-facts { color: var(--pg-muted); }
+.nb p.nb-text, .nb p.nb-heading, .nb p.nb-omitted { color: var(--pg-muted); font-size: .875rem; }
+.nb p.nb-heading { font-weight: 600; }
+.nb p.nb-error { padding: 8px 12px; background: var(--pg-error-bg); color: var(--pg-error); border-radius: 6px; }
+.nb-notes { margin-top: 24px; color: var(--pg-muted); font-size: .875rem; max-width: 52rem; }
+.nb kbd { font: .85em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; border: 1px solid var(--pg-line); border-radius: 4px; padding: 0 4px; }

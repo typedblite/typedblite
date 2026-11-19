@@ -5,5 +5,5 @@
     "lib": ["ES2022", "WebWorker"], "strict": true, "skipLibCheck": true, "noEmit": true,
     "types": []
   },
-  "include": ["src/worker.ts", "src/language-worker.ts", "src/language-server.ts", "src/polyfills.ts", "src/run.ts", "src/protocol.ts"]
+  "include": ["src/worker.ts", "src/language-worker.ts", "src/language-server.ts", "src/polyfills.ts", "src/run.ts", "src/protocol.ts", "src/notebook/kernel-worker.ts", "src/notebook/kernel-core.ts", "src/notebook/kernel-protocol.ts"]
 }

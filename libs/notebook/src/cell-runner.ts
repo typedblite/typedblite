@@ -17,6 +17,8 @@ export interface RunCellOptions {
   readonly maxRows: number;
   /** Checked between statements: a cell cannot be stopped inside one. */
   readonly cancelled?: () => boolean;
+  /** What an engine that cannot answer is called to the reader: the extension's is a process, the browser's a worker. */
+  readonly unavailableTitle?: string;
 }
 
 const TITLES: Record<string, string> = {
@@ -40,7 +42,7 @@ export async function runCell(source: string, host: HostCaller, session: Stateme
   try {
     statements = (await host.call<{ statements: string[] }>('statement.split', { source })).statements;
   } catch (error) {
-    return { outputs: [unavailable(error)], failed: true };
+    return { outputs: [unavailable(error, options.unavailableTitle)], failed: true };
   }
   if (statements.length === 0) return { outputs: [{ kind: 'text', text: 'Nothing to run: this cell has no statement.' }], failed: false };
 
@@ -62,7 +64,7 @@ export async function runCell(source: string, host: HostCaller, session: Stateme
     try {
       answered = await session.run(statement);
     } catch (error) {
-      outputs.push(unavailable(error));
+      outputs.push(unavailable(error, options.unavailableTitle));
       return { outputs, failed: true };
     }
     if (answered.reopened) {
@@ -122,7 +124,7 @@ function location(diagnostics: readonly Diagnostic[], source: string, start: num
 }
 
 /** The host could not answer at all: no `node`, or the process died. Nothing was run. */
-function unavailable(error: unknown): OutputBlock {
+function unavailable(error: unknown, title = 'The engine host is not available'): OutputBlock {
   const message = error instanceof Error ? error.message : String(error);
-  return { kind: 'refusal', title: hasCode(error, 'SESSION_NOT_FOUND') ? 'No session' : 'The engine host is not available', message };
+  return { kind: 'refusal', title: hasCode(error, 'SESSION_NOT_FOUND') ? 'No session' : title, message };
 }
