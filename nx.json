@@ -18,6 +18,7 @@
       "content-revision",
       "typeqlite-language",
       "typedblite-runtime",
+      "typedblite-session",
       "typedblite"
     ],
     "projectsRelationship": "fixed",

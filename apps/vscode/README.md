@@ -50,13 +50,34 @@ The engine never sees this warning. It is produced by the editor alone.
 - **One workspace is one schema.** If two independent schemas in one workspace define the same label,
   a reference resolves to the definition in its own file first, and otherwise to whichever is found
   first.
-- Running queries against a database is not part of this extension.
+- **Running statements has no UI here yet.** The extension carries the engine host and starts it for features built
+  on it (see [The engine host](#the-engine-host)); the graph explorer, debugger and notebook are those features.
 - **The Markdown preview reads your theme's files**, because VS Code offers no other way to get a
   theme's token colours. In a remote window (WSL, SSH, a container) the themes stay in your local
   VS Code, out of this extension's reach. Install the **TypeQLite Theme Bridge** there too (below),
   or the preview shows TypeQLite in its own colours. A theme whose colours are in a `.tmTheme` file gets the preview's own
   colours instead. On GitHub, TypeQLite code blocks are plain: GitHub has no TypeQL grammar, and allows
   no colours of a page's own.
+
+## The engine host
+
+The extension ships the TypeDBLite **engine host**, a separate process that runs TypeQLite statements in sessions
+([ADR-011](../../docs/architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md)). It
+is a bundle inside the `.vsix` (`out/host/sidecar.cjs`), and the extension **never imports it**: it runs it with a
+`node` and sends it operations over the sidecar (JSON lines on stdio).
+
+- **It starts on the first request**, not when a `.tql` file opens, so using the editor costs nothing.
+- **It needs Node 22.16 or newer**, which has `node:sqlite`. The extension uses the `node` on PATH, or the path in
+  the **`typedblite.host.node`** setting (a machine setting: a repository cannot choose what runs). It asks that
+  `node` before using it, and says what is wrong if it is missing, too old, or has no `node:sqlite`.
+- **Other extensions and features use it** through the command `typedblite.host.request`
+  (`executeCommand('typedblite.host.request', 'session.open', { schema })`, which answers the host's envelope), or
+  through the extension's exported API (`host.call(operation, input)`, which answers the data and throws a
+  `HostRequestError` carrying the host's `code`).
+- **Its sessions live in its process.** If the process dies, the next request starts a new one, and a session id from
+  before answers `SESSION_NOT_FOUND`: reopen it. Changing `typedblite.host.node` ends the running host.
+
+The operations are the host's: see [its README](../engine-host/README.md).
 
 ## Install
 

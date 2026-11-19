@@ -431,6 +431,34 @@ const cases: Record<string, () => Promise<void>> = {
     }
   },
 
+  async 'the engine host starts over the sidecar from the installed extension, and a session works through it'() {
+    const extension = vscode.extensions.getExtension<{ host: { call<T>(operation: string, input?: Record<string, unknown>): Promise<T> } }>('typedblite.typeqlite');
+    assert.ok(extension, 'the extension is installed');
+    const api = await extension.activate();
+    // The host is the bundle inside the installed `.vsix`, run by the `node` on PATH: nothing of the repository.
+    assert.ok(extension.extensionPath.includes('extensions'), 'the installed copy, not the source folder');
+
+    // Through the command other extensions use: the envelope, as the host sent it.
+    const envelope = await vscode.commands.executeCommand<{ status: string; data: { id: string; hasSchema: boolean } }>('typedblite.host.request', 'session.open', {
+      schema: 'define attribute name, value string; entity person, owns name;',
+    });
+    assert.equal(envelope.status, 'success');
+    assert.equal(envelope.data.hasSchema, true);
+
+    // Through the exported API, in the same host process, so the session is still there.
+    const session = envelope.data.id;
+    await api.host.call('session.run', { session, statement: 'insert $p isa person, has name "Ada";' });
+    const read = await api.host.call<{ kind: string; rows: { n: string }[] }>('session.run', {
+      session,
+      statement: 'match $p isa person, has name $n; select $n;',
+    });
+    assert.deepEqual(read.rows, [{ n: 'Ada' }]);
+
+    // A fault is the host's own code, not a crash.
+    await assert.rejects(api.host.call('session.get', { session: 's404' }), (error: { code?: string }) => error.code === 'SESSION_NOT_FOUND');
+    await api.host.call('session.close', { session });
+  },
+
   // Last, because it deletes a file from the workspace.
   async 'a schema split across files resolves, and deleting the defining file unresolves it'() {
     // `split-attributes.typeqlite` is never opened: the server found it by indexing the workspace.

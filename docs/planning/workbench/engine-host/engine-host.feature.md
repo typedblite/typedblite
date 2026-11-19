@@ -1,7 +1,7 @@
 ---
 kind: feature
-status: proposed
-decided-by: []
+status: complete
+decided-by: [adr-011]
 title: TypeQLite Engine Host (a standalone NestJS CQRS app)
 feature: engine-host
 branch: feat/engine-host
@@ -11,10 +11,10 @@ depends-on: [editor]
 
 # TypeQLite Engine Host — Feature Doc
 
-> **Status:** 📋 Proposed, not started · **Written:** 2026-11-17 · **Branch:** `feat/engine-host`,
-> from `main`, not yet cut · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md)
+> **Status:** ✅ Complete (2026-11-19): all six phases merged into `feat/engine-host`; the merge into `main` is the founder's call · **Written:** 2026-11-17 · **Branch:** `feat/engine-host`,
+> from `main` · **Depends on:** [TypeQLite Editor](../../editor/editor.feature.md)
 > (complete) · **First feature of:** the [Workbench initiative](../workbench.initiative.md) ·
-> **Governed by:** an ADR that Phase 00 writes
+> **Governed by:** [ADR-011](../../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md)
 >
 > Request, 2026-11-17: *an initiative covering the graph explorer, debugger and notebook, with the
 > engine host and its session construct.*
@@ -161,25 +161,25 @@ write tier is opt-in. A host that holds real stores must not let an agent write 
 
 ## Definition of done
 
-- [ ] Core specs, run with no transport and no VS Code: open, define, write, read, commit, roll back,
+- [x] Core specs, run with no transport and no VS Code: open, define, write, read, commit, roll back,
       restart, close; a closed session refuses; two sessions keep separate stores.
-- [ ] Auto mode classifies statements the same way the CLI did before the move: the CLI's existing
+- [x] Auto mode classifies statements the same way the CLI did before the move: the CLI's existing
       specs pass unchanged.
-- [ ] A write in manual mode is gone after rollback and present after commit.
-- [ ] Facts and refusals come back as data, with the engine's own message.
-- [ ] **One operation, five transports:** a parity spec sends the same operation through each
-      transport and asserts the same answer.
-- [ ] An unrecognised mode flag exits 2 and names the flag. It never starts a server.
-- [ ] MCP lists only operations that declare an input schema, exposes reads by default, refuses a
+- [x] A write in manual mode is gone after rollback and present after commit.
+- [x] Facts and refusals come back as data, with the engine's own message.
+- [x] **One operation, five transports:** a parity spec sends the same operation through each
+      transport and asserts the same answer. *(Exit code and kind are compared between the CLI and the sidecar only; the REPL, HTTP and MCP do not carry them.)*
+- [x] An unrecognised mode flag exits 2 and names the flag. It never starts a server.
+- [x] MCP lists only operations that declare an input schema, exposes reads by default, refuses a
       write unless the write tier is on, and HTTP MCP refuses a non-loopback host.
-- [ ] The decision on where the engine runs, and on adding NestJS to the repository, is an ADR.
-- [ ] The extension starts the host over the sidecar and a smoke test reaches it. *e2e against the
+- [x] The decision on where the engine runs, and on adding NestJS to the repository, is an ADR.
+- [x] The extension starts the host over the sidecar and a smoke test reaches it. *e2e against the
       packaged `.vsix`.*
-- [ ] 🔴 The conformance run is unchanged at **1742 of 1756**, and `@typedblite/runtime` has no new
+- [x] 🔴 The conformance run is unchanged at **1742 of 1756**, and `@typedblite/runtime` has no new
       dependency.
-- [ ] `AGENTS.md` (including its layout and dependency graph), the README and the project overview
+- [x] `AGENTS.md` (including its layout and dependency graph), the README and the project overview
       memory name the host.
-- [ ] Build, typecheck and test are green for everything touched, from a clean tree.
+- [x] Build, typecheck and test are green for everything touched, from a clean tree.
 
 ## Out of scope
 
@@ -192,7 +192,7 @@ write tier is opt-in. A host that holds real stores must not let an agent write 
 
 ## Open questions for Phase 00
 
-These are for the founder.
+**All nine were answered on 2026-11-19 in [ADR-011](../../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md)** (D1 to D9, in this order). The text below is kept as asked. One check is left: `node:sqlite` in the desktop Electron's Node (Phase 05).
 
 1. ~~**Where the engine runs.**~~ **Largely decided 2026-11-17: a separate process, the host.** What
    remains is **how the editor launches it.** The extension needs a `node` on the user's PATH, or
@@ -232,12 +232,12 @@ cannot drift from the core. The sidecar and CLI are driven as child processes fr
 
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
-| 00 | Scope, the NestJS and launch decisions, operation names, and the ADR | Not started | |
-| 01 | The core: the session aggregate, its commands and queries, the shared classifier | Not started | |
-| 02 | CLI, REPL and sidecar transports, and the parity spec | Not started | |
-| 03 | HTTP transport, as generic dispatch | Not started | |
-| 04 | MCP transport: tools, the read-only default, the write tier | Not started | |
-| 05 | The client in `apps/vscode`, packaging, e2e smoke test, docs | Not started | |
+| 00 | Scope, the NestJS and launch decisions, operation names, and the ADR | Complete | [summary](phases/00-scope-and-adr/summary.md) |
+| 01 | The core: the session aggregate, its commands and queries, the shared classifier | Complete | [summary](phases/01-core/summary.md) |
+| 02 | The host on `@devx-micro/app-*`: operations declared once, CLI, REPL and sidecar entry points, and the parity spec | Complete | [summary](phases/02-transports/summary.md) |
+| 03 | HTTP through `app-http`, as generic dispatch | Complete | [summary](phases/03-http/summary.md) |
+| 04 | MCP transport: tools, the read-only default, the write tier. Written in the host (ADR-011 D10) | Complete | [summary](phases/04-mcp/summary.md) |
+| 05 | The client in `apps/vscode`, packaging, e2e smoke test, docs | Complete | [summary](phases/05-client/summary.md) |
 
 ## Phase Intent
 
@@ -251,10 +251,10 @@ whether NestJS enters the repository. Write the ADR.
 classifier moved out of the CLI. The `typedblite` CLI moves onto them with no change to its specs.
 No transport yet: the specs call the bus.
 
-**02 — CLI, REPL and sidecar.** The three transports that need no server. The sidecar is what the
+**02 — CLI, REPL and sidecar.** Built on `@devx-micro/app-main`, `app-runtime`, `app-cli`, `app-repl` and `app-sidecar` (ADR-011 D10), so the work is declaring the operations and composing them. The three transports that need no server. The sidecar is what the
 editor will use, so it comes first. The unknown-mode-flag refusal and the parity spec land here.
 
-**03 — HTTP.** One generic dispatch route over the operation list.
+**03 — HTTP.** One generic dispatch route over the operation list, through `app-http`.
 
 **04 — MCP.** Stdio and loopback Streamable HTTP. Tools only, reads by default, the write tier
 opt-in, and a spec that a non-loopback host is refused.
@@ -266,7 +266,11 @@ Packaging, the e2e smoke test, `AGENTS.md` and the README.
 
 Anything a phase defers is recorded here, not only in a commit message.
 
-- *(none yet)*
+- **Electron's Node as a fallback host runtime.** Measured to work on VS Code 1.146, and absent on builds with Node 20. Needs an `env` option on devx-micro's `SidecarClient` (it cannot set `ELECTRON_RUN_AS_NODE` for its child). Not done in Phase 05.
+- **Whether an engine refusal should exit non-zero** on the CLI (asked of the founder in Phase 02, open).
+- ~~**Where MCP lives**~~: decided 2026-11-19, in the host. Lifting it into devx-micro as `app-mcp` is possible later.
+- **The lockfile's six `@devx-micro` entries** point at their future npmjs.org URLs with the local registry's integrity. Refresh them with `npm install` once the packages are published (Phase 02).
+- **Publishing `@devx-micro/app-*`**: all seven are on the local registry, none on npmjs.org. A public `npm ci` of this repository needs them there (ADR-011 D10).
 
 ## Key Documents
 

@@ -1,6 +1,6 @@
 ---
 kind: initiative
-status: proposed
+status: in-progress
 title: TypeQLite Workbench
 initiative: workbench
 features: [engine-host, graph-explorer, debugger, notebook]
@@ -8,7 +8,7 @@ features: [engine-host, graph-explorer, debugger, notebook]
 
 # TypeQLite Workbench — Initiative
 
-> **Status:** 📋 Proposed, nothing started · **Written:** 2026-11-17 · **Branch:** none. An
+> **Status:** 🚧 Started 2026-11-19; the engine host is built, the three consumers are next · **Written:** 2026-11-17 · **Branch:** none. An
 > initiative has no branch; each feature is cut from `main`
 > ([lifecycle standard](../../standards/governance/multi-phase-lifecycle-standard.md#branches)).
 >
@@ -97,8 +97,8 @@ These sit across features. The first is the host's, and the rest follow from it.
    Phase 00 answers both. The debugger's execution model (record then replay, or a blocking worker)
    and the notebook's restart both depend on the answer.
 2. **One ADR or several.** The host's decision is an ADR. Each consumer's Phase 00 may add its own.
-   The debugger's feature document names ADR-009 for itself, but ADR-009 is taken (WASM SQLite);
-   its Phase 00 takes the next free number.
+   The debugger's feature document names ADR-009 for itself, but ADR-009 is taken (WASM SQLite)
+   and so is ADR-011 (the host); its Phase 00 takes the next free number.
 3. **The webview stack**, shared by the explorer and possibly the notebook's renderer. Decide it once,
    in whichever of the two starts first.
 
@@ -117,7 +117,7 @@ Update this table when a feature changes state.
 
 | Feature | Status |
 | ------- | ------ |
-| engine-host | Proposed |
+| engine-host | Complete: six phases in `feat/engine-host`, awaiting the merge into `main` ([ADR-011](../../architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) accepted) |
 | graph-explorer | Proposed |
 | debugger | Proposed |
 | notebook | Proposed |

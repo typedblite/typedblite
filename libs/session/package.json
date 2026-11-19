@@ -1,0 +1,43 @@
+{
+  "name": "@typedblite/session",
+  "description": "A TypeQLite session over TypeDBLite: one open store with a lifetime, transactions, a restart, and the statement classifier the CLI and the engine host share",
+  "version": "0.0.1",
+  "license": "MPL-2.0",
+  "keywords": [
+    "typedblite",
+    "typeqlite",
+    "typeql",
+    "session",
+    "transaction"
+  ],
+  "homepage": "https://github.com/typedblite/typedblite/tree/main/libs/session#readme",
+  "bugs": {
+    "url": "https://github.com/typedblite/typedblite/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typedblite/typedblite.git",
+    "directory": "libs/session"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.16"
+  },
+  "files": [
+    "out",
+    "src"
+  ],
+  "main": "./out/index.js",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "default": "./out/index.js"
+    }
+  },
+  "dependencies": {
+    "@typedblite/runtime": "0.0.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

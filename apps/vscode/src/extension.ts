@@ -10,8 +10,18 @@ import { fallbackPalette, themePalette } from './markdown/paint.js';
 import { PreviewHighlighter, typeqliteFences } from './markdown/preview-highlighter.js';
 import { HIGHLIGHT_BLOCKS, type HighlightBlocksParams, type HighlightBlocksResult } from './markdown/protocol.js';
 import { loadTheme, THEME_SETTINGS } from './markdown/theme-loader.js';
+import { HOST_NODE_SETTING, HOST_REQUEST_COMMAND } from './host/constants.js';
+import { HostClient, type HostEnvelope } from './host/host-client.js';
 
 let client: LanguageClient | undefined;
+let host: HostClient | undefined;
+
+/** What the extension hands to the features and extensions built on it, beside the Markdown plugin. */
+export interface TypeDBLiteApi {
+  extendMarkdownIt(md: MarkdownIt): MarkdownIt;
+  /** The engine host: operations by name, over a process the extension starts when first asked. */
+  readonly host: Pick<HostClient, 'request' | 'call'>;
+}
 
 /**
  * The client half of the TypeQLite editor. It starts the language server, and it colours the
@@ -28,7 +38,24 @@ let client: LanguageClient | undefined;
  */
 export async function activate(
   context: vscode.ExtensionContext,
-): Promise<{ extendMarkdownIt(md: MarkdownIt): MarkdownIt }> {
+): Promise<TypeDBLiteApi> {
+  // 🔴 The engine host is a separate process the extension starts, and never code it imports (feature invariant 6).
+  // It is started on the first request, not at activation, so opening a `.tql` file costs nothing. Registered first: it
+  // does not wait for the language server.
+  const hostClient = new HostClient({
+    sidecarPath: context.asAbsolutePath('out/host/sidecar.cjs'),
+    configuredNode: () => vscode.workspace.getConfiguration().get<string>(HOST_NODE_SETTING) || undefined,
+  });
+  host = hostClient;
+  context.subscriptions.push(
+    hostClient,
+    vscode.commands.registerCommand(HOST_REQUEST_COMMAND, (operation: string, input?: Record<string, unknown>): Promise<HostEnvelope> => hostClient.request(operation, input)),
+    // A different `node` takes effect on the next request: the running host is ended, and its sessions with it.
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration(HOST_NODE_SETTING)) void hostClient.stop();
+    }),
+  );
+
   const serverModule = context.asAbsolutePath('out/language-server/main.cjs');
   // The server is a separate process, so a debugger can only attach to it if ITS argv carries
   // `--inspect`. `DEBUG_BREAK` makes it wait for the debugger; `DEBUG_SOCKET` moves the port.
@@ -74,9 +101,10 @@ export async function activate(
       if (THEME_SETTINGS.some((setting) => event.affectsConfiguration(setting))) highlighter.themeChanged();
     }),
   );
-  return { extendMarkdownIt: (md) => typeqliteFences(md, highlighter) };
+  return { extendMarkdownIt: (md) => typeqliteFences(md, highlighter), host: hostClient };
 }
 
-export function deactivate(): Thenable<void> | undefined {
-  return client?.stop();
+export async function deactivate(): Promise<void> {
+  await host?.stop();
+  await client?.stop();
 }
