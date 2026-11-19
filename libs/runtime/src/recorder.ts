@@ -34,15 +34,18 @@ export interface RecordingLimits {
 /** The provisional caps of ADR-014 B10, confirmed by Phase 01's measurements. */
 export const DEFAULT_RECORDING_LIMITS: RecordingLimits = { rowsPerStep: 1000, callsPerSite: 50, bytes: 16 * 1024 * 1024 };
 
-/** One binding, as recorded: a thing described as it was at that point (ADR-014 B8). */
+/**
+ * One binding, as recorded. A thing names its description in `Recording.things` by `ref`, which is the thing as it
+ * was at that point (ADR-014 B8): the same thing before and after a write stage has two.
+ */
 export type RecordedValue =
   | {
       readonly kind: 'thing';
       readonly iid: string;
       /** `''` when the thing no longer existed when it was recorded (a `delete` stage's rows). */
       readonly type: string;
-      readonly relation: boolean;
-      readonly attributes: ReadonlyArray<{ readonly type: string; readonly value: string }>;
+      /** Its key in `Recording.things`. */
+      readonly ref: string;
     }
   | { readonly kind: 'type'; readonly label: string }
   | { readonly kind: 'attribute'; readonly type: string; readonly valueType: string; readonly value: string }
@@ -134,12 +137,24 @@ export interface RecordedRefusal {
   readonly at?: number;
 }
 
+/** A thing as it was when a row naming it was recorded. */
+export interface RecordedThing {
+  readonly iid: string;
+  /** `''` when the thing no longer existed. */
+  readonly type: string;
+  readonly relation: boolean;
+  /** Every attribute it owned, in the order they were written. */
+  readonly attributes: ReadonlyArray<{ readonly type: string; readonly value: string }>;
+}
+
 /** What one statement did, as plain JSON: every record has an `id`, unique in the recording. */
 export interface Recording {
   readonly version: 1;
   readonly limits: RecordingLimits;
   /** One per pipeline the statement ran. A `define` runs none. */
   readonly frames: FrameRecord[];
+  /** Each thing a kept row names, once per state it was recorded in, by `ref`. */
+  things: Record<string, RecordedThing>;
   readonly refusal?: RecordedRefusal;
   /** Set when the recording passed `limits.bytes` and every row was dropped. */
   readonly rowsOmitted?: true;
@@ -175,7 +190,11 @@ export class StepRecorder implements StepHook {
   private readonly frames: FrameRecord[] = [];
   private readonly stack: Open[] = [];
   private readonly keyed = new WeakMap<object, Map<string, unknown>>();
-  private readonly described = new Map<number, ThingDescription>();
+  /** Each thing described since the last write stage, by its number: its `ref`. */
+  private readonly described = new Map<number, string>();
+  private readonly things: Record<string, RecordedThing> = {};
+  /** Bumped by each write stage, so a thing described after it is a new `ref`. */
+  private epoch = 0;
   private refusal: RecordedRefusal | undefined;
   private nextId = 1;
 
@@ -232,7 +251,7 @@ export class StepRecorder implements StepHook {
         frames: [],
       }));
       record.rowsIn += rows.length;
-      if (stage.writes) this.described.clear();
+      if (stage.writes) this.written();
       this.stack.push({ type: 'stage', record });
     });
   }
@@ -242,7 +261,7 @@ export class StepRecorder implements StepHook {
       const open = this.popTo('stage');
       if (open?.type !== 'stage') return;
       // After a write, what the stage wrote is what its rows are described as.
-      if (open.record.writes) this.described.clear();
+      if (open.record.writes) this.written();
       open.record.rowsOut += rows.length;
       this.keep(open.record, rows);
     });
@@ -355,10 +374,12 @@ export class StepRecorder implements StepHook {
       version: 1,
       limits: this.limits,
       frames: this.frames,
+      things: this.things,
       ...(this.refusal === undefined ? {} : { refusal: this.refusal }),
     };
     if (sizeOf(recording) > this.limits.bytes) {
       dropRows(this.frames);
+      recording.things = {};
       recording.rowsOmitted = true;
     }
     return recording;
@@ -441,20 +462,30 @@ export class StepRecorder implements StepHook {
     if (binding === undefined) return { kind: 'empty' };
     if (typeof binding === 'string') return { kind: 'type', label: binding };
     if (typeof binding === 'number') {
-      const thing = this.describe(binding);
-      return { kind: 'thing', iid: thing.iid, type: thing.type, relation: thing.relation, attributes: thing.attributes };
+      const ref = this.describe(binding);
+      const thing = this.things[ref];
+      return { kind: 'thing', iid: thing.iid, type: thing.type, ref };
     }
     return binding.kind === 'attribute'
       ? { kind: 'attribute', type: binding.attributeType, valueType: binding.valueType, value: binding.value }
       : { kind: 'value', valueType: binding.valueType, value: binding.value };
   }
 
-  private describe(iid: number): ThingDescription {
+  /** The thing's `ref`, describing it when it has not been since the last write stage. */
+  private describe(iid: number): string {
     const known = this.described.get(iid);
     if (known !== undefined) return known;
-    const described = this.services?.describe(iid) ?? { iid: String(iid), type: '', relation: false, attributes: [] };
-    this.described.set(iid, described);
-    return described;
+    const described: ThingDescription = this.services?.describe(iid) ?? { iid: String(iid), type: '', relation: false, attributes: [] };
+    const ref = `${described.iid}#${this.epoch}`;
+    this.things[ref] = { iid: described.iid, type: described.type, relation: described.relation, attributes: described.attributes.map((a) => ({ type: a.type, value: a.value })) };
+    this.described.set(iid, ref);
+    return ref;
+  }
+
+  /** A write stage began or ended: every thing is described again from here on. */
+  private written(): void {
+    this.described.clear();
+    this.epoch += 1;
   }
 
   private guard(report: () => void): void {

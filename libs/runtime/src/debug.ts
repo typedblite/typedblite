@@ -17,6 +17,7 @@ export {
   type FrameRecord,
   type RecordedRefusal,
   type RecordedRow,
+  type RecordedThing,
   type RecordedValue,
   type Recording,
   type RecordingLimits,

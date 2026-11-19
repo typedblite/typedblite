@@ -145,11 +145,13 @@ describe('a recording', () => {
     const nicks = (stage: StageRecord): string[] => {
       const thing = stage.rows[0].$p;
       assert.equal(thing.kind, 'thing');
-      return thing.kind === 'thing' ? thing.attributes.filter((a) => a.type === 'nick').map((a) => a.value) : [];
+      return thing.kind === 'thing' ? recording.things[thing.ref].attributes.filter((a) => a.type === 'nick').map((a) => a.value) : [];
     };
     assert.deepEqual(nicks(match), []);
     assert.deepEqual(nicks(insert), ['B']);
     assert.equal(insert.writes, true);
+    // One thing, two states: two descriptions, each kept once however many rows name it.
+    assert.equal(Object.keys(recording.things).length, 2);
   });
 
   it('records a function call site as one frame over every call, and fetch sub-queries as frames of the fetch stage', () => {
@@ -232,6 +234,7 @@ describe('the caps (B10)', () => {
   it('drop every row past the byte ceiling, keeping the counts', () => {
     const { recording } = record('match $p isa person, has name $n; select $n;', { bytes: 1500 });
     assert.equal(recording.rowsOmitted, true);
+    assert.deepEqual(recording.things, {});
     const [match] = stages(recording);
     assert.deepEqual([match.rows.length, match.rowsDropped, match.rowsOut], [0, 3, 3]);
     assert.equal(steps(match)[0].rows.length, 0);
@@ -253,7 +256,9 @@ describe('attaching', () => {
     recorder.stageStart({ index: 0, kind: 'match', writes: false, scope: [] }, []);
     recorder.stageEnd([{ $x: 7 }]);
     recorder.frameEnd();
-    assert.deepEqual(recorder.finish().frames[0].stages[0].rows, [{ $x: { kind: 'thing', iid: '7', type: '', relation: false, attributes: [] } }]);
+    const recording = recorder.finish();
+    assert.deepEqual(recording.frames[0].stages[0].rows, [{ $x: { kind: 'thing', iid: '7', type: '', ref: '7#0' } }]);
+    assert.deepEqual(recording.things, { '7#0': { iid: '7', type: '', relation: false, attributes: [] } });
   });
 
   it('counts a report it cannot place as a fault, and never throws', () => {
