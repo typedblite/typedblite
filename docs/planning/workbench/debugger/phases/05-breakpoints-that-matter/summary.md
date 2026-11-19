@@ -48,7 +48,7 @@ moving back through what was recorded.
 - 🔴 **The real host** (`apps/vscode/test/debug-adapter.test.ts`): a `match` whose rows disappear at its third pattern,
   `$n > 1000` on its own line, stops there under *When a step empties*: `$n > 1000 · 2 → 0 row(s)`, line 4. The
   Definition of Done's e2e half is Phase 06's.
-- The gate, from a clean tree: see below.
+- The gate, from a clean tree: all 14 steps passed.
 
 ## For Phase 06
 
