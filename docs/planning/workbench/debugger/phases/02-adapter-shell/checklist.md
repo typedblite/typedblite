@@ -1,6 +1,6 @@
 ---
 kind: checklist
-status: in-progress
+status: complete
 feature: debugger
 phase: 02-adapter-shell
 ---
@@ -21,41 +21,41 @@ answers go to the debug console. Run Without Debugging runs the file through `se
 
 ## `@typedblite/session`
 
-- [ ] `locateStatements(source)`: each statement's original text (comments inside it kept) and where it starts. The
+- [x] `locateStatements(source)`: each statement's original text (comments inside it kept) and where it starts. The
       splitting loop is shared with `splitStatements`, whose output does not change (invariant 6)
 
 ## The engine host
 
-- [ ] `statement.locate`: a query over `locateStatements`
-- [ ] `session.debug`: one statement through `Session.debug`, answering `{ result, recording }`. 🔴 Refused with
+- [x] `statement.locate`: a query over `locateStatements`
+- [x] `session.debug`: one statement through `Session.debug`, answering `{ result, recording }`. 🔴 Refused with
       `NOT_IN_MEMORY` on any session not at `:memory:` (B2)
-- [ ] `session.debug` is not an MCP tool, in either tier (ADR-011 D8, B2)
+- [x] `session.debug` is not an MCP tool, in either tier (ADR-011 D8, B2)
 
 ## `libs/debugger` (`@typedblite/debugger`, private, B4)
 
-- [ ] The project: package, Nx targets, tsconfig, vitest; `@vscode/debugadapter` and `@vscode/debugprotocol` 1.68.0,
+- [x] The project: package, Nx targets, tsconfig, vitest; `@vscode/debugadapter` and `@vscode/debugprotocol` 1.68.0,
       checked in the lockfile against registry.npmjs.org
-- [ ] The host's wire shapes declared here, with a type-level spec that they match the runtime's and the session's
+- [x] The host's wire shapes declared here, with a type-level spec that they match the runtime's and the session's
       own (no runtime dependency, B4)
-- [ ] The launch: `program`, `schema[]`, `seed[]`, `cwd`, `stopOnEntry`, `noDebug`. A schema or seed refusal ends the
+- [x] The launch: `program`, `schema[]`, `seed[]`, `cwd`, `stopOnEntry`, `noDebug`. A schema or seed refusal ends the
       launch and says which file and statement
-- [ ] A timeline of stops (statement stops in this phase), pure and specified on its own
-- [ ] The DAP session: initialize, launch, configurationDone, threads, stackTrace, scopes, variables, next, stepIn,
+- [x] A timeline of stops (statement stops in this phase), pure and specified on its own
+- [x] The DAP session: initialize, launch, configurationDone, threads, stackTrace, scopes, variables, next, stepIn,
       stepOut, continue, disconnect; output of facts and answers; exited and terminated events
-- [ ] Run Without Debugging through `session.run`
-- [ ] The host session is closed on disconnect
+- [x] Run Without Debugging through `session.run`
+- [x] The host session is closed on disconnect
 
 ## Proof
 
-- [ ] Timeline specs, launch specs with a fake host
-- [ ] DAP specs over a real engine host (the bundle the `.vsix` ships), driven by `@vscode/debugadapter-testsupport`:
+- [x] Timeline specs, launch specs with a fake host
+- [x] DAP specs over a real engine host (the bundle the `.vsix` ships), driven by `@vscode/debugadapter-testsupport`:
       launch, stop on entry, step over statements, output, a refusal, Run Without Debugging, disconnect
-- [ ] A session whose program writes and commits leaves every file in its folder byte for byte as it was
-- [ ] `AGENTS.md`'s layout and dependency graph name `libs/debugger`
-- [ ] The gate, from a clean tree
+- [x] A session whose program writes and commits leaves every file in its folder byte for byte as it was
+- [x] `AGENTS.md`'s layout and dependency graph name `libs/debugger`
+- [x] The gate, from a clean tree
 
 ## Outputs
 
-- [ ] `summary.md`
-- [ ] The feature document's Phase Plan row
-- [ ] Merged into `feat/debugger`
+- [x] `summary.md`
+- [x] The feature document's Phase Plan row
+- [x] Merged into `feat/debugger`
