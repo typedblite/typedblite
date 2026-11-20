@@ -20,7 +20,7 @@ const ROOT = 'source.typeqlite';
  *
  * The layers are the editor's: TextMate scopes underneath, and a semantic token on top **only where
  * the palette gives it a paint**. A semantic token the theme does not style leaves the TextMate
- * colour showing, as it does in the editor.
+ * color showing, as it does in the editor.
  */
 export function paintBlock(text: string, highlight: BlockHighlight, palette: Palette): string {
   const paints: (Paint | undefined)[] = new Array<Paint | undefined>(text.length).fill(undefined);
@@ -43,7 +43,7 @@ export function paintBlock(text: string, highlight: BlockHighlight, palette: Pal
   return html;
 }
 
-/** Colours from the active theme. Paints are memoised, so equal styles are one object and one run. */
+/** Colors from the active theme. Paints are memoised, so equal styles are one object and one run. */
 export function themePalette(theme: Theme): Palette {
   const paints = new Map<string, Paint | undefined>();
   const memo = (key: string, style: () => TokenStyle | undefined) => {
@@ -61,7 +61,7 @@ export function themePalette(theme: Theme): Palette {
 
 /**
  * The preview's own highlight.js classes, for when the theme cannot be read: TypeQLite still reads
- * as code, in the colours the preview gives every other language.
+ * as code, in the colors the preview gives every other language.
  */
 export const fallbackPalette: Palette = (() => {
   const classes = new Map<string, Paint>();

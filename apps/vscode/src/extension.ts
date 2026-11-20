@@ -30,13 +30,13 @@ export interface TypeDBLiteApi {
 }
 
 /**
- * The client half of the TypeQLite editor. It starts the language server, and it colours the
+ * The client half of the TypeQLite editor. It starts the language server, and it colors the
  * TypeQLite code blocks in the Markdown preview with what that server says about them (ADR-010).
  *
  * 🔴 Everything the editor knows comes from the server, and the server is `createTypeQLiteServices`
  * (ADR-008). A command, check or keyword list written here would be a second definition of
  * TypeQLite, and it would drift from the first. The preview keeps to that: the server classifies
- * every token, and the client only turns classes into the theme's colours, which the server cannot
+ * every token, and the client only turns classes into the theme's colors, which the server cannot
  * see.
  *
  * The shape is upstream's: `packages/langium-vscode/src/extension.ts` at `v4.3.0` (ADR-008 D8,

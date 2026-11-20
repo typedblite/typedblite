@@ -23,7 +23,7 @@ affiliated with, sponsored by, or endorsed by TypeDB Ltd.
 - **Offline-first sync.** Every write goes in a change log, and stores replicate hub-and-spoke, converge
   without conflict when two nodes make the same edit, and keep conflicting edits rather than discarding
   them. The [sync demo](apps/sync-demo/) runs a browser, a desktop app and a phone against one hub.
-- **Measured, not claimed.** On TypeDB's own behaviour specification, TypeDBLite passes **1,742 of 1,756
+- **Measured, not claimed.** On TypeDB's own behavior specification, TypeDBLite passes **1,742 of 1,756
   scenarios**. Of the 14 that do not pass, 12 also fail on TypeDB itself. The run, the method and each
   non-passing scenario are in [CONFORMANCE.md](CONFORMANCE.md).
 
@@ -86,7 +86,7 @@ Or try it in a browser, with three examples to start from: `npm run playground`,
 | [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
 | [`@typedblite/session`](libs/session/) | A TypeQLite session over the engine: one open store with transactions, a restart and a close, and the statement classifier the CLI and the engine host share. |
 | [`@typedblite/debugger`](libs/debugger/) (private) | The TypeQLite debug adapter (ADR-014): the Debug Adapter Protocol over recordings the engine host makes of each statement. The VS Code extension runs it inline. |
-| [`typedblite-conformance`](libs/conformance/) | TypeDB's own behaviour specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
+| [`typedblite-conformance`](libs/conformance/) | TypeDB's own behavior specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
 | [`typedblite`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
 | [`@typedblite/engine-host`](apps/engine-host/) (private) | The workbench's engine host: a NestJS CQRS app that runs statements in sessions, for the graph explorer, debugger and notebook (ADR-011). In progress: the core, and the CLI, REPL, sidecar, HTTP and MCP transports (HTTP loopback only, MCP read-only by default). |
 | [`typedblite-sync-demo`](apps/sync-demo/) | Offline-first sync, shown end to end: a browser, a desktop app and an Android phone, each with its own TypeDBLite store, replicating through a TypeDBLite hub. Cut any link or stop the hub, and watch them converge. |
@@ -107,7 +107,7 @@ Or try it in a browser, with three examples to start from: `npm run playground`,
 
 ## TypeQLite language
 
-TypeQLite 3.x implements the TypeQL subset that real production schemas and the TypeDB behaviour specification require. The grammar lives at [libs/language/src/typeqlite.langium](libs/language/src/typeqlite.langium).
+TypeQLite 3.x implements the TypeQL subset that real production schemas and the TypeDB behavior specification require. The grammar lives at [libs/language/src/typeqlite.langium](libs/language/src/typeqlite.langium).
 
 ### Schema DDL
 
@@ -155,7 +155,7 @@ delete $p;
 | `@key`, `@unique` | Enforced: one owner per value. A key must also be held exactly once |
 | `@abstract` | Enforced: the type cannot have instances of its own |
 | `@regex` | Enforced on every write |
-| `@independent` | Honoured: the attribute survives without an owner |
+| `@independent` | Honored: the attribute survives without an owner |
 | `@doc` | Retained, and readable with `get_doc(type)` |
 | `@card(min..max)` | Shapes `fetch` and `update`; bounds other than a key's are not enforced on writes |
 | `@range`, `@values`, `@distinct`, `@cascade`, `@meta` | Accepted; not enforced on writes |
@@ -179,7 +179,7 @@ See it working: the [sync demo](apps/sync-demo/) runs a browser, a desktop app a
 
 ## Conformance
 
-The `typedblite-conformance` package vendors TypeDB's own behaviour specification and runs every Cucumber scenario against the TypeDBLite runtime. The result is a report card — passes, failures, and declared deviations.
+The `typedblite-conformance` package vendors TypeDB's own behavior specification and runs every Cucumber scenario against the TypeDBLite runtime. The result is a report card — passes, failures, and declared deviations.
 
 ```bash
 nx run typedblite-conformance:test
@@ -220,12 +220,12 @@ TypeDBLite-specific ADRs and standards live in [docs/](docs/):
 | [ADR-002](docs/architecture/adr-002-typeql-engine-as-a-port.md) | TypeQL Engine as a Port |
 | [ADR-003](docs/architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md) | TypeDBLite Change Log and Sync as a Port |
 | [ADR-004](docs/architecture/adr-004-typedblite-execution-diagnostics-as-a-returned-report.md) | TypeDBLite Execution Diagnostics as a Returned Report |
-| [ADR-005](docs/architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md) | TypeDB's Behaviour Specification is TypeDBLite's Conformance Oracle |
+| [ADR-005](docs/architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md) | TypeDB's Behavior Specification is TypeDBLite's Conformance Oracle |
 | [ADR-006](docs/architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md) | An Attribute Is Stored Once per Type and Value |
 | [ADR-007](docs/architecture/adr-007-a-scenario-typedb-itself-fails-is-a-deviation.md) | A Scenario TypeDB Itself Fails Is a Deviation |
 | [ADR-008](docs/architecture/adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md) | The TypeQLite Editor Is a Langium Language Server in This Repository |
 | [ADR-009](docs/architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md) | TypeDBLite Runs in the Browser on WASM SQLite |
-| [ADR-010](docs/architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md) | The Markdown Preview Highlights TypeQLite Code Blocks as the Editor Does, in the Theme's Colours |
+| [ADR-010](docs/architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md) | The Markdown Preview Highlights TypeQLite Code Blocks as the Editor Does, in the Theme's Colors |
 | [ADR-011](docs/architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md) | The Workbench Runs TypeQLite in a Separate Engine-Host Process |
 | [ADR-012](docs/architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md) | The TypeQLite Notebook Is a Markdown File, Run on the Engine Host |
 | [ADR-013](docs/architecture/adr-013-the-browser-notebook-runs-the-notebook-in-a-page.md) | The Browser Notebook Runs the Notebook in a Page, on WASM SQLite |
@@ -238,43 +238,43 @@ References in source code link to `docs/architecture/adr-NNN-*.md` using relativ
 ## Special Thanks to TypeDB!
 
 **TypeDBLite exists because of [TypeDB](https://typedb.com).** The data model, the query language and
-the behaviour that TypeDBLite implements are the work of [TypeDB Ltd](https://typedb.com) and the
+the behavior that TypeDBLite implements are the work of [TypeDB Ltd](https://typedb.com) and the
 TypeDB community.
 
 Thank you to the team at TypeDB Ltd for an amazing product suite and ecosystem:
-- a database whose type system makes modelling a domain a pleasure;
+- a database whose type system makes modeling a domain a pleasure;
 - a query language that reads like the domain it describes;
 - tooling such as TypeDB Studio;
 - and the generosity of publishing it all as open source.
 
-**A special thank-you for the [TypeDB Behaviour Specification](https://github.com/typedb/typedb-behaviour).**
+**A special thank-you for the [TypeDB Behavior Specification](https://github.com/typedb/typedb-behaviour).**
 Its Cucumber scenarios are an executable definition of how TypeDB behaves. TypeDBLite runs 1,756 of
 them as its conformance suite, and is built and tested against them. Without that suite, this project
 could not say how closely it matches TypeDB, and could not have got as close as it has.
 
 | Created by TypeDB Ltd | What it is | Links | How TypeDBLite uses it |
 |---|---|---|---|
-| **TypeDB™** | The polymorphic database | [typedb.com](https://typedb.com) · [GitHub](https://github.com/typedb/typedb) | TypeDBLite reimplements its data model and behaviour in TypeScript, over SQLite |
+| **TypeDB™** | The polymorphic database | [typedb.com](https://typedb.com) · [GitHub](https://github.com/typedb/typedb) | TypeDBLite reimplements its data model and behavior in TypeScript, over SQLite |
 | **TypeQL™** | TypeDB's query language | [Reference](https://typedb.com/docs/typeql-reference/) · [GitHub](https://github.com/typedb/typeql) | TypeQLite is a dialect of TypeQL 3.x, and follows its syntax |
 | **TypeDB Studio** | TypeDB's IDE | [Docs](https://typedb.com/docs/tools/studio) · [GitHub](https://github.com/typedb/typedb-studio) | The model for TypeDBLite's proposed [graph explorer](docs/planning/workbench/graph-explorer/graph-explorer.feature.md) |
-| **TypeDB Behaviour Specification** | TypeDB's Cucumber conformance suite | [GitHub](https://github.com/typedb/typedb-behaviour) | Vendored unmodified in [`libs/conformance/spec/`](libs/conformance/spec/) as TypeDBLite's [conformance oracle](CONFORMANCE.md) |
+| **TypeDB Behavior Specification** | TypeDB's Cucumber conformance suite | [GitHub](https://github.com/typedb/typedb-behaviour) | Vendored unmodified in [`libs/conformance/spec/`](libs/conformance/spec/) as TypeDBLite's [conformance oracle](CONFORMANCE.md) |
 
 **Trademarks.** TypeDB™ and TypeQL™ are trademarks of TypeDB Ltd. TypeDB Studio is a product of
 TypeDB Ltd. These names are used here only to identify TypeDB Ltd's products, and to describe what
 TypeDBLite is compatible with.
 
-**Copyright.** TypeDB, TypeQL, TypeDB Studio and the TypeDB Behaviour Specification are copyright
+**Copyright.** TypeDB, TypeQL, TypeDB Studio and the TypeDB Behavior Specification are copyright
 TypeDB Ltd and their contributors, and are published under the
 [Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/). The specification files in
 [`libs/conformance/spec/`](libs/conformance/spec/) are TypeDB Ltd's work. They keep their original
-licence headers and [`LICENSE`](libs/conformance/spec/LICENSE).
+license headers and [`LICENSE`](libs/conformance/spec/LICENSE).
 
 **Independence.** TypeDBLite is an independent open-source project. It is not affiliated with,
 sponsored by, or endorsed by TypeDB Ltd. For TypeDB itself, visit [typedb.com](https://typedb.com).
 
 ## License
 
-[Mozilla Public License 2.0](LICENSE), the licence TypeDB, TypeQL and TypeDB's behaviour
+[Mozilla Public License 2.0](LICENSE), the license TypeDB, TypeQL and TypeDB's behavior
 specification are published under. The specification files vendored in
-[`libs/conformance/spec/`](libs/conformance/spec/) are TypeDB's, under the same licence, with their
+[`libs/conformance/spec/`](libs/conformance/spec/) are TypeDB's, under the same license, with their
 headers intact.

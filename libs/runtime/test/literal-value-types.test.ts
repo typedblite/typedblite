@@ -7,7 +7,7 @@ import { TypeDBLiteInterpreter } from '../src/interpreter.js';
  *
  * 🔴 **The grammar accepting them is half the feature.** `literalText` in the interpreter and
  * `literal` in the generator each convert a literal node to storage text, and until this change
- * *both* returned a silent placeholder for anything they did not recognise — `''` and `NULL`. A
+ * *both* returned a silent placeholder for anything they did not recognize — `''` and `NULL`. A
  * boolean would have been stored as an empty string and every later match on it would simply never
  * fire, with no error anywhere. These tests are the roundtrip that proves it does not.
  *

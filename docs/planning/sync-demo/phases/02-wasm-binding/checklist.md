@@ -24,7 +24,7 @@ spike is gone.
 
 ## Build
 
-- [x] `src/wasm.ts`: the spike binding moved unchanged in behaviour, with a supported-API header
+- [x] `src/wasm.ts`: the spike binding moved unchanged in behavior, with a supported-API header
       (usage, OPFS, one connection per file). Exported as `./wasm`
 - [x] `@sqlite.org/sqlite-wasm`: an optional peer dependency (`^3.50.0`) and an exact dev dependency
       (3.54.1-build1). `playwright-core` 1.62.1 is a dev dependency

@@ -94,7 +94,7 @@ Canonical `datetime-tz` text already keeps the zone, so `UNIQUE (type, value)` g
 extra rule. In TypeDB 3.10.4 the stored form of a `datetime-tz` is the UTC instant followed by a
 4-byte zone code: an IANA zone id, or a fixed offset (`encoding/value/date_time_tz_bytes.rs`,
 `timezone.rs`). An attribute's vertex key is its type followed by those bytes, unhashed and not
-normalised to UTC (`encoding/graph/thing/vertex_attribute.rs`).
+normalized to UTC (`encoding/graph/thing/vertex_attribute.rs`).
 
 ⚠️ **Identity and comparison differ for zoned datetimes.** TypeDB's in-memory `Value` takes its
 equality, ordering and hashing from chrono's `DateTime`, which compares instants and ignores the
@@ -297,7 +297,7 @@ indexed `has(owner, type)`, which forced a sort per owner, and it found owners o
 every candidate thing. Decision 2's index and value-first lookups replaced both.
 
 **Conformance.** 1,306 → 1,439 of 1,756, with no scenario lost. The storage swap alone left the card
-unchanged at 1,306. The new behaviour added 133: attribute inserts, matches, deletes, `isa $t` over
+unchanged at 1,306. The new behavior added 133: attribute inserts, matches, deletes, `isa $t` over
 attributes, and values matched across numeric kinds.
 
 ## Amendment — `@key` and `@unique` are scoped per owner type (2026-11-11)

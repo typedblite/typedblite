@@ -185,7 +185,7 @@ describe('cancellation', () => {
 
     addSkill(hub, 's-2');
     await new Promise((resolve) => setTimeout(resolve, 300));
-    assert.equal(received.length, countAtCancel, 'a cancelled subscription must stop delivering');
+    assert.equal(received.length, countAtCancel, 'a canceled subscription must stop delivering');
 
     await stream.close();
     hub.close();

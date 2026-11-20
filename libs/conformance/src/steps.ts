@@ -59,7 +59,7 @@ const firstTokenPosition = (text: string): { line: number; character: number } =
 /**
  * A parse failure AT the first token means the parser does not know the statement — `redefine`,
  * `fun`, `fetch` — which is not the parse failure a scenario specifies. TypeDB's is inside a
- * statement it recognises; eleven `redefine` scenarios "passed" their `parsing fails` steps on
+ * statement it recognizes; eleven `redefine` scenarios "passed" their `parsing fails` steps on
  * a grammar with no `redefine` before this check existed.
  */
 const failedAtFirstToken = (thrown: unknown, text: string): boolean => {
@@ -98,7 +98,7 @@ const expectFailure = (
   }
   // 🔴 `fails` is not `parsing fails`. The spec keeps them apart, so a query that failed because
   // TypeDBLite could not parse it did not fail the way the scenario specifies — it failed before
-  // reaching the behaviour under test. The first report card had three "passes" of this shape.
+  // reaching the behavior under test. The first report card had three "passes" of this shape.
   if (mode !== 'parse' && parseFailure) {
     throw new Error(`the query failed to parse, which is not the failure the scenario specifies: ${message(thrown)}`);
   }

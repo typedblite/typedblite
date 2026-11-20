@@ -112,7 +112,7 @@ const checkRange = (naive: Naive, refuse: Refuse, at: Range | undefined): Naive 
   return naive;
 };
 
-const normalise = (naive: Naive): Naive => {
+const normalize = (naive: Naive): Naive => {
   const carry = naive.nanos >= BigInt(0) ? naive.nanos / NANOS_PER_DAY : (naive.nanos - NANOS_PER_DAY + BigInt(1)) / NANOS_PER_DAY;
   return { days: naive.days + Number(carry), nanos: naive.nanos - carry * NANOS_PER_DAY };
 };
@@ -212,7 +212,7 @@ const describe = (naive: Naive): string => formatNaive(naive).replace('T', ' ');
  */
 function toInstant(local: Naive, zone: Zone, strict: boolean, refuse: Refuse, at: Range | undefined): Naive {
   if (zone.kind === 'offset') {
-    const instant = normalise({ days: local.days, nanos: local.nanos - BigInt(zone.minutes) * BigInt(60_000) * NANOS_PER_MS });
+    const instant = normalize({ days: local.days, nanos: local.nanos - BigInt(zone.minutes) * BigInt(60_000) * NANOS_PER_MS });
     const { year } = civilFromDays(instant.days);
     if (year < MIN_YEAR || year > MAX_YEAR) refuse(DiagnosticCode.valueOutOfRange, `Local time ${describe(local)} does not exist in timezone ${zone.text}.`, at);
     return instant;
@@ -224,12 +224,12 @@ function toInstant(local: Naive, zone: Zone, strict: boolean, refuse: Refuse, at
   if (strict && candidates.length > 1) refuse(DiagnosticCode.valueTypeConflict, `Local time ${describe(local)} is ambiguous in timezone ${zone.name}.`, at);
   // In a gap, the offset BEFORE it: the local time comes out advanced by the gap.
   const instant = candidates[0] ?? ms - offsetAt(zone.name, ms - 86_400_000, refuse, at);
-  return normalise({ days: Math.floor(instant / 86_400_000), nanos: BigInt(((instant % 86_400_000) + 86_400_000) % 86_400_000) * NANOS_PER_MS + subMs(local) });
+  return normalize({ days: Math.floor(instant / 86_400_000), nanos: BigInt(((instant % 86_400_000) + 86_400_000) % 86_400_000) * NANOS_PER_MS + subMs(local) });
 }
 
 function toLocal(instant: Naive, zone: Zone, refuse: Refuse, at: Range | undefined): Naive {
   const offset = zone.kind === 'offset' ? zone.minutes * 60_000 : offsetAt(zone.name, localMs(instant), refuse, at);
-  return normalise({ days: instant.days, nanos: instant.nanos + BigInt(offset) * NANOS_PER_MS });
+  return normalize({ days: instant.days, nanos: instant.nanos + BigInt(offset) * NANOS_PER_MS });
 }
 
 // ── arithmetic ───────────────────────────────────────────────────────────────
@@ -262,7 +262,7 @@ function shift(naive: Naive, duration: Duration, sign: 1 | -1, zone: Zone | unde
     const moved = addMonths(n, sign * duration.months);
     return { days: moved.days + sign * duration.days, nanos: moved.nanos };
   };
-  const clock = (n: Naive): Naive => normalise({ days: n.days, nanos: n.nanos + BigInt(sign) * duration.nanos });
+  const clock = (n: Naive): Naive => normalize({ days: n.days, nanos: n.nanos + BigInt(sign) * duration.nanos });
   if (zone === undefined) return checkRange(sign === 1 ? clock(calendar(naive)) : calendar(clock(naive)), refuse, at);
   // Zoned: the calendar moves the wall clock, the clock moves the instant.
   if (sign === 1) {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from './parse.js';
 
 /**
- * Type variables in `match` — Phase 05 of the conformance feature. Every form the behaviour spec
+ * Type variables in `match` — Phase 05 of the conformance feature. Every form the behavior spec
  * writes, pinned to parse; what a form ANSWERS is the interpreter's and the report card's.
  */
 const parses = (text: string): boolean => {

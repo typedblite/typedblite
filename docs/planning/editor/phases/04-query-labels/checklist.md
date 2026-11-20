@@ -19,7 +19,7 @@ warning that the runtime never sees (D2, D6).
 
 ## Found at the start
 
-- [x] Query labels are coloured by position today, whether or not they name anything. The provider
+- [x] Query labels are colored by position today, whether or not they name anything. The provider
       says so in a 🔴 comment, because until now nothing could resolve them
 - [x] A query document has no cross-references into the schema, so Langium would never rebuild it when
       a schema file changed, and an unknown-label warning would go stale. The document builder has to
@@ -31,7 +31,7 @@ warning that the runtime never sees (D2, D6).
       definition each expects (any type, entity, relation, attribute, or role, where the role's
       relation is known from context) and resolution through the index
 - [x] Definition, references and hover consult it when Langium's cross-references give nothing
-- [x] Semantic tokens: in a workspace with a schema, a label is coloured only when it resolves; without
+- [x] Semantic tokens: in a workspace with a schema, a label is colored only when it resolves; without
       one, by position, as today (D6)
 - [x] `TypeQLiteDocumentValidator`: an unknown label is a warning, `typedblite.unknown-label`, only in a
       workspace that defines at least one type. It is never a `ValidationRegistry` check (D2)

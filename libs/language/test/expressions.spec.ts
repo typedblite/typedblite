@@ -11,7 +11,7 @@ import {
 } from '../src/generated/ast.js';
 
 /**
- * Value expressions — Phase 06 of the conformance feature. Every form the behaviour spec writes,
+ * Value expressions — Phase 06 of the conformance feature. Every form the behavior spec writes,
  * pinned to parse, and the precedence table pinned by shape: what an expression EVALUATES to is
  * the interpreter's and the report card's.
  */

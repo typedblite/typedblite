@@ -8,8 +8,8 @@
  * `device.html` is the shipped device page (`src/client/index.html`) with this feature's three differences made at
  * build time, so there is no second copy of its markup and styles to drift: no PWA manifest, a Disconnect /
  * Reconnect switch in the card header, the light and dark palettes keyed on `data-theme`, which the page takes
- * from the page that embeds it, and the device's own colour (`devices.css`) on its card, on the chips that say
- * where a task was made, and on the highlight that fades when a sync brings a change in, which takes the colour of the device that made it.
+ * from the page that embeds it, and the device's own color (`devices.css`) on its card, on the chips that say
+ * where a task was made, and on the highlight that fades when a sync brings a change in, which takes the color of the device that made it.
  */
 import { build } from 'esbuild';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -68,7 +68,7 @@ const device = shipped
       '  #link { font: inherit; font-size: 13px; font-weight: 600; padding: 4px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); cursor: pointer; }',
       '  #link[aria-pressed="true"] { background: var(--off); border-color: var(--off); color: #fff; }',
       '  header #status, header #pending { flex-basis: 100%; }',
-      '  /* Each device\'s colour (devices.css): its card and its name, and the chip on a task made on any device. */',
+      '  /* Each device\'s color (devices.css): its card and its name, and the chip on a task made on any device. */',
       '  :root[data-device="a"] { --device: var(--device-a); }',
       '  :root[data-device="b"] { --device: var(--device-b); }',
       '  :root[data-device="c"] { --device: var(--device-c); }',
@@ -77,7 +77,7 @@ const device = shipped
       '  .origin[data-origin="a"] { color: var(--device-a); border-color: var(--device-a); }',
       '  .origin[data-origin="b"] { color: var(--device-b); border-color: var(--device-b); }',
       '  .origin[data-origin="c"] { color: var(--device-c); border-color: var(--device-c); }',
-      '  /* The row that flashes when a sync brings a task in or changes it takes the colour of the device that made the change. */',
+      '  /* The row that flashes when a sync brings a task in or changes it takes the color of the device that made the change. */',
       '  li[data-editor="a"] { --flash: color-mix(in srgb, var(--device-a) 28%, var(--card)); }',
       '  li[data-editor="b"] { --flash: color-mix(in srgb, var(--device-b) 28%, var(--card)); }',
       '  li[data-editor="c"] { --flash: color-mix(in srgb, var(--device-c) 28%, var(--card)); }',

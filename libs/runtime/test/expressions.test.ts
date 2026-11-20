@@ -213,7 +213,7 @@ describe('value expressions', () => {
     engine.execute('match $p isa person, has ref 0; let $v = 7; insert $p has weight $v;');
     assert.deepEqual(values(engine, 'match $p isa person, has ref 0, has weight $w; $w < 10; select $w;'), [{ w: 'weight:7.0' }]);
     assert.equal(refusal(() => engine.execute('insert $y isa person, has ref 9, has weight 1.0e400;')).code, DiagnosticCode.valueOutOfRange);
-    // A literal is spelt by the ATTRIBUTE's type at insert (round 10): an exponent no decimal
+    // A literal is spelled by the ATTRIBUTE's type at insert (round 10): an exponent no decimal
     // holds is refused there with a code, never stored and never a raw RangeError.
     engine.define('define attribute price value decimal; person owns price;');
     assert.equal(refusal(() => engine.execute('insert $y isa person, has ref 9, has price 1.0e-99999999999;')).code, DiagnosticCode.valueTypeConflict);
@@ -331,7 +331,7 @@ describe('value expressions', () => {
     assert.equal(refusal(() => engine.query('match $p isa person, has ref 99, has age $a; let $v = ceil($a);')).code, DiagnosticCode.valueTypeConflict);
   });
 
-  it('review round 16: a literal on an abstract attribute is spelt per concrete subtype; long is integer', () => {
+  it('review round 16: a literal on an abstract attribute is spelled per concrete subtype; long is integer', () => {
     engine.define('define attribute measure @abstract; attribute height sub measure, value integer; attribute mass sub measure, value double; person owns measure, owns height, owns mass;');
     engine.execute('insert $p isa person, has ref 30, has height 60, has mass 60;');
     assert.deepEqual(values(engine, 'match $p isa person, has ref 30, has measure 60, has measure $m; select $m;'), [{ m: 'height:60' }, { m: 'mass:60.0' }]);

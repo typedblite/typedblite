@@ -12,7 +12,7 @@ changes are made, and what a pull request needs before it can be merged.
 - [Decisions](#decisions)
 - [Larger features](#larger-features)
 - [Reporting bugs](#reporting-bugs)
-- [Licence](#licence)
+- [License](#license)
 
 ## Ways to contribute
 
@@ -36,7 +36,7 @@ Windows all work: the gate has passed on Linux (Node 22.16, 22 and 24), Windows 
 > **GitHub Actions is off for now** (the account's billing needs attention), so nothing on GitHub checks a
 > pull request. **Run `npm run gate` before you open one** and put its result in the description. It runs the
 > one Node and OS you have, so a change that touches paths, child processes, file handles or Node-version
-> behaviour is worth trying on another if you can. The workflows are written and will be turned back on.
+> behavior is worth trying on another if you can. The workflows are written and will be turned back on.
 
 ```bash
 git clone https://github.com/typedblite/typedblite.git
@@ -181,7 +181,7 @@ Open an issue with:
 - **The TypeQLite** that shows the problem: the schema, the data, and the query. The smaller, the
   better.
 - **What you expected, and what happened.** Include the diagnostic code and message, if there is one.
-- **What TypeDB does,** if you know. TypeDB's behaviour is the definition of correct here. If you
+- **What TypeDB does,** if you know. TypeDB's behavior is the definition of correct here. If you
   have Docker, the [TypeDB oracle](docs/development/testing.md#the-typedb-oracle) can run your
   case against a real TypeDB.
 - Your Node.js version and operating system.
@@ -189,12 +189,12 @@ Open an issue with:
 Please report security vulnerabilities privately, through GitHub's private vulnerability reporting
 for this repository, not in a public issue.
 
-## Licence
+## License
 
 TypeDBLite is licensed under the [Mozilla Public License 2.0](LICENSE). By contributing, you agree
 that your contribution is licensed under the same terms.
 
-The files in `libs/conformance/spec/` are TypeDB's behaviour specification, also under MPL-2.0, and
+The files in `libs/conformance/spec/` are TypeDB's behavior specification, also under MPL-2.0, and
 keep their own headers. Do not edit them.
 
 ---

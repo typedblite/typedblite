@@ -67,8 +67,8 @@ const clickIntoEditor = async (page: Page) => {
   await page.locator('#editor .view-lines').click({ position: { x: 300, y: 20 } });
   await page.keyboard.press('Control+End');
 };
-/** The colour of the first rendered token with exactly this text, as `rgb(r, g, b)`. */
-const colourOf = (page: Page, text: string) =>
+/** The color of the first rendered token with exactly this text, as `rgb(r, g, b)`. */
+const colorOf = (page: Page, text: string) =>
   page.evaluate((wanted) => {
     const spans = [...document.querySelectorAll('#editor .view-line span span')] as HTMLElement[];
     const found = spans.find((span) => span.textContent === wanted);
@@ -181,7 +181,7 @@ describe('the playground in Chromium', () => {
     expect(await page.locator('#output').innerText()).toContain('0 candidate');
   });
 
-  it('draws links in the accent colour, so they can be read on a dark page', async () => {
+  it('draws links in the accent color, so they can be read on a dark page', async () => {
     const page = await open();
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme });
@@ -191,7 +191,7 @@ describe('the playground in Chromium', () => {
     }
   });
 
-  it("follows a host page's data-theme over the system's scheme, and takes the editor's colours from the page", async () => {
+  it("follows a host page's data-theme over the system's scheme, and takes the editor's colors from the page", async () => {
     // The website hosts the playground in Starlight, which sets `data-theme` on <html> whatever the system says.
     const page = await open();
     await page.emulateMedia({ colorScheme: 'light' });
@@ -269,12 +269,12 @@ describe('the playground in Chromium', () => {
 describe('the editor and its language server', () => {
   const VALID = `${SCHEMA}\nmatch $p isa person, has name $n; select $n;`;
 
-  it('is a Monaco editor, and the language server answers: it colours names it resolved', async () => {
+  it('is a Monaco editor, and the language server answers: it colors names it resolved', async () => {
     const page = await open();
     await settled(page);
     expect(await page.locator('#editor .monaco-editor').count()).toBe(1);
     await setProgram(page, VALID);
-    // `person` is a plain name to a tokenizer. Teal (Light Modern's type colour) can only come from the
+    // `person` is a plain name to a tokenizer. Teal (Light Modern's type color) can only come from the
     // server's semantic tokens, which resolved it to the entity it names.
     await page.waitForFunction(() => {
       const spans = [...document.querySelectorAll('#editor .view-line span span')] as HTMLElement[];
@@ -282,7 +282,7 @@ describe('the editor and its language server', () => {
     }, undefined, { timeout: 20_000 });
   });
 
-  it('speaks LSP to the language worker: it initialises, opens the program, and keeps it in sync', async () => {
+  it('speaks LSP to the language worker: it initializes, opens the program, and keeps it in sync', async () => {
     const page = await open();
     await settled(page);
     await setProgram(page, VALID);
@@ -296,15 +296,15 @@ describe('the editor and its language server', () => {
     expect(sent.indexOf('initialize')).toBeLessThan(sent.indexOf('textDocument/didOpen'));
   });
 
-  it('colours keywords from the tokenizer, in the VS Code theme colours, with no server involved', async () => {
+  it('colors keywords from the tokenizer, in the VS Code theme colors, with no server involved', async () => {
     const page = await open();
     await settled(page);
     await setProgram(page, VALID);
     // Light Modern: keyword.control #AF00DB, storage.type #0000FF, storage.modifier #0000FF.
     await page.waitForFunction(() => [...document.querySelectorAll('#editor .view-line span span')].some((s) => s.textContent === 'define'));
-    expect(await colourOf(page, 'define')).toBe('rgb(175, 0, 219)');
-    expect(await colourOf(page, 'entity')).toBe('rgb(0, 0, 255)');
-    expect(await colourOf(page, 'string')).toBe('rgb(0, 0, 255)');
+    expect(await colorOf(page, 'define')).toBe('rgb(175, 0, 219)');
+    expect(await colorOf(page, 'entity')).toBe('rgb(0, 0, 255)');
+    expect(await colorOf(page, 'string')).toBe('rgb(0, 0, 255)');
   });
 
   it('underlines an error the server reports, and clears it when the program is fixed', async () => {

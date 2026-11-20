@@ -48,12 +48,12 @@ export class HarnessError extends Error {}
 /**
  * The engine ran nothing — no projection reported for a read, a skipped write-less pipeline. 🔴 Never the
  * failure a `; fails` step specifies: TypeDB would have evaluated the query, and whatever it did
- * then is the behaviour under test. `expectFailure` refuses this in every mode.
+ * then is the behavior under test. `expectFailure` refuses this in every mode.
  */
 export class EvaluatedNothing extends HarnessError {}
 
 /**
- * One scenario's state — what a driver's `World` holds in its own behaviour tests.
+ * One scenario's state — what a driver's `World` holds in its own behavior tests.
  *
  * 🔴 **The harness stands in for the connection layer, and only for it.** TypeDB's spec drives a
  * server through a driver: databases, transactions and their kinds are protocol, enforced before

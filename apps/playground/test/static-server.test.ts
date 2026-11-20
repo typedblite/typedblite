@@ -23,7 +23,7 @@ afterAll(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 
-/** A raw request, so a `..` path reaches the server unresolved: `fetch` would normalise it away. */
+/** A raw request, so a `..` path reaches the server unresolved: `fetch` would normalize it away. */
 const raw = (path: string) =>
   new Promise<{ status: number; body: string }>((resolve, reject) => {
     const url = new URL(site.url);

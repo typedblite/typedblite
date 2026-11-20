@@ -1,6 +1,6 @@
 /**
  * `edited-by`: the device that made the latest change to a task, recorded in the same transaction as the change so that
- * it replicates with it. The in-browser demo's highlight takes its colour from it. These tests are the data's side of
+ * it replicates with it. The in-browser demo's highlight takes its color from it. These tests are the data's side of
  * that: who is recorded, when, and what an older store reads as. (`browser-hub-replication.test.ts` carries it between
  * devices.)
  */

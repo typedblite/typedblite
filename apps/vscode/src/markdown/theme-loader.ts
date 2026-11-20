@@ -6,18 +6,18 @@ import { resolveTheme, type Theme, type ThemeFile } from './theme.js';
 import { THEME_FILES_COMMAND, themeFiles, type ThemeFilesResult } from './theme-source.js';
 
 /**
- * The active colour theme's token colouring, read from the files of the extension that contributes
- * it, with the user's customisations applied (ADR-010).
+ * The active color theme's token coloring, read from the files of the extension that contributes
+ * it, with the user's customizations applied (ADR-010).
  *
- * 🔴 There is no API for a theme's token colours, so this finds the theme the way the workbench
+ * 🔴 There is no API for a theme's token colors, so this finds the theme the way the workbench
  * does: by the id or label in `workbench.colorTheme` (or the preferred theme for the OS's scheme when
  * `window.autoDetectColorScheme` is on), among the `contributes.themes` of every extension, the
  * built-in ones included. In a remote window the theme is not in this extension host, and the files
  * come from the TypeQLite Theme Bridge instead (`theme-source.ts`, ADR-010 D7).
  *
- * The customisations are read HERE, never by the bridge: settings for the remote machine apply only
+ * The customizations are read HERE, never by the bridge: settings for the remote machine apply only
  * in the remote host. Undefined when the theme cannot be read. The preview then falls back to its
- * own highlighting colours, and says why in the log.
+ * own highlighting colors, and says why in the log.
  */
 export async function loadTheme(log: vscode.OutputChannel): Promise<Theme | undefined> {
   const themeName = activeThemeName();
@@ -45,11 +45,11 @@ export async function loadTheme(log: vscode.OutputChannel): Promise<Theme | unde
  */
 export async function readThemeFiles(themeName: string): Promise<ThemeFilesResult> {
   const location = findTheme(themeName);
-  if (!location) return { missing: `No extension in this extension host contributes the colour theme '${themeName}'` };
+  if (!location) return { missing: `No extension in this extension host contributes the color theme '${themeName}'` };
   try {
     return { files: await readThemeChain(location, new Set()) };
   } catch (error) {
-    return { missing: `Could not read the colour theme '${themeName}': ${(error as Error).message}` };
+    return { missing: `Could not read the color theme '${themeName}': ${(error as Error).message}` };
   }
 }
 
@@ -107,7 +107,7 @@ async function readThemeChain(location: vscode.Uri, seen: Set<string>): Promise<
   let tokenColors = json['tokenColors'];
   if (typeof tokenColors === 'string') {
     // A path to the rules. A `.tmTheme` (plist) file is the older form, and is not read: the
-    // preview keeps its own colours for that theme rather than guess.
+    // preview keeps its own colors for that theme rather than guess.
     if (!tokenColors.endsWith('.json')) throw new Error(`its tokenColors are in ${tokenColors}, which is not JSON`);
     const rules = await readJson(vscode.Uri.joinPath(location, '..', tokenColors));
     tokenColors = Array.isArray(rules) ? rules : (rules['tokenColors'] ?? rules['settings']);

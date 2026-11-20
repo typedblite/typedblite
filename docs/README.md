@@ -21,7 +21,7 @@ Choose your starting point by what you want to do.
 | [CLI](../apps/cli/README.md) | The `typedblite` REPL, file runner and one-shot executor |
 | [Sync demo](../apps/sync-demo/README.md) | A browser, a desktop app and a phone, each with its own store, syncing through a hub: setup, the story, and how to run it |
 | [VS Code extension](../apps/vscode/README.md) | The TypeQLite editor: diagnostics, navigation, completion, rename, quick fixes |
-| [Conformance status](../CONFORMANCE.md) | How closely TypeDBLite matches TypeDB, measured against TypeDB's own behaviour specification |
+| [Conformance status](../CONFORMANCE.md) | How closely TypeDBLite matches TypeDB, measured against TypeDB's own behavior specification |
 
 ## Work on TypeDBLite
 
@@ -54,4 +54,4 @@ builds the same reference as pages of the site at `/api/` (see [The website](dev
   comments cite them by number, for example "ADR-004 Decision 3".
 - [Standards](standards/governance/) set the rules for conformance claims and for multi-phase work.
 - [Planning](planning/) holds feature documents, both complete and proposed.
-- [Brand](brand/) holds the logo files, the colours and type, and how to use them.
+- [Brand](brand/) holds the logo files, the colors and type, and how to use them.

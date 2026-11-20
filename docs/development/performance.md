@@ -89,7 +89,7 @@ states. The messages are unchanged. Guarded by `empty-answer-cost.test.ts`.
 ### 5. One broad `has` value made a selective match slow
 
 `$s isa project, has project-id "x", has revision "r1"` built one `t.iid IN (owners of the value)`
-subquery per literal, and SQLite materialises each. When one value is owned by thousands of things
+subquery per literal, and SQLite materializes each. When one value is owned by thousands of things
 and another by one, the broad one set the cost: 5.0 ms against 0.017 ms for the same answer
 computed from the selective subquery, with the other checked per candidate by `EXISTS`.
 

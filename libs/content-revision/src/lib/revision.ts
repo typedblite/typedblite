@@ -1,7 +1,7 @@
 // 🔴 **If you change the semantics in this file, every store stops converging with every other.**
-// CouchDB's revision-tree behaviour is kept here on purpose (ADR-003), and it was proven against real
+// CouchDB's revision-tree behavior is kept here on purpose (ADR-003), and it was proven against real
 // CouchDB 3.4.3 in TypeDBLite Sync Phase 03. That differential suite has since been removed, so
-// nothing re-checks CouchDB parity. `revision.spec.ts` and `sha256.spec.ts` pin today's behaviour,
+// nothing re-checks CouchDB parity. `revision.spec.ts` and `sha256.spec.ts` pin today's behavior,
 // including that the digest equals what `node:crypto` gave before ADR-009; keep them green.
 /**
  * Revision identifiers for the change log.

@@ -9,7 +9,7 @@ not.
 **A construct is added only when something needs it.** TypeDBLite implements the TypeQL its
 callers use, not everything TypeDB has. The rule is "find the caller first". A caller is one of:
 
-- **A scenario in TypeDB's behaviour specification** that fails because the construct is missing.
+- **A scenario in TypeDB's behavior specification** that fails because the construct is missing.
   This is the most common caller. Run the report card (`nx run typedblite-conformance:report`) and
   look at the failure digest.
 - **A real schema or query** that someone needs to run, in an issue or a pull request.
@@ -24,7 +24,7 @@ the [TypeDB oracle](testing.md#the-typedb-oracle).
 
 Edit [`libs/language/src/typeqlite.langium`](../../libs/language/src/typeqlite.langium). It is a
 [Langium](https://langium.org/docs/reference/grammar-language/) grammar, and it follows TypeQL's
-syntax exactly. Where TypeDB's behaviour specification shows the syntax, follow that.
+syntax exactly. Where TypeDB's behavior specification shows the syntax, follow that.
 
 Regenerate the parser:
 
@@ -97,7 +97,7 @@ A value expression belongs in [`expressions.ts`](../../libs/runtime/src/expressi
 
 ## 4. Tests
 
-- **Runtime tests** in `libs/runtime/test/` cover the behaviour, **and** each refusal by its code.
+- **Runtime tests** in `libs/runtime/test/` cover the behavior, **and** each refusal by its code.
 - **Run the report card:**
 
   ```bash
@@ -126,7 +126,7 @@ A value expression belongs in [`expressions.ts`](../../libs/runtime/src/expressi
 - [ ] Validator rules (if any) have codes, and are meant to apply to the runtime too
 - [ ] Label positions updated (if the construct names a type)
 - [ ] Engine handles the construct, and refuses what it does not handle, by code
-- [ ] Runtime tests for behaviour and refusals
+- [ ] Runtime tests for behavior and refusals
 - [ ] Report card: no regression, baseline raised, passing deviations removed
 - [ ] The clean-tree gate is green ([Testing](testing.md#the-clean-tree-gate))
 - [ ] The language guide and CONFORMANCE.md are up to date

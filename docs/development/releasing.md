@@ -116,7 +116,7 @@ no provenance, and the plan says to publish with it. Whether to wait is the main
 ## The VS Code extensions
 
 Two extensions, published by `typedblite`: **TypeQLite** (`apps/vscode`) and the **TypeQLite Theme Bridge**
-(`apps/vscode/theme-bridge`), which a remote window needs to colour Markdown previews. Each has its own version in
+(`apps/vscode/theme-bridge`), which a remote window needs to color Markdown previews. Each has its own version in
 its `package.json` and its own `CHANGELOG.md`, and is released by its own tag. They are not versioned with the npm
 packages.
 

@@ -65,7 +65,7 @@ the rows marked **updated** are what changed.
 | The engine host | **Updated:** built ([engine-host](../engine-host/engine-host.feature.md)). Sessions, `statement.split`, `session.restart`; reachable from the extension through `HostClient` (`typedblite.host.request` and the exported `host` API) |
 | Extension side | The extension has no notebook API use and no webview, and never loads the runtime or imports the host. **Updated:** it starts the host as a process (ADR-011). Its language client selects `scheme: 'file'` documents only, so cells are not served yet |
 | Notebook cells in the language server | **New, measured (spike):** with `notebookDocumentSync` advertised and `NotebookDocuments.listen(connection)`, cells are built as documents and resolve across each other. The schema scope is the whole workspace, so notebooks would share one (ADR-012 N4) |
-| Embedded Markdown | The Markdown preview already highlights TypeQLite fences in the editor's colours ([ADR-010](../../../architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md)). A notebook's Markdown cells can reuse that |
+| Embedded Markdown | The Markdown preview already highlights TypeQLite fences in the editor's colors ([ADR-010](../../../architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md)). A notebook's Markdown cells can reuse that |
 
 ## What the engine host gives it, and what it adds
 
@@ -87,7 +87,7 @@ The notebook adds, on top of the host:
 engine entry points the CLI uses. There is no SQL against the store and no execution path private
 to the notebook. A cell's output could be reproduced by pasting the cell into the REPL.
 
-**2. The notebook changes nothing about the engine's answers.** It adds no runtime behaviour. Any
+**2. The notebook changes nothing about the engine's answers.** It adds no runtime behavior. Any
 runtime change it does need goes through the usual path, and the conformance run stays at **1742
 of 1756** ([ADR-005](../../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
 

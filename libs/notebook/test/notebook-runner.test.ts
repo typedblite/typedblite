@@ -158,11 +158,11 @@ describe('running a cell', () => {
     expect(result).toEqual({ outputs: [{ kind: 'text', text: 'Nothing to run: this cell has no statement.' }], failed: false });
   });
 
-  it('can be cancelled between statements, and says where it stopped', async () => {
+  it('can be canceled between statements, and says where it stopped', async () => {
     const { host } = scripted(split(['a;', 'b;']));
     let stop = false;
     const session: StatementRunner = { run: async () => { stop = true; return { result: ok('write'), reopened: false }; } };
-    const result = await runCell('a;\nb;', host, session, { maxRows: 10, cancelled: () => stop });
+    const result = await runCell('a;\nb;', host, session, { maxRows: 10, canceled: () => stop });
     expect(result.outputs.at(-1)).toEqual({ kind: 'text', text: 'Stopped before statement 2 of 2.' });
     expect(result.failed).toBe(false);
   });

@@ -98,7 +98,7 @@ export class SqliteEngine {
    * rethrowing the same error. Inside `work`, this engine's own `execute` and `query` are in the transaction.
    *
    * One handle, one transaction at a time. Two overlapping calls on the same engine would share one SQLite connection
-   * and so one transaction; `TypeDBLiteDatabase` serialises them, and a second `BEGIN` here is refused rather than
+   * and so one transaction; `TypeDBLiteDatabase` serializes them, and a second `BEGIN` here is refused rather than
    * silently joined.
    */
   async transaction<T>(work: () => Promise<T>): Promise<T> {

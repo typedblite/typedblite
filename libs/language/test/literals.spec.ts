@@ -106,7 +106,7 @@ describe('datetime literals', () => {
     expect(literal).toMatchObject({ value: 3 });
   });
 
-  describe('🔴 one spelling per instant, with the two the behaviour spec forced open', () => {
+  describe('🔴 one spelling per instant, with the two the behavior spec forced open', () => {
     // `attr.value` is compared as text. A grammar accepting several spellings of one moment
     // stores several texts that never match each other — so these must fail, and fail here.
     //

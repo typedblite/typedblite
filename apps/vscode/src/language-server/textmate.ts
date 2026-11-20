@@ -72,7 +72,7 @@ const NONE: readonly string[] = [];
  * 🔴 **This is not a TextMate engine; it is enough of one for the grammar Langium generates.** That
  * grammar uses `match`, `begin`/`end`, `include` from its repository, and captures, and nothing else.
  * Any other construct (`while`, an external include, an `end` that back-references its `begin`) is
- * **refused, not skipped**. A construct skipped here would colour a code block differently from the
+ * **refused, not skipped**. A construct skipped here would color a code block differently from the
  * editor with no sign of why. The regexes run as JavaScript with the `u` flag, so the
  * Oniguruma-only syntax that the `u` flag rejects fails loudly too.
  *

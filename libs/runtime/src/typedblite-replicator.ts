@@ -16,7 +16,7 @@ import {
 
 /**
  * Where a continuous replication is: `syncing` while it is receiving, `ready` once it has caught up (and still
- * running), `failed` after an error, `idle` after it is cancelled.
+ * running), `failed` after an error, `idle` after it is canceled.
  *
  * @category Replication
  */
@@ -170,7 +170,7 @@ export class TypeDBLiteReplicator {
   }
 
   /**
-   * Replicates continuously, until the session is cancelled: holds a subscription to the hub open and pushes local
+   * Replicates continuously, until the session is canceled: holds a subscription to the hub open and pushes local
    * changes as they appear. Being caught up reports `ready` and keeps the subscription running.
    *
    * @privateRemarks
@@ -228,22 +228,22 @@ export class TypeDBLiteReplicator {
     // slow first push completing after a fast second one moved `pushCursor` backwards, re-sending
     // everything between. Idempotency saved correctness; nothing saved the bandwidth or the cursor.
     let pushing = false;
-    let cancelled = false;
+    let canceled = false;
     const pushTimer =
       options.direction === 'pull'
         ? undefined
         : setInterval(() => {
-            if (pushing || cancelled) return;
+            if (pushing || canceled) return;
             pushing = true;
             void this.pushFrom(
               pushCursor,
               (_applied, at) => {
                 pushCursor = at;
               },
-              () => cancelled,
+              () => canceled,
             )
               .catch((error: Error) => {
-                if (cancelled) return;
+                if (canceled) return;
                 session.status = 'failed';
                 events.onFailed?.(error, 'transient');
               })
@@ -262,7 +262,7 @@ export class TypeDBLiteReplicator {
         //
         // The flag as well as the timer: clearing the interval stops the *next* push, and a drain
         // already running would otherwise continue to exhaustion.
-        cancelled = true;
+        canceled = true;
         if (pushTimer) clearInterval(pushTimer);
         await subscription?.cancel();
         session.status = 'idle';
@@ -279,7 +279,7 @@ export class TypeDBLiteReplicator {
    * were never sent and nothing retried them, because the cursor said they were done. Silent,
    * permanent, one-directional data loss, and worse than a failure because it looked like a sync.
    *
-   * `replicator.ts`'s `drain` already loops. Two implementations of one behaviour disagreeing is
+   * `replicator.ts`'s `drain` already loops. Two implementations of one behavior disagreeing is
    * the finding under the finding — this now matches it.
    */
   private async pushFrom(

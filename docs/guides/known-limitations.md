@@ -31,7 +31,7 @@ It is never silently skipped. From the [language guide](typeqlite-language.md#wh
 - **`let … in`** over anything but a function call.
 - **`return check`**, and a `reduce` after a write stage.
 - **Several reads in one `query()` call.** Run each separately.
-- **Rules and inference.** TypeDB 3 removed them in favour of functions, and TypeDBLite follows.
+- **Rules and inference.** TypeDB 3 removed them in favor of functions, and TypeDBLite follows.
 
 ### Annotations
 
@@ -41,7 +41,7 @@ Some annotations are accepted and **not enforced** on writes. An unenforced one 
 | Annotation | In TypeDBLite |
 | --- | --- |
 | `@key`, `@unique`, `@abstract`, `@regex` | Enforced |
-| `@independent` | Honoured |
+| `@independent` | Honored |
 | `@doc` | Retained |
 | `@card(min..max)` | **Partly.** It decides whether `fetch` returns a value or a list, and whether `update` may replace one. Bounds other than a key's are **not** enforced on writes |
 | `@range`, `@values` | Arguments checked against the value type at `define`. **Not** enforced on writes |
@@ -49,7 +49,7 @@ Some annotations are accepted and **not enforced** on writes. An unenforced one 
 
 ## Compatibility with TypeDB
 
-Measured against TypeDB's own behaviour specification (cited run: 2026-11-12, spec pin
+Measured against TypeDB's own behavior specification (cited run: 2026-11-12, spec pin
 `typedb/typedb-behaviour@7d35851`, surveyed against TypeDB 3.10.4):
 
 - **1,742 of 1,756 scenarios pass (99.2%).** 12 are deviations, scenarios that TypeDB 3.10.4 fails too,
@@ -58,7 +58,7 @@ Measured against TypeDB's own behaviour specification (cited run: 2026-11-12, sp
 - **The one failure** is `update` L959. TypeDB treats an `owns` with no `@card` as `@card(0..1)` and
   enforces it at commit. TypeDBLite does not enforce that default, so a thing can hold several values
   where TypeDB would refuse the commit. This is **a product decision that is still open**: a
-  consumer's stores rely on the current behaviour, and enforcing the default would refuse writes to things
+  consumer's stores rely on the current behavior, and enforcing the default would refuse writes to things
   that already hold several values. See [CONFORMANCE.md](../../CONFORMANCE.md#the-one-failure) for the two
   ways forward.
 - **The spec covers queries and schema (`query/language`).** The numbers say how closely TypeDBLite matches
@@ -107,7 +107,7 @@ entities and 21,000 tasks:
 - **Linux, macOS and Windows.** The test gate has passed on all three. GitHub Actions is currently off, so
   nothing re-checks that on every change; run `npm run gate` yourself.
 - **The VS Code extension** is built from source and is not yet on a marketplace. In a remote window (WSL,
-  SSH, a container), colouring Markdown previews in your theme needs the optional TypeQLite Theme Bridge,
+  SSH, a container), coloring Markdown previews in your theme needs the optional TypeQLite Theme Bridge,
   installed in your local VS Code.
 
 ## What is open

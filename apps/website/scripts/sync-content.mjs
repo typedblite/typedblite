@@ -130,7 +130,7 @@ function describe(body) {
 function generate(row) {
   const raw = readFileSync(join(ROOT, row.source), 'utf8').replace(/\r\n/g, '\n');
   const lines = raw.split('\n');
-  // Skip a leading HTML block (the READMEs' centred logo) before the title.
+  // Skip a leading HTML block (the READMEs' centered logo) before the title.
   const titleIndex = lines.findIndex((line) => /^# \S/.test(line));
   if (titleIndex < 0) {
     errors.push(`${row.source}: no "# " title`);
@@ -163,13 +163,13 @@ function copyBrand() {
     copyFileSync(join(brand, name), join(SITE, 'src/assets/brand', name));
   }
   copyFileSync(join(brand, 'typedblite-icon.svg'), join(SITE, 'public/favicon.svg'));
-  // The TypeQLite grammar the code fences are coloured with: the extension's own, so the site and the editor agree.
+  // The TypeQLite grammar the code fences are colored with: the extension's own, so the site and the editor agree.
   mkdirSync(join(SITE, 'src/generated'), { recursive: true });
   copyFileSync(join(ROOT, 'apps/vscode/syntaxes/typeqlite.tmLanguage.json'), join(SITE, 'src/generated/typeqlite.tmLanguage.json'));
 }
 
 // Astro caches each page's rendered HTML, keyed by its Markdown and not by the highlighting plugin or the themes,
-// so a change to either would leave stale colours in the pages. Start every build from an empty cache.
+// so a change to either would leave stale colors in the pages. Start every build from an empty cache.
 rmSync(join(SITE, 'node_modules/.astro'), { recursive: true, force: true });
 rmSync(join(SITE, '.astro'), { recursive: true, force: true });
 for (const section of GENERATED_SECTIONS) rmSync(join(DOCS, section), { recursive: true, force: true });

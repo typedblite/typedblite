@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { parse } from './parse.js';
 
 /**
- * Every Background in the vendored TypeDB behaviour spec parses — the grammar's acceptance test
+ * Every Background in the vendored TypeDB behavior spec parses — the grammar's acceptance test
  * for TypeDBLite Conformance Phase 01.
  *
  * 🔴 The grammar's own rule is that a construct is added when a caller needs it. The caller is

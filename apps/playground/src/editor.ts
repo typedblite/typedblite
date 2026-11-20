@@ -7,7 +7,7 @@ import * as monaco from 'monaco-editor/editor/editor.api.js';
 import { MonacoLspClient, createTransportToWorker } from 'monaco-lsp-client';
 
 import { LANGUAGE_ID, MONARCH, SURFACE, themeRules } from './highlighting.js';
-import { currentScheme, onSchemeChange, resolveColour, type Scheme } from './scheme.js';
+import { currentScheme, onSchemeChange, resolveColor, type Scheme } from './scheme.js';
 
 /**
  * The program editor: Monaco, with TypeQLite served by the real language server over LSP.
@@ -16,7 +16,7 @@ import { currentScheme, onSchemeChange, resolveColour, type Scheme } from './sch
  * LSP client: diagnostics, completion, hover, go to definition and references, rename, quick fixes,
  * outline, folding, formatting and semantic tokens. It is the server the VS Code extension runs
  * (`language-server.ts`), so the playground's editor and the extension cannot disagree about the
- * language. The only thing written here is the colouring a tokenizer can do from text alone
+ * language. The only thing written here is the coloring a tokenizer can do from text alone
  * (`highlighting.ts`), because semantic tokens do not cover keywords.
  *
  * Browser only. `test-browser/playground.test.ts` is where it is tested, in Chromium.
@@ -72,8 +72,8 @@ export function applyTheme(container: HTMLElement, scheme: Scheme): void {
     inherit: true,
     rules: themeRules(scheme).map((rule) => ({ ...rule, foreground: rule.foreground })),
     colors: {
-      'editor.background': resolveColour(container, '--pg-code') ?? SURFACE[scheme]['editor.background'],
-      'editor.foreground': resolveColour(container, '--pg-ink') ?? SURFACE[scheme]['editor.foreground'],
+      'editor.background': resolveColor(container, '--pg-code') ?? SURFACE[scheme]['editor.background'],
+      'editor.foreground': resolveColor(container, '--pg-ink') ?? SURFACE[scheme]['editor.foreground'],
     },
   });
   monaco.editor.setTheme(`typeqlite-${scheme}`);

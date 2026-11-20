@@ -10,7 +10,7 @@ import { DiagnosticCode, diagnosticOf } from '../src/diagnostics.js';
  * a concrete subtype inserts as usual, and `isa` still answers the subtype's instances for the
  * abstract parent. 🔴 This is also what lets `define` convert a type to abstract by looking at
  * its instances alone — no record of whether it was abstract before, which three review rounds
- * had guarded and each guard broke a neighbour. A restated `@abstract` finds no instances to
+ * had guarded and each guard broke a neighbor. A restated `@abstract` finds no instances to
  * refuse on because none could have been inserted.
  */
 describe('@abstract is enforced', () => {

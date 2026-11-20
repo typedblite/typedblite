@@ -81,7 +81,7 @@ Langium wraps every registered validation check in an `async` function internall
 
 ## Grammar scope
 
-TypeQLite 3.x implements the subset required by real production schemas and by TypeDB's behaviour specification (`typedblite-conformance/spec/`). A construct is added only when a real caller needs it. The rule is:
+TypeQLite 3.x implements the subset required by real production schemas and by TypeDB's behavior specification (`typedblite-conformance/spec/`). A construct is added only when a real caller needs it. The rule is:
 
 > Find the caller first. What is here is what callers use — not what TypeDB has.
 
@@ -91,4 +91,4 @@ TypeQLite 3.x implements the subset required by real production schemas and by T
 npm exec nx -- run typeqlite-language:test
 ```
 
-Test files live in `test/` with `.spec.ts` extension. The spec-backgrounds suite (`test/spec-backgrounds.spec.ts`) uses the vendored TypeDB behaviour specification as acceptance tests for the grammar.
+Test files live in `test/` with `.spec.ts` extension. The spec-backgrounds suite (`test/spec-backgrounds.spec.ts`) uses the vendored TypeDB behavior specification as acceptance tests for the grammar.

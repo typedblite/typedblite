@@ -16,7 +16,7 @@ export interface RunCellOptions {
   /** How many rows of an answer are shown. The rest are counted, not dropped silently. */
   readonly maxRows: number;
   /** Checked between statements: a cell cannot be stopped inside one. */
-  readonly cancelled?: () => boolean;
+  readonly canceled?: () => boolean;
   /** What an engine that cannot answer is called to the reader: the extension's is a process, the browser's a worker. */
   readonly unavailableTitle?: string;
 }
@@ -49,7 +49,7 @@ export async function runCell(source: string, host: HostCaller, session: Stateme
   const outputs: OutputBlock[] = [];
   let from = 0;
   for (const [index, statement] of statements.entries()) {
-    if (options.cancelled?.()) {
+    if (options.canceled?.()) {
       outputs.push({ kind: 'text', text: `Stopped before statement ${index + 1} of ${statements.length}.` });
       return { outputs, failed: false };
     }

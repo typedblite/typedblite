@@ -31,8 +31,8 @@ import type {
  * ([ADR-009](../../../docs/architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md) D1).
  *
  * It satisfies the SYNCHRONOUS interface in `sqlite-database.ts`, which holds wherever the WASM module
- * is initialised before an interpreter is constructed: a Web Worker in a browser, Electron or a
- * Capacitor WebView, and Node for tests. Initialisation is the one asynchronous step and cannot hide
+ * is initialized before an interpreter is constructed: a Web Worker in a browser, Electron or a
+ * Capacitor WebView, and Node for tests. Initialization is the one asynchronous step and cannot hide
  * in a synchronous opener, so callers `await initWasmSqlite()` once, first:
  *
  * ```ts
@@ -86,11 +86,11 @@ type PoolUtil = {
 let pool: PoolUtil | undefined;
 
 /**
- * Initialises the WASM SQLite module, once, and optionally installs OPFS persistence. Call it, and await it, before
+ * Initializes the WASM SQLite module, once, and optionally installs OPFS persistence. Call it, and await it, before
  * constructing an interpreter with {@link openWasmSqlite}. Calling it again returns the module already loaded.
  *
  * @param options Where to find the `.wasm`, and whether to persist to the Origin Private File System.
- * @returns The initialised `@sqlite.org/sqlite-wasm` module.
+ * @returns The initialized `@sqlite.org/sqlite-wasm` module.
  * @category SQLite binding
  */
 export async function initWasmSqlite(
@@ -181,8 +181,8 @@ class WasmStatement implements SqliteStatement {
   ) {}
 
   /**
-   * Prepares per call and finalises in `finally`: `node:sqlite` frees statements with the garbage
-   * collector, and a WASM statement is leaked heap memory until it is finalised. The interpreter
+   * Prepares per call and finalizes in `finally`: `node:sqlite` frees statements with the garbage
+   * collector, and a WASM statement is leaked heap memory until it is finalized. The interpreter
    * prepares inline at ~250 call sites, so holding them would leak on every call.
    */
   private use<T>(

@@ -20,11 +20,11 @@ export function onSchemeChange(listener: (scheme: Scheme) => void): void {
 }
 
 /**
- * The colour a custom property has on `element`, as `#rrggbb`, or `undefined` if the browser does not
+ * The color a custom property has on `element`, as `#rrggbb`, or `undefined` if the browser does not
  * give an sRGB value. The property may be built from others (`var(--sl-color-gray-6)`) and in any CSS
- * colour syntax, so a probe element resolves it.
+ * color syntax, so a probe element resolves it.
  */
-export function resolveColour(element: HTMLElement, property: string): string | undefined {
+export function resolveColor(element: HTMLElement, property: string): string | undefined {
   const probe = document.createElement('span');
   probe.style.color = `var(${property})`;
   probe.hidden = true;

@@ -1,13 +1,13 @@
 /*
- * One colour per device, the same on every page that names a device: the device's own card, the chip on a task that
+ * One color per device, the same on every page that names a device: the device's own card, the chip on a task that
  * says where it was made, and the hub's list. The page that loads this resolves the theme: the embedding page's
  * `data-theme` (Starlight's light/dark switch, which the device pages copy from their parent) wins, and with none the
- * operating system's colour scheme decides.
+ * operating system's color scheme decides.
  *
  * Cyan, rose and olive: at least 100 degrees of hue apart, so that no two can be taken for one another, and clear of the
  * green, red and amber that already mean online, offline and waiting, and of violet and magenta, which were tried and
- * were too close to each other. Each has at least 4.5:1 contrast on the page and card backgrounds in its theme. The device's name is always written beside its colour,
- * so the colour is never the only thing that tells two devices apart (test/browser-hub-build.test.ts holds all of this).
+ * were too close to each other. Each has at least 4.5:1 contrast on the page and card backgrounds in its theme. The device's name is always written beside its color,
+ * so the color is never the only thing that tells two devices apart (test/browser-hub-build.test.ts holds all of this).
  */
 :root {
   --device-a: #0e7490;

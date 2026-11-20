@@ -1,8 +1,8 @@
 /*
  * The playground's own styles, shared by the two pages that host it: the standalone page (index.html,
- * which defines the colours below) and the website's (apps/website/src/pages/playground.astro, which maps
+ * which defines the colors below) and the website's (apps/website/src/pages/playground.astro, which maps
  * them onto Starlight's). Everything is scoped to `.pg`, so it cannot reach the page around it, and it
- * reads colours only from these custom properties:
+ * reads colors only from these custom properties:
  *
  *   --pg-ink --pg-muted --pg-line --pg-panel --pg-code --pg-accent --pg-accent-ink --pg-error --pg-error-bg
  */

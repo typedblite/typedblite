@@ -132,20 +132,20 @@ Sorting is done in JavaScript. The consuming API is five methods: `define`, `exe
   would expose the gap. Closing it needs the owner's type on the `attr` row.
 - 🔴 **Deletion semantics differ.** `role_player.rel` cascades, `role_player.player` does not, so
   deleting a thing that still plays a role is refused where TypeDB would delete the relation with
-  it. Defensible, and **not the same behaviour**.
+  it. Defensible, and **not the same behavior**.
 - **`plays` and `relates` are parsed and not enforced.** A wrong-typed role player is structurally
   impossible in TypeDB and possible here until a validator or a storage change closes it.
 - **Nothing is measured for performance.** The model is one row per attribute, so a match with
   several constraints becomes several `EXISTS` subqueries.
 - **This is a second implementation of somebody else's language**, and TypeQL will move without us.
-  The mitigation is Decision 7 — failing loudly on anything unrecognised — not keeping pace.
+  The mitigation is Decision 7 — failing loudly on anything unrecognized — not keeping pace.
 
 ## Amendment — 2026-09-11: "drop-in" is a measured claim, and the measure is ADR-005
 
 Phase 03 demonstrated drop-in for the consumer schemas. It did not, and could not, measure
 conformance to **TypeQL as TypeDB specifies it**: nothing here checked TypeQL semantics until
 [ADR-005](adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md) adopted
-TypeDB's own behaviour specification as the oracle. 🔴 **Surveyed 2026-09-10, the honest score is
+TypeDB's own behavior specification as the oracle. 🔴 **Surveyed 2026-09-10, the honest score is
 0 of 791 language scenarios**, because every scenario's schema declares annotations TypeDBLite
 refuses. From ADR-005's acceptance, any statement that TypeDBLite is a drop-in TypeDB replacement
 cites a conformance run and its number. Nothing above is rewritten: it was right about the port and

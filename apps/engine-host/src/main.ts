@@ -18,9 +18,9 @@ import { mcpModes } from './mcp-modes.js';
  * | `--mcp`, `--mcp-http` | an MCP server over stdio, or over HTTP on loopback; reads only unless `--mcp-write` |
  * | an operation name | one operation, one envelope on stdout, an exit code |
  * | none | HTTP on `127.0.0.1`, port `TYPEDBLITE_HOST_PORT` (default 3470) |
- * | an unrecognised flag first | refused by name, exit 2 |
+ * | an unrecognized flag first | refused by name, exit 2 |
  *
- * 🔴 A bare `typedblite-host` starts a server, so an unrecognised flag must never fall through to it: `defineApp`
+ * 🔴 A bare `typedblite-host` starts a server, so an unrecognized flag must never fall through to it: `defineApp`
  * refuses one by name. The server answers loopback only.
  */
 export const app = defineApp({

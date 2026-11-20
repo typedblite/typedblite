@@ -5,7 +5,7 @@ import { DiagnosticCode, diagnosticOf } from '../src/diagnostics.js';
 
 /**
  * Writes that answer, `update`, and the `delete` forms — update.feature, delete.feature and
- * put.feature are the acceptance suite; this pins each behaviour.
+ * put.feature are the acceptance suite; this pins each behavior.
  */
 const SCHEMA = [
   'define',

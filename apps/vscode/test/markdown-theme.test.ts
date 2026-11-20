@@ -1,8 +1,8 @@
 import { resolveTheme, semanticStyle, textMateStyle, type ThemeFile, type ThemeSettings } from '../src/markdown/theme';
 
 /**
- * Each case pins one of VS Code's colouring rules, as `theme.ts` restates them. A rule that drifted
- * would colour a code block in the preview differently from the same text in the editor.
+ * Each case pins one of VS Code's coloring rules, as `theme.ts` restates them. A rule that drifted
+ * would color a code block in the preview differently from the same text in the editor.
  */
 const SETTINGS: ThemeSettings = { themeName: 'Test Theme', semanticHighlighting: 'configuredByTheme' };
 const theme = (files: ThemeFile[], settings: Partial<ThemeSettings> = {}) =>
@@ -10,7 +10,7 @@ const theme = (files: ThemeFile[], settings: Partial<ThemeSettings> = {}) =>
 const STRING = ['source.typeqlite', 'string.quoted.double.typeqlite'];
 const ESCAPE = [...STRING, 'constant.character.escape.typeqlite'];
 
-describe('semantic token colours', () => {
+describe('semantic token colors', () => {
   const semantic = (semanticTokenColors: Record<string, unknown>, more: Partial<ThemeSettings> = {}) =>
     theme([{ semanticHighlighting: true, semanticTokenColors }], more);
 
@@ -26,7 +26,7 @@ describe('semantic token colours', () => {
     expect(semanticStyle(t, 'type', [])).toEqual({ foreground: '#333333' });
   });
 
-  it("lets a later rule win a tie, so the user's customisation beats the theme", () => {
+  it("lets a later rule win a tie, so the user's customization beats the theme", () => {
     const t = semantic({ variable: '#aaaaaa' }, {
       semanticTokenColorCustomizations: { rules: { variable: '#bbbbbb' } },
     });
@@ -43,7 +43,7 @@ describe('semantic token colours', () => {
     }]);
     expect(semanticStyle(t, 'type', [])).toEqual({ foreground: '#000002' });
     expect(semanticStyle(t, 'property', [])).toEqual({ foreground: '#000003' });
-    // Nothing styles a parameter: the editor leaves the TextMate colour showing.
+    // Nothing styles a parameter: the editor leaves the TextMate color showing.
     expect(semanticStyle(t, 'parameter', [])).toBeUndefined();
   });
 
@@ -58,29 +58,29 @@ describe('semantic token colours', () => {
 });
 
 describe('whether semantic highlighting is on', () => {
-  const colours = { semanticTokenColors: { type: '#123456' } };
+  const colors = { semanticTokenColors: { type: '#123456' } };
   const on = (files: ThemeFile[], more: Partial<ThemeSettings> = {}) =>
     semanticStyle(theme(files, more), 'type', []) !== undefined;
 
   it("follows the theme when the setting is configuredByTheme, and is off when the theme says nothing", () => {
-    expect(on([{ ...colours, semanticHighlighting: true }])).toBe(true);
-    expect(on([colours])).toBe(false);
+    expect(on([{ ...colors, semanticHighlighting: true }])).toBe(true);
+    expect(on([colors])).toBe(false);
   });
 
-  it("lets the customisation's enabled, for this theme or globally, override the theme", () => {
-    expect(on([{ ...colours, semanticHighlighting: true }], {
+  it("lets the customization's enabled, for this theme or globally, override the theme", () => {
+    expect(on([{ ...colors, semanticHighlighting: true }], {
       semanticTokenColorCustomizations: { '[Test Theme]': { enabled: false } },
     })).toBe(false);
-    expect(on([colours], { semanticTokenColorCustomizations: { enabled: true } })).toBe(true);
+    expect(on([colors], { semanticTokenColorCustomizations: { enabled: true } })).toBe(true);
   });
 
   it('lets editor.semanticHighlighting.enabled override everything', () => {
-    expect(on([{ ...colours, semanticHighlighting: true }], { semanticHighlighting: false })).toBe(false);
-    expect(on([colours], { semanticHighlighting: true })).toBe(true);
+    expect(on([{ ...colors, semanticHighlighting: true }], { semanticHighlighting: false })).toBe(false);
+    expect(on([colors], { semanticHighlighting: true })).toBe(true);
   });
 });
 
-describe('TextMate colours', () => {
+describe('TextMate colors', () => {
   const rules = (...tokenColors: unknown[]) => theme([{ tokenColors }]);
 
   it('prefers the longer scope prefix', () => {
@@ -123,11 +123,11 @@ describe('TextMate colours', () => {
     expect(textMateStyle(t, ESCAPE)?.italic).toBe(false);
   });
 
-  it('ignores a rule with no scope: those are the theme defaults, not a token colour', () => {
+  it('ignores a rule with no scope: those are the theme defaults, not a token color', () => {
     expect(textMateStyle(rules({ settings: { foreground: '#ffffff' } }), STRING)).toBeUndefined();
   });
 
-  it("applies the customisation shorthands with VS Code's scopes, exclusions included", () => {
+  it("applies the customization shorthands with VS Code's scopes, exclusions included", () => {
     const t = theme([{}], {
       tokenColorCustomizations: { keywords: '#000001', '[Other Theme]': { strings: '#000009' } },
     });
@@ -144,7 +144,7 @@ describe('TextMate colours', () => {
     expect(textMateStyle(t, STRING)).toEqual({ foreground: '#000003' });
   });
 
-  it('refuses a colour that is not a hex colour, so nothing else reaches the style attribute', () => {
+  it('refuses a color that is not a hex color, so nothing else reaches the style attribute', () => {
     const t = rules({ scope: 'string', settings: { foreground: 'red;background:url(x)' } });
     expect(textMateStyle(t, STRING)).toBeUndefined();
   });

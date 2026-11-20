@@ -180,7 +180,7 @@ describe('define refuses what TypeDB refuses', () => {
 
     it('a value-type conflict inside one statement is refused, whichever way round', () => {
       assert.equal(
-        refusal(() => engine.define('define attribute colour value string; colour value integer;')).code,
+        refusal(() => engine.define('define attribute color value string; color value integer;')).code,
         DiagnosticCode.valueTypeConflict,
       );
       assert.equal(

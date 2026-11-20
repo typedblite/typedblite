@@ -1,7 +1,7 @@
 {
   "name": "typeqlite-theme",
   "displayName": "TypeQLite Theme Bridge",
-  "description": "Lets the TypeQLite extension colour Markdown previews in your colour theme in remote windows: WSL, SSH and containers",
+  "description": "Lets the TypeQLite extension color Markdown previews in your color theme in remote windows: WSL, SSH and containers",
   "icon": "images/icon.png",
   "version": "0.0.1",
   "license": "MPL-2.0",

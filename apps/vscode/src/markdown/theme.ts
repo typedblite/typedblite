@@ -1,25 +1,25 @@
 /**
- * Resolving a token's style from a VS Code colour theme, the way the editor does (ADR-010).
+ * Resolving a token's style from a VS Code color theme, the way the editor does (ADR-010).
  *
  * 🔴 **VS Code has no API for this.** An extension can read the theme's kind (dark, light, high
- * contrast) and its workbench colours, never its token colours. So the client reads the theme's
+ * contrast) and its workbench colors, never its token colors. So the client reads the theme's
  * files itself (`theme-loader.ts`) and this module applies the editor's rules to them. Each rule
  * below restates one of VS Code's, and the tests pin them:
  *
  * - **Semantic tokens** (`semanticTokenColors`): a selector `type.modifier:language` or
  *   `*.modifier` matches when its type, every modifier and its language match. A type scores 100,
  *   each modifier 100, a language 10. Each style field comes from the best-scoring rule that sets
- *   it, and a later rule wins a tie, so the user's customisations beat the theme.
+ *   it, and a later rule wins a tie, so the user's customizations beat the theme.
  * - **Fallback**: a field no semantic rule sets comes from the token type's TextMate scopes, probed
  *   in VS Code's order (`type` → `entity.name.type`, then `support.type`). A token with no style at
- *   all is not drawn, and the TextMate colour underneath shows through.
+ *   all is not drawn, and the TextMate color underneath shows through.
  * - **TextMate** (`tokenColors`): a selector matches a scope when it is the scope or a dot-segment
  *   prefix of it (`string` matches `string.quoted.double`). A longer prefix beats a shorter one, a
  *   selector with matching ancestors (`source string`) beats one without, and a later rule wins a
  *   tie. A scope inherits every field its own match does not set from the scope that encloses it.
  *   `a - b` excludes.
  * - **Enabled**: `editor.semanticHighlighting.enabled` wins. When it is `configuredByTheme`, the
- *   customisation's `enabled` for this theme, then its global `enabled`, then the theme's
+ *   customization's `enabled` for this theme, then its global `enabled`, then the theme's
  *   `semanticHighlighting`, then off.
  */
 
@@ -34,7 +34,7 @@ export interface TokenStyle {
 const FIELDS = ['foreground', 'italic', 'bold', 'underline', 'strikethrough'] as const;
 type Field = (typeof FIELDS)[number];
 
-/** One theme file's token colouring, with `include` and a `tokenColors` path already followed. */
+/** One theme file's token coloring, with `include` and a `tokenColors` path already followed. */
 export interface ThemeFile {
   readonly semanticHighlighting?: boolean;
   readonly semanticTokenColors?: Readonly<Record<string, unknown>>;
@@ -42,7 +42,7 @@ export interface ThemeFile {
 }
 
 export interface ThemeSettings {
-  /** The theme's id or label, for `[Theme Name]` blocks in the customisations. */
+  /** The theme's id or label, for `[Theme Name]` blocks in the customizations. */
   readonly themeName: string;
   readonly semanticHighlighting: boolean | 'configuredByTheme';
   readonly semanticTokenColorCustomizations?: unknown;
@@ -86,11 +86,11 @@ export function resolveTheme(files: readonly ThemeFile[], settings: ThemeSetting
   const semantic = semanticRules(semanticColors);
 
   let customEnabled: boolean | undefined;
-  for (const block of customisations(settings.semanticTokenColorCustomizations, settings.themeName)) {
+  for (const block of customizations(settings.semanticTokenColorCustomizations, settings.themeName)) {
     if (typeof block['enabled'] === 'boolean') customEnabled = block['enabled'];
     if (isObject(block['rules'])) semantic.push(...semanticRules(block['rules']));
   }
-  for (const block of customisations(settings.tokenColorCustomizations, settings.themeName)) {
+  for (const block of customizations(settings.tokenColorCustomizations, settings.themeName)) {
     for (const [group, scopes] of Object.entries(TOKEN_GROUPS)) {
       const style = styleOf(block[group]);
       if (style) textmate.push({ selectors: scopes.map(selector), style });
@@ -125,7 +125,7 @@ export function textMateStyle(theme: Theme, stack: readonly string[]): TokenStyl
   return nonEmpty(style);
 }
 
-/** The style of a semantic token, or undefined when the editor would leave the TextMate colour. */
+/** The style of a semantic token, or undefined when the editor would leave the TextMate color. */
 export function semanticStyle(
   theme: Theme,
   type: string,
@@ -235,7 +235,7 @@ function textMateRules(rules: readonly unknown[] | undefined): TextMateRule[] {
   for (const rule of rules ?? []) {
     if (!isObject(rule) || !isObject(rule['settings'])) continue;
     const scope = rule['scope'];
-    // A rule with no scope holds the theme's defaults (`editor.foreground`), not a token colour.
+    // A rule with no scope holds the theme's defaults (`editor.foreground`), not a token color.
     const scopes = typeof scope === 'string' ? scope.split(',') : Array.isArray(scope) ? scope : [];
     const style = styleOf(rule['settings']);
     const selectors = scopes.filter((s): s is string => typeof s === 'string' && s.trim() !== '').map(selector);
@@ -286,8 +286,8 @@ function compareScores(a: readonly number[], b: readonly number[]): number {
   return 0;
 }
 
-/** The customisation blocks that apply: the global one, then each `[Theme Name]` block naming this theme. */
-function customisations(value: unknown, themeName: string): Record<string, unknown>[] {
+/** The customization blocks that apply: the global one, then each `[Theme Name]` block naming this theme. */
+function customizations(value: unknown, themeName: string): Record<string, unknown>[] {
   if (!isObject(value)) return [];
   const blocks: Record<string, unknown>[] = [value];
   for (const [key, block] of Object.entries(value)) {
@@ -301,15 +301,15 @@ function customisations(value: unknown, themeName: string): Record<string, unkno
 const wildcard = (pattern: string) =>
   new RegExp(`^${pattern.split('*').map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`);
 
-const COLOUR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
-/** A rule's style: a colour string, or `{ foreground, fontStyle, bold, italic, … }`. */
+/** A rule's style: a color string, or `{ foreground, fontStyle, bold, italic, … }`. */
 function styleOf(value: unknown): TokenStyle | undefined {
-  if (typeof value === 'string') return COLOUR.test(value) ? { foreground: value } : undefined;
+  if (typeof value === 'string') return COLOR.test(value) ? { foreground: value } : undefined;
   if (!isObject(value)) return undefined;
   const style: Partial<Record<Field, unknown>> = {};
   const foreground = value['foreground'];
-  if (typeof foreground === 'string' && COLOUR.test(foreground)) style.foreground = foreground;
+  if (typeof foreground === 'string' && COLOR.test(foreground)) style.foreground = foreground;
   const fontStyle = value['fontStyle'];
   if (typeof fontStyle === 'string') {
     // `fontStyle` sets all four: `""` is how a rule says "none of them", over an inherited italic.

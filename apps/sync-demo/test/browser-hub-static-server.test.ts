@@ -20,7 +20,7 @@ beforeAll(async () => {
   writeFileSync(join(root, 'inside/index.html'), '<h1>inside</h1>');
   writeFileSync(join(root, 'inside/deep/file name.txt'), 'spaced');
   for (const [name, body] of Object.entries({ 'a.js': 'js', 'a.css': 'css', 'a.wasm': 'wasm', 'a.map': '{}', 'a.json': '{}', 'a.svg': '<svg/>', 'a.bin': 'bin' })) writeFileSync(join(root, name), body);
-  // A neighbour of the folder, which a `..` must not reach.
+  // A neighbor of the folder, which a `..` must not reach.
   writeFileSync(join(root, '..', `${root.split('/').pop()}-secret.txt`), 'TOP-SECRET-CONTENT');
   plain = await startStaticServer(root);
   mounted = await startStaticServer(root, { prefix: '/sync-demo' });
@@ -100,7 +100,7 @@ describe('refusing', () => {
 
   it('does not serve a file outside its folder, however the path is spelled', async () => {
     const secret = `/../${root.split('/').pop()}-secret.txt`;
-    // `fetch` normalises `..` away, so send it raw.
+    // `fetch` normalizes `..` away, so send it raw.
     const raw = (path: string): Promise<{ status: number; body: string }> =>
       new Promise((resolve, reject) => {
         const req = httpRequest({ host: '127.0.0.1', port: new URL(plain.url).port, path, method: 'GET' }, (res) => {

@@ -223,7 +223,7 @@ export class TypeQLiteDocumentBuilder extends DefaultDocumentBuilder {
   }
 
   /**
-   * Publishes a validated document's diagnostics even if a newer update has cancelled the build.
+   * Publishes a validated document's diagnostics even if a newer update has canceled the build.
    *
    * The diagnostics already exist at this point, and sending them is cheap, so cancelling here saves
    * nothing and loses them for good. Every other phase keeps its token.

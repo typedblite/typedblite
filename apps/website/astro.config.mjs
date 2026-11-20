@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { REPO_PUBLIC, REPO_URL } from './scripts/content-map.mjs';
 
 // The editor's own TypeQLite grammar (copied here by scripts/sync-content.mjs), so a fence on the site is
-// coloured the way it is in VS Code. `typeql` is what the guides write; the other names are aliases.
+// colored the way it is in VS Code. `typeql` is what the guides write; the other names are aliases.
 const typeql = {
   ...JSON.parse(readFileSync(new URL('./src/generated/typeqlite.tmLanguage.json', import.meta.url), 'utf8')),
   name: 'typeql',
@@ -58,12 +58,12 @@ export default defineConfig({
       components: { Head: './src/components/Head.astro', Sidebar: './src/components/Sidebar.astro', Footer: './src/components/Footer.astro' },
       ...(REPO_PUBLIC ? { editLink: { baseUrl: `${REPO_URL}/edit/main/` } } : {}),
       // The themes are VS Code's own Dark+ and Light+, the ones the editor and the playground use, so a fence is
-      // coloured as it is there. The plugin lays the language server's semantic tokens over the grammar's.
+      // colored as it is there. The plugin lays the language server's semantic tokens over the grammar's.
       expressiveCode: {
         themes: ['dark-plus', 'light-plus'],
         useStarlightUiThemeColors: true,
-        // Expressive Code darkens or lightens a syntax colour that is under 5.5:1 against the background. Off, the
-        // colours are the themes' own, the ones the editor shows.
+        // Expressive Code darkens or lightens a syntax color that is under 5.5:1 against the background. Off, the
+        // colors are the themes' own, the ones the editor shows.
         minSyntaxHighlightingColorContrast: 0,
         plugins: [typeqliteSemanticTokens()],
         shiki: { langs: [/** @type {any} */ (typeql)] },

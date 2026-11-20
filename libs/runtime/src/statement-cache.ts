@@ -14,7 +14,7 @@ import type { SqliteDatabase, SqliteStatement } from './sqlite-database.js';
  * and no caller can change a statement's settings for the next one. A statement whose table a later
  * DDL changed is re-prepared by SQLite itself on its next use.
  *
- * A binding that prepares lazily (the WASM one prepares and finalises per call, `wasm.ts`) loses
+ * A binding that prepares lazily (the WASM one prepares and finalizes per call, `wasm.ts`) loses
  * nothing here: it caches the wrapper, which is cheap either way.
  */
 export function cachingStatements(db: SqliteDatabase, capacity = 512): SqliteDatabase {

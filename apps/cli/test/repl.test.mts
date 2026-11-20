@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
  *
  * 🔴 Deliberately not refactored into something easier to test. The interactive loop *is* the
  * thing — line buffering across a multi-line pipeline, meta-commands, and surviving an error are
- * behaviours of the loop, not of anything underneath it. Extracting a "testable core" would leave
+ * behaviors of the loop, not of anything underneath it. Extracting a "testable core" would leave
  * exactly the part that can break untested, which is how Phase 02 shipped an atomicity test that
  * could not fail.
  */
@@ -48,7 +48,7 @@ describe('the REPL', () => {
     assert.match(output, /\(1 row\)/);
   });
 
-  // The behaviour that makes the loop non-trivial: a pipeline spans lines, so `match …;` alone
+  // The behavior that makes the loop non-trivial: a pipeline spans lines, so `match …;` alone
   // must NOT be executed — it binds and projects nothing.
   //
   // ⚠️ This projected `$s` — the *entity* — until 2026-09-10, and had to change because `select`

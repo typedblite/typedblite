@@ -94,7 +94,7 @@ describe('the browser notebook in Chromium', () => {
 
   // 🔴 Every cell asks the language server for its tokens at once. Langium's provider used to answer one cell with another's
   // tokens in front of its own, and Monaco warned that they ran past the end of the line.
-  it('colours every cell from its own tokens: Monaco has nothing to say about them', async () => {
+  it('colors every cell from its own tokens: Monaco has nothing to say about them', async () => {
     const page = await open();
     await page.waitForFunction(() => (window as unknown as { __lspSent: { method: string }[] }).__lspSent.filter((m) => m.method === 'textDocument/semanticTokens/full').length >= 9, undefined, { timeout: 30_000 });
     await page.waitForTimeout(1_000);

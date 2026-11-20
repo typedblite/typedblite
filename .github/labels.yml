@@ -26,7 +26,7 @@
   description: "A maintainer would welcome a contribution"
 - name: "conformance"
   color: "fbca04"
-  description: "Concerns a scenario of TypeDB's behaviour specification"
+  description: "Concerns a scenario of TypeDB's behavior specification"
 - name: "needs-caller"
   color: "fef2c0"
   description: "Name the real query or scenario that needs this"

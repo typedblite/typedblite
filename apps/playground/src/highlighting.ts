@@ -1,7 +1,7 @@
 import { KEYWORD_SCOPES } from '@typedblite/language';
 
 /**
- * How TypeQLite is coloured in the playground's editor, before the language server answers and
+ * How TypeQLite is colored in the playground's editor, before the language server answers and
  * underneath what it does: the keywords, strings, comments, variables and numbers a tokenizer can know
  * from text alone. The server adds the rest (a name resolved to a type, an attribute, a role) as semantic
  * tokens, as it does in VS Code.
@@ -19,7 +19,7 @@ const WORD = /^[A-Za-z]/;
 const wordsOf = (scope: string): string[] => byScope(scope).filter((word) => WORD.test(word));
 const symbolsOf = (scope: string): string[] => byScope(scope).filter((word) => !WORD.test(word));
 
-/** The same scope names the TextMate grammar uses, so a theme written for one colours the other. */
+/** The same scope names the TextMate grammar uses, so a theme written for one colors the other. */
 export const TOKEN = {
   control: 'keyword.control.typeqlite',
   storage: 'storage.type.typeqlite',
@@ -92,7 +92,7 @@ export interface ThemeRule {
 }
 
 /**
- * The colours VS Code's own Light Modern and Dark Modern give these scopes, so TypeQLite looks here as it
+ * The colors VS Code's own Light Modern and Dark Modern give these scopes, so TypeQLite looks here as it
  * does in the editor. A rule's token is a prefix of the scope; a semantic token is matched by its type.
  */
 const palette = {
@@ -115,7 +115,7 @@ export function themeRules(scheme: 'light' | 'dark'): ThemeRule[] {
     { token: 'keyword.operator.words', foreground: c.operatorWord },
     { token: 'constant.language', foreground: c.constant },
     // An annotation is a keyword to VS Code's themes: the grammar scopes it `keyword.annotations.typeqlite`, and
-    // Dark Modern and Light Modern colour `keyword` as `storage`. The editor and the site show the same.
+    // Dark Modern and Light Modern color `keyword` as `storage`. The editor and the site show the same.
     { token: 'keyword.annotations', foreground: c.storage },
     { token: 'keyword.operator', foreground: c.operator },
     { token: 'variable.parameter', foreground: c.variable },
@@ -132,7 +132,7 @@ export function themeRules(scheme: 'light' | 'dark'): ThemeRule[] {
   ];
 }
 
-/** The editor's own surface colours, matched to the page's code background. */
+/** The editor's own surface colors, matched to the page's code background. */
 export const SURFACE = {
   light: { 'editor.background': '#f7f5f1', 'editor.foreground': '#15171c' },
   dark: { 'editor.background': '#14161b', 'editor.foreground': '#f4f2ee' },

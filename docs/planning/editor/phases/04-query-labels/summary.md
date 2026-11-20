@@ -32,7 +32,7 @@ warning that the runtime never sees (D2, D6).
     workspace defines at least one type.
   - `TypeQLiteDocumentBuilder` relinks any document holding labels when anything changes. Without
     it, a warning stayed stale after the defining file appeared.
-- Hover falls back to a label's resolution, and semantic tokens colour labels through the same table.
+- Hover falls back to a label's resolution, and semantic tokens color labels through the same table.
 
 The grammar is unchanged, and so is the runtime.
 
@@ -47,9 +47,9 @@ The grammar is unchanged, and so is the runtime.
 
 ## Decisions made in the phase
 
-- **Semantic tokens follow D6.** In a workspace with a schema, a label is coloured only when it
+- **Semantic tokens follow D6.** In a workspace with a schema, a label is colored only when it
   resolves, and by what it resolves to (attribute → property, role → parameter, other types → type).
-  In a workspace with none, labels keep the position-based colouring they had before. A 🔴 comment
+  In a workspace with none, labels keep the position-based coloring they had before. A 🔴 comment
   in the old provider said resolution "genuinely does not exist here", and that comment is replaced.
 - **`$t label person` is never warned about.** It asserts a label rather than using one. Nor is a
   role whose relation the pattern does not name (`links (employee: $x)` with no `isa`), because there

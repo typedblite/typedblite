@@ -86,7 +86,7 @@ function render(): void {
       const item = document.createElement('li');
       const origin = document.createElement('span');
       origin.className = 'bh-origin';
-      origin.dataset['origin'] = task.origin; // app.css colours it with the device's colour (devices.css)
+      origin.dataset['origin'] = task.origin; // app.css colors it with the device's color (devices.css)
       origin.textContent = LABELS[task.origin] ?? task.origin;
       item.append(`${task.done ? '✓' : '○'} ${task.title} — `, origin);
       return item;

@@ -104,11 +104,11 @@ export class TypeQLiteFormatter extends AbstractFormatter {
    * `tracker.schema.typeqlite` and the definition it documents.
    *
    * Appending to the previous item instead was tried and is worse: it preserves existing spacing
-   * but never inserts any, so the formatter silently stops normalising vertical space. That
+   * but never inserts any, so the formatter silently stops normalizing vertical space. That
    * version passed both production schemas — because they already had the blank lines — and failed
    * the mangled-input test, which is the one that can tell the difference.
    *
-   * So: normalise where we can see the whole gap, and defer to Langium where a comment owns it.
+   * So: normalize where we can see the whole gap, and defer to Langium where a comment owns it.
    */
   private separate(
     f: ReturnType<AbstractFormatter['getNodeFormatter']>,

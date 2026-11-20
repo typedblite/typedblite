@@ -1,6 +1,6 @@
 # TypeDBLite Conformance Status
 
-How closely TypeDBLite matches TypeDB, measured against TypeDB's own behaviour specification. This page
+How closely TypeDBLite matches TypeDB, measured against TypeDB's own behavior specification. This page
 gives the latest numbers, what each non-passing scenario is and why, and how to reproduce or update the
 count.
 
@@ -81,7 +81,7 @@ values, so TypeDB refuses the commit. TypeDBLite does not enforce the default, s
 through.
 
 **This is a product decision that is still open, not an oversight.** A downstream application depends on the current
-behaviour:
+behavior:
 
 | Store | Ownership declared without `@card` | Owners holding more than one value |
 | --- | --- | ---: |
@@ -109,11 +109,11 @@ side fails too. TypeDBLite fails at the same step or a later one, for the same c
 
 | Scenario | Where TypeDB 3.10.4 fails | Cause |
 | --- | --- | --- |
-| `insert` L2219: inferred concepts are not materialised | parse, L2222 | TypeDB-2 `rule` syntax; TypeDB 3 has no rules. `@ignore` |
+| `insert` L2219: inferred concepts are not materialized | parse, L2222 | TypeDB-2 `rule` syntax; TypeDB 3 has no rules. `@ignore` |
 | `insert` L2272: an inferred ownership is not persisted | parse, L2275 | `rule` syntax. `@ignore` |
-| `insert` L2337: an inferred attribute gets materialised | parse, L2343 | `rule` syntax. `@ignore` |
-| `insert` L2432: an inferred relation gets materialised | parse, L2435 | TypeDB-2 define-shaped `undefine employment owns ref`. `@ignore` |
-| `insert` L2515: a chain of inferred concepts is materialised | commit, L2580 (`@card(0..1)` violated) | the rules chain; its data cannot commit on TypeDB 3. `@ignore` |
+| `insert` L2337: an inferred attribute gets materialized | parse, L2343 | `rule` syntax. `@ignore` |
+| `insert` L2432: an inferred relation gets materialized | parse, L2435 | TypeDB-2 define-shaped `undefine employment owns ref`. `@ignore` |
+| `insert` L2515: a chain of inferred concepts is materialized | commit, L2580 (`@card(0..1)` violated) | the rules chain; its data cannot commit on TypeDB 3. `@ignore` |
 | `delete` L221: variable types can be used in deletes | type inference, L233 | TypeQL-2 syntax throughout (`$n0 "Alice"`, `type person`). `@ignore` |
 | `match` L210: transitive `sub` assertions | L231, templating an iid for a type | "types cannot be specified by IID" (upstream comment). `@ignore` |
 | `match` L1484: relation and role pairings | L1516, `transaction is open: false` | TypeDB keeps every kind of transaction open after a failed read (probed directly). `@ignore` |
@@ -209,9 +209,9 @@ Where a step's meaning was unclear, the harness copies TypeDB's own step definit
 - **`verify answer set is equivalent for query`** compares whole rows. TypeDB's step is turned off; if
   it were on, it would compare whole rows too.
 
-## Recent behaviour changes
+## Recent behavior changes
 
-The push from 1,676 to 1,742 (PR #6) changed behaviour that callers can notice. Projects that load the
+The push from 1,676 to 1,742 (PR #6) changed behavior that callers can notice. Projects that load the
 built runtime see these changes after their next rebuild:
 
 - **Deleting a thing keeps relations that still have other players.** Before, every relation the thing
@@ -223,7 +223,7 @@ built runtime see these changes after their next rebuild:
   has roles also records its `plays`.
 - **Writes are type-checked as TypeDB checks them:**
   - `delete has $e of $p` requires every type the match lets `$p` be to own every type `$e` can be.
-  - `delete links` and `update … links` refuse any relation type that has specialised the role away.
+  - `delete links` and `update … links` refuse any relation type that has specialized the role away.
   - Refusals use TypeDB's own messages ("Left type … across constraint …", "Type-inference was unable
     to find compatible types …").
 - **The grammar now accepts these TypeDB forms:**
@@ -242,7 +242,7 @@ built runtime see these changes after their next rebuild:
 | --- | --- | --- |
 | 2026-09-11 | 0 → 140 → 164 → 416 | spec vendored; first four phases ([ADR-005](docs/architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md) accepted) |
 | 2026-11-11 | 1,306 → 1,439 | attributes stored once per type and value ([ADR-006](docs/architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md)) |
-| 2026-11-12 | 1,676 | lists, role specialisation, scoped keys, real transactions, functions and metadata (PR #5) |
+| 2026-11-12 | 1,676 | lists, role specialization, scoped keys, real transactions, functions and metadata (PR #5) |
 | 2026-11-12 | **1,742**, 1 fail, 12 deviations | every gap TypeDB passes closed but one; differential oracle; [ADR-007](docs/architecture/adr-007-a-scenario-typedb-itself-fails-is-a-deviation.md) (PR #6) |
 
 ## Caveats
@@ -271,7 +271,7 @@ built runtime see these changes after their next rebuild:
 ## References
 
 - [ADR-005](docs/architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md):
-  TypeDB's behaviour specification is TypeDBLite's conformance oracle
+  TypeDB's behavior specification is TypeDBLite's conformance oracle
 - [ADR-006](docs/architecture/adr-006-an-attribute-is-stored-once-per-type-and-value.md): an attribute
   is stored once per type and value
 - [ADR-007](docs/architecture/adr-007-a-scenario-typedb-itself-fails-is-a-deviation.md): a scenario

@@ -30,7 +30,7 @@ TypeDBLite is for where a server is not an option:
 
 What you give up, compared with TypeDB:
 
-- **It is a dialect.** On TypeDB's own behaviour specification it passes 1,742 of 1,756 scenarios, and it refuses by
+- **It is a dialect.** On TypeDB's own behavior specification it passes 1,742 of 1,756 scenarios, and it refuses by
   name what it does not support, but a query that runs on TypeDB may not run here, and some annotations are accepted without being enforced on writes
   ([The language](known-limitations.md#the-language)). Do not assume a schema or a query moves between the two
   unchanged; check it against the [language guide](typeqlite-language.md).

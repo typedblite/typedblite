@@ -41,7 +41,7 @@ export function registerNotebookControllers(context: vscode.ExtensionContext, ho
         await execution.clearOutput();
         let result: CellResult;
         try {
-          result = await runCell(cell.document.getText(), host, runner, { maxRows: maxRows(), cancelled: () => execution.token.isCancellationRequested });
+          result = await runCell(cell.document.getText(), host, runner, { maxRows: maxRows(), canceled: () => execution.token.isCancellationRequested });
         } catch (error) {
           // `runCell` answers its failures as outputs; this is a bug in it, and the cell says so instead of hanging.
           result = { outputs: [{ kind: 'refusal', title: 'The notebook failed', message: error instanceof Error ? error.message : String(error) }], failed: true };

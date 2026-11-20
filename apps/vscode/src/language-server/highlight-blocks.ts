@@ -9,10 +9,10 @@ import { tokenizeTextMate, type RawGrammar } from './textmate.js';
  * tokens an editor would show for each, were it a `.tql` file (ADR-010).
  *
  * 🔴 **The blocks are built as their own workspace, never the editor's.** A docs page's examples are
- * self-contained. Resolved against the open workspace, a page's labels would be coloured by
- * whatever schema happens to sit beside it, and left uncoloured where none does. Built together, a
+ * self-contained. Resolved against the open workspace, a page's labels would be colored by
+ * whatever schema happens to sit beside it, and left uncolored where none does. Built together, a
  * `define` in one block resolves the labels in the queries below it, as a reader expects. A page
- * with no schema falls back to colouring labels by position, as an editor workspace with no schema
+ * with no schema falls back to coloring labels by position, as an editor workspace with no schema
  * does (ADR-008 D6).
  *
  * The services are created per request, so nothing outlives it. The client caches by content.

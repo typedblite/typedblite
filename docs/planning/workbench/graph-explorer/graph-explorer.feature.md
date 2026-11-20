@@ -57,7 +57,7 @@ the web app always serves the latest release.
 | **Transaction control** | *Auto*: one transaction per query, its type found from the query. *Manual*: read, write or schema; Open, Commit, Rollback, Close; a `*` marks uncommitted changes | Both modes. `beginTransaction`, `commitTransaction` and `rollbackTransaction` exist. Auto mode needs the CLI's statement classification, moved somewhere shared |
 | **Query tool** | A schema pane, an editor with tabs, results, and history. Run with Ctrl+Enter. A row limit of 10 to 100,000, defaulting to 100 | The editor already exists: the `.tql` file. Add **Run** on a statement (a command, a CodeLens and Ctrl+Enter) and a results panel |
 | **Results: Log, Table, Graph, Raw** | Log is console text. Table shows one row per answer, or a fetch's top-level keys. Graph is for `match` without `fetch`, and for `insert`. Raw is the JSON response | **The same four views.** Log shows execution facts (ADR-004). Table shows rows. Graph shows concepts. Raw shows the engine's report as JSON |
-| **Graph visualisation** | Entity: rounded rectangle. Relation: diamond. Attribute: ellipse. Role: grey. Edges for `has`, `links` (labelled with the role), `isa`, `sub`, `owns`, `relates` and `plays`. Zoom, pan, drag; click to highlight a node's neighbourhood; search by iid, value, type or label | The same shape conventions, which TypeDB users already read, in this project's own theme |
+| **Graph visualization** | Entity: rounded rectangle. Relation: diamond. Attribute: ellipse. Role: gray. Edges for `has`, `links` (labeled with the role), `isa`, `sub`, `owns`, `relates` and `plays`. Zoom, pan, drag; click to highlight a node's neighbourhood; search by iid, value, type or label | The same shape conventions, which TypeDB users already read, in this project's own theme |
 | **Expand** | Right-click a node: *Load relations*, *Load links* or *Load attributes*, either for this node or for every node of its type | **The core of exploring.** Each expansion is a TypeQLite query pinned by `iid` |
 | **Schema tool** | Draws types and only their *declared* `sub`, `owns`, `relates` and `plays` edges; inherited ones are not drawn | `schemaSnapshot()` already returns exactly these edges |
 | **Schema pane** | A tree with find, expand and collapse all, flat or hierarchical view, view the schema as text, and refresh | A native VS Code tree view |
@@ -69,7 +69,7 @@ the web app always serves the latest release.
 **This is modelled on Studio, not a copy of it.** It does not reuse Studio's name, assets or theme:
 those are TypeDB's product identity. Licensing does not block reuse: TypeDBLite is MPL-2.0, the
 same as Studio, so a Studio source file *could* be brought in. It would keep its MPL header, just as
-the vendored behaviour specification does. Phase 00 records any file that is. The shape conventions
+the vendored behavior specification does. Phase 00 records any file that is. The shape conventions
 are TypeDB's visual vocabulary, not Studio artwork.
 
 ## What already exists — verified on disk 2026-11-12
@@ -110,7 +110,7 @@ typed, so the **Log** view shows it, and a bug in the explorer can be reproduced
 the explorer needs something TypeQLite cannot ask, that is a grammar question, decided
 caller-first.
 
-**2. The explorer changes nothing about the engine's answers.** It adds no runtime behaviour. Any
+**2. The explorer changes nothing about the engine's answers.** It adds no runtime behavior. Any
 runtime change it does need (an export, a role-variable construct) goes through the usual path,
 and the conformance run stays at **1742 of 1756**
 ([ADR-005](../../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
@@ -135,7 +135,7 @@ classification, value rendering and type kinds all come from the runtime and the
 3. **A schema view**: a tree of types, plus a graph of their declared `sub`, `owns`, `relates` and
    `plays` edges.
 4. **An answer graph**: things, relations and attributes as nodes, with `has` and `links` edges,
-   roles labelled. Zoom, pan, drag, highlight a neighbourhood, and search.
+   roles labeled. Zoom, pan, drag, highlight a neighbourhood, and search.
 5. **Exploring**: expand a node's relations, links or attributes, for that node or for every node of
    its type. Browse the instances of a type, and open the detail of one thing.
 6. **History, saved queries and export** to JSON and CSV.
@@ -151,13 +151,13 @@ packaged `.vsix`.
       *e2e.*
 - [ ] Answers become a graph model (nodes and edges) through a pure function with its own specs.
       Each entity, relation and attribute gives one node; attributes are keyed by `(type, value)`;
-      each role player gives a `links` edge labelled with its role.
+      each role player gives a `links` edge labeled with its role.
 - [ ] Each expansion is a spec'd TypeQLite query, and the Log view shows the query it ran.
 - [ ] The schema graph from `schemaSnapshot()` matches a fixture schema's declared edges exactly,
       and draws no inherited edges.
 - [ ] An expansion past the row limit reports how many nodes it did not draw.
 - [ ] A write in manual mode is gone after Rollback, and present after Commit. *e2e.*
-- [ ] The webview renders a graph from a fixture store, and expanding a node adds its neighbours.
+- [ ] The webview renders a graph from a fixture store, and expanding a node adds its neighbors.
       *e2e, asserted through the webview's message protocol rather than pixels.*
 - [ ] 🔴 The conformance run is unchanged at **1742 of 1756**.
 - [ ] `AGENTS.md`, the README and the project overview memory name the explorer.
@@ -184,7 +184,7 @@ These are for the founder.
 2. ~~**Where the engine runs.**~~ Moved to the [engine host](../engine-host/engine-host.feature.md).
 3. **Graph library.** Candidates: Sigma.js with Graphology (WebGL, built for large graphs),
    Cytoscape.js (rich layouts and styling), or vis-network. Choose on the size bound
-   (invariant 4) and licence. Which library Studio uses was not confirmed.
+   (invariant 4) and license. Which library Studio uses was not confirmed.
 4. **The UI's framework inside the webview:** none (plain DOM), or a small one. Studio uses
    Angular, which would be heavy here.
 5. **Live refresh:** should a graph update when the store changes, using the change log (ADR-003)?
@@ -232,7 +232,7 @@ file. A results panel with the Log, Table and Raw views. A transaction control i
 **03 — Schema.** A tree view of types in the sidebar. A schema graph from `schemaSnapshot()` with
 declared edges only.
 
-**04 — Answer graph.** The pure graph model. The Graph view: shapes by kind, roles labelled, zoom,
+**04 — Answer graph.** The pure graph model. The Graph view: shapes by kind, roles labeled, zoom,
 pan, drag, highlight a neighbourhood, search by iid, value or label.
 
 **05 — Exploring.** Expand a node's relations, links or attributes, for this node or for every node

@@ -1,14 +1,14 @@
 /**
- * Colours a TypeQLite code fence the way the editor does: the TextMate grammar's colours (from Shiki, in
+ * Colors a TypeQLite code fence the way the editor does: the TextMate grammar's colors (from Shiki, in
  * the same VS Code themes the editor uses) with the language server's semantic tokens laid over them.
  *
  * The tokens come from the VERY provider the VS Code extension and the playground run
  * (`TypeQLiteSemanticTokenProvider`, through `createTypeQLiteServices`), run here at build time on each
- * fence's text. A name that resolves to a type, an attribute or a role gets the colour of its kind, and one
- * that does not resolve keeps the grammar's colour, exactly as in the editor. Nothing is listed here: a
- * token the provider gains is coloured by the same rule.
+ * fence's text. A name that resolves to a type, an attribute or a role gets the color of its kind, and one
+ * that does not resolve keeps the grammar's color, exactly as in the editor. Nothing is listed here: a
+ * token the provider gains is colored by the same rule.
  *
- * A token's colour is the theme's colour for the TextMate scope VS Code falls back to for that token type,
+ * A token's color is the theme's color for the TextMate scope VS Code falls back to for that token type,
  * so it follows the theme, not a second palette.
  */
 import { definePlugin, InlineStyleAnnotation } from 'astro-expressive-code';
@@ -19,7 +19,7 @@ import { createTypeQLiteServices } from '@typedblite/language';
 const LANGUAGES = new Set(['typeql', 'typeqlite', 'tql']);
 const TOKEN_TYPES = Object.keys(AllSemanticTokenTypes);
 
-/** VS Code's default scope for a semantic token type that its theme gives no colour of its own. */
+/** VS Code's default scope for a semantic token type that its theme gives no color of its own. */
 const SCOPE_OF_TYPE = {
   type: 'entity.name.type',
   class: 'entity.name.type',
@@ -31,7 +31,7 @@ const SCOPE_OF_TYPE = {
 };
 
 /** The foreground a theme gives a scope: the longest settings selector that is a prefix of it. */
-export function colourOfScope(settings, scope) {
+export function colorOfScope(settings, scope) {
   let best;
   let bestLength = -1;
   for (const setting of settings) {
@@ -99,7 +99,7 @@ export function typeqliteSemanticTokens() {
           const line = lines[token.line];
           if (!scope || !line) continue;
           styleVariants.forEach((variant, styleVariantIndex) => {
-            const color = colourOfScope(variant.theme.settings, scope);
+            const color = colorOfScope(variant.theme.settings, scope);
             if (!color) return;
             line.addAnnotation(
               new InlineStyleAnnotation({

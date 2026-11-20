@@ -24,7 +24,7 @@ nothing to decide. This phase writes no code.
 - [x] `node:sqlite` in a launched Node: present in the remote server's Node 24.22
 - [~] `node:sqlite` in the desktop Electron's Node: **not verified**, so Electron-as-Node is a
       fallback only. Handed to Phase 05
-- [~] The same lock behaviour through `SqliteEngine`: handed to Phase 01
+- [~] The same lock behavior through `SqliteEngine`: handed to Phase 01
 
 ## Decisions
 

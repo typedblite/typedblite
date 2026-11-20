@@ -51,7 +51,7 @@ const VALUE_TYPE_NAMES = new Set(['integer', 'long', 'double', 'decimal', 'strin
 const TEMPORAL_TYPES = new Set(['date', 'datetime', 'datetime-tz', 'duration']);
 const isNumericType = (valueType: string): boolean => NUMERIC_TYPES.has(valueType);
 /** `long` is `integer` (review, round 16). */
-const normaliseType = (valueType: string): string => (valueType === 'long' ? 'integer' : valueType);
+const normalizeType = (valueType: string): string => (valueType === 'long' ? 'integer' : valueType);
 
 export interface Value {
   readonly valueType: ValueType;
@@ -796,7 +796,7 @@ export function checkExpression(expression: Expression, variableType: (variable:
       refuse(DiagnosticCode.valueTypeConflict, `Built-in function '${qualified}' cannot be applied to arguments of type '${first}'.`, at);
     } else if ((bare === 'ceil' || bare === 'floor' || bare === 'round') && (first === 'integer' || first === 'long')) {
       refuse(DiagnosticCode.valueTypeConflict, `Built-in function '${qualified}' cannot be applied to arguments of type 'integer'.`, at);
-    } else if ((bare === 'max' || bare === 'min') && first !== undefined && second !== undefined && normaliseType(first) !== normaliseType(second)) {
+    } else if ((bare === 'max' || bare === 'min') && first !== undefined && second !== undefined && normalizeType(first) !== normalizeType(second)) {
       refuse(DiagnosticCode.valueTypeConflict, `Function '${bare}' expects matching argument types.`, at);
     }
     return;

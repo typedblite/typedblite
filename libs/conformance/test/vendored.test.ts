@@ -24,7 +24,7 @@ describe('the vendored specification', () => {
 
   it('lists every file the pin covers', () => {
     assert.ok(manifest.length >= 20, `manifest has ${manifest.length} entries`);
-    assert.ok(manifest.some(([, path]) => path === 'LICENSE'), 'the MPL-2.0 licence is vendored');
+    assert.ok(manifest.some(([, path]) => path === 'LICENSE'), 'the MPL-2.0 license is vendored');
   });
 
   it('is byte-identical to upstream at the pinned commit', () => {

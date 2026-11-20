@@ -15,7 +15,7 @@ TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) gr
 | `libs/language/` | `@typedblite/language` | Langium grammar, AST, language services |
 | `libs/runtime/` | `@typedblite/runtime` | interpreter, SQLite generator, change log |
 | `libs/content-revision/` | `@typedblite/content-revision` | revision identifiers |
-| `libs/conformance/` | `typedblite-conformance` | TypeDB behaviour spec vendored as Cucumber features |
+| `libs/conformance/` | `typedblite-conformance` | TypeDB behavior spec vendored as Cucumber features |
 | `libs/session/` | `@typedblite/session` | A session over the engine (transactions, restart) and the statement classifier, shared by the CLI and the engine host |
 | `libs/debugger/` | `@typedblite/debugger` (private) | The TypeQLite debug adapter (ADR-014): DAP over recordings of each statement, made by the engine host's `session.debug` in a `:memory:` session |
 | `apps/cli/` | `typedblite` | The CLI: REPL and file runner |
@@ -50,7 +50,7 @@ The repo is completely self-contained and self-referential:
 | ADR-002 | TypeQL engine as a port, SQLite as one adapter |
 | ADR-003 | Change log belongs to the engine; sync is a port; CouchDB wire protocol in scope |
 | ADR-004 | Execution diagnostics are returned reports, not emitted events |
-| ADR-005 | TypeDB's behaviour spec is TypeDBLite's conformance oracle |
+| ADR-005 | TypeDB's behavior spec is TypeDBLite's conformance oracle |
 | ADR-006 | An attribute is stored once per type and value |
 | ADR-007 | A scenario TypeDB itself fails is a deviation, and the oracle decides which |
 | ADR-008 | The TypeQLite editor is a Langium language server in this repository; nothing it knows reaches the runtime |

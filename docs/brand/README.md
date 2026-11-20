@@ -36,7 +36,7 @@ In a Markdown file on GitHub, pick the right logo for the reader's theme with `<
 </picture>
 ```
 
-## Colours
+## Colors
 
 | Name | Hex | Role |
 | ---- | --- | ---- |
@@ -46,12 +46,12 @@ In a Markdown file on GitHub, pick the right logo for the reader's theme with `<
 
 ## Typography
 
-The wordmark is set in [Nunito](https://fonts.google.com/specimen/Nunito) (SIL Open Font Licence):
+The wordmark is set in [Nunito](https://fonts.google.com/specimen/Nunito) (SIL Open Font License):
 "TypeDB" in SemiBold (600), "Lite" in Regular (400) and signal orange, tracked at −0.02em. In the
 logo files, text 64 units high sits beside a 112-unit mark with a 24-unit gap.
 
 Headings, on the website and the playground, are set in Nunito too. Body text is set in
-[Inter](https://fonts.google.com/specimen/Inter) (SIL Open Font Licence). It is a neutral sans that
+[Inter](https://fonts.google.com/specimen/Inter) (SIL Open Font License). It is a neutral sans that
 contrasts with Nunito's rounded forms and stays readable at small sizes. Both fonts are self-hosted
 (Fontsource), so no page asks a third party for them. Code stays in the reader's monospace font.
 
@@ -59,10 +59,10 @@ contrasts with Nunito's rounded forms and stays readable at small sizes. Both fo
 
 - Leave clear space around the logo at least as wide as one node of the mark.
 - Keep the logo at least 120 px wide. Below that, use the mark or the icon. The icon holds up at 16 px.
-- Use the files as they are: don't recolour, stretch, rotate or rearrange them, or add effects.
+- Use the files as they are: don't recolor, stretch, rotate or rearrange them, or add effects.
 - Don't use the logo in a way that suggests TypeDB Ltd made, sponsors or endorses TypeDBLite. It is
   an independent project (see the [README](../../README.md#special-thanks-to-typedb)). Its
-  colours and shapes are deliberately unlike TypeDB's own branding.
+  colors and shapes are deliberately unlike TypeDB's own branding.
 
 ## The mark's geometry
 

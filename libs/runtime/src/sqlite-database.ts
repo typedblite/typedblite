@@ -65,7 +65,7 @@ export interface SqliteStatement {
  * does not satisfy this interface; it would mean making the interpreter async throughout. A binding that is
  * synchronous inside a Web Worker does satisfy it.
  *
- * What a binding must honour beyond the types:
+ * What a binding must honor beyond the types:
  *
  * - **Bare named parameters.** `.all({ id })` and `.run({ keep })` bind `:id` and `:keep` — the object's keys carry no prefix. `node:sqlite` allows this by default; most WASM bindings need the keys prefixed (`{ ':id': id }`), so an adapter must translate.
  * - **Positional parameters** (`?`) as spread arguments.

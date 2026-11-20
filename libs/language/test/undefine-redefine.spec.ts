@@ -4,7 +4,7 @@ import { TypeQLiteValidationCode } from '../src/typeqlite-validation-codes.js';
 
 /**
  * The two schema stages Phase 04 of the conformance feature added, pinned both ways — what
- * parses, and what the behaviour spec calls a PARSING failure. `undefine` admits only its
+ * parses, and what the behavior spec calls a PARSING failure. `undefine` admits only its
  * targeted forms; `redefine` exactly one change. Whether an undefine names something defined,
  * or a redefine changes anything, is the interpreter's question, not this file's.
  */

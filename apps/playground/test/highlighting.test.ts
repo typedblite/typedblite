@@ -3,7 +3,7 @@ import { grammarKeywords, TypeQLiteGrammar } from '@typedblite/language';
 import { LANGUAGE_ID, MONARCH, SURFACE, themeRules, TOKEN } from '../src/highlighting';
 
 /**
- * The editor's base colouring comes from the same table as the VS Code grammar (`KEYWORD_SCOPES`), so these
+ * The editor's base coloring comes from the same table as the VS Code grammar (`KEYWORD_SCOPES`), so these
  * check the one thing that can go wrong in between: a keyword the grammar has that this tokenizer would miss.
  */
 const grammarWords = grammarKeywords(TypeQLiteGrammar()).filter((word) => /^[A-Za-z]/.test(word) && !word.startsWith('@'));
@@ -51,14 +51,14 @@ describe('the tokenizer knows every keyword of the grammar', () => {
 });
 
 describe('the themes', () => {
-  it.each(['light', 'dark'] as const)('%s: every rule has a six-digit hex colour, and no scope is coloured twice', (scheme) => {
+  it.each(['light', 'dark'] as const)('%s: every rule has a six-digit hex color, and no scope is colored twice', (scheme) => {
     const rules = themeRules(scheme);
     for (const rule of rules) expect(rule.foreground, rule.token).toMatch(/^[0-9A-F]{6}$/);
     const tokens = rules.map((rule) => rule.token);
     expect(new Set(tokens).size).toBe(tokens.length);
   });
 
-  it('colours the scopes the tokenizer emits, and the semantic types the server sends', () => {
+  it('colors the scopes the tokenizer emits, and the semantic types the server sends', () => {
     const tokens = themeRules('dark').map((rule) => rule.token);
     for (const emitted of Object.values(TOKEN)) {
       expect(tokens.some((token) => emitted === token || emitted.startsWith(`${token}.`)), emitted).toBe(true);
@@ -69,9 +69,9 @@ describe('the themes', () => {
   it.each([
     ['light', '0000FF'],
     ['dark', '569CD6'],
-  ] as const)("%s: colours an annotation as VS Code's themes colour the keyword scope the grammar gives it", (scheme, keyword) => {
+  ] as const)("%s: colors an annotation as VS Code's themes color the keyword scope the grammar gives it", (scheme, keyword) => {
     // `@key` is `keyword.annotations.typeqlite` in the TextMate grammar, so a VS Code theme gives it its `keyword`
-    // colour. The playground, the extension and the site must show the same.
+    // color. The playground, the extension and the site must show the same.
     const rule = themeRules(scheme).find((r) => r.token === 'keyword.annotations');
     expect(rule?.foreground).toBe(keyword);
   });

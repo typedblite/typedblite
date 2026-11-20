@@ -15,7 +15,7 @@ The first release. Nothing has been published to a marketplace yet.
 - Completion, rename, and quick fixes.
 - The TypeDBLite mark as the icon of `.typeqlite` and `.tql` files, in light and dark forms. VS Code uses it
   when your file icon theme has no icon of its own for TypeQLite.
-- Formatting, and semantic highlighting that colours a label by what it resolves to and keywords by kind.
+- Formatting, and semantic highlighting that colors a label by what it resolves to and keywords by kind.
 - **The TypeQLite debugger.** F5 on a `.tql` or `.typeqlite` file runs it in a fresh in-memory store, after any
   schema and seed files the launch names. Step through statements, stages, and a `match`'s steps in the order the engine
   runs them; see each step's rows, counts and dropped rows; break on a line, on a row-count condition, where TypeQLite
@@ -29,5 +29,5 @@ The first release. Nothing has been published to a marketplace yet.
   notebook is written back byte for byte.
 - **The engine host**, bundled and started as a process on first use, with a `node` it checks first (`typedblite.host.node`):
   needs Node 22.16 or newer. Other extensions reach it through the command `typedblite.host.request`.
-- TypeQLite code blocks coloured in your theme, in the Markdown preview and the Markdown editor. In a remote
+- TypeQLite code blocks colored in your theme, in the Markdown preview and the Markdown editor. In a remote
   window, the preview needs the optional TypeQLite Theme Bridge, installed in your local VS Code.

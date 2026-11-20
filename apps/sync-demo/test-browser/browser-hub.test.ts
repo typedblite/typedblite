@@ -560,7 +560,7 @@ describe('the theme', () => {
     }
   }, 60_000);
 
-  it('with no data-theme at all, the operating system’s colour scheme decides, standalone and embedded', async () => {
+  it('with no data-theme at all, the operating system’s color scheme decides, standalone and embedded', async () => {
     const context = await browser.newContext({ colorScheme: 'dark' });
     try {
       const { page } = await open(context);
@@ -575,13 +575,13 @@ describe('the theme', () => {
   }, 60_000);
 });
 
-describe('each device has its own colour', () => {
+describe('each device has its own color', () => {
   const LIGHT = { a: 'rgb(14, 116, 144)', b: 'rgb(190, 24, 93)', c: 'rgb(77, 124, 15)' } as const; // #0e7490 #be185d #4d7c0f
   const DARK = { a: 'rgb(34, 211, 238)', b: 'rgb(244, 114, 182)', c: 'rgb(163, 230, 53)' } as const; // #22d3ee #f472b6 #a3e635
   const ONLINE_LIGHT = 'rgb(18, 128, 92)'; // #12805c, the shipped page's "online"
-  const colour = (f: Frame | Page, selector: string, property = 'color'): Promise<string> =>
+  const color = (f: Frame | Page, selector: string, property = 'color'): Promise<string> =>
     f.locator(selector).first().evaluate((element, p) => getComputedStyle(element).getPropertyValue(p), property);
-  const hubChip = (page: Page, name: string): Promise<string> => colour(page, `#bh-tasks .bh-origin[data-origin="${name}"]`);
+  const hubChip = (page: Page, name: string): Promise<string> => color(page, `#bh-tasks .bh-origin[data-origin="${name}"]`);
 
   let context: BrowserContext;
   let page: Page;
@@ -594,31 +594,31 @@ describe('each device has its own colour', () => {
   }, 90_000);
   afterAll(() => context?.close());
 
-  it('colours each device’s card header and its name with its own colour, and no two alike', async () => {
+  it('colors each device’s card header and its name with its own color, and no two alike', async () => {
     const seen = new Set<string>();
     for (const name of NAMES) {
       const f = frame(page, name);
-      expect(await colour(f, '#device')).toBe(LIGHT[name]);
-      expect(await colour(f, 'header', 'border-top-color')).toBe(LIGHT[name]);
-      expect(await colour(f, 'header', 'border-top-width')).toBe('4px');
-      seen.add(await colour(f, '#device'));
+      expect(await color(f, '#device')).toBe(LIGHT[name]);
+      expect(await color(f, 'header', 'border-top-color')).toBe(LIGHT[name]);
+      expect(await color(f, 'header', 'border-top-width')).toBe('4px');
+      seen.add(await color(f, '#device'));
     }
     expect(seen.size).toBe(3);
   });
 
-  it('colours the chip on every task by the device that made it, on every device’s page, and still names it', async () => {
+  it('colors the chip on every task by the device that made it, on every device’s page, and still names it', async () => {
     for (const viewer of NAMES) {
       for (const maker of NAMES) {
         const chip = frame(page, viewer).locator(`li .origin[data-origin="${maker}"]`);
         expect(await chip.count(), `${viewer} shows ${maker}'s task`).toBe(1);
-        expect(await colour(frame(page, viewer), `li .origin[data-origin="${maker}"]`)).toBe(LIGHT[maker]);
-        expect(await colour(frame(page, viewer), `li .origin[data-origin="${maker}"]`, 'border-top-color')).toBe(LIGHT[maker]);
+        expect(await color(frame(page, viewer), `li .origin[data-origin="${maker}"]`)).toBe(LIGHT[maker]);
+        expect(await color(frame(page, viewer), `li .origin[data-origin="${maker}"]`, 'border-top-color')).toBe(LIGHT[maker]);
         expect(await chip.innerText()).toBe(`Device ${maker.toUpperCase()}`);
       }
     }
   });
 
-  it('colours the hub’s list the same way, and names the device beside the colour', async () => {
+  it('colors the hub’s list the same way, and names the device beside the color', async () => {
     for (const name of NAMES) {
       expect(await hubChip(page, name)).toBe(LIGHT[name]);
       expect(await page.locator(`#bh-tasks .bh-origin[data-origin="${name}"]`).innerText()).toBe(`Device ${name.toUpperCase()}`);
@@ -626,35 +626,35 @@ describe('each device has its own colour', () => {
     expect(await page.locator('#bh-tasks li').first().innerText()).toMatch(/^[○✓] Made on A — Device A$/);
   });
 
-  it('leaves the status colours to mean what they mean: online is the shipped green, whatever the device', async () => {
+  it('leaves the status colors to mean what they mean: online is the shipped green, whatever the device', async () => {
     for (const name of NAMES) {
-      expect(await colour(frame(page, name), '#status')).toBe(ONLINE_LIGHT);
-      expect(await colour(frame(page, name), '#status')).not.toBe(LIGHT[name]);
+      expect(await color(frame(page, name), '#status')).toBe(ONLINE_LIGHT);
+      expect(await color(frame(page, name), '#status')).not.toBe(LIGHT[name]);
     }
-    expect(await colour(page, '#bh-state')).not.toBe(LIGHT.a);
+    expect(await color(page, '#bh-state')).not.toBe(LIGHT.a);
   });
 
-  it('does not colour the hub’s own controls with a device’s colour', async () => {
+  it('does not color the hub’s own controls with a device’s color', async () => {
     const used = new Set(Object.values(LIGHT));
-    for (const selector of ['#bh-hub-title', '#bh-toggle', '#bh-count', '#bh-info']) expect(used.has(await colour(page, selector))).toBe(false);
+    for (const selector of ['#bh-hub-title', '#bh-toggle', '#bh-count', '#bh-info']) expect(used.has(await color(page, selector))).toBe(false);
   });
 
   it('follows the dark theme everywhere at once, and the light theme back', async () => {
     await page.evaluate(() => (document.documentElement.dataset['theme'] = 'dark'));
-    await until('every card, chip and hub entry is in its dark colour', async () => {
+    await until('every card, chip and hub entry is in its dark color', async () => {
       for (const name of NAMES) {
-        if ((await colour(frame(page, name), '#device')) !== DARK[name]) return false;
+        if ((await color(frame(page, name), '#device')) !== DARK[name]) return false;
         if ((await hubChip(page, name)) !== DARK[name]) return false;
-        for (const maker of NAMES) if ((await colour(frame(page, name), `li .origin[data-origin="${maker}"]`)) !== DARK[maker]) return false;
+        for (const maker of NAMES) if ((await color(frame(page, name), `li .origin[data-origin="${maker}"]`)) !== DARK[maker]) return false;
       }
       return true;
     });
     await page.evaluate(() => (document.documentElement.dataset['theme'] = 'light'));
-    await until('and back in the light ones', async () => (await Promise.all(NAMES.map((name) => colour(frame(page, name), '#device')))).every((c, i) => c === LIGHT[NAMES[i]!]));
+    await until('and back in the light ones', async () => (await Promise.all(NAMES.map((name) => color(frame(page, name), '#device')))).every((c, i) => c === LIGHT[NAMES[i]!]));
     expect(await hubChip(page, 'b')).toBe(LIGHT.b);
   });
 
-  /** Start recording, in a device page, every row that is given the fading highlight, and what colour it has at that moment. */
+  /** Start recording, in a device page, every row that is given the fading highlight, and what color it has at that moment. */
   const recordFlashes = (target: Frame): Promise<void> =>
     target.evaluate(() => {
       type Flash = { editor: string | undefined; title: string | null | undefined; background: string };
@@ -675,15 +675,15 @@ describe('each device has its own colour', () => {
     });
   const flashes = (target: Frame): Promise<Array<{ editor?: string; title?: string | null; background: string }>> =>
     target.evaluate(() => (window as unknown as { flashes: Array<{ editor?: string; title?: string | null; background: string }> }).flashes);
-  /** What `rule` computes to in this page, for comparing: a colour the page itself resolves, so it is the browser's own arithmetic. */
+  /** What `rule` computes to in this page, for comparing: a color the page itself resolves, so it is the browser's own arithmetic. */
   const resolved = (target: Frame, device: string): Promise<string> =>
     target.evaluate((name) => {
       const probe = document.createElement('div');
       probe.style.background = `color-mix(in srgb, var(--device-${name}) 28%, var(--card))`;
       document.body.append(probe);
-      const colour = getComputedStyle(probe).backgroundColor;
+      const color = getComputedStyle(probe).backgroundColor;
       probe.remove();
-      return colour;
+      return color;
     }, device);
   const YELLOW = 'rgb(255, 244, 194)'; // #fff4c2, the shipped page's highlight
 
@@ -691,7 +691,7 @@ describe('each device has its own colour', () => {
   const flashOf = async (target: Frame, title: string) => (await flashes(target)).find((f) => f.title === title);
   const flashedBy = (title: string, names: readonly string[]) => async (): Promise<boolean> => (await Promise.all(names.map((n) => flashOf(frame(page, n), title)))).every(Boolean);
 
-  it('the highlight takes the colour of the device that made the change: added on A, checked on B, unchecked on C', async () => {
+  it('the highlight takes the color of the device that made the change: added on A, checked on B, unchecked on C', async () => {
     for (const name of NAMES) await recordFlashes(frame(page, name));
     const check = async (title: string, editor: 'a' | 'b' | 'c', seenBy: Array<'a' | 'b' | 'c'>): Promise<void> => {
       await until(`${seenBy.join(' and ').toUpperCase()} flash "${title}"`, flashedBy(title, seenBy));
@@ -703,17 +703,17 @@ describe('each device has its own colour', () => {
       }
     };
 
-    // Task 1 is added on A: B and C show A's colour.
+    // Task 1 is added on A: B and C show A's color.
     await add(page, 'a', 'Task 1');
     await check('Task 1', 'a', ['b', 'c']);
 
-    // It is checked on B: A and C show B's colour, not A's, though A made the task.
+    // It is checked on B: A and C show B's color, not A's, though A made the task.
     for (const name of NAMES) await clearFlashes(frame(page, name));
     await frame(page, 'b').locator('li', { hasText: 'Task 1' }).locator('input').check();
     await check('Task 1', 'b', ['a', 'c']);
     expect((await flashOf(frame(page, 'a'), 'Task 1'))!.background).not.toBe(await resolved(frame(page, 'a'), 'a'));
 
-    // It is unchecked on C: A and B show C's colour, not A's.
+    // It is unchecked on C: A and B show C's color, not A's.
     for (const name of NAMES) await clearFlashes(frame(page, name));
     await frame(page, 'c').locator('li', { hasText: 'Task 1' }).locator('input').uncheck();
     await check('Task 1', 'c', ['a', 'b']);
@@ -727,7 +727,7 @@ describe('each device has its own colour', () => {
     }
   });
 
-  it('each of the three colours appears, and none is the old yellow, when the three devices each make a change', async () => {
+  it('each of the three colors appears, and none is the old yellow, when the three devices each make a change', async () => {
     for (const name of NAMES) await clearFlashes(frame(page, name));
     await add(page, 'b', 'Flash from B');
     await until('A and C flash it', flashedBy('Flash from B', ['a', 'c']));
@@ -738,7 +738,7 @@ describe('each device has its own colour', () => {
     for (const flash of seen) expect(flash.background).not.toBe(YELLOW);
   });
 
-  it('a change that arrives with others is shown in its own editor’s colour: two devices change two tasks in one sync', async () => {
+  it('a change that arrives with others is shown in its own editor’s color: two devices change two tasks in one sync', async () => {
     await add(page, 'a', 'Pair 1');
     await add(page, 'a', 'Pair 2');
     await until('B and C have both', async () => (await Promise.all(['b', 'c'].map((n) => titles(page, n)))).every((list) => list.includes('Pair 1') && list.includes('Pair 2')));
@@ -763,7 +763,7 @@ describe('each device has its own colour', () => {
     await until('A lists it', async () => (await titles(page, 'a')).includes('Mine, so no flash'));
     await until('everyone has it', everyDeviceHas(page, 'Mine, so no flash'));
     expect((await flashes(own)).filter((f) => f.title === 'Mine, so no flash')).toEqual([]);
-    // After the fade, every row is back on the card colour.
+    // After the fade, every row is back on the card color.
     await until('rows are back on the card', async () => own.evaluate(() => [...document.querySelectorAll<HTMLElement>('#tasks li')].every((li) => !li.classList.contains('flash'))));
     await new Promise((resolve) => setTimeout(resolve, 1_500));
     expect(await own.evaluate(() => [...document.querySelectorAll<HTMLElement>('#tasks li')].map((li) => getComputedStyle(li).backgroundColor))).toEqual(Array(await own.locator('#tasks li').count()).fill('rgba(0, 0, 0, 0)'));
@@ -771,7 +771,7 @@ describe('each device has its own colour', () => {
 
   it('keeps the chip on the card while its row is tinted, and the tint follows the dark theme', async () => {
     await page.evaluate(() => (document.documentElement.dataset['theme'] = 'dark'));
-    await until('B is dark', async () => (await colour(frame(page, 'b'), '#device')) === DARK.b);
+    await until('B is dark', async () => (await color(frame(page, 'b'), '#device')) === DARK.b);
     const seenBy = frame(page, 'a');
     await recordFlashes(seenBy);
     await add(page, 'b', 'Flash from B, in the dark');
@@ -784,29 +784,29 @@ describe('each device has its own colour', () => {
       const probe = document.createElement('div');
       probe.style.background = 'var(--card)';
       document.body.append(probe);
-      const colour = getComputedStyle(probe).backgroundColor;
+      const color = getComputedStyle(probe).backgroundColor;
       probe.remove();
-      return colour;
+      return color;
     });
     expect(chip).toBe(card);
     await page.evaluate(() => (document.documentElement.dataset['theme'] = 'light'));
-    await until('B is light again', async () => (await colour(frame(page, 'b'), '#device')) === LIGHT.b);
+    await until('B is light again', async () => (await color(frame(page, 'b'), '#device')) === LIGHT.b);
   });
 
-  it('a device that is cut off keeps its colour, and its status goes red on its own', async () => {
+  it('a device that is cut off keeps its color, and its status goes red on its own', async () => {
     await frame(page, 'b').click('#link');
     await until('B says it is offline', async () => /^Offline/.test(await status(page, 'b')));
-    expect(await colour(frame(page, 'b'), '#device')).toBe(LIGHT.b);
-    expect(await colour(frame(page, 'b'), '#status')).toBe('rgb(196, 50, 10)'); // #c4320a, "offline"
+    expect(await color(frame(page, 'b'), '#device')).toBe(LIGHT.b);
+    expect(await color(frame(page, 'b'), '#status')).toBe('rgb(196, 50, 10)'); // #c4320a, "offline"
     await frame(page, 'b').click('#link');
     await until('B is back', () => online(page, ['b']));
   });
 
-  it('with no data-theme, the operating system’s dark scheme gives the dark colours', async () => {
+  it('with no data-theme, the operating system’s dark scheme gives the dark colors', async () => {
     const dark = await browser.newContext({ colorScheme: 'dark' });
     try {
       const { page: darkPage } = await open(dark);
-      for (const name of NAMES) expect(await colour(frame(darkPage, name), '#device')).toBe(DARK[name]);
+      for (const name of NAMES) expect(await color(frame(darkPage, name), '#device')).toBe(DARK[name]);
     } finally {
       await dark.close();
     }
@@ -816,9 +816,9 @@ describe('each device has its own colour', () => {
     const solo = await context.newPage();
     try {
       await solo.goto(new URL('device.html?device=z&fresh', site.url).href);
-      // `#device` has no colour of its own for an unknown device, so it keeps the muted text colour and the header the accent.
-      expect(await colour(solo, 'header', 'border-top-color')).toBe('rgb(59, 91, 219)'); // #3b5bdb
-      expect(Object.values(LIGHT)).not.toContain(await colour(solo, '#device'));
+      // `#device` has no color of its own for an unknown device, so it keeps the muted text color and the header the accent.
+      expect(await color(solo, 'header', 'border-top-color')).toBe('rgb(59, 91, 219)'); // #3b5bdb
+      expect(Object.values(LIGHT)).not.toContain(await color(solo, '#device'));
     } finally {
       await solo.close();
     }

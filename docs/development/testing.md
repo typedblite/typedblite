@@ -49,7 +49,7 @@ against `test/fakes/vscode.ts`.
 | `typedblite-conformance` | `libs/conformance/test/*.test.ts` | The [report card](#the-conformance-report-card) has not regressed, plus the harness itself |
 | `typedblite` | `apps/cli/test/*.test.mts` | The CLI. `repl.test.mts` spawns the real binary and pipes input into it |
 | `typeqlite-vscode` | `apps/vscode/test/*.test.ts` | The manifest matches the language library, and the bundled language server answers over stdio |
-| `playground` | `apps/playground/test/`, `apps/playground/test-browser/` | The browser playground. The unit tests run `runProgram` on `node:sqlite`, the examples, share links, the runner's timeout, the static server's path-traversal guard, and the **language server over the real LSP** in Node. `test-browser` runs the page in Chromium: the engine in a worker, nothing requested from another origin, a program's text shown as text, and the Monaco editor driven by the language server. Names coloured by what they resolve to, squiggles, completion, hover and formatting each fail if the LSP client is switched off (keyword colours need no server, and are checked without one) |
+| `playground` | `apps/playground/test/`, `apps/playground/test-browser/` | The browser playground. The unit tests run `runProgram` on `node:sqlite`, the examples, share links, the runner's timeout, the static server's path-traversal guard, and the **language server over the real LSP** in Node. `test-browser` runs the page in Chromium: the engine in a worker, nothing requested from another origin, a program's text shown as text, and the Monaco editor driven by the language server. Names colored by what they resolve to, squiggles, completion, hover and formatting each fail if the LSP client is switched off (keyword colors need no server, and are checked without one) |
 | `sync-demo` | `apps/sync-demo/test/smoke.test.ts` | The sync demo's story with headless devices, a real hub process and the real switchboard: convergence after every network event. `test-browser` adds the PWA in Chromium, the Electron app, and the whole story headless |
 
 ## The clean-tree gate
@@ -74,7 +74,7 @@ Chromium, the e2e a display, and the clean room the npm registry, for the packag
 
 **GitHub Actions is off for now**, so this is the only check. It covers the one Node and OS you run it on;
 CI used to cover Node 22.16, 22 and 24 on Linux and Node 24 on Windows and macOS. For a change that touches
-paths, child processes, file handles or Node-version behaviour, try it on another if you can.
+paths, child processes, file handles or Node-version behavior, try it on another if you can.
 
 🔴 **Why clean.** `build` is `tsc -b`, which is incremental. A library whose sources did not change
 is not rebuilt, so the packages that depend on it are checked against stale type declarations, even
@@ -84,7 +84,7 @@ build you can trust.
 
 ## The conformance report card
 
-`libs/conformance` vendors [TypeDB's behaviour specification](https://github.com/typedb/typedb-behaviour)
+`libs/conformance` vendors [TypeDB's behavior specification](https://github.com/typedb/typedb-behaviour)
 (its `query/language` features, pinned in `spec/PIN`) and runs every scenario against the engine
 ([ADR-005](../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
 
@@ -166,8 +166,8 @@ runtime tests. The revision *hash* is pinned: `sha256.spec.ts` proves it identic
 
 ## Writing tests
 
-- **Put the test where the behaviour lives.** Grammar and validator rules go in `libs/language/test`,
-  engine behaviour in `libs/runtime/test`.
+- **Put the test where the behavior lives.** Grammar and validator rules go in `libs/language/test`,
+  engine behavior in `libs/runtime/test`.
 - **File names:** `*.spec.ts` in the language library, `*.test.ts` in the runtime, conformance and
   extension, and `*.test.mts` in the CLI.
 - **Assert on diagnostic codes, not messages.** Codes are stable API; messages are for people and
@@ -181,7 +181,7 @@ runtime tests. The revision *hash* is pinned: `sha256.spec.ts` proves it identic
   red. A test that cannot fail proves nothing.
 - **Differential tests** compare two implementations that must agree. For example,
   `relation-join-planning-differential.test.ts` runs the planned and unplanned engines and asserts
-  the same rows in the same order. Prefer this shape whenever you add an optimisation.
+  the same rows in the same order. Prefer this shape whenever you add an optimization.
 - **Count work, do not time it.** To guard performance, assert on `lastQueryTrace()` counts, as in
   `query-trace.test.ts`. Timings are flaky; counts are not. When the cost is a scan the trace does
   not count, assert on SQLite's own plan, as `full-text-key.test.ts` does with `EXPLAIN QUERY PLAN`.

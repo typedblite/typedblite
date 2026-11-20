@@ -38,7 +38,7 @@ import {
  * two identical role names ambiguous.
  *
  * ⚠️ A role may also be added by a RE-OPEN, such as `employment relates manager;`, a
- * `TypeExtensionDef` naming the relation with no kind keyword, which the behaviour spec writes
+ * `TypeExtensionDef` naming the relation with no kind keyword, which the behavior spec writes
  * (`undefine.feature`). Those `relates` live under the extension, not the `RelationDef`. Since
  * ADR-008 D3 they are gathered from the whole workspace, through the index, not only from the
  * relation's own document.

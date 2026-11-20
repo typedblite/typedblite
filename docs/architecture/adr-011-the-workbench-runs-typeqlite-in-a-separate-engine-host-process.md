@@ -29,7 +29,7 @@ Measured on 2026-11-19:
 | ---- | ----------- |
 | Two `node:sqlite` connections on one file, journal mode `delete`: while one has an open transaction, the other's write fails with `database is locked`, and its reads succeed and see committed rows only | SQLite can arbitrate two sessions on one file. Raw `node:sqlite` was tested, not `SqliteEngine`, which Phase 01 re-checks |
 | The VS Code remote server on this WSL install ships Node 24.22 with `node:sqlite` | A `node` the extension launches works. The desktop Electron's own Node was **not** verified |
-| `apps/cli/src/session.ts` has a location, `run`, a textual classifier and `splitStatements`; no transactions, facts, id or restart | The host's core generalises it |
+| `apps/cli/src/session.ts` has a location, `run`, a textual classifier and `splitStatements`; no transactions, facts, id or restart | The host's core generalizes it |
 | Nothing in the repository depends on `@nestjs/*` | The decision to add it is this ADR's |
 
 ## Decision

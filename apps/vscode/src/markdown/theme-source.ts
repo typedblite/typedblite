@@ -20,13 +20,13 @@ export interface ThemeSources {
  * The active theme's files, from wherever they can be read (ADR-010 D7).
  *
  * 🔴 **In a remote window, themes are not where this extension runs.** The Markdown preview's
- * plugins, and so this extension, run in the remote extension host (WSL, SSH, a container). Colour
+ * plugins, and so this extension, run in the remote extension host (WSL, SSH, a container). Color
  * themes, the built-in ones included, are UI extensions, in the local VS Code. An extension in the
  * remote host cannot see them: `vscode.extensions.all` lists only its own host's extensions. So this
  * looks here first and, failing that, asks the bridge, which runs where the themes are and reads the
  * same files with the same code.
  *
- * Undefined when neither can, with the reason logged: the preview then keeps its own colours.
+ * Undefined when neither can, with the reason logged: the preview then keeps its own colors.
  */
 export async function themeFiles(
   themeName: string,
@@ -42,7 +42,7 @@ export async function themeFiles(
     log(
       `${here.missing}. In a remote window (WSL, SSH, a container) themes live in the local VS Code, where ` +
         `this extension cannot read them. Install the TypeQLite Theme Bridge (${THEME_BRIDGE_ID}) there, and ` +
-        `the preview will use your theme's colours. (${(error as Error).message})`,
+        `the preview will use your theme's colors. (${(error as Error).message})`,
     );
     return undefined;
   }

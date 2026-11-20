@@ -40,7 +40,7 @@ import {
 /**
  * Resolved highlighting for TypeQLite.
  *
- * 🔴 **The point is what is NOT emitted.** A TextMate grammar is a regex over text: it colours
+ * 🔴 **The point is what is NOT emitted.** A TextMate grammar is a regex over text: it colors
  * `adr` and `adrr` identically, because it has no idea one names a type and the other names
  * nothing. The scope provider already knows. This turns that knowledge into the thing a reader
  * actually looks at.
@@ -140,7 +140,7 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
 
     // ── Queries ─────────────────────────────────────────────────────────────
     //
-    // Labels (`isa project`, `has name`, a role) are plain `ID`s, coloured by `labelTokens` above.
+    // Labels (`isa project`, `has name`, a role) are plain `ID`s, colored by `labelTokens` above.
     // What is left here is variables and literals.
     if (isHasProperty(node)) {
       if (node.valueVariable) {
@@ -189,10 +189,10 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
   /**
    * Labels that are plain `ID`s (ADR-008 D5): `isa project`, `has name`, a role, a re-open's label.
    *
-   * 🔴 The same rule as a cross-reference, once the workspace has a schema: a label is coloured only
+   * 🔴 The same rule as a cross-reference, once the workspace has a schema: a label is colored only
    * when it resolves, and by what it resolves to. A workspace with no schema cannot tell a known label
    * from a typo, because in TypeDB the schema lives in the database (ADR-008 D6). So there, and only
-   * there, a label is coloured by its position, as it was before labels could resolve.
+   * there, a label is colored by its position, as it was before labels could resolve.
    */
   private labelTokens(node: AstNode, acceptor: SemanticTokenAcceptor): void {
     const document = AstUtils.getDocument(node);
@@ -225,7 +225,7 @@ export class TypeQLiteSemanticTokenProvider extends AbstractSemanticTokenProvide
    * Emit a token for a cross-reference **only if it resolved**.
    *
    * 🔴 `ref` is `undefined` when linking failed. Emitting anyway is the bug this whole phase
-   * exists to prevent — it would colour a typo as a type and put the editor back where the
+   * exists to prevent — it would color a typo as a type and put the editor back where the
    * TextMate grammar left it.
    */
   private reference<N extends AstNode>(

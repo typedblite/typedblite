@@ -238,7 +238,7 @@ describe('annotation arguments', () => {
 
 describe('a value type is a value type, and only an attribute has one', () => {
   it.each(['bool', 'rgba'])('refuses `value %s` as unknown', async (name) => {
-    const found = await errors(`define attribute colour value ${name};`);
+    const found = await errors(`define attribute color value ${name};`);
     expect(found).toHaveLength(1);
     expect(found[0].code).toBe(TypeQLiteValidationCode.unknownValueType);
     expect(found[0].message).toContain('string, integer');

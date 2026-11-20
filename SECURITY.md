@@ -35,7 +35,7 @@ In scope: the packages published from this repository (`@typedblite/runtime`, `@
 spoke code.
 
 Out of scope: TypeDB itself, which is a separate product (report it to [TypeDB Ltd](https://typedb.com)),
-and the vendored behaviour specification under `libs/conformance/spec/`.
+and the vendored behavior specification under `libs/conformance/spec/`.
 
 TypeDBLite is an embedded engine. It trusts the schema and queries given to it, and the stores it opens.
 Run the replication hub only on a network you trust until its authentication is documented.
