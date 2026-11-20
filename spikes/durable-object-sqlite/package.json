@@ -1,0 +1,14 @@
+{
+  "name": "typedblite-spike-durable-object-sqlite",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Spike: TypeDBLite's interpreter on a Durable Object's synchronous SQLite storage.",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node check.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.162.0"
+  }
+}

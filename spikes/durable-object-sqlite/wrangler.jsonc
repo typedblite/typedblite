@@ -1,0 +1,11 @@
+// SPIKE: one TypeDBLite store per SQLite-backed Durable Object. `build.mjs` writes dist/worker.js.
+{
+  "name": "typedblite-spike-durable-object-sqlite",
+  "main": "dist/worker.js",
+  "no_bundle": true,
+  "compatibility_date": "2026-11-01",
+  "durable_objects": {
+    "bindings": [{ "name": "STORE", "class_name": "TypeDBLiteStore" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TypeDBLiteStore"] }]
+}
