@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { TypeDBLiteDatabase, type EmbeddedDatabase } from '../src/typedblite-database.js';
+import { rowString, TypeDBLiteDatabase, type EmbeddedDatabase } from '../src/typedblite-database.js';
 
 /**
  * `TypeDBLiteDatabase.transaction`: atomic against one store, serialized on one handle, and a refusal, never a
@@ -18,18 +18,17 @@ const labels = async (db: TypeDBLiteDatabase): Promise<string[]> => {
   const { rows } = await db.query(
     'match $x isa skill, has skill-id $l; select $l;',
   );
-  return rows
-    .map((row) => {
-      const value = row['l'] as { asString?: () => string } | string;
-      return typeof value === 'string'
-        ? value
-        : (value.asString?.() ?? String(value));
-    })
-    .sort();
+  return rows.map((row) => rowString(row, 'l') ?? '').sort();
 };
+
+const opened: TypeDBLiteDatabase[] = [];
+afterEach(async () => {
+  for (const db of opened.splice(0)) await db.close().catch(() => undefined);
+});
 
 const open = async () => {
   const db = await TypeDBLiteDatabase.open({ name: 'txn' });
+  opened.push(db);
   await db.define(schema);
   return db;
 };

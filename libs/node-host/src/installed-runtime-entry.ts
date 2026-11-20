@@ -24,9 +24,12 @@ export function installedRuntimeEntry(fromDirectory: string): string {
   try {
     return resolver.resolve('@typedblite/runtime');
   } catch (error) {
+    const reason = error instanceof Error ? error.message.split('\n')[0] : String(error);
+    // No trailing period: the loader quotes this message inside its own sentence.
     throw new Error(
-      `@typedblite/runtime is not installed where ${fromDirectory} can resolve it: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}. ` +
-        'It is a dependency of the package that holds this file; reinstall that package from a registry that has it.',
+      `@typedblite/runtime is not installed where ${fromDirectory} can resolve it: ${reason}. ` +
+        "It is a dependency of the package that holds this file; install that package's dependencies where it is " +
+        'installed',
     );
   }
 }

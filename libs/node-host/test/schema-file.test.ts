@@ -44,7 +44,9 @@ describe('readSchemaFile', () => {
     mkdirSync(join(root, 'module', 'lib'), { recursive: true });
     process.chdir(elsewhere);
     try {
-      expect(() => readSchemaFile(join(root, 'module', 'lib'), 'store.schema.typeqlite')).toThrow(/missing from the package/);
+      expect(() => readSchemaFile(join(root, 'module', 'lib'), 'store.schema.typeqlite')).toThrow(
+        /missing from the package/,
+      );
     } finally {
       process.chdir(cwd);
     }

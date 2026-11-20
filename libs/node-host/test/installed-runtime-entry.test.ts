@@ -14,7 +14,16 @@ describe('installedRuntimeEntry', () => {
   };
   // The package as typedblite ships it: ESM, with only a `default` condition in its exports map.
   const installRuntime = (at: string): void => {
-    put(`${at}/package.json`, JSON.stringify({ name: '@typedblite/runtime', version: '0.0.1', type: 'module', main: './out/index.js', exports: { '.': { types: './out/index.d.ts', default: './out/index.js' } } }));
+    put(
+      `${at}/package.json`,
+      JSON.stringify({
+        name: '@typedblite/runtime',
+        version: '0.0.1',
+        type: 'module',
+        main: './out/index.js',
+        exports: { '.': { types: './out/index.d.ts', default: './out/index.js' } },
+      }),
+    );
     put(`${at}/out/index.js`, 'export const SqliteEngine = class {};\n');
   };
 
@@ -42,7 +51,9 @@ describe('installedRuntimeEntry', () => {
   it('prefers the nearer copy', () => {
     installRuntime('prefix/node_modules/@typedblite/runtime');
     installRuntime('prefix/node_modules/@example/app/node_modules/@typedblite/runtime');
-    expect(installedRuntimeEntry(join(root, 'prefix/node_modules/@example/app'))).toContain('@example/app/node_modules/@typedblite/runtime');
+    expect(installedRuntimeEntry(join(root, 'prefix/node_modules/@example/app'))).toContain(
+      '@example/app/node_modules/@typedblite/runtime',
+    );
   });
 
   it('refuses when no copy is reachable, naming the directory it looked from', () => {

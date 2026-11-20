@@ -86,6 +86,7 @@ Or try it in a browser, with three examples to start from: `npm run playground`,
 | [`@typedblite/content-revision`](libs/content-revision/) | Canonical state encoding and CouchDB-style generation-digest revision identifiers (ADR-003). Shared by the runtime's change log and external content-versioning consumers. |
 | [`@typedblite/session`](libs/session/) | A TypeQLite session over the engine: one open store with transactions, a restart and a close, and the statement classifier the CLI and the engine host share. |
 | [`@typedblite/debugger`](libs/debugger/) (private) | The TypeQLite debug adapter (ADR-014): the Debug Adapter Protocol over recordings the engine host makes of each statement. The VS Code extension runs it inline. |
+| [`@typedblite/node-host`](libs/node-host/) (private) | The Node host adapter: the database handle an application's repositories are written against, with transactions on one handle, the schema's report on open, row readers and TypeQLite literals. A host consumes it through a `file:` dependency. |
 | [`typedblite-conformance`](libs/conformance/) | TypeDB's own behavior specification vendored as Cucumber features and run against TypeDBLite as a report card. The spec lives under `spec/`; `deviations.yaml` declares intentional gaps. |
 | [`typedblite`](apps/cli/) | Interactive REPL, file runner (`--file`), and one-shot executor (`--exec`) for TypeQLite statements. |
 | [`@typedblite/engine-host`](apps/engine-host/) (private) | The workbench's engine host: a NestJS CQRS app that runs statements in sessions, for the graph explorer, debugger and notebook (ADR-011). In progress: the core, and the CLI, REPL, sidecar, HTTP and MCP transports (HTTP loopback only, MCP read-only by default). |
@@ -204,7 +205,7 @@ npm exec nx -- run typedblite-runtime:build
 npm exec nx -- run typedblite-runtime:test
 ```
 
-Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-session`, `engine-host`, `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode`, `sync-demo` and `playground`. Set `CI=true` to collect coverage into `coverage/`. **`npm run gate`** runs the whole check, from a clean tree: build, type-check, the tests with the 80% coverage floor, and the WASM, browser and VS Code suites. GitHub Actions is off for now, so it is the check before a pull request. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
+Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-session`, `typedblite-node-host`, `engine-host`, `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode`, `sync-demo` and `playground`. Set `CI=true` to collect coverage into `coverage/`. **`npm run gate`** runs the whole check, from a clean tree: build, type-check, the tests with the 80% coverage floor, and the WASM, browser and VS Code suites. GitHub Actions is off for now, so it is the check before a pull request. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
 
 ## Test fixtures
 

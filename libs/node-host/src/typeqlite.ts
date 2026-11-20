@@ -5,10 +5,6 @@
 
 // The C0 control range and DEL, minus tab/newline/carriage-return which are escaped by name below. Written as code
 // points because the literal characters are invisible in a diff.
-//
-// `no-control-regex` exists to catch control characters that arrived in a pattern by accident. Matching them is the
-// entire purpose of this one, so the rule is disabled here and nowhere else.
-// eslint-disable-next-line no-control-regex
 const UNPRINTABLE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
 /**

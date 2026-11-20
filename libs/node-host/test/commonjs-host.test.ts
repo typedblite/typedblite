@@ -97,7 +97,10 @@ export async function resolve(specifier, context, next) {
   const body = `
 (async () => {
   const { openSchemaDatabase, requiredRowString } = LOAD;
-  const { database } = await openSchemaDatabase({ name: 'fb' }, 'define attribute code, value string; entity item, owns code @key;');
+  const { database } = await openSchemaDatabase(
+    { name: 'fb' },
+    'define attribute code, value string; entity item, owns code @key;',
+  );
   await database.execute('insert $i isa item, has code "via-fallback";');
   const { rows } = await database.query('match $i isa item, has code $c; select $c;');
   console.log(requiredRowString(rows[0], 'c'));

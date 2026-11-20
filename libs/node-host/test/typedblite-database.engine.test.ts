@@ -33,7 +33,7 @@ describe('TypeDBLiteDatabase in memory', () => {
   let db: TypeDBLiteDatabase;
 
   beforeEach(async () => {
-    db = await TypeDBLiteDatabase.open({ name: `mem-${Math.random().toString(36).slice(2)}` });
+    db = await TypeDBLiteDatabase.open({ name: 'mem' });
     await db.define(SCHEMA);
   });
 
@@ -53,7 +53,9 @@ describe('TypeDBLiteDatabase in memory', () => {
   it('🔴 refuses a duplicate @key — the reason this feature exists', async () => {
     await db.execute('insert $w isa widget, has widget-id "w1", has widget-label "first";');
     // Application code cannot make this guarantee under concurrency. The database can.
-    await assert.rejects(async () => db.execute('insert $w isa widget, has widget-id "w1", has widget-label "second";'));
+    await assert.rejects(async () =>
+      db.execute('insert $w isa widget, has widget-id "w1", has widget-label "second";'),
+    );
   });
 
   it('returns no rows rather than throwing when nothing matches', async () => {
@@ -65,7 +67,7 @@ describe('TypeDBLiteDatabase in memory', () => {
 describe('constraint-violation detection', () => {
   it('matches a real violation, scoped to the attribute', async () => {
     const db = await TypeDBLiteDatabase.open({
-      name: `cnt-${Math.random().toString(36).slice(2)}`,
+      name: 'cnt',
     });
     try {
       await db.define(SCHEMA);

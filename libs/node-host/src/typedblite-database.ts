@@ -1,4 +1,13 @@
-import type { ExecutionReport } from '@typedblite/runtime';
+import type {
+  ChangeStreamOptions,
+  ExecutionReport,
+  ReplicationEvents,
+  ReplicationOptions,
+  ReplicationSession,
+  TypeDBLiteOptions,
+  TypeDBLiteReplicator,
+  createChangeStreamHandler,
+} from '@typedblite/runtime';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -7,35 +16,31 @@ import { pathToFileURL } from 'node:url';
 import { installedRuntimeEntry } from './installed-runtime-entry.js';
 import { moduleDirectoryFrom } from './module-directory.js';
 
-/** The engine package's exports that a host reaches for at run time. */
+/**
+ * The engine package's exports that a host reaches for at run time.
+ *
+ * @privateRemarks
+ * 🔴 **Option bags and results are the runtime's own types; only the change log is `unknown`.** A host holds its
+ * change log as an opaque value (it gets it from its own store registry), so the log parameter stays `unknown`
+ * rather than forcing every caller to import and cast to the runtime's `ChangeLog`. Everything else is taken from
+ * the runtime, not redeclared, so a new option (such as `replicateOnce`'s `timeoutMs`) is visible here the day the
+ * runtime adds it. `runtime-type.test.ts` fails to compile if the real module stops satisfying this shape.
+ */
 export interface TypeDbLiteRuntime {
-  readonly SqliteEngine: new (location?: string) => EmbeddedDatabase;
+  readonly SqliteEngine: new (location?: string, options?: TypeDBLiteOptions) => EmbeddedDatabase;
   readonly TypeDBLiteReplicator: new (
     log: unknown,
     hubUrl: string,
     pushIntervalMs?: number,
     headers?: () => Record<string, string> | Promise<Record<string, string>>,
   ) => {
-    replicateOnce(options: {
-      readonly direction: 'push' | 'pull' | 'duplex';
-      readonly from?: { readonly pull?: number; readonly push?: number };
-    }): Promise<{
-      readonly cursor: { readonly pull?: number; readonly push?: number };
-      readonly applied: number;
-      readonly conflicts: number;
-    }>;
+    replicateOnce(options: ReplicationOptions): ReturnType<TypeDBLiteReplicator['replicateOnce']>;
+    replicateContinuously(options: ReplicationOptions, events?: ReplicationEvents): ReplicationSession;
   };
   readonly createChangeStreamHandler: (
     log: unknown,
-    options?: {
-      readonly pollMs?: number;
-      readonly limit?: number;
-      readonly path?: string;
-    },
-  ) => {
-    handle: (request: unknown, response: unknown) => void;
-    close: () => void;
-  };
+    options?: ChangeStreamOptions & { readonly path?: string },
+  ) => ReturnType<typeof createChangeStreamHandler>;
 }
 
 /**
@@ -304,19 +309,20 @@ export class TypeDBLiteDatabase {
 
   /**
    * Marks the async context of a running transaction's work, so a call back into this database from inside it is
-   * refused instead of waiting on the transaction it is part of (a deadlock). Compared by identity: a different
-   * `TypeDBLiteDatabase` is not inside this one's transaction.
+   * refused instead of waiting on the transaction it is part of (a deadlock). Each handle has its own storage, so a
+   * different `TypeDBLiteDatabase` never sees this one's mark: no identity comparison is needed.
    */
-  private readonly insideTransaction = new AsyncLocalStorage<{
-    readonly database: TypeDBLiteDatabase;
-    ended: boolean;
-  }>();
+  private readonly insideTransaction = new AsyncLocalStorage<{ ended: boolean }>();
 
   private constructor(
     private readonly database: EmbeddedDatabase,
     /** The database's name. */
     public readonly name: string,
-    /** False for an in-memory database, where a snapshot has nowhere to go. */
+    /**
+     * Whether a `storagePath` was given: false for an in-memory database, where a snapshot has nowhere to go. With an
+     * `engine` supplied it only repeats what the caller said, since this handle cannot see where that engine keeps its
+     * data.
+     */
     public readonly durable: boolean,
   ) {}
 
@@ -396,7 +402,7 @@ export class TypeDBLiteDatabase {
     this.openTransaction = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const token = { database: this, ended: false };
+    const token = { ended: false };
     const stillOpen = (): void => {
       // The handle outlives the callback if the work leaks it; using it later would write outside this transaction,
       // or inside the next one.
@@ -443,7 +449,7 @@ export class TypeDBLiteDatabase {
     const store = this.insideTransaction.getStore();
     // A callback that outlives its transaction still carries the store; once the transaction ended it is an
     // ordinary caller again.
-    if (store?.database === this && !store.ended) {
+    if (store && !store.ended) {
       throw new Error(
         `Called '${this.name}' from inside a transaction on it: ${what}. ` +
           'The database waits for its transaction to end, so this would never return.',
