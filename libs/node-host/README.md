@@ -52,9 +52,9 @@ await database.close();
   and no timeout is enforced.
 - **Diagnostics are returned.** `define` and `execute` answer `{ diagnostics }`, typed from the runtime's
   `ExecutionReport['diagnostics']`. A refusal is still a thrown error.
-- **A CommonJS host can `require` it.** It is ESM, and Node loads it from `require` (Node 22.16 and later, as `engines` says). The
-  engine is loaded with a dynamic `import()` when a database is first opened, from where this package is
-  installed. If a host's build has rewritten that `import()` into a `require`, it falls back to resolving the
+- **A CommonJS host can `require` it.** It is ESM, and Node loads it from `require` (Node 22.16 and later, as
+  `engines` says). The engine is loaded with a dynamic `import()` when a database is first opened, from where this
+  package is installed. If a host's build has rewritten that `import()` into a `require`, it falls back to resolving the
   installed runtime from this module's directory.
 - **Node only.** It uses `node:async_hooks` and `node:fs`. In a browser, use the runtime directly.
 

@@ -32,7 +32,7 @@ describe('moduleDirectoryFrom', () => {
     }
   });
 
-  it('says so when it has neither', () => {
-    expect(() => moduleDirectoryFrom(() => undefined, undefined)).toThrow(/neither a __dirname nor an import\.meta\.url/);
+  it('says so when it has neither, with no trailing period to double up in a combined message', () => {
+    expect(() => moduleDirectoryFrom(() => undefined, undefined)).toThrow(/neither a __dirname nor an import\.meta\.url$/);
   });
 });

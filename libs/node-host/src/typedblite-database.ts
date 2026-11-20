@@ -512,7 +512,9 @@ export async function openSchemaDatabase(options: OpenSchemaDatabaseOptions, sch
   // an engine made here would otherwise stay open until exit (for a file store, its connection and lock files), and
   // a host that retries would hold two. An engine the caller passed in is the caller's: closing it would break a
   // caller that keeps it and retries.
-  const ownsEngine = options.engine === undefined;
+  // Falsy, not `=== undefined`: `open` creates an engine for any falsy `engine` (a `null` from untyped JavaScript
+  // too), so ownership must follow the same test or that engine leaks.
+  const ownsEngine = !options.engine;
   try {
     const report = await database.define(schema);
     return { database, report };

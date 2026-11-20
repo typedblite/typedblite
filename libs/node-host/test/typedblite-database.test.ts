@@ -189,8 +189,25 @@ describe('openSchemaDatabase when the schema is refused', () => {
     expect(close).toHaveBeenCalledTimes(1);
   });
 
+  it('treats an engine given as null as absent, and closes the one it created', async () => {
+    const close = vi.spyOn(runtime.SqliteEngine.prototype, 'close');
+
+    await expect(
+      openSchemaDatabase({ name: 'bad', engine: null as unknown as undefined }, 'define this is not typeqlite;'),
+    ).rejects.toThrow();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   it('still reports the schema error when closing the engine it created fails too', async () => {
-    const close = vi.spyOn(runtime.SqliteEngine.prototype, 'close').mockRejectedValue(new Error('close failed'));
+    // Really close it, then report a failure: the engine is released, and only the error path is exercised.
+    const realClose = runtime.SqliteEngine.prototype.close;
+    const close = vi
+      .spyOn(runtime.SqliteEngine.prototype, 'close')
+      .mockImplementation(async function (this: InstanceType<typeof runtime.SqliteEngine>) {
+        await realClose.call(this);
+        throw new Error('close failed');
+      });
 
     const failure = await openSchemaDatabase({ name: 'bad' }, 'define this is not typeqlite;').catch(
       (error: unknown) => error,

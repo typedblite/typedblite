@@ -24,5 +24,5 @@ export function moduleDirectoryFrom(readDirname: () => unknown, moduleUrl: strin
   }
   if (typeof commonJsDirname === 'string' && commonJsDirname !== '') return commonJsDirname;
   if (typeof moduleUrl === 'string' && moduleUrl !== '') return dirname(fileURLToPath(moduleUrl));
-  throw new Error('Cannot tell where this module is installed: it has neither a __dirname nor an import.meta.url.');
+  throw new Error('Cannot tell where this module is installed: it has neither a __dirname nor an import.meta.url');
 }
