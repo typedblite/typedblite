@@ -230,7 +230,7 @@ describe('undefine', () => {
     });
   });
 
-  it('undefines a role specialisation only as it is defined — L631', () => {
+  it('undefines a role specialization only as it is defined — L631', () => {
     assert.match(refusal(() => engine.define('undefine as employee from employment relates employer;')).message, /there is no defined 'employment relates employer as employee'/);
   });
 });

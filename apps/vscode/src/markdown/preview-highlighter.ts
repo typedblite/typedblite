@@ -5,7 +5,7 @@ import { FENCE_LANGUAGES, fenceLanguage, type HighlightBlocksResult } from './pr
 export interface HighlighterHost {
   /** Ask the language server for the blocks' tokens. */
   request(blocks: readonly string[]): Promise<HighlightBlocksResult>;
-  /** The active theme's palette, or the preview's own colours when the theme cannot be read. */
+  /** The active theme's palette, or the preview's own colors when the theme cannot be read. */
   palette(): Promise<Palette>;
   /** Re-render open previews: called once tokens or a palette arrive that a render was missing. */
   refresh(): void;
@@ -15,13 +15,13 @@ export interface HighlighterHost {
 const CACHE_LIMIT = 64;
 
 /**
- * The TypeQLite code blocks of the Markdown preview, highlighted by the language server and coloured
+ * The TypeQLite code blocks of the Markdown preview, highlighted by the language server and colored
  * from the active theme (ADR-010).
  *
  * 🔴 **markdown-it renders synchronously, and the server answers asynchronously.** So a render that
  * finds no tokens for its blocks draws them plain, asks, and calls `refresh` when the answer lands.
  * The re-render then finds them. The same goes for the palette, which is read from the theme's files
- * once and again whenever the theme or a colour setting changes. A failed request is remembered as
+ * once and again whenever the theme or a color setting changes. A failed request is remembered as
  * failed, so the blocks stay plain instead of asking again on every render.
  */
 export class PreviewHighlighter {
@@ -47,7 +47,7 @@ export class PreviewHighlighter {
     return blocks.map((text, index) => paintBlock(text, result[index]!, palette));
   }
 
-  /** The theme or a colour setting changed: read the palette again and redraw what is open. */
+  /** The theme or a color setting changed: read the palette again and redraw what is open. */
   themeChanged(): void {
     this.palette = undefined;
     this.paletteLoading = undefined;

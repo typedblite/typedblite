@@ -148,7 +148,7 @@ import { createChangeStreamHandler } from '@typedblite/runtime';
 
 const changes = createChangeStreamHandler(hub.changeLog, { path: '/changes' });
 createServer((request, response) => {
-  if (!isAuthorised(request)) return void response.writeHead(401).end();
+  if (!isAuthorized(request)) return void response.writeHead(401).end();
   changes.handle(request, response);
 }).listen(4001);
 ```
@@ -169,7 +169,7 @@ const replicator = new TypeDBLiteReplicator(
 // Catch up once, giving up if the hub has not answered within 8 seconds…
 await replicator.replicateOnce({ direction: 'duplex', timeoutMs: 8_000 });
 
-// …or keep replicating until cancelled.
+// …or keep replicating until canceled.
 const session = replicator.replicateContinuously(
   { direction: 'duplex' },
   {

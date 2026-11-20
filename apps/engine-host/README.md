@@ -47,7 +47,7 @@ node apps/engine-host/out/main.js --mcp                                         
 | `--mcp` | An MCP server over stdio. **Reads only** unless `--mcp-write` is also given |
 | `--mcp-http` | The same over Streamable HTTP at `/mcp`, on loopback. `--port` (default 3471; 0 picks one), `--host` (loopback only: anything else exits 2 naming it) |
 | `--help` | The operations and what each takes |
-| an unrecognised flag first | Refused by name, exit 2. It never falls through into a mode, so a typo cannot start a server |
+| an unrecognized flag first | Refused by name, exit 2. It never falls through into a mode, so a typo cannot start a server |
 
 ### HTTP
 

@@ -65,7 +65,7 @@ describe('type patterns', () => {
     assert.deepEqual(labels(engine, 'match writer owns $x;'), ['name', 'ref']);
   });
 
-  it('plays reads the schema; a role type is labelled relation:role', () => {
+  it('plays reads the schema; a role type is labeled relation:role', () => {
     assert.deepEqual(labels(engine, 'match $x plays employment:employee;'), ['person', 'scifi-writer', 'writer']);
     assert.deepEqual(labels(engine, 'match person plays $x;'), ['employment:employee']);
   });

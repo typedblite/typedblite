@@ -35,7 +35,7 @@ No code, as planned.
 
 - `node:sqlite` in the **desktop Electron's Node**. Electron-as-Node is a fallback only until
   Phase 05 checks it.
-- The lock behaviour **through `SqliteEngine`**, which may set its own pragmas. Phase 01 checks it.
+- The lock behavior **through `SqliteEngine`**, which may set its own pragmas. Phase 01 checks it.
 
 ## Left open
 

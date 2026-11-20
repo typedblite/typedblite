@@ -143,7 +143,7 @@ installed into VS Code 1.146.0, 16 of 16 passing.
   which works around this without making the interpreter suspend.
 - **New grammar constructs.** See invariant 4.
 - **Marketplace publishing.** This involves a publisher id, the extension's display name next to
-  TypeDB's own TypeQL extension, and licence review. The `.vsix` is the deliverable here.
+  TypeDB's own TypeQL extension, and license review. The `.vsix` is the deliverable here.
 - **A browser (web-worker) build** for vscode.dev. Langium supports it and the services already run
   on `EmptyFileSystem`, but nothing has asked for it.
 - **Migrating the downstream extension.** This feature makes it *possible* for the downstream application's
@@ -154,7 +154,7 @@ installed into VS Code 1.146.0, 16 of 16 passing.
 
 **Language services are proven against a workspace, not a string.** Every new provider gets a
 spec in `libs/language/test/` that loads **several documents** into one workspace, using Langium's
-own test utilities (`langium/test`). Cross-file behaviour is the feature, so a single-document
+own test utilities (`langium/test`). Cross-file behavior is the feature, so a single-document
 spec proves nothing about it.
 
 **Editor claims are proven by running the editor.** A provider can pass every unit spec and still

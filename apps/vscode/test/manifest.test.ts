@@ -195,7 +195,7 @@ describe('the manifest agrees with langium-config.json', () => {
 
 /**
  * The TypeQLite Theme Bridge is a second extension, packaged from this project (ADR-010 D7). It runs
- * where VS Code keeps colour themes, and answers one command for the main extension.
+ * where VS Code keeps color themes, and answers one command for the main extension.
  */
 describe('the Theme Bridge manifest', () => {
   const bridge = read('theme-bridge/package.json');
@@ -213,7 +213,7 @@ describe('the Theme Bridge manifest', () => {
     expect(bridge.contributes).toBeUndefined();
   });
 
-  it('ships its bundle, its icon and its licence, and nothing of the main extension', () => {
+  it('ships its bundle, its icon and its license, and nothing of the main extension', () => {
     expect(existsSync(resolve(APP, 'theme-bridge', bridge.main))).toBe(true);
     expect(readFileSync(resolve(APP, 'theme-bridge', bridge.icon)).equals(readFileSync(resolve(APP, manifest.icon)))).toBe(true);
     expect(bridge.vsce).toEqual({ dependencies: false });
@@ -221,7 +221,7 @@ describe('the Theme Bridge manifest', () => {
     expect(readFileSync(resolve(APP, '.vscodeignore'), 'utf8').split('\n')).toContain('theme-bridge/**');
   });
 
-  it("shares the main extension's version, licence, publisher and engine", () => {
+  it("shares the main extension's version, license, publisher and engine", () => {
     for (const field of ['version', 'license', 'publisher', 'engines'] as const) {
       expect(bridge[field], field).toEqual(manifest[field]);
     }

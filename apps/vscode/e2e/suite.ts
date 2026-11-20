@@ -115,7 +115,7 @@ const cases: Record<string, () => Promise<void>> = {
     assert.deepEqual(again ?? [], [], 'formatting is idempotent');
   },
 
-  async 'semantic tokens colour a resolved reference and not an unresolved one'() {
+  async 'semantic tokens color a resolved reference and not an unresolved one'() {
     const document = await open('resolution.typeqlite');
     // Wait for the build: the tokens of an unbuilt document are not the ones under test.
     await diagnosticsOf(document.uri);
@@ -211,7 +211,7 @@ const cases: Record<string, () => Promise<void>> = {
       .map((c) => (typeof c === 'string' ? c : c.value))
       .join('\n');
     assert.match(text, /entity nav-person/);
-    assert.match(text, /Someone the organisation knows about\./);
+    assert.match(text, /Someone the organization knows about\./);
     assert.match(text, /A human being/);
   },
 
@@ -306,7 +306,7 @@ const cases: Record<string, () => Promise<void>> = {
     assert.equal(query.getText(), 'match\n$x isa ren-object;\n');
   },
 
-  async 'semantic tokens colour a resolved query label and not an unknown one'() {
+  async 'semantic tokens color a resolved query label and not an unknown one'() {
     const document = await open('labels.tql');
     await settledOn(document.uri, 1);
     const legend = await vscode.commands.executeCommand<vscode.SemanticTokensLegend>(
@@ -328,7 +328,7 @@ const cases: Record<string, () => Promise<void>> = {
       const text = document.getText(new vscode.Range(start, start.translate(0, tokens.data[i + 2]!)));
       byText.set(text, legend.tokenTypes[tokens.data[i + 3]!]!);
     }
-    // The workspace has a schema, so a label is coloured only when it resolves (ADR-008 D6).
+    // The workspace has a schema, so a label is colored only when it resolves (ADR-008 D6).
     assert.equal(byText.get('nav-person'), 'type');
     assert.equal(byText.get('nav-name'), 'property');
     assert.equal(byText.has('nav-persn'), false);
@@ -383,7 +383,7 @@ const cases: Record<string, () => Promise<void>> = {
     assert.ok(!prose.scopes.some((s) => s.endsWith('.typeqlite')), `prose 'entity' has ${prose.scopes.join(' ')}`);
   },
 
-  async 'the Markdown preview colours TypeQLite code blocks in the theme, and again when it changes (ADR-010)'() {
+  async 'the Markdown preview colors TypeQLite code blocks in the theme, and again when it changes (ADR-010)'() {
     const markdown = [
       '```typeql',
       'define',
@@ -396,7 +396,7 @@ const cases: Record<string, () => Promise<void>> = {
       '```',
       '',
     ].join('\n');
-    /** The query block's runs, as `text colour`, once the preview draws them in `expected`'s colour. */
+    /** The query block's runs, as `text color`, once the preview draws them in `expected`'s color. */
     const queryRuns = async (expected: string) => {
       const started = Date.now();
       let html = '';
@@ -406,14 +406,14 @@ const cases: Record<string, () => Promise<void>> = {
         const query = html.split('<code').at(-1)!;
         if (query.toLowerCase().includes(`color:${expected}`)) {
           return [...query.matchAll(/<span style="color:(#[0-9a-f]+)">([^<]*)<\/span>/gi)].map(
-            ([, colour, text]) => `${text} ${colour!.toLowerCase()}`,
+            ([, color, text]) => `${text} ${color!.toLowerCase()}`,
           );
         }
         await new Promise((done) => setTimeout(done, 200));
       }
       throw new Error(`The preview never drew the query in ${expected}:\n${html}`);
     };
-    // Each colour below was read from the theme's files, its includes followed, by hand.
+    // Each color below was read from the theme's files, its includes followed, by hand.
     // VS Code 1.146's default theme, Dark 2026 → Dark Modern → Dark+ → Dark (Visual Studio).
     assert.deepEqual(await queryRuns('#c586c0'), [
       'match #c586c0', // keyword.control: Dark+ (longer than Dark 2026's `keyword`)

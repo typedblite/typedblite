@@ -25,13 +25,13 @@ Files: `.typeqlite` and `.tql`.
   reference and every query label is renamed with it.
 - **Quick fixes.** Remove an annotation the position does not admit; keep either of two annotations
   that disagree; change an unknown label or an unresolved reference to the nearest defined name.
-- **Formatting and semantic highlighting.** A label is coloured by what it resolves to. Keywords are
-  coloured by kind (`define`, `entity`, `string` and `@key` each look different), with the same
-  scopes as TypeDB's TypeQL extension, so your theme colours TypeQLite as it colours TypeQL.
+- **Formatting and semantic highlighting.** A label is colored by what it resolves to. Keywords are
+  colored by kind (`define`, `entity`, `string` and `@key` each look different), with the same
+  scopes as TypeDB's TypeQL extension, so your theme colors TypeQLite as it colors TypeQL.
 - **TypeQLite in the Markdown editor.** Code fenced as `typeql`, `typeqlite` or `tql` is highlighted
   while you write the Markdown, not only in its preview.
 - **TypeQLite in the Markdown preview.** Code blocks fenced as `typeql`, `typeqlite` or `tql` are
-  highlighted as the editor would highlight them, in your colour theme, and again when it changes. The
+  highlighted as the editor would highlight them, in your color theme, and again when it changes. The
   blocks on one page are read together, so a schema in one block resolves the labels in the next.
 
 ## Unknown labels, and why they are only warnings
@@ -39,7 +39,7 @@ Files: `.typeqlite` and `.tql`.
 In TypeDB the schema lives in the database, not beside the query. So:
 
 - In a workspace that defines **no** types, a query's labels are never reported as unknown. They are
-  coloured by position.
+  colored by position.
 - In a workspace that defines **some**, a label it does not define is a warning
   (`typedblite.unknown-label`), never an error, because the database may still know it.
 
@@ -53,11 +53,11 @@ The engine never sees this warning. It is produced by the editor alone.
 - **Running statements has no UI here yet.** The extension carries the engine host and starts it for features built
   on it (see [The engine host](#the-engine-host)); the graph explorer, debugger and notebook are those features.
 - **The Markdown preview reads your theme's files**, because VS Code offers no other way to get a
-  theme's token colours. In a remote window (WSL, SSH, a container) the themes stay in your local
+  theme's token colors. In a remote window (WSL, SSH, a container) the themes stay in your local
   VS Code, out of this extension's reach. Install the **TypeQLite Theme Bridge** there too (below),
-  or the preview shows TypeQLite in its own colours. A theme whose colours are in a `.tmTheme` file gets the preview's own
-  colours instead. On GitHub, TypeQLite code blocks are plain: GitHub has no TypeQL grammar, and allows
-  no colours of a page's own.
+  or the preview shows TypeQLite in its own colors. A theme whose colors are in a `.tmTheme` file gets the preview's own
+  colors instead. On GitHub, TypeQLite code blocks are plain: GitHub has no TypeQL grammar, and allows
+  no colors of a page's own.
 
 ## Notebooks
 
@@ -208,4 +208,4 @@ The architecture is ADR-008 in this repository, and ADR-010 for the Markdown pre
 ## License
 
 [Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/). The packaged extension includes the
-licence text.
+license text.

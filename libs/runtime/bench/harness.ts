@@ -39,7 +39,7 @@ export interface Results {
 }
 
 export const results: Results = {
-  label: process.env['BENCH_LABEL'] ?? 'unlabelled',
+  label: process.env['BENCH_LABEL'] ?? 'unlabeled',
   commit: gitCommit(),
   date: new Date().toISOString(),
   machine: `${platform()} ${release()}, ${cpus()[0]?.model ?? 'unknown CPU'} ×${cpus().length}, Node ${process.version}`,

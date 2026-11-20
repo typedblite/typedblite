@@ -37,7 +37,7 @@ describe('schema names resolve', () => {
 
   it('accepts `plays` naming a role a RE-OPEN added to the relation', async () => {
     // Round 1 of the Phase 01 review: the scope for a role was the `relates` traits under the
-    // RelationDef alone, so `employment relates manager;` (a TypeExtensionDef — the behaviour
+    // RelationDef alone, so `employment relates manager;` (a TypeExtensionDef — the behavior
     // spec's `undefine.feature` writes it) left a later `plays employment:manager` unresolved in
     // the editor while the runtime accepted it.
     const diagnostics = await validate(

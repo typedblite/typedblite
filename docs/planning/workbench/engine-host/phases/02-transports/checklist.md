@@ -28,7 +28,7 @@ sidecar, with a spec that a transport cannot drift from the core.
 - [x] Every operation declares an input schema that agrees with its `validate` (`assertInputSchemaAgreesWithValidate`)
 - [x] **Parity:** the same flow through the CLI, the sidecar and the REPL gives the same data, status and error codes
 - [x] A mutation (the REPL running a different statement) fails the parity spec
-- [x] An unrecognised mode flag exits 2 and names the flag, in the built process; `-x` the same; no arguments
+- [x] An unrecognized mode flag exits 2 and names the flag, in the built process; `-x` the same; no arguments
       starts nothing
 - [x] One operation as a process: exit codes 0, 2 and 5, and a typo'd operation is an error envelope
 - [x] The sidecar through `SidecarClient`, the client the editor will use: a session across requests, in order

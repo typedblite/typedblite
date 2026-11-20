@@ -7,7 +7,7 @@ extends: [adr-002, adr-003]
 operationalised-by: [typedblite-conformance-standard]
 ---
 
-# ADR-005: TypeDB's behaviour specification is TypeDBLite's conformance oracle
+# ADR-005: TypeDB's behavior specification is TypeDBLite's conformance oracle
 
 - **Status:** Accepted — by the founder (Dave Jackson), 2026-09-11, with Phases 00–03 of the conformance
   feature closed and the card at 416 of 1,756
@@ -61,7 +61,7 @@ in, and what rule makes its number binding.
 ### 1. `typedb-behaviour` is the oracle for TypeQL semantics, and it is vendored at a pinned commit
 
 The feature files are copied into this repository under the TypeDBLite conformance project, **with
-their MPL-2.0 headers intact and the licence file alongside**, from one recorded commit of
+their MPL-2.0 headers intact and the license file alongside**, from one recorded commit of
 `typedb/typedb-behaviour`. A `PIN` file records the commit, the date, and the TypeDB server version
 the survey was made against. The pin moves only by a deliberate commit that re-baselines
 (Decision 4).
@@ -142,13 +142,13 @@ requires of CouchDB compatibility. A claim without a cited run is prose.
 
 - **The corpus is TypeDB 3.x's.** TypeDBLite implements the 3.x language (ADR-002), so that is the
   right target, but every pin move may change scenarios under us; re-baselining is real work.
-- **Licence obligation.** MPL-2.0 files are file-scoped copyleft: they stay under MPL with headers
+- **License obligation.** MPL-2.0 files are file-scoped copyleft: they stay under MPL with headers
   intact, and modifications to *those files* are MPL. Our step definitions are ours. The vendored
-  directory carries the licence and says so.
+  directory carries the license and says so.
 - **The differential oracle against a live TypeDB is still owed for *our* schemas.** The
   specification covers the language. A live-server differential oracle covers the schemas we write.
   That is a separate, smaller piece of work, sequenced after this.
-- **`not-applicable` is a judgement, and judgements drift.** Decision 3's rule that the four counts
+- **`not-applicable` is a judgment, and judgments drift.** Decision 3's rule that the four counts
   sum to the total is what keeps a scenario from quietly moving from fail to not-applicable; the
   standard says how the classification is declared.
 

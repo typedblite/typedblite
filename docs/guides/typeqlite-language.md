@@ -1,8 +1,8 @@
 # The TypeQLite language
 
 TypeQLite is the dialect of [TypeQL 3.x](https://typedb.com/docs/typeql) that TypeDBLite runs. If you
-know TypeQL, you already know TypeQLite: the syntax is TypeQL's, and the behaviour is measured
-against TypeDB's own behaviour specification. On that specification, TypeDBLite passes **1,742 of
+know TypeQL, you already know TypeQLite: the syntax is TypeQL's, and the behavior is measured
+against TypeDB's own behavior specification. On that specification, TypeDBLite passes **1,742 of
 1,756 scenarios** ([CONFORMANCE.md](../../CONFORMANCE.md)).
 
 This guide is a tour of what you can write, with examples that run as shown. For the full detail of
@@ -59,7 +59,7 @@ define
 **Value types:** `string`, `integer`, `long`, `double`, `decimal`, `boolean`, `date`, `datetime`,
 `datetime-tz`, `duration`.
 
-**Subtyping.** Any type can specialise another with `sub`. A subtype inherits what its parent owns
+**Subtyping.** Any type can specialize another with `sub`. A subtype inherits what its parent owns
 and plays, and `isa person` also matches an `employee-person`:
 
 ```typeql
@@ -70,7 +70,7 @@ define
   relation contract sub employment, relates contractor as employee;
 ```
 
-`relates contractor as employee` specialises an inherited role: in a `contract`, the employee role
+`relates contractor as employee` specializes an inherited role: in a `contract`, the employee role
 is called `contractor`, and a type must declare `plays contract:contractor` to fill it.
 
 **Structs** declare a named group of values: `struct address: street value string, city value string;`.
@@ -91,13 +91,13 @@ define
 
 What each one does in TypeDBLite, as measured:
 
-| Annotation | Behaviour |
+| Annotation | Behavior |
 | ---------- | --------- |
 | `@key` | **Enforced.** A value identifies at most one owner, and every owner must hold exactly one key value by commit. A keyed entity is also what [replication](replication-and-search.md) identifies across stores |
 | `@unique` | **Enforced.** At most one owner per value, among the declaring type and its subtypes |
 | `@abstract` | **Enforced.** The type cannot have instances of its own; insert a concrete subtype |
 | `@regex("…")` | **Enforced** on every write. The whole value must match |
-| `@independent` | **Honoured.** The attribute is kept when its last owner lets go of it. Other attributes are removed |
+| `@independent` | **Honored.** The attribute is kept when its last owner lets go of it. Other attributes are removed |
 | `@doc("…")` | **Retained.** Read it back with `get_doc(person)` |
 | `@card(min..max)` | **Partly.** It decides whether `fetch` returns a value or a list, and whether `update` may replace one. Bounds other than a key's are **not** enforced on writes |
 | `@range(…)`, `@values(…)` | Their arguments are checked against the value type at `define`. **Not** enforced on writes |
@@ -331,7 +331,7 @@ skipped:
 - **Several reads in one `query()` call.** Run each separately.
 - **Enforcing `@card`, `@range`, `@values`, `@distinct` and `@cascade` on writes.** See
   [Annotations](#annotations).
-- **Rules and inference.** TypeDB 3 removed them in favour of functions, and TypeDBLite follows.
+- **Rules and inference.** TypeDB 3 removed them in favor of functions, and TypeDBLite follows.
 
 For the scenario-level detail of every difference, with the reason each one exists, see
 [CONFORMANCE.md](../../CONFORMANCE.md).

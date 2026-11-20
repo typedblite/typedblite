@@ -17,7 +17,7 @@ The editor is [Monaco](https://microsoft.github.io/monaco-editor/), with the **r
 behind it over LSP, in a worker. It is the server the VS Code extension runs, so you get what the extension gives:
 errors underlined as you type, completion (<kbd>Ctrl</kbd> + <kbd>Space</kbd>), hover, go to definition
 (<kbd>F12</kbd>) and references, rename (<kbd>F2</kbd>), quick fixes, an outline, folding, formatting
-(<kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>F</kbd>), and names coloured by what they resolve to.
+(<kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>F</kbd>), and names colored by what they resolve to.
 
 A program is a list of statements. The page splits it with the language library's own parser, so a `define`
 block with many definitions is one statement. **A statement that follows a write or a query ends with `end;`.**
@@ -41,8 +41,8 @@ says so in its footer.
 | `src/editor.ts` | The Monaco editor, and Monaco's own LSP client pointed at the language worker |
 | `src/language-server.ts` | `serve(connection)`: `startLanguageServer` over `createTypeQLiteServices`, the extension's server |
 | `src/language-worker.ts` | That server in a worker, over `vscode-languageserver/browser` |
-| `src/highlighting.ts` | The base colouring a tokenizer can do from text (keywords, strings, comments), built from the language package's `KEYWORD_SCOPES`, and the light and dark themes |
-| `src/main.ts`, `src/app.html`, `src/app.css`, `src/index.html` | The page. `app.html` is the markup and `app.css` the styles (scoped to `.pg`, colours from `--pg-*` custom properties): `index.html` is the standalone page around them, and the website's `/playground/` is a Starlight page around the same two files. `scheme.ts` follows the host page's `data-theme`. Everything drawn from a program's output goes in through `textContent` |
+| `src/highlighting.ts` | The base coloring a tokenizer can do from text (keywords, strings, comments), built from the language package's `KEYWORD_SCOPES`, and the light and dark themes |
+| `src/main.ts`, `src/app.html`, `src/app.css`, `src/index.html` | The page. `app.html` is the markup and `app.css` the styles (scoped to `.pg`, colors from `--pg-*` custom properties): `index.html` is the standalone page around them, and the website's `/playground/` is a Starlight page around the same two files. `scheme.ts` follows the host page's `data-theme`. Everything drawn from a program's output goes in through `textContent` |
 | `src/examples.ts` | Three examples, each run by a test |
 | `build.mjs` | esbuild bundles the page and worker into `.build/`, with `sqlite3.wasm`. Every URL is relative |
 
@@ -87,7 +87,7 @@ The browser test needs Playwright's Chromium (`npx playwright-core install chrom
 runs in a worker, that nothing is requested from another origin, that a program's text is shown as text and never
 becomes an element (and that breaking this fails the test), that a shared link reproduces a program, and that the
 page fits a phone. It also drives the editor: the language server is spoken to over LSP (the page's messages to its
-worker are recorded and checked), names are coloured by what the server resolved them to, errors are underlined and
+worker are recorded and checked), names are colored by what the server resolved them to, errors are underlined and
 clear when fixed, and completion, hover and formatting work. Each of those fails if the language client is switched
 off. `test/language-server.test.ts` runs the server alone over the real protocol in Node.
 

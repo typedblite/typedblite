@@ -179,7 +179,7 @@ or the emulator's reversed port. The demo needs no account, no cloud service and
 - **The downstream application's own data**: its schema, its API, its token flow and its UI. The demo has its own task
   schema and talks only to its own hub.
 - **Authentication between spoke and hub**, beyond showing the replicator's `headers` hook with a
-  static demo token. Per-record authorisation is ADR-003's open question, not this feature's.
+  static demo token. Per-record authorization is ADR-003's open question, not this feature's.
 - **Production hosting** of the hub or the clients.
 - **iOS.** Capacitor supports it, but it needs macOS to build.
 - **Moving the spike's browser harness wholesale.** Only what the promoted binding's tests need is
@@ -195,7 +195,7 @@ These are for the founder.
    (so "the hub goes down" can kill a real process, as `docker stop` did)?
 3. **Dependency versions:** `@sqlite.org/sqlite-wasm`, `playwright-core`, `electron` and the
    Capacitor packages. The original pinned Electron 38.2.0 and Capacitor ^7.4.3. Phase 00 confirms
-   the current versions, and the licence of each.
+   the current versions, and the license of each.
 4. **Android in the default run:** on by default when an emulator is reachable (as the original
    was), or opt-in?
 
@@ -215,7 +215,7 @@ because every store holds the same tasks, which is what the original's driver ch
 
 | # | Phase | Status | Summary |
 | - | ----- | ------ | ------- |
-| 00 | [Scope, the survey of the original, ADR-009, versions and licences](phases/00-scope-and-adr/summary.md) | Complete | [summary](phases/00-scope-and-adr/summary.md) |
+| 00 | [Scope, the survey of the original, ADR-009, versions and licenses](phases/00-scope-and-adr/summary.md) | Complete | [summary](phases/00-scope-and-adr/summary.md) |
 | 01 | [The runtime in a browser: a browser-safe entry, synchronous SHA-256, `Object.groupBy`](phases/01-runtime-in-browser/summary.md) | Complete | [summary](phases/01-runtime-in-browser/summary.md) |
 | 02 | [The WASM binding, promoted: the export, the peer dependency, tests in Node and Chromium](phases/02-wasm-binding/summary.md) | Complete | [summary](phases/02-wasm-binding/summary.md) |
 | 03 | [Replication that fails honestly: 5xx and timeouts, and a warning on a reopened store](phases/03-honest-replication/summary.md) | Complete | [summary](phases/03-honest-replication/summary.md) |

@@ -1,6 +1,6 @@
 /**
  * What a hub refuses, and how. Each case was first measured against a live hub as unprotected
- * behaviour (the replication guide's Security section): a stranger's POST was applied, any content
+ * behavior (the replication guide's Security section): a stranger's POST was applied, any content
  * type was accepted, a 64 MB body was read and applied, streams were unlimited, a batch applied half,
  * and a 400 echoed internal error text.
  *

@@ -61,7 +61,7 @@ describe('what the server offers the editor', () => {
     expect(capabilities[capability]).toBeTruthy();
   });
 
-  it('describes its semantic tokens, so the editor can colour them', () => {
+  it('describes its semantic tokens, so the editor can color them', () => {
     const legend = capabilities['semanticTokensProvider'].legend;
     expect(legend.tokenTypes).toEqual(expect.arrayContaining(['type', 'property', 'variable']));
     expect(capabilities['semanticTokensProvider'].full).toBeTruthy();

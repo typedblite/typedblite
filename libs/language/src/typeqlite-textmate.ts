@@ -1,19 +1,19 @@
 import { AstUtils, GrammarAST, GrammarUtils, stream, type Grammar } from 'langium';
 
 /**
- * The TextMate scope of each keyword of TypeQLite, by scope: what an editor colours before, and underneath, the semantic
+ * The TextMate scope of each keyword of TypeQLite, by scope: what an editor colors before, and underneath, the semantic
  * tokens.
  *
  * A keyword the grammar gains is refused until it has a scope here, and a keyword the grammar loses
- * is refused until it leaves. So the grammar and its colouring cannot drift apart. Annotations are
+ * is refused until it leaves. So the grammar and its coloring cannot drift apart. Annotations are
  * scoped by their shape (`@` first), so a new one needs no entry.
  *
  * @privateRemarks
  * 🔴 **The keywords come from the Langium grammar; only their scopes are written here.** Langium's
  * own generator gives every keyword one scope, `keyword.control`, so a theme draws `define`,
  * `entity`, `string` and `@key` alike. TypeDB's TypeQL extension scopes them by what they are, and
- * themes colour them apart. This uses the same scopes, so that any theme colours TypeQLite as it
- * colours TypeQL (ADR-008 D8, row 3, amended 2026-11-13).
+ * themes color them apart. This uses the same scopes, so that any theme colors TypeQLite as it
+ * colors TypeQL (ADR-008 D8, row 3, amended 2026-11-13).
  *
  * @category Highlighting
  */
@@ -36,7 +36,7 @@ export const KEYWORD_SCOPES: Readonly<Record<string, readonly string[]>> = {
   'keyword.operator.words': ['contains', 'is', 'like', 'not', 'or', 'try'],
   'constant.language': ['false', 'true'],
   'keyword.operator': ['!=', '%', '*', '+', '-', '->', '..', '/', '<', '<=', '=', '==', '>', '>=', '?', '^'],
-  // Punctuation, which no scope colours.
+  // Punctuation, which no scope colors.
   '': ['(', ')', ',', '.', ':', '::', ';', '[', ']', '{', '}'],
 };
 
@@ -91,7 +91,7 @@ export function grammarKeywords(grammar: Grammar): string[] {
  *
  * @privateRemarks
  * 🔴 **A name's characters bound every word match, not `\b`.** `-` is part of a TypeQLite name
- * (`project-id`, `$start-date`), so `\b` would colour the `value` in a label `value-type` and the `-`
+ * (`project-id`, `$start-date`), so `\b` would color the `value` in a label `value-type` and the `-`
  * in `project-id` as an operator. Each word match is fenced by lookarounds on `[\w-]`, and on `$`, `@`
  * and `.` before it, so a variable or a `$p.value` path is never read as a keyword. The regexes have
  * to run in both Oniguruma (VS Code) and JavaScript (the preview's tokenizer), so they keep to

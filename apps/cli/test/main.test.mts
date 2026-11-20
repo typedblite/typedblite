@@ -8,7 +8,7 @@ import { main } from '../src/main';
 /**
  * The CLI's argument handling, in process.
  *
- * 🔴 **`--help` exits 0 and no arguments exits 0, but an *unrecognised* invocation exits 1.** That
+ * 🔴 **`--help` exits 0 and no arguments exits 0, but an *unrecognized* invocation exits 1.** That
  * asymmetry is the contract for anything scripted: printing help because the user asked is success,
  * printing it because nothing matched is not, and collapsing the two makes a typo look like a
  * working command.
@@ -23,7 +23,7 @@ describe('typedblite main', () => {
     expect(await main([])).toBe(0);
   });
 
-  it('exits 1 for an invocation it does not recognise', async () => {
+  it('exits 1 for an invocation it does not recognize', async () => {
     expect(await main(['--wat'])).toBe(1);
   });
 

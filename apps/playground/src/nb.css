@@ -1,7 +1,7 @@
 /*
  * The browser notebook's own styles, shared by the two pages that host it: the standalone page (try.html, which defines the
- * colours below) and the website's (apps/website/src/pages/try.astro, which maps them onto Starlight's). Everything is scoped
- * to `.nb`, so it cannot reach the page around it, and it reads colours only from the playground's custom properties:
+ * colors below) and the website's (apps/website/src/pages/try.astro, which maps them onto Starlight's). Everything is scoped
+ * to `.nb`, so it cannot reach the page around it, and it reads colors only from the playground's custom properties:
  *
  *   --pg-ink --pg-muted --pg-line --pg-panel --pg-code --pg-accent --pg-accent-ink --pg-error --pg-error-bg
  */

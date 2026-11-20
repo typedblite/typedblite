@@ -38,7 +38,7 @@ engines disagree. The full run on 2026-11-12 found:
 - 12 fail on TypeDB, listed here.
 
 A further 245 failed on TypeDB but passed here. Almost all of those are things the harness cannot do
-over HTTP, such as given rows, or value spellings the adapter does not normalise. They are not evidence
+over HTTP, such as given rows, or value spellings the adapter does not normalize. They are not evidence
 about either engine.
 
 | Scenario | Where TypeDB 3.10.4 fails | Why |

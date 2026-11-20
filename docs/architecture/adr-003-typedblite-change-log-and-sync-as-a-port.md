@@ -20,7 +20,7 @@
 > It was accepted after two review rounds closed fifteen findings — nine from a review of the whole
 > feature run before the merge decision, and six from a re-review of those fixes, four of which the
 > fixes had themselves introduced. 🔴 **None of the fifteen argued this decision was wrong**; every
-> one was a place the implementation did not yet honour it, which is why acceptance waited for them
+> one was a place the implementation did not yet honor it, which is why acceptance waited for them
 > to close rather than being reconsidered.
 >
 > 🔴 **One consequence was found while closing them and is recorded in Consequences below**: a
@@ -114,7 +114,7 @@ message, because each changes what the decisions above mean.
     carries `CHECK (kind IN ('type', 'attribute'))` and SQLite cannot alter a CHECK in place.
 
 11. **`PRAGMA busy_timeout` is required for a multi-process store.** Decision 2 relies on SQLite
-    serialising writers, which is true — but `node:sqlite` sets no busy timeout, so a process
+    serializing writers, which is true — but `node:sqlite` sets no busy timeout, so a process
     blocked on the write lock **fails immediately with SQLITE_BUSY rather than waiting**. A hub and
     its spokes are a multi-process design by definition, so this would otherwise have surfaced as
     intermittent failures under load. The interpreter now sets it (5 s, configurable).
@@ -144,7 +144,7 @@ message, because each changes what the decisions above mean.
     ground rather than a seam.
 
     🔴 **The semantics are untouched, and the test count is the evidence.** This file warns that
-    CouchDB's revision-tree behaviour is kept deliberately, that it was proven against **real CouchDB
+    CouchDB's revision-tree behavior is kept deliberately, that it was proven against **real CouchDB
     3.4.3**, and that `nx run @typedblite/runtime:test-oracle` is not in the routine suite. A move is
     not a semantics change: **157 tests before, 157 after**, redistributed 18 to the new library and
     139 left here. ⚠️ **The oracle command is unchanged** — `couchdb-oracle.test.ts` did not move.
@@ -164,7 +164,7 @@ D5 declined `_changes`, `_revs_diff`, `_bulk_get` and `_local` on a stated premi
 
 ⚠️ **A drop-in replacement means one end is precisely _not_ ours.** The clause that carried the
 decision is false under the new goal, so this is an amendment on changed facts rather than a
-reversal of judgement. The rest of D5 stands untouched: **the semantics were always the point**, and
+reversal of judgment. The rest of D5 stands untouched: **the semantics were always the point**, and
 they are already built — multi-version conflicts, a total winner rule, enumerable losing revisions.
 
 D5 also says, of differential testing against CouchDB:
@@ -172,7 +172,7 @@ D5 also says, of differential testing against CouchDB:
 > We cannot replicate with a real CouchDB and **must not claim to**.
 
 🔴 **That sentence now describes the deliverable.** Making it false — provably, against a real
-server — is the work this amendment authorises. Until it is done, the sentence stays true and must
+server — is the work this amendment authorizes. Until it is done, the sentence stays true and must
 keep being said.
 
 ### What is already built, and is not re-litigated
@@ -215,8 +215,8 @@ must cite a run in which the oracle was up.**
 ## Amendment — The hub's side of D8 refuses what it should, and says so (2026-11-14)
 
 D8 defined the hub's transport: SSE out, POST in. It said nothing about what a hub does with a request it
-should not honour, and a review of the hub on 2026-11-14 (the replication guide's Security section) found it
-honoured nearly everything. This changes the hub's side of the wire. **The spoke's side and the protocol's
+should not honor, and a review of the hub on 2026-11-14 (the replication guide's Security section) found it
+honored nearly everything. This changes the hub's side of the wire. **The spoke's side and the protocol's
 shape are unchanged**, and `TypeDBLiteReplicator` needs no change.
 
 - **POST** must be `application/json` (415 otherwise). The body is limited by `maxBodyBytes` (default 64 MiB;
@@ -288,7 +288,7 @@ looks cleanest right up to the first crash between commit and publish.
   use, and a change-log format is a long-lived on-disk commitment. Pin the Node version for anything
   holding real data; treat a Node upgrade as a substrate change to be tested, not a routine bump.
 - **The single-writer property becomes something we depend on.** Decision 2's "no gap handling" is
-  true because SQLite serialises writers. Moving the hub to a multi-writer engine would invalidate
+  true because SQLite serializes writers. Moving the hub to a multi-writer engine would invalidate
   it silently.
 - 🔴 **A relation without `@key` cannot replicate.** Decision 3 makes identity the `@key`
   attribute's value, so a keyless thing falls back to `last_insert_rowid()`. Its *role players* are

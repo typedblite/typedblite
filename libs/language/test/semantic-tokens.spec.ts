@@ -43,11 +43,11 @@ describe('declarations are classified', () => {
 /**
  * 🔴 The assertion this phase exists for.
  *
- * A TextMate grammar colours `project-id` and `nope-id` identically — it is a regex, and neither is
+ * A TextMate grammar colors `project-id` and `nope-id` identically — it is a regex, and neither is
  * a keyword. The scope provider knows one resolves and the other does not, and until now that
  * knowledge was thrown away at exactly the point it would be most useful.
  */
-describe('resolution is what decides the colour', () => {
+describe('resolution is what decides the color', () => {
   const withReference = (attribute: string) =>
     [
       'define',
@@ -74,7 +74,7 @@ describe('resolution is what decides the colour', () => {
     expect(unresolved).toHaveLength(resolved.length - 1);
   });
 
-  it('does not colour an unresolved role reference either', async () => {
+  it('does not color an unresolved role reference either', async () => {
     const tokens = await semanticTokens(
       ['define', 'entity person, plays nothing:nowhere;'].join('\n'),
     );

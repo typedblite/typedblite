@@ -34,8 +34,8 @@ The language library is unchanged apart from its `vscode-languageserver` version
 
 - `nx run typeqlite-vscode:e2e`, in VS Code 1.146.0: **4 passed, 0 failed**. The four cases are
   activation (with `.tql` mapped to `typeqlite`), a `typedblite.duplicate-owns` error at line 2, column
-  31, Format Document followed by an idempotent second format, and a resolved `owns` coloured
-  `property` beside an unresolved one left uncoloured.
+  31, Format Document followed by an idempotent second format, and a resolved `owns` colored
+  `property` beside an unresolved one left uncolored.
 - `nx run-many -t typecheck test --skip-nx-cache`: green across 6 projects (1181 tests, 12 of them new).
 - Report card: **1742 pass · 1 fail · 12 deviation · 1 n/a · 1756**, the same before and after.
 

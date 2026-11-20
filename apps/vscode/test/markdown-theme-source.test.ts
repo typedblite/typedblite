@@ -6,7 +6,7 @@ import { themeFiles, THEME_BRIDGE_ID, type ThemeSources } from '../src/markdown/
  */
 describe("finding the active theme's files", () => {
   const FILES = [{ tokenColors: [] }];
-  const MISSING = { missing: "No extension in this extension host contributes the colour theme 'Dark 2026'" };
+  const MISSING = { missing: "No extension in this extension host contributes the color theme 'Dark 2026'" };
 
   function sources(here: Awaited<ReturnType<ThemeSources['here']>>, bridge: ThemeSources['bridge']) {
     const asked: string[] = [];

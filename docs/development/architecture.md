@@ -31,7 +31,7 @@ flowchart LR
 | `@typedblite/language` | `typeqlite-language` | The grammar, the generated AST and parser, the validator, and the language services an editor uses. **Touches no database** |
 | `@typedblite/content-revision` | `content-revision` | Deterministic revision identifiers. No dependencies |
 | `@typedblite/runtime` | `typedblite-runtime` | The engine: interpreter, storage, change log, replication, full-text search. **The only package that touches SQLite** |
-| `typedblite-conformance` | `typedblite-conformance` | Runs TypeDB's behaviour specification against the runtime |
+| `typedblite-conformance` | `typedblite-conformance` | Runs TypeDB's behavior specification against the runtime |
 | `typedblite` | `typedblite` | The `typedblite` CLI: REPL, file runner and one-shot executor |
 | `typeqlite` | `typeqlite-vscode` | The VS Code extension: a Langium language server over the language library |
 | `typedblite-sync-demo` | `sync-demo` | The offline-first sync demo: browser, desktop and Android devices and a TypeDBLite hub. Uses only the runtime's public API |
@@ -105,7 +105,7 @@ Every store has the same fixed tables, whatever its schema:
 | `has` | Ownership: `owner` → `attribute`. A `scope` column carries `@key` and `@unique`, enforced by a partial `UNIQUE` index |
 | `role_player` | `rel`, `role`, `player`, with a count for a role played more than once |
 | `type_parent` | The `sub` hierarchy, so `isa person` also matches subtypes |
-| `schema_*` | The schema: elements, `owns`, `relates`, `plays`, value types, annotations, functions, structs, specialised roles, ordered ownerships |
+| `schema_*` | The schema: elements, `owns`, `relates`, `plays`, value types, annotations, functions, structs, specialized roles, ordered ownerships |
 | `change_log`, `key_attribute`, `pending_role` | Replication ([ADR-003](../architecture/adr-003-typedblite-change-log-and-sync-as-a-port.md)) |
 | `entity_fts`, `entity_fts_key` | The FTS5 full-text index, and each entity's row in it, so a write finds that row without scanning the index ([Performance](performance.md#2-every-write-scanned-the-full-text-index)) |
 
@@ -192,7 +192,7 @@ followed by a lost publish would be a change that never replicates and that noth
 ## Conformance is the oracle
 
 [ADR-005](../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md):
-TypeDB's own behaviour specification, vendored in `libs/conformance/spec/`, is the definition of
+TypeDB's own behavior specification, vendored in `libs/conformance/spec/`, is the definition of
 correct. The number of passing scenarios may never go down. A scenario TypeDB itself fails is a
 declared deviation, not a TypeDBLite bug
 ([ADR-007](../architecture/adr-007-a-scenario-typedb-itself-fails-is-a-deviation.md)). See

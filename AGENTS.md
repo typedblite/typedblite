@@ -16,7 +16,7 @@ flowchart LR
   libs --> runtime["runtime/<br/><b>@typedblite/runtime</b><br/>interpreter, storage, change log"]
   libs --> revision["content-revision/<br/><b>@typedblite/content-revision</b><br/>revision identifiers"]
   libs --> session["session/<br/><b>@typedblite/session</b><br/>session core, statement classifier"]
-  libs --> conformance["conformance/<br/><b>typedblite-conformance</b><br/>TypeDB behaviour spec and report card"]
+  libs --> conformance["conformance/<br/><b>typedblite-conformance</b><br/>TypeDB behavior spec and report card"]
   libs --> debugger["debugger/<br/><b>@typedblite/debugger</b> (private)<br/>the TypeQLite debug adapter (ADR-014)"]
   apps --> cli["cli/<br/><b>typedblite</b><br/>the CLI: REPL and file runner"]
   apps --> host["engine-host/<br/><b>@typedblite/engine-host</b> (private)<br/>NestJS CQRS host that runs statements in sessions (ADR-011)"]
@@ -140,9 +140,9 @@ npm run langium:generate
 
 This regenerates `src/generated/ast.ts`, `src/generated/grammar.ts`, and `src/generated/module.ts`, and then the TextMate grammar, `syntaxes/typeqlite.tmLanguage.json` (`scripts/generate-textmate.mts`). `src/generated/` and `syntaxes/` are gitignored: the `build`, `test` and `typecheck` targets regenerate it first (`langium-generate`), so commit the grammar, not the output.
 
-**Grammar scope discipline.** A construct is added to the grammar only when a real caller needs it. The rule is "find the caller first". The TypeDB behaviour spec (`libs/conformance/spec/`) is a first-class caller — if the spec's Background steps require a construct, add it.
+**Grammar scope discipline.** A construct is added to the grammar only when a real caller needs it. The rule is "find the caller first". The TypeDB behavior spec (`libs/conformance/spec/`) is a first-class caller — if the spec's Background steps require a construct, add it.
 
-**Every keyword needs a TextMate scope.** The TextMate grammar takes its keywords from the Langium grammar and their scopes from `KEYWORD_SCOPES` in `typeqlite-textmate.ts`: `keyword.control`, `storage.type` for kinds, `storage.modifier` for value types, and so on, the same scopes as TypeDB's TypeQL grammar, so a theme colours TypeQLite as it colours TypeQL. A new keyword fails `typeqlite-textmate.spec.ts` until it has one, and generation refuses a stale entry. Annotations are scoped by their `@`, with no entry.
+**Every keyword needs a TextMate scope.** The TextMate grammar takes its keywords from the Langium grammar and their scopes from `KEYWORD_SCOPES` in `typeqlite-textmate.ts`: `keyword.control`, `storage.type` for kinds, `storage.modifier` for value types, and so on, the same scopes as TypeDB's TypeQL grammar, so a theme colors TypeQLite as it colors TypeQL. A new keyword fails `typeqlite-textmate.spec.ts` until it has one, and generation refuses a stale entry. Annotations are scoped by their `@`, with no entry.
 
 **Annotation admissibility.** Which annotations are valid on which positions is tracked in the validator's admissibility table (`typeqlite-annotations.ts`). `@key` is enforced at write time by the runtime. All other annotations parse successfully, but their runtime semantics are tracked scenario-by-scenario on the conformance report card.
 
@@ -182,13 +182,13 @@ A store accepts a revision from a peer only if it is derived from what the recor
 
 ## Conformance
 
-`libs/conformance/` vendors the TypeDB behaviour specification as Cucumber `.feature` files under `spec/`. The test suite (`test/conformance.test.ts`) runs every scenario and compares against `baseline.json`.
+`libs/conformance/` vendors the TypeDB behavior specification as Cucumber `.feature` files under `spec/`. The test suite (`test/conformance.test.ts`) runs every scenario and compares against `baseline.json`.
 
 ### Deviations
 
 Intentional failures are declared in `deviations.yaml`:
 - Each entry needs an **owner**: an ADR number (`adr-NNN`) or a defect record id.
-- An entry whose scenario starts passing is reported by the run as `deviationsNowPassing`. Remove it in the same commit that fixes the behaviour.
+- An entry whose scenario starts passing is reported by the run as `deviationsNowPassing`. Remove it in the same commit that fixes the behavior.
 - Do not declare a deviation against a scenario that fails for a different reason (e.g. a Background step fails before the deviation is reached).
 
 ### Baseline
@@ -233,11 +233,11 @@ must stay so (ADR-008 D5). The editor resolves them through `TypeQLiteLabels`, w
 (`sitesOf`, and `LABEL_POSITIONS` for completion) must change whenever the grammar gains a position
 that names a type. `nx run typeqlite-vscode:package` builds `apps/vscode/dist/typeqlite-<version>.vsix` (and the Theme Bridge's), named by `vsce` from each manifest; `e2e --packaged` finds them the same way.
 
-The extension also colours TypeQLite code blocks in VS Code's Markdown preview
+The extension also colors TypeQLite code blocks in VS Code's Markdown preview
 ([ADR-010](docs/architecture/adr-010-the-markdown-preview-highlights-typeqlite-in-the-editor-s-colours.md)).
 The server classifies, through the `typeqlite/highlightBlocks` request: TextMate scopes from the
 grammar file the extension ships, and the editor's own semantic tokens. The client only maps those to
-the active theme's colours, which it reads from the theme's files (`src/markdown/theme.ts` restates
+the active theme's colors, which it reads from the theme's files (`src/markdown/theme.ts` restates
 VS Code's rules for that). In a remote window the theme is not in the extension's host, so a second
 extension, the TypeQLite Theme Bridge (`theme-bridge/`, `src/theme-bridge.ts`, `extensionKind: ["ui"]`),
 reads the files where VS Code keeps them and answers `typeqlite.themeFiles`. `package` builds both
@@ -268,7 +268,7 @@ token rule there would be a second definition of the language.
 5. Add validation in `typeqlite-validator.ts` if the construct has parse-time constraints.
 6. Add SQLite generation in `libs/runtime/src/sqlite-generator.ts`.
 7. Add interpreter handling in `libs/runtime/src/interpreter.ts`.
-8. Add tests in `libs/runtime/test/` covering the new behaviour.
+8. Add tests in `libs/runtime/test/` covering the new behavior.
 9. Run the full conformance suite to check for regressions: `nx run typedblite-conformance:test`.
 
 ---

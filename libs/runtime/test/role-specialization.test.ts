@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { TypeDBLiteInterpreter, type TypeDBLiteValue } from '../src/interpreter.js';
 
 /**
- * `relates father as parent` — a role specialising an inherited one (define.feature L635,
- * match.feature L3546). The specialising role is a sub-role: role-type patterns walk it as `sub`
+ * `relates father as parent` — a role specializing an inherited one (define.feature L635,
+ * match.feature L3546). The specializing role is a sub-role: role-type patterns walk it as `sub`
  * walks types, and a relation matched through the general role finds players of the special one.
  */
 const SCHEMA = [
@@ -35,26 +35,26 @@ const refusal = (statement: string): string | undefined => {
 };
 
 describe('role types form a hierarchy', () => {
-  it('a specialising role is a sub-role of the one it specialises', () => {
+  it('a specializing role is a sub-role of the one it specializes', () => {
     assert.deepEqual(labels('match $x sub marriage:spouse;', 'x'), ['hetero-marriage:husband', 'hetero-marriage:wife', 'marriage:spouse']);
   });
 
-  it('`relates $r as member` answers the role and every role specialising it, once each', () => {
+  it('`relates $r as member` answers the role and every role specializing it, once each', () => {
     assert.deepEqual(labels('match $_ relates $x as member;', 'x'), ['family-relation:member', 'parentship:child', 'parentship:parent']);
     assert.deepEqual(labels('match $x relates $_ as family-relation:member;', 'x'), ['family-relation', 'parentship']);
   });
 });
 
-describe('defining specialisations', () => {
+describe('defining specializations', () => {
   it('refuses a role no supertype relates — L685', () => {
     assert.match(refusal('define relation close-marriage relates close as spouse;') ?? '', /no supertype of 'close-marriage' relates 'spouse'/);
   });
 
-  it('refuses specialising a role a supertype already specialised — L985', () => {
+  it('refuses specializing a role a supertype already specialized — L985', () => {
     assert.match(refusal('define relation fathership sub parentship, relates father as member;') ?? '', /'family-relation:member' must be inherited without specialization/);
   });
 
-  it('adds a specialisation to a plain role, refuses a different one, and redefines it — L619, L630', () => {
+  it('adds a specialization to a plain role, refuses a different one, and redefines it — L619, L630', () => {
     engine.define('define relation step-parentship sub parentship, relates task;');
     assert.equal(refusal('define step-parentship relates task as parent;'), undefined);
     assert.match(refusal('define step-parentship relates task as child;') ?? '', /different 'step-parentship relates task as parent' is already defined/);
@@ -62,13 +62,13 @@ describe('defining specialisations', () => {
     assert.match(refusal('redefine step-parentship relates task as child;') ?? '', /already defined/);
   });
 
-  it('undefines a specialisation only as it is defined — L631', () => {
+  it('undefines a specialization only as it is defined — L631', () => {
     assert.match(refusal('undefine as member from parentship relates parent;') ?? 'x', /^x$/);
     assert.match(refusal('undefine as member from parentship relates parent;') ?? '', /there is no defined 'parentship relates parent as member' to undefine/);
   });
 });
 
-describe('matching relations through specialised roles', () => {
+describe('matching relations through specialized roles', () => {
   it('finds players of the special roles through the general one — match.feature L1484', () => {
     engine.execute('insert $a isa person, has ref 1; $b isa person, has ref 2; (wife: $a, husband: $b) isa hetero-marriage;');
     assert.equal(engine.query('match $m links (spouse: $x, spouse: $y), isa hetero-marriage;').rows.length, 2);

@@ -3,7 +3,7 @@
 Status: in progress · Written 2026-11-14 · Basis: a read of the repository at `main` (`5aac641`); [where to resume](#where-to-resume) is current as of `d3c7c78`
 
 This plan takes TypeDBLite from "a strong repository" to "a project strangers can install, trust, and
-contribute to." It is organised as gates, not dates: each phase has exit criteria, and the launch
+contribute to." It is organized as gates, not dates: each phase has exit criteria, and the launch
 happens when the gates are green. A suggested calendar is at the end.
 
 - [Where to resume](#where-to-resume)
@@ -55,7 +55,7 @@ To go back: fix billing, `gh workflow enable` the three workflows, restore the D
   `langium-cli` on Node 24.22+, the Node 22.16 minimum, a Windows build command, a fixed-wait test, and a Langium
   race that dropped a document's diagnostics).
 - **2026-11-14 to 15** (#18 to #21, #37 to #48): the logo and the extension's icon (#18, #20); the Markdown
-  preview's highlighting in the theme's colours (#19) and, in remote windows, the Theme Bridge (#37); TypeQLite
+  preview's highlighting in the theme's colors (#19) and, in remote windows, the Theme Bridge (#37); TypeQLite
   keywords scoped by kind, and fences highlighted in the Markdown editor (#21); the CLI running on Windows and
   through its npm `bin` link (#38); the runtime's crash and index tests fixed on Windows (#39); every project above
   the 80% coverage floor, decision 9 (#40); **`npm run gate`** (#41); Dependabot paused (#42); the hub security
@@ -81,7 +81,7 @@ To go back: fix billing, `gh workflow enable` the three workflows, restore the D
   five-minute tour** (#1, `docs/guides/five-minute-tour.tql.md`, run as written from the tarballs by `npm run tour`, a gate
   step; #2 matches a title with `has title == $t`); **a value read as an attribute is refused** (#3: found by running
   the tour's TypeQL on a live TypeDB; `given $t: string; … has title $t` matched nothing and said so only in an
-  `empty-match` fact, and TypeDB refuses it, so TypeDBLite now does too: a behaviour change in the changelog); and
+  `empty-match` fact, and TypeDB refuses it, so TypeDBLite now does too: a behavior change in the changelog); and
   **`oracle-bench`** (#4: the load test's `growth` and `relations` workloads on TypeDBLite and on a live TypeDB, with
   the network taken out; no results are kept in the repository).
 
@@ -194,7 +194,7 @@ Useful to know:
 
 | Strength | Evidence |
 | --- | --- |
-| Measured compatibility, not claimed | 1,742 of 1,756 scenarios in TypeDB's own behaviour spec pass (99.2%). 12 of the 14 non-passing also fail on TypeDB 3.10.4 itself ([CONFORMANCE.md](../../../CONFORMANCE.md)) |
+| Measured compatibility, not claimed | 1,742 of 1,756 scenarios in TypeDB's own behavior spec pass (99.2%). 12 of the 14 non-passing also fail on TypeDB 3.10.4 itself ([CONFORMANCE.md](../../../CONFORMANCE.md)) |
 | Runs where a server can't | Node (`node:sqlite`), browsers (WASM SQLite, ADR-009), any binding satisfying `SqliteDatabase` |
 | A working end-to-end story | Offline-first sync demo: browser, desktop and Android, converging through a hub |
 | Editor tooling | VS Code extension with a Langium language server |
@@ -225,7 +225,7 @@ in [section 4](#4-readiness-audit).
 ## 3. Positioning and audience
 
 **One-line pitch (draft):** *TypeDB's data model and TypeQL, embedded: a TypeScript engine on SQLite that
-runs in Node and the browser, and passes 99.2% of TypeDB's own behaviour spec.*
+runs in Node and the browser, and passes 99.2% of TypeDB's own behavior spec.*
 
 **Audiences, in priority order**
 
@@ -299,7 +299,7 @@ Each phase lists its **exit criteria**. Don't start the next phase's public step
 
 ### Phase 0 — Legal, naming and reservations (week 1–2)
 
-- [ ] Read TypeDB Ltd's trademark and brand policy. Summarise the constraints in one page.
+- [ ] Read TypeDB Ltd's trademark and brand policy. Summarize the constraints in one page.
 - [x] Speak to TypeDB Ltd's CEO; blessing to release as open source received *(done, by video call)*.
 - [ ] Confirm it in writing (see B1): a short email, and a one-line reply from TypeDB Ltd. Ask in the
       same message: (a) may we use "TypeDBLite" and `typedblite.dev` as they stand; (b) do they want
@@ -606,7 +606,7 @@ See [section 7](#7-launch-day-runbook).
 
 1. The problem: you want TypeDB's model somewhere a server can't go.
 2. What TypeDBLite is, in one paragraph, with the install-and-query snippet.
-3. How we know it's faithful: the behaviour spec, 1,742/1,756, and the honest accounting of the other 14.
+3. How we know it's faithful: the behavior spec, 1,742/1,756, and the honest accounting of the other 14.
 4. Where it runs: Node, browser, offline sync (embed the clip).
 5. What it can't do yet, stated plainly.
 6. Thanks to TypeDB Ltd and the community; independence statement.
@@ -797,7 +797,7 @@ fine in a private repository and not in a public one.
 ### PL-2. Report the Langium race upstream
 
 Langium 4.4.2's `DocumentBuilder.notifyDocumentPhase` checks the cancellation token before each listener, after a
-document is already `Validated` and marked complete. A build cancelled in that gap drops the listener that sends the
+document is already `Validated` and marked complete. A build canceled in that gap drops the listener that sends the
 diagnostics, and nothing rebuilds the document. An editor opening several files at once triggers it (about 3 runs in
 10 for five documents).
 

@@ -19,7 +19,7 @@ cannot drift from the core.
 - **Twelve operation descriptors** (`operations.ts`), each with a `validate` hook and an `inputSchema`, so that
   the CLI, REPL, sidecar, and later HTTP and MCP, all read one declaration (invariant 5).
 - **`typedblite-host`** (`main.ts`): `defineApp` from `@devx-micro/app-main`. `--repl`, `--sidecar`, an operation
-  name for one shot, and an unrecognised flag refused by name with exit 2. A bare run prints help and starts
+  name for one shot, and an unrecognized flag refused by name with exit 2. A bare run prints help and starts
   nothing, because there is no HTTP mode yet.
 - **`session.run` takes a `location`** (open, run, close in one call), as the feature document said it should
   over the CLI. It works on every transport, so the answer is the same however it is reached.

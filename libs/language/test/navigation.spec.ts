@@ -10,7 +10,7 @@ import { uriOf, workspace } from './workspace.js';
 const FILES = {
   'people.typeqlite': [
     'define',
-    '#! Someone the organisation knows about.',
+    '#! Someone the organization knows about.',
     '#! Employees are people too.',
     'entity person @doc("A human being"),',
     '  owns name,',
@@ -121,7 +121,7 @@ describe('hover', () => {
   it('shows the `#!` doc comment and the `@doc` text', async () => {
     const ws = await workspace(FILES);
     const value = await hover(ws, 'people.typeqlite', 'person', 1);
-    expect(value).toContain('Someone the organisation knows about.\nEmployees are people too.');
+    expect(value).toContain('Someone the organization knows about.\nEmployees are people too.');
     expect(value).toContain('A human being');
   });
 
@@ -142,7 +142,7 @@ describe('hover', () => {
     const person = ws.documentOf('people.typeqlite').parseResult.value.clauses[0]!;
     const [definition] = (person as unknown as { definitions: { $cstNode?: never }[] }).definitions;
     expect(docCommentOf(definition!)).toBe(
-      'Someone the organisation knows about.\nEmployees are people too.',
+      'Someone the organization knows about.\nEmployees are people too.',
     );
   });
 });

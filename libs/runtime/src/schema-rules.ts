@@ -64,8 +64,8 @@ export interface SchemaFacts {
   /** The ordered capabilities, `owns name[]` and `relates parent[]`, as their subjects. */
   readonly ordered: ReadonlySet<string>;
   /**
-   * Role specialisation, `relates father as parent`: each specialising role as `relation:role`, to
-   * the role it specialises as its DECLARING relation's `relation:role` — the role types' parents.
+   * Role specialization, `relates father as parent`: each specializing role as `relation:role`, to
+   * the role it specializes as its DECLARING relation's `relation:role` — the role types' parents.
    */
   readonly specialises: ReadonlyMap<string, string>;
   /** The schema's functions, by name (`define fun …`). */
@@ -192,7 +192,7 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
   const parents = new Map(applied.parents);
   const valueTypes = new Map(applied.valueTypes);
   const roles = new Map([...applied.roles].map(([relation, set]) => [relation, new Set(set)]));
-  const specialising: Array<[string, string, string]> = [];
+  const specializing: Array<[string, string, string]> = [];
   const declareRole = (relation: string, role: string): void => {
     const set = roles.get(relation) ?? new Set<string>();
     set.add(role);
@@ -220,7 +220,7 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
       if (!isAttributeDef(definition)) {
         for (const trait of definition.traits) {
           if (isRelatesTrait(trait)) declareRole(name, trait.name);
-          if (isRelatesTrait(trait) && trait.specialises !== undefined) specialising.push([name, trait.name, trait.specialises]);
+          if (isRelatesTrait(trait) && trait.specialises !== undefined) specializing.push([name, trait.name, trait.specialises]);
         }
       }
     }
@@ -229,7 +229,7 @@ function propose(file: TypeQLiteFile, applied: SchemaFacts): SchemaFacts {
   // relation a relates y;` is one statement, in either order.
   const specialises = new Map(applied.specialises);
   const resolving = { ...applied, parents } as SchemaFacts;
-  for (const [relation, role, parent] of specialising) {
+  for (const [relation, role, parent] of specializing) {
     const declaring = ancestorsOf(relation, resolving).find((t) => roles.get(t)?.has(parent));
     if (declaring !== undefined) specialises.set(`${relation}:${role}`, `${declaring}:${parent}`);
   }
@@ -280,7 +280,7 @@ export function valueTypeOf(attribute: string, facts: SchemaFacts): string | und
   return undefined;
 }
 
-/** Which relation in the hierarchy DECLARES a role — the one it is played and specialised as. */
+/** Which relation in the hierarchy DECLARES a role — the one it is played and specialized as. */
 function roleDeclaredBy(relation: string, role: string, facts: SchemaFacts): string | undefined {
   for (const type of [relation, ...ancestorsOf(relation, facts)]) {
     if (facts.roles.get(type)?.has(role)) return type;
@@ -376,7 +376,7 @@ function checkNoCycle(definition: TypeDefinition, name: string, facts: SchemaFac
  *
  * 🔴 No memory of whether the type was abstract before, on purpose. Three review rounds guarded
  * such a record — for restatements, for databases from before it, for the first statement after
- * it — and each guard broke a neighbour. The record is not needed: `@abstract` is enforced at
+ * it — and each guard broke a neighbor. The record is not needed: `@abstract` is enforced at
  * insert, so a type that is abstract has no direct instances, and a restated `@abstract` finds
  * none to refuse on. The rule reads the instances and nothing else.
  *
@@ -668,7 +668,7 @@ function checkOrderUnchanged(capability: string, appliedOrdered: boolean, stated
 function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFacts, refuse: Refuse, applied: SchemaFacts): void {
   if (applied.roles.get(relation)?.has(trait.name) === true) {
     checkOrderUnchanged(`${relation} relates ${trait.name}`, applied.ordered.has(relatesSubject(relation, trait.name)), trait.ordered === true, trait, refuse);
-    // A restatement keeps its specialisation (define.feature L619) — changing it is `redefine`'s.
+    // A restatement keeps its specialization (define.feature L619) — changing it is `redefine`'s.
     // Adding one to a role defined without one is a definition, not a change (redefine.feature L630).
     const before = applied.specialises.get(`${relation}:${trait.name}`);
     const stated = trait.specialises;
@@ -681,7 +681,7 @@ function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFac
       );
     }
   }
-  if (trait.specialises !== undefined) checkSpecialisation(trait, trait.specialises, relation, proposed, refuse);
+  if (trait.specialises !== undefined) checkSpecialization(trait, trait.specialises, relation, proposed, refuse);
   const kind = kindOf(relation, proposed) ?? 'entity';
   if (kind !== 'relation') {
     refuse(
@@ -698,7 +698,7 @@ function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFac
   refuse(
     DiagnosticCode.roleRedeclared,
     `'${relation} relates ${trait.name}': '${declaredBy}:${trait.name}' should be unique in relation ` +
-      `type hierarchy, and '${relation}' inherits it. Specialise it with \`relates ${trait.name} as …\` ` +
+      `type hierarchy, and '${relation}' inherits it. Specialize it with \`relates ${trait.name} as …\` ` +
       `or use the inherited role.`,
     rangeOf(trait),
   );
@@ -706,28 +706,28 @@ function checkRelates(trait: RelatesTrait, relation: string, proposed: SchemaFac
 
 /**
  * `relates father as parent`: `parent` must be a role the relation INHERITS — declared above it
- * (define.feature L685) — and inherited without specialisation: once `parentship` specialises
- * `family-relation:member`, a relation below it cannot specialise `member` again (L985). Several
- * roles of ONE relation may specialise the same role (L943).
+ * (define.feature L685) — and inherited without specialisation: once `parentship` specializes
+ * `family-relation:member`, a relation below it cannot specialize `member` again (L985). Several
+ * roles of ONE relation may specialize the same role (L943).
  */
-export function checkSpecialisation(trait: RelatesTrait, parent: string, relation: string, proposed: SchemaFacts, refuse: Refuse): void {
+export function checkSpecialization(trait: RelatesTrait, parent: string, relation: string, proposed: SchemaFacts, refuse: Refuse): void {
   const above = ancestorsOf(relation, proposed);
   const declaring = above.find((type) => proposed.roles.get(type)?.has(parent));
   if (declaring === undefined) {
     refuse(
       DiagnosticCode.unknownRole,
-      `'${relation} relates ${trait.name} as ${parent}': no supertype of '${relation}' relates '${parent}', so there is no role to specialise.`,
+      `'${relation} relates ${trait.name} as ${parent}': no supertype of '${relation}' relates '${parent}', so there is no role to specialize.`,
       rangeOf(trait),
     );
     return;
   }
   const between = above.slice(0, above.indexOf(declaring));
-  const specialisedBy = between.find((type) => [...proposed.specialises].some(([child, of]) => child.startsWith(`${type}:`) && of === `${declaring}:${parent}`));
-  if (specialisedBy !== undefined) {
+  const specializedBy = between.find((type) => [...proposed.specialises].some(([child, of]) => child.startsWith(`${type}:`) && of === `${declaring}:${parent}`));
+  if (specializedBy !== undefined) {
     refuse(
       DiagnosticCode.roleRedeclared,
       `'${relation} relates ${trait.name} as ${parent}': '${declaring}:${parent}' must be inherited without specialization, ` +
-        `and '${specialisedBy}' already specialises it.`,
+        `and '${specializedBy}' already specializes it.`,
       rangeOf(trait),
     );
   }

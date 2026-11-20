@@ -29,7 +29,7 @@ describe('painting a block', () => {
     );
   });
 
-  it('leaves the TextMate colour where the palette gives a semantic token none', () => {
+  it('leaves the TextMate color where the palette gives a semantic token none', () => {
     const over: BlockHighlight = {
       textmate: [{ offset: 0, length: 5, scopes: KEYWORD }],
       semantic: [{ offset: 0, length: 5, type: 'parameter', modifiers: [] }],
@@ -53,7 +53,7 @@ describe('painting a block', () => {
     );
   });
 
-  it("draws a semantic token in the theme's colour, over the TextMate one", () => {
+  it("draws a semantic token in the theme's color, over the TextMate one", () => {
     const theme = resolveTheme(
       [{ semanticHighlighting: true, semanticTokenColors: { variable: { foreground: '#9cdcfe', italic: true } } }],
       { themeName: 'x', semanticHighlighting: 'configuredByTheme' },

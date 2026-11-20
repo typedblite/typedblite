@@ -1,14 +1,14 @@
 # typedblite-conformance
 
-TypeDB's own behaviour specification, vendored and run against TypeDBLite as a report card.
+TypeDB's own behavior specification, vendored and run against TypeDBLite as a report card.
 
-This package is the TypeDBLite Conformance Standard (ADR-005). It answers the question: *which TypeDB behaviours does TypeDBLite implement correctly, and which does it knowingly deviate from?*
+This package is the TypeDBLite Conformance Standard (ADR-005). It answers the question: *which TypeDB behaviors does TypeDBLite implement correctly, and which does it knowingly deviate from?*
 
 ## What this package provides
 
 - **Vendored spec** (`spec/query/language/*.feature`) — Cucumber `.feature` files from [typedb/typedb-behaviour](https://github.com/typedb/typedb-behaviour), vendored at a pinned commit. These files are **never edited by hand**.
 - **Runner** (`src/runner.ts`) — executes every Cucumber scenario against the TypeDBLite runtime.
-- **Report card** (`src/report.ts`) — summarises pass/fail counts per feature file and compares against `baseline.json`.
+- **Report card** (`src/report.ts`) — summarizes pass/fail counts per feature file and compares against `baseline.json`.
 - **CLI** (`src/cli.ts`) — prints the report card and exits 1 on a regression.
 - **Deviation declarations** (`deviations.yaml`) — intentional failures, each with an owner.
 - **Not-applicable declarations** (`not-applicable.yaml`) — scenarios that do not apply to TypeDBLite's model.
@@ -22,7 +22,7 @@ This package is the TypeDBLite Conformance Standard (ADR-005). It answers the qu
 | Commit | `7d35851` (2026-09-10) |
 | Paths | `query/language/*.feature`, `LICENSE` |
 | Surveyed against | TypeDB 3.10.4 |
-| Licence | MPL-2.0 — file headers intact |
+| License | MPL-2.0 — file headers intact |
 
 The pinned commit is in `spec/PIN`. Do not update the vendored files without also updating `PIN` and re-running the full report card.
 

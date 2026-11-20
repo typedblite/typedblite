@@ -139,7 +139,7 @@ describe('the bundled language server', () => {
     expect(edits.length).toBeGreaterThan(0);
   });
 
-  it('colours a resolved reference and not an unresolved one', async () => {
+  it('colors a resolved reference and not an unresolved one', async () => {
     const legend: string[] = capabilities['semanticTokensProvider'].legend.tokenTypes;
     const { data } = await connection.sendRequest<{ data: number[] }>(
       'textDocument/semanticTokens/full',

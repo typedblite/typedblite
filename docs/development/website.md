@@ -27,7 +27,7 @@ links to an unpublished document is dropped. To publish another document, add a 
 `astro.config.mjs` if it is not in an auto-generated group).
 
 Also generated, from other places: the brand files (`docs/brand/`) and the favicon, and the TypeQLite grammar that
-colours code fences, which is the VS Code extension's own (`apps/vscode/syntaxes/typeqlite.tmLanguage.json`). ```` ```mermaid ```` fences are drawn in the browser,
+colors code fences, which is the VS Code extension's own (`apps/vscode/syntaxes/typeqlite.tmLanguage.json`). ```` ```mermaid ```` fences are drawn in the browser,
 in the reader's theme.
 
 ## The playground is a page of the site
@@ -35,7 +35,7 @@ in the reader's theme.
 `/playground/` is an Astro page (`src/pages/playground.astro`) inside Starlight's layout: its header, search, theme
 switch and sidebar. The playground supplies the markup (`apps/playground/src/app.html`, a fragment that its build also
 puts into the standalone `index.html`), its styles (`app.css`, scoped to `.pg`, reading only `--pg-*` custom
-properties) and its scripts, workers and `.wasm`; the page maps `--pg-*` onto Starlight's colours. The editor follows
+properties) and its scripts, workers and `.wasm`; the page maps `--pg-*` onto Starlight's colors. The editor follows
 Starlight's `data-theme` and takes its background from the page. `scripts/check-playground.mjs` (part of `website:check`)
 opens the built page in Chromium and checks that the shell is there, the first example runs and draws, nothing fails to
 load, and the editor follows the theme. The playground's scripts find their workers beside themselves
@@ -45,7 +45,7 @@ load, and the editor follows the theme. The playground's scripts find their work
 
 `/sync-demo/` is the same arrangement for the offline-first demo: an Astro page (`src/pages/sync-demo.astro`) inside
 Starlight's layout around the demo's markup (`apps/sync-demo/src/browser-hub/app.html`), its styles (`app.css`, scoped
-to `.bh`, reading only `--bh-*` custom properties, which the page maps onto Starlight's colours) and its scripts, Workers
+to `.bh`, reading only `--bh-*` custom properties, which the page maps onto Starlight's colors) and its scripts, Workers
 and `.wasm`, copied beside the page by `scripts/assemble.mjs`. The page owns the hub (a dedicated Worker on WASM SQLite
 and OPFS) and embeds three device pages as iframes (`/sync-demo/device.html?device=a`, absolute because the site answers
 with and without the trailing slash). The devices follow Starlight's `data-theme` through the same-origin parent. The build
@@ -56,19 +56,19 @@ there, the hub and the devices start, a task reaches another device and the hub,
 reconnected, the devices follow the theme, and the page works without the trailing slash. Only one tab can own the
 hub's store, and the page says so ([the demo's README](../../apps/sync-demo/README.md#in-your-browser-in-one-page)).
 
-## How a TypeQLite fence is coloured
+## How a TypeQLite fence is colored
 
-As in the editor, in two layers. Shiki colours it with the TextMate grammar, in VS Code's own Dark+ and Light+ themes
-(`minSyntaxHighlightingColorContrast: 0`, so the colours are the themes' and Expressive Code does not adjust them).
+As in the editor, in two layers. Shiki colors it with the TextMate grammar, in VS Code's own Dark+ and Light+ themes
+(`minSyntaxHighlightingColorContrast: 0`, so the colors are the themes' and Expressive Code does not adjust them).
 Over that, `src/plugins/typeqlite-semantic.mjs` runs **the language server's semantic token provider** (the
-`TypeQLiteSemanticTokenProvider` the extension and the playground run) on each fence at build time, and colours each
+`TypeQLiteSemanticTokenProvider` the extension and the playground run) on each fence at build time, and colors each
 token by what the theme gives the scope VS Code falls back to for its type. A name that resolves to a type, an attribute
-or a variable gets that colour, and one that does not resolve keeps the grammar's, as in the editor.
+or a variable gets that color, and one that does not resolve keeps the grammar's, as in the editor.
 
 A fence is highlighted **on its own**, with no schema around it. So a query in one fence does not know the types a
-`define` in an earlier fence declared, and its names keep the grammar's colour. Put the schema in the same fence to
-get them coloured. `scripts/check-highlighting.mjs` (part of `website:check`) checks the tokens, that fences
-highlighted at once do not mix (the provider keeps state), and that the colours are the playground's.
+`define` in an earlier fence declared, and its names keep the grammar's color. Put the schema in the same fence to
+get them colored. `scripts/check-highlighting.mjs` (part of `website:check`) checks the tokens, that fences
+highlighted at once do not mix (the provider keeps state), and that the colors are the playground's.
 
 ## Commands
 
@@ -88,7 +88,7 @@ a file, every `#fragment` resolves to an id (the API pages included), and the pl
 
 `/api/` is generated by TypeDoc into Markdown (`typedoc-plugin-markdown`) and built by Starlight like any other page,
 through the `starlight-typedoc` plugin in `astro.config.mjs`, so it has the site's header, sidebar, search, theme and
-code colours. The plugin runs TypeDoc at the start of every `astro dev` and `astro build` and writes the pages to
+code colors. The plugin runs TypeDoc at the start of every `astro dev` and `astro build` and writes the pages to
 `src/content/docs/api/` (git-ignored). It reads **the repository's own `typedoc.json`** (entry points, validation,
 warnings as errors), the one `npm run check-api` runs, so there is one configuration; `npm run docs:api` still writes the
 standalone HTML reference to `dist/api`, which the site does not use. `src/plugins/typedoc-site.mjs` is a small TypeDoc plugin
@@ -140,7 +140,7 @@ The site was first planned for GitHub Pages; that workflow (`site.yml`) never ra
 `CNAME` and `.nojekyll` files the build used to write for it. The domain is set by `cloudflare.config.ts`.
 
 While the repository is private the site links to none of it: `REPO_PUBLIC` in `apps/website/scripts/content-map.mjs` is
-`false`, so there is no GitHub icon in the header, no "Edit page" links, no "View on GitHub" button, the footer's licence
+`false`, so there is no GitHub icon in the header, no "Edit page" links, no "View on GitHub" button, the footer's license
 and the API reference's "Defined in" and the guides' links to source files are plain text, and `check-site.mjs` fails
 the build if a link to the repository gets in. (The `git clone` commands in the guides stay: they are code.)
 

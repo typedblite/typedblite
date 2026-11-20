@@ -17,7 +17,7 @@
  * 🔴 **Every defect case here was proved against the unfixed code**, in a worktree at the commit
  * before the fixes, one test at a time. That is the parking lot's standing `#tech-debt` item —
  * "regression tests are not proven to fail against the unfixed code, and nothing does it
- * automatically" — honoured by hand, because nothing yet does it automatically. Ten fail there:
+ * automatically" — honored by hand, because nothing yet does it automatically. Ten fail there:
  *
  *   a keyless role player is skipped · a real push leaves it behind · applyRemote refuses a local:
  *   id · applyRemote is atomic · a push backlog larger than one window · a multi-byte character
@@ -34,7 +34,7 @@
  * function; it now drives a real replicator against a real hub. The other was handed the resume
  * cursor by hand, so it never exercised the reporting it existed to prove.
  *
- * 🔴 **Five others pass against the unfixed code, and are labelled rather than quietly counted.**
+ * 🔴 **Five others pass against the unfixed code, and are labeled rather than quietly counted.**
  * Three state a premise or a mechanism (`the tracker schema really does have keyless relations`,
  * `two nodes give the same logical relation the same id`, `a keyless relation is never sent over
  * the wire`); two guard a choice made *by* the fix and so have nothing to fail against yet
@@ -570,7 +570,7 @@ describe('Round two — findings the fixes themselves introduced', () => {
   });
 
   it('🔴 cancel stops a drain that is already running', async () => {
-    // `pushFrom` is now an unbounded loop, so a cancelled session would otherwise keep POSTing to a
+    // `pushFrom` is now an unbounded loop, so a canceled session would otherwise keep POSTing to a
     // hub the caller has finished with, and could set status 'failed' after cancel set 'idle'.
     const hubDb = new TypeDBLiteInterpreter(':memory:');
     hubDb.define(SCHEMA);
@@ -600,7 +600,7 @@ describe('Round two — findings the fixes themselves introduced', () => {
 
     assert.ok(
       pushes - atCancel <= 1,
-      `a cancelled drain must stop, not run to exhaustion (${pushes - atCancel} pushes after cancel)`,
+      `a canceled drain must stop, not run to exhaustion (${pushes - atCancel} pushes after cancel)`,
     );
     assert.equal(session.status, 'idle', 'and must not be flipped to failed after cancelling');
 

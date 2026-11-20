@@ -213,7 +213,7 @@ describe('a scenario cannot pass without reaching its assertion', () => {
   it('a "fails" step is NOT satisfied by a parse failure — that is what "parsing fails" is for', () => {
     // The first report card had three "passes" of exactly this shape: `let $doc = get_fun_doc(…)`
     // fails on TypeDB because the function does not exist, and "failed" here because the parser
-    // stopped at `let`. Both failed; only one of them is the behaviour the scenario specifies.
+    // stopped at `let`. Both failed; only one of them is the behavior the scenario specifies.
     const [result] = runFeature(
       feature(scenario('x', [...open('schema'), step('typeql schema query; fails', { docString: 'define entity;' })])),
       noDeclarations,

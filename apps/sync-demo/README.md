@@ -75,11 +75,11 @@ What differs from the hub above, and what does not:
   (the store fails to open with "Missing required OPFS APIs") and no nested `Worker` there either, so a SharedWorker
   cannot hold a SQLite store on OPFS, nor delegate to a Worker that can. A service worker cannot either. So one page owns
   the hub, and hands each device a port.
-- **Each device has its own colour,** the same on its card, on the chip that says where a task was made, and in the hub's
+- **Each device has its own color,** the same on its card, on the chip that says where a task was made, and in the hub's
   list: cyan, rose and olive (`src/browser-hub/devices.css`), at least 100° of hue apart and clear of the green,
-  red and amber that already mean online, offline and waiting. The device's name is always written beside its colour. The main demo's clients are told apart
-  by name only. The highlight that fades on a change a sync has just brought in is tinted the same way, with the colour of the
-  device that *made the change*: a task added on A shows A's colour, checking it on B shows B's, unchecking it on C shows
+  red and amber that already mean online, offline and waiting. The device's name is always written beside its color. The main demo's clients are told apart
+  by name only. The highlight that fades on a change a sync has just brought in is tinted the same way, with the color of the
+  device that *made the change*: a task added on A shows A's color, checking it on B shows B's, unchecking it on C shows
   C's. The task records its latest editor (`edited-by`) in the same transaction as the change, so it replicates with
   it; the chip still says who made the task. A store from before this was recorded reads each task as last edited by
   its maker until someone changes it.

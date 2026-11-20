@@ -96,11 +96,11 @@ describe('the page', () => {
     for (const selector of selectors) for (const part of selector.split(',')) expect(part.trim()).toMatch(/^\.bh\b/);
   });
 
-  it('reads colours only from --bh-* properties and the devices’ own', () => {
+  it('reads colors only from --bh-* properties and the devices’ own', () => {
     const css = read('app.css');
     const used = [...css.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]!);
     expect(used.length).toBeGreaterThan(5);
-    // Its own `--bh-*`, and the devices' colours, which `devices.css` defines for every page that names a device.
+    // Its own `--bh-*`, and the devices' colors, which `devices.css` defines for every page that names a device.
     expect(used.filter((name) => !name.startsWith('--bh-') && !name.startsWith('--device-'))).toEqual([]);
   });
 
@@ -149,10 +149,10 @@ describe('the device page', () => {
   });
 });
 
-describe('the devices’ colours', () => {
+describe('the devices’ colors', () => {
   type Palette = Record<'a' | 'b' | 'c', string>;
   const css = read('devices.css').replace(/\/\*[\s\S]*?\*\//g, '');
-  /** The three colours a rule block sets. */
+  /** The three colors a rule block sets. */
   const palette = (block: string): Palette => ({
     a: block.match(/--device-a:\s*(#[0-9a-f]{6})/i)![1]!.toLowerCase(),
     b: block.match(/--device-b:\s*(#[0-9a-f]{6})/i)![1]!.toLowerCase(),
@@ -183,18 +183,18 @@ describe('the devices’ colours', () => {
     return Math.min(d, 360 - d);
   };
 
-  // What the colours sit on, and what already means something, read from the pages themselves.
+  // What the colors sit on, and what already means something, read from the pages themselves.
   const shipped = readFileSync(CLIENT, 'utf8');
   /** `#fff` is `#ffffff`. */
   const full = (hex: string): string => (hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join('')}` : hex).toLowerCase();
   const vars = (text: string): Record<string, string> => Object.fromEntries([...text.matchAll(/(--[\w-]+):\s*(#[0-9a-f]{3,6})\b/gi)].map((m) => [m[1]!, full(m[2]!)]));
   const lightPage = vars(shipped.match(/^\s*:root\s*\{([^}]*)\}/m)![1]!);
   const darkPage = vars(shipped.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)![1]!);
-  const themes = { light: { colours: light, page: lightPage }, dark: { colours: dark, page: darkPage } } as const;
+  const themes = { light: { colors: light, page: lightPage }, dark: { colors: dark, page: darkPage } } as const;
   const names = ['a', 'b', 'c'] as const;
 
-  it('is one colour per device, three different ones, in each theme', () => {
-    for (const { colours } of Object.values(themes)) expect(new Set(Object.values(colours)).size).toBe(3);
+  it('is one color per device, three different ones, in each theme', () => {
+    for (const { colors } of Object.values(themes)) expect(new Set(Object.values(colors)).size).toBe(3);
   });
 
   it('keeps the same three in each of the ways a page can be themed', () => {
@@ -204,16 +204,16 @@ describe('the devices’ colours', () => {
   });
 
   it.each(['light', 'dark'] as const)('reads at least 4.5:1 on the %s theme’s page and card', (theme) => {
-    const { colours, page } = themes[theme];
+    const { colors, page } = themes[theme];
     for (const name of names) {
-      for (const background of [page['--bg']!, page['--card']!]) expect(contrast(colours[name], background), `${theme} ${name} on ${background}`).toBeGreaterThanOrEqual(4.5);
+      for (const background of [page['--bg']!, page['--card']!]) expect(contrast(colors[name], background), `${theme} ${name} on ${background}`).toBeGreaterThanOrEqual(4.5);
     }
   });
 
   it.each(['light', 'dark'] as const)('is a different hue from every other device, by 90 degrees at least, and from online, offline and waiting, by 30 (%s)', (theme) => {
-    const { colours, page } = themes[theme];
-    for (const [x, y] of [['a', 'b'], ['a', 'c'], ['b', 'c']] as const) expect(apart(colours[x], colours[y]), `${x} and ${y}`).toBeGreaterThanOrEqual(90);
-    for (const name of names) for (const status of ['--on', '--off', '--wait']) expect(apart(colours[name], page[status]!), `${name} and ${status}`).toBeGreaterThanOrEqual(30);
+    const { colors, page } = themes[theme];
+    for (const [x, y] of [['a', 'b'], ['a', 'c'], ['b', 'c']] as const) expect(apart(colors[x], colors[y]), `${x} and ${y}`).toBeGreaterThanOrEqual(90);
+    for (const name of names) for (const status of ['--on', '--off', '--wait']) expect(apart(colors[name], page[status]!), `${name} and ${status}`).toBeGreaterThanOrEqual(30);
   });
 
   it('reads at least 4.5:1 on the hub panel’s background too, in the standalone page', () => {
@@ -232,14 +232,14 @@ describe('the devices’ colours', () => {
     expect(read('index.html')).toContain('<link rel="stylesheet" href="devices.css">');
   });
 
-  it('gives each device’s page its own colour, by the name it is opened with, and falls back to the accent', () => {
+  it('gives each device’s page its own color, by the name it is opened with, and falls back to the accent', () => {
     const device = read('device.html');
     for (const name of names) expect(device).toContain(`:root[data-device="${name}"] { --device: var(--device-${name}); }`);
     expect(device).toMatch(/header \{ border-top: 4px solid var\(--device, var\(--accent\)\); \}/);
     expect(device).toMatch(/#device \{ color: var\(--device, var\(--muted\)\)/);
   });
 
-  it('colours the chip that says where a task was made by the device that made it, on the device pages and in the hub', () => {
+  it('colors the chip that says where a task was made by the device that made it, on the device pages and in the hub', () => {
     const device = read('device.html');
     for (const name of names) {
       expect(device).toContain(`.origin[data-origin="${name}"] { color: var(--device-${name}); border-color: var(--device-${name}); }`);
@@ -247,7 +247,7 @@ describe('the devices’ colours', () => {
     }
   });
 
-  it('tints the row that flashes when a sync brings a change in with the colour of the device that made the change, and keeps the chip on the card', () => {
+  it('tints the row that flashes when a sync brings a change in with the color of the device that made the change, and keeps the chip on the card', () => {
     const device = read('device.html');
     for (const name of names) expect(device).toContain(`li[data-editor="${name}"] { --flash: color-mix(in srgb, var(--device-${name}) 28%, var(--card)); }`);
     expect(device).toContain('li .origin { background: var(--card); }');
@@ -260,17 +260,17 @@ describe('the devices’ colours', () => {
 
   it.each(['light', 'dark'] as const)('keeps a task’s text readable (6.5:1, past AA’s 4.5:1) on every device’s tint, in the %s theme', (theme) => {
     const percent = Number(read('device.html').match(/--device-a\) (\d+)%, var\(--card\)/)![1]) / 100;
-    const { colours, page } = themes[theme];
+    const { colors, page } = themes[theme];
     const channels = (hex: string): number[] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
     const mixed = (device: string): string => `#${channels(device).map((c, i) => Math.round(percent * c + (1 - percent) * channels(page['--card']!)[i]!).toString(16).padStart(2, '0')).join('')}`;
     for (const name of names) {
-      expect(contrast(page['--ink']!, mixed(colours[name])), `${theme} ${name}`).toBeGreaterThanOrEqual(6.5);
+      expect(contrast(page['--ink']!, mixed(colors[name])), `${theme} ${name}`).toBeGreaterThanOrEqual(6.5);
       // …and it is a tint worth the name: further from the card than the shipped yellow was.
-      expect(contrast(mixed(colours[name]), page['--card']!), `${theme} ${name} against the card`).toBeGreaterThanOrEqual(contrast(page['--flash']!, page['--card']!));
+      expect(contrast(mixed(colors[name]), page['--card']!), `${theme} ${name} against the card`).toBeGreaterThanOrEqual(contrast(page['--flash']!, page['--card']!));
     }
   });
 
-  it('is not the only thing that names a device: each page writes the device’s name beside its colour', () => {
+  it('is not the only thing that names a device: each page writes the device’s name beside its color', () => {
     expect(read('device.js')).toMatch(/origin\.dataset\["origin"\]\s*=\s*task\.origin/);
     expect(read('device.js')).toMatch(/Device A/);
     expect(read('page.js')).toMatch(/origin\.textContent/);

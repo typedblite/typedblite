@@ -33,7 +33,7 @@ function installTheme(theme: Record<string, unknown> = {}) {
 }
 
 describe('loading the active theme', () => {
-  it('finds it by the id in workbench.colorTheme, follows its include, and resolves its colours', async () => {
+  it('finds it by the id in workbench.colorTheme, follows its include, and resolves its colors', async () => {
     installTheme({ tokenColors: [{ scope: 'keyword.control', settings: { foreground: '#222222' } }] });
     fake.settings.set('workbench', { colorTheme: 'Test Dark' });
     const theme = await loadTheme(log());
@@ -62,7 +62,7 @@ describe('loading the active theme', () => {
     expect(textMateStyle((await loadTheme(log()))!, KEYWORD)).toEqual({ foreground: '#333333' });
   });
 
-  it("applies the user's customisations and editor.semanticHighlighting.enabled, read in this host", async () => {
+  it("applies the user's customizations and editor.semanticHighlighting.enabled, read in this host", async () => {
     installTheme();
     fake.settings.set('workbench', { colorTheme: 'Test Dark' });
     fake.settings.set('editor', {
@@ -115,7 +115,7 @@ describe('when the theme is not readable in this extension host', () => {
 
   it('names the theme when no extension contributes it', async () => {
     expect(await readThemeFiles('Nowhere')).toEqual({
-      missing: "No extension in this extension host contributes the colour theme 'Nowhere'",
+      missing: "No extension in this extension host contributes the color theme 'Nowhere'",
     });
   });
 });

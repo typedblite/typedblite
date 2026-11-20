@@ -31,7 +31,7 @@ describe('the TextMate layer, on the grammar the editor uses', () => {
     ]);
   });
 
-  it("scopes each kind of keyword as TypeDB's TypeQL grammar does, so a theme colours them apart", () => {
+  it("scopes each kind of keyword as TypeDB's TypeQL grammar does, so a theme colors them apart", () => {
     expect(tokens('define entity person, owns email @key; attribute email, value string;')).toEqual([
       ['define', KEYWORD],
       ['entity', 'storage.type.typeqlite'],

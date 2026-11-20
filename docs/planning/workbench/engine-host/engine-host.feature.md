@@ -63,7 +63,7 @@ application are taken as requirements here:
 
 - **HTTP is generic dispatch over the operation list**, not a route per operation, so each input
   shape is declared once.
-- **An unrecognised mode flag is refused by name.** A mistyped flag must not fall through and start
+- **An unrecognized mode flag is refused by name.** A mistyped flag must not fall through and start
   a long-lived server that a script waits on forever.
 - **MCP exposes tools only, reads by default.** Writes are opt-in, and HTTP MCP is loopback only
   until authentication exists.
@@ -93,12 +93,12 @@ which are long-lived. It does **not** suit the **CLI**, which is one shot: a ses
 invocation is gone when the process exits. Over the CLI, `session.run` takes a location directly and
 opens, runs and closes in one call. State across CLI invocations is the file, not the session.
 
-**This generalises something that exists.**
+**This generalizes something that exists.**
 [`TypeDBLiteSession`](../../../../apps/cli/src/session.ts) is the piece the REPL and the CLI share.
 It has a location, a `run`, a textual classifier and `splitStatements`, and returns an `Outcome` of
 rows, ok or error. It has no transactions, no facts, no restart, no id and no dispatch. Phase 00
 decides whether the host's session core replaces it (the CLI then uses it) or wraps it. Either way
-the `typedblite` CLI's behaviour does not change.
+the `typedblite` CLI's behavior does not change.
 
 ## What already exists — verify before relying on it
 
@@ -122,7 +122,7 @@ This is load-bearing. It was written on 2026-11-17 from the other feature docume
 and no path private to a consumer. Every statement a consumer runs is one a user could paste into
 the REPL.
 
-**2. The host adds no engine behaviour.** The conformance run stays at **1742 of 1756**
+**2. The host adds no engine behavior.** The conformance run stays at **1742 of 1756**
 ([ADR-005](../../../architecture/adr-005-typedb-s-behaviour-specification-is-typedblite-s-conformance-oracle.md)).
 Anything it needs from the runtime goes through the usual path.
 
@@ -169,7 +169,7 @@ write tier is opt-in. A host that holds real stores must not let an agent write 
 - [x] Facts and refusals come back as data, with the engine's own message.
 - [x] **One operation, five transports:** a parity spec sends the same operation through each
       transport and asserts the same answer. *(Exit code and kind are compared between the CLI and the sidecar only; the REPL, HTTP and MCP do not carry them.)*
-- [x] An unrecognised mode flag exits 2 and names the flag. It never starts a server.
+- [x] An unrecognized mode flag exits 2 and names the flag. It never starts a server.
 - [x] MCP lists only operations that declare an input schema, exposes reads by default, refuses a
       write unless the write tier is on, and HTTP MCP refuses a non-loopback host.
 - [x] The decision on where the engine runs, and on adding NestJS to the repository, is an ADR.
@@ -221,7 +221,7 @@ write tier is opt-in. A host that holds real stores must not let an agent write 
 ## How this gets proven
 
 **With no transport.** The CQRS core is a module, and its handlers are specs. Nearly all of the
-behaviour is proven here.
+behavior is proven here.
 
 **Through the transports.** A parity spec sends the same operations through each one, so a transport
 cannot drift from the core. The sidecar and CLI are driven as child processes from plain Node.
@@ -285,4 +285,4 @@ Anything a phase defers is recorded here, not only in a commit message.
 - [ADR-009](../../../architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md): the WASM
   binding, which makes a worker possible
 - [`libs/runtime/README.md`](../../../../libs/runtime/README.md): the `SqliteDatabase` interface
-- [`apps/cli/src/session.ts`](../../../../apps/cli/src/session.ts): the session the host generalises
+- [`apps/cli/src/session.ts`](../../../../apps/cli/src/session.ts): the session the host generalizes

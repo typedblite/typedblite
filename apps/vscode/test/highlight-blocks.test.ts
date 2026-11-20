@@ -45,7 +45,7 @@ describe('highlighting the TypeQLite blocks of one Markdown page', () => {
   it('builds each request as its own workspace, so one page never sees another', async () => {
     await highlightBlocks([SCHEMA], GRAMMAR);
     const blocks = [QUERY];
-    // A page with no schema: labels coloured by position, nickname included, as ADR-008 D6 says.
+    // A page with no schema: labels colored by position, nickname included, as ADR-008 D6 says.
     expect(semantic(blocks, await highlightBlocks(blocks, GRAMMAR), 0)).toEqual(
       expect.arrayContaining(['person:type', 'name:property', 'nickname:property']),
     );

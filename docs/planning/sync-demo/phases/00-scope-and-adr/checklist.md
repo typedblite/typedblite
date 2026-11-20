@@ -20,7 +20,7 @@ phase: 00-scope-and-adr
       7.4.3, playwright-core 1.62.1 (Chromium revision 1234, present in `~/.cache/ms-playwright`),
       and `@sqlite.org/sqlite-wasm` 3.54.1-build1
 - [x] The latest releases (npm, 2026-11-12): Electron 45.3.1, Capacitor 8.6.2, playwright-core 1.65.0,
-      and sqlite-wasm 3.54.1-build1. Licences: sqlite-wasm and playwright-core are Apache-2.0;
+      and sqlite-wasm 3.54.1-build1. Licenses: sqlite-wasm and playwright-core are Apache-2.0;
       Electron and Capacitor are MIT. All are compatible with MPL-2.0
 - [x] Android toolchain on this machine: SDK platforms 34 and 35, the API 34 google_apis x86_64
       image, an existing AVD, and JDK 21 at `~/Android/jdk/jdk-21.0.13+9`. 🔴 **The user is not in the

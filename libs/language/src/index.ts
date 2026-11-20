@@ -42,7 +42,7 @@
  * Which annotations are admitted where, and what values they take.
  *
  * @categoryDescription Highlighting
- * The TextMate grammar for editors and highlighters that colour code with one, generated from the grammar's keywords.
+ * The TextMate grammar for editors and highlighters that color code with one, generated from the grammar's keywords.
  *
  * @module @typedblite/language
  */

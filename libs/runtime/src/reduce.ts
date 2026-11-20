@@ -155,7 +155,7 @@ interface Operand {
   readonly text: string;
 }
 
-const normalise = (valueType: string): string => (valueType === 'long' ? 'integer' : valueType);
+const normalize = (valueType: string): string => (valueType === 'long' ? 'integer' : valueType);
 
 function reduceOne(
   reduction: Reduction,
@@ -196,7 +196,7 @@ function reduceOne(
     case 'sum': {
       const terms = numbers();
       if (terms.length === 0) {
-        const declared = normalise(valueTypeOf(argument) ?? 'integer');
+        const declared = normalize(valueTypeOf(argument) ?? 'integer');
         return NUMERIC.has(declared) ? TypeDBLiteValue.value(declared, declared === 'double' ? '0.0' : '0') : inapplicable(declared);
       }
       return cellOf(terms.reduce((acc, n) => operate('+', acc, n, refuse, at)));
@@ -214,7 +214,7 @@ function reduceOne(
         const order = compareOperands(candidate, best, refuse, at, inapplicable);
         if (wantMax ? order > 0 : order < 0) best = candidate;
       }
-      return TypeDBLiteValue.value(normalise(best.valueType), best.text);
+      return TypeDBLiteValue.value(normalize(best.valueType), best.text);
     }
     case 'mean': {
       const terms = numbers();

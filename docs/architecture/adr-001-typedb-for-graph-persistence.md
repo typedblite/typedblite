@@ -70,7 +70,7 @@ in-process, in ordinary `nx test`, with no container and no port.
    user-facing depends on it.
 
 3. **The TypeDB substrate is generic; the schema and repositories belong to the application.**
-   WASM initialisation, the file storage adapter and the database handle are infrastructure.
+   WASM initialization, the file storage adapter and the database handle are infrastructure.
    The schema and the repositories belong in the application layer.
 
 4. **The invariants move into the schema.** Entity keys are `@key` attributes. These are

@@ -49,11 +49,11 @@ describe('typeqlite/highlightBlocks', () => {
     expect(semantic(blocks, result, 0)).toEqual(
       expect.arrayContaining(['name:property.declaration', 'person:type.declaration', 'name:property']),
     );
-    // `nickname` is defined nowhere on the page, so, as in the editor, it is not coloured as a label.
+    // `nickname` is defined nowhere on the page, so, as in the editor, it is not colored as a label.
     expect(semantic(blocks, result, 1)).toEqual(['$p:variable', 'person:type', 'name:property', '"Ann":string', '"A":string']);
   });
 
-  it('colours labels by position on a page with no schema, as an editor workspace with none does', async () => {
+  it('colors labels by position on a page with no schema, as an editor workspace with none does', async () => {
     const blocks = [QUERY];
     expect(semantic(blocks, await highlight(blocks), 0)).toEqual(
       expect.arrayContaining(['person:type', 'name:property', 'nickname:property']),

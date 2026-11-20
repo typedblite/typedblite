@@ -1,7 +1,7 @@
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/nunito';
 
-/* TypeDBLite's colours: ink #15171C, paper #F4F2EE, signal orange #E8590C (docs/brand/README.md).
+/* TypeDBLite's colors: ink #15171C, paper #F4F2EE, signal orange #E8590C (docs/brand/README.md).
    Orange text on paper is 3.6:1, short of 4.5:1, so text accents use a darker orange in the light theme. */
 :root {
   --sl-color-accent-low: #3a1a0a;
@@ -67,7 +67,7 @@ pre.mermaid {
   color: var(--sl-color-accent-high);
 }
 
-/* Starlight colours its cards in turn (purple, orange, green, red, blue). The site has one accent. */
+/* Starlight colors its cards in turn (purple, orange, green, red, blue). The site has one accent. */
 .card,
 .card:nth-child(n) {
   --sl-card-border: var(--sl-color-accent) !important;

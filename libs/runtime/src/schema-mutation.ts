@@ -20,7 +20,7 @@ import {
   isUndefineOwns,
   isUndefinePlays,
   isUndefineRelates,
-  isUndefineSpecialise,
+  isUndefineSpecialize,
   isUndefineSub,
   isUndefineType,
   isUndefineValue,
@@ -34,7 +34,7 @@ import {
   type UndefineFrom,
 } from '@typedblite/language';
 import { DiagnosticCode, rangeOf } from './diagnostics.js';
-import { checkArgumentsFit, checkSpecialisation, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
+import { checkArgumentsFit, checkSpecialization, type DataFacts, type Refuse, type SchemaFacts } from './schema-rules.js';
 import {
   SEP,
   ownsKey,
@@ -164,21 +164,21 @@ function redefineType(node: RedefineType, context: MutationContext): void {
         rangeOf(node),
       );
     }
-    // `redefine part-time-employment relates part-time-role as empty-abstract-role;` — the specialisation
+    // `redefine part-time-employment relates part-time-role as empty-abstract-role;` — the specialization
     // is the change (redefine.feature L630), checked as `define` checks one, against the schema without
     // the one it replaces.
     if (isRelatesTrait(trait) && trait.specialises !== undefined) {
       const key = roleRef(name, trait.name);
       const before = context.schema.specialises.get(key)?.split(':')[1];
       if (before === undefined) {
-        refuse(DiagnosticCode.notDefined, `'${capability}' specialises nothing, so there is no specialisation to redefine. Try define instead.`, rangeOf(node));
+        refuse(DiagnosticCode.notDefined, `'${capability}' specializes nothing, so there is no specialization to redefine. Try define instead.`, rangeOf(node));
       }
       if (before === trait.specialises) {
         refuse(DiagnosticCode.alreadyDefined, `'${capability} as ${trait.specialises}' is already defined; a redefine changes something. Nothing was redefined.`, rangeOf(node));
       }
       const without = new Map(context.schema.specialises);
       without.delete(key);
-      checkSpecialisation(trait, trait.specialises, name, { ...context.schema, specialises: without }, refuse);
+      checkSpecialization(trait, trait.specialises, name, { ...context.schema, specialises: without }, refuse);
       context.db.prepare('INSERT OR REPLACE INTO schema_specialises(relation, role, specialises) VALUES (?, ?, ?)').run(name, trait.name, trait.specialises);
       return;
     }
@@ -788,7 +788,7 @@ function undefineFrom(node: UndefineFrom, context: MutationContext): void {
     return;
   }
 
-  if (isUndefineSpecialise(target)) {
+  if (isUndefineSpecialize(target)) {
     // `undefine as employee from part-time-employment relates part-time-employee;` (L631).
     const capability = node.capability;
     if (capability === undefined || !isCapabilityRelates(capability)) {

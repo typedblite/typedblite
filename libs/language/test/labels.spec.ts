@@ -139,21 +139,21 @@ describe('the unknown-label warning (ADR-008 D6)', () => {
 });
 
 describe('semantic tokens', () => {
-  it('with a schema, colour a label only when it resolves', async () => {
+  it('with a schema, color a label only when it resolves', async () => {
     const ws = await workspace(files('match $p isa person; $q isa persn;'));
     const tokens = await ws.tokens('query.tql');
     expect(tokens).toContainEqual({ text: 'person', type: 'type' });
     expect(tokens.find((t) => t.text === 'persn')).toBeUndefined();
   });
 
-  it('colour a resolved label by what it names', async () => {
+  it('color a resolved label by what it names', async () => {
     const ws = await workspace(files());
     const tokens = await ws.tokens('query.tql');
     expect(tokens).toContainEqual({ text: 'name', type: 'property' });
     expect(tokens).toContainEqual({ text: 'employee', type: 'parameter' });
   });
 
-  it('without a schema, colour a label by its position, as before', async () => {
+  it('without a schema, color a label by its position, as before', async () => {
     const ws = await workspace({ 'query.tql': 'match $p isa persn, has nme $n;' });
     const tokens = await ws.tokens('query.tql');
     expect(tokens).toContainEqual({ text: 'persn', type: 'type' });

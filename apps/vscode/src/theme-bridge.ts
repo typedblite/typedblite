@@ -4,7 +4,7 @@ import { THEME_FILES_COMMAND, type ThemeFilesResult } from './markdown/theme-sou
 
 /**
  * The TypeQLite Theme Bridge: a UI extension (`extensionKind: ["ui"]`) whose only job is to read a
- * colour theme's files where VS Code keeps them (ADR-010 D7).
+ * color theme's files where VS Code keeps them (ADR-010 D7).
  *
  * In a remote window the TypeQLite extension runs in the remote extension host, and the themes are
  * UI extensions in the local one, out of its sight. Commands cross between the hosts, so it asks for

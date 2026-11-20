@@ -52,7 +52,7 @@ export function valueNode(name: string, value: RecordedValue, things: Recording[
   }
 }
 
-/** One row: its bindings, summarised on one line, and opening to each. */
+/** One row: its bindings, summarized on one line, and opening to each. */
 export function rowNode(name: string, row: RecordedRow, things: Recording['things']): VariableNode {
   const bindings = Object.entries(row).map(([variable, value]) => valueNode(variable, value, things));
   return {

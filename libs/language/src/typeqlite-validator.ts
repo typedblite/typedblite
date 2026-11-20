@@ -94,7 +94,7 @@ import { TypeQLiteValidationCode } from './typeqlite-validation-codes.js';
  *
  * ⚠️ **"Loudly" changed shape on 2026-09-11, by founder decision.** An unenforced annotation was
  * an *error* — the schema was refused. That refused every valid TypeDB schema that used one:
- * a documentation store's schema could not be applied at all, and every Background in TypeDB's own behaviour
+ * a documentation store's schema could not be applied at all, and every Background in TypeDB's own behavior
  * specification was turned away before a single semantic could be measured (ADR-005). It is now a
  * diagnostic **below error severity**: `define` applies the schema and the runtime forwards the
  * diagnostic as a fact in its report, so the reader sees *"`@card` is parsed and not enforced"*
@@ -379,7 +379,7 @@ export class TypeQLiteValidator {
    */
   checkLabelsAreUnique(node: DefineClause, accept: ValidationAcceptor): void {
     const seen = new Map<string, string>();
-    for (const definition of labelled(node)) {
+    for (const definition of labeled(node)) {
       const previous = seen.get(definition.name);
       // The same label as the same kind is the one type stated again — additive, and a no-op where it
       // repeats (define.feature L2529). Only a second KIND is a second type.
@@ -399,7 +399,7 @@ export class TypeQLiteValidator {
 
   /** Reserved keywords parse here and fail only against a real TypeDB. */
   checkReservedKeywords(node: DefineClause, accept: ValidationAcceptor): void {
-    for (const definition of labelled(node)) {
+    for (const definition of labeled(node)) {
       if (RESERVED.has(definition.name)) {
         accept(
           'error',
@@ -484,7 +484,7 @@ export class TypeQLiteValidator {
  *
  * 🔴 The list was hand-written before that and over-reserved by twelve: `name`, `label`, `kind`,
  * `type`, `value`, `sort`, `limit`, `offset`, `require`, `distinct`, `select`, `reduce` are all
- * accepted by the server. `name` alone refused every Background in TypeDB's own behaviour spec,
+ * accepted by the server. `name` alone refused every Background in TypeDB's own behavior spec,
  * and a real schema renamed `name` to `project-name` to dodge a refusal TypeDB never makes.
  * `d-20260911-the-validator-reserves-ten-identifiers-typedb`.
  */
@@ -512,7 +512,7 @@ export const reservedKeywordMessage = (word: string): string =>
 const article = (subject: AnnotationSubject): string => (/^[aeiou]/.test(subject) ? 'an' : 'a');
 
 /** Every named definition in a `define` clause, with the label TypeDB would see. */
-function* labelled(clause: DefineClause) {
+function* labeled(clause: DefineClause) {
   for (const definition of clause.definitions) {
     if (isEntityDef(definition) || isRelationDef(definition) || isAttributeDef(definition)) {
       yield definition;

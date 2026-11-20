@@ -159,7 +159,7 @@ function renderTasks(tasks: State['tasks'], flash: ReadonlySet<string>): void {
       const origin = document.createElement('span');
       origin.className = 'origin';
       origin.textContent = LABELS[task.origin] ?? task.origin;
-      origin.dataset['origin'] = task.origin; // devices.css colours it by the device that made the task
+      origin.dataset['origin'] = task.origin; // devices.css colors it by the device that made the task
       const label = document.createElement('label');
       label.append(box, title, origin);
       item.append(label);
@@ -175,7 +175,7 @@ function renderTasks(tasks: State['tasks'], flash: ReadonlySet<string>): void {
       row.box.checked = task.done;
       row.item.classList.toggle('done', task.done);
     }
-    // Who made the latest change, and so whose colour the highlight takes (the chip, below, says who made the task).
+    // Who made the latest change, and so whose color the highlight takes (the chip, below, says who made the task).
     row.item.dataset['editor'] = task.editedBy;
     if (flash.has(task.id)) {
       row.item.classList.add('flash');

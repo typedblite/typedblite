@@ -1,5 +1,5 @@
 // 🔴 **If you change the semantics in this file, re-run the parity oracle.**
-// CouchDB's revision-tree behaviour is kept here on purpose (ADR-003), and it was proven against
+// CouchDB's revision-tree behavior is kept here on purpose (ADR-003), and it was proven against
 // real CouchDB 3.4.3 in TypeDBLite Sync Phase 03. That check is **no longer part of the routine
 // suite** — it skipped on every CI run for want of the stack, reporting nothing. Bring the stack up
 // and run `nx run typedblite-runtime:test-oracle`. Nothing else will tell you the semantics drifted.
@@ -593,7 +593,7 @@ export class ChangeLog {
     // on *some other* node, so accepting one asserts an equivalence between two things that have
     // never been shown to be the same. Two peers' unrelated keyless relations collide on one id,
     // and `localIid` cannot resolve it, so every revision inserts another `thing` row. Refusing is
-    // the behaviour `canonical.ts` documents; until now nothing performed it.
+    // the behavior `canonical.ts` documents; until now nothing performed it.
     if (!isReplicable(record.entityId)) return false;
 
     // 🔴 Refused, not skipped: a revision that does not match its content is a peer that is broken or hostile,

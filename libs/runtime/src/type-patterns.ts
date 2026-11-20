@@ -46,7 +46,7 @@ export interface TypeConstraint {
   subs: Array<{ readonly type?: string; readonly variable?: string; readonly direct: boolean }>;
   owns: Array<{ readonly attribute?: string; readonly variable?: string }>;
   plays: Array<{ readonly role?: string; readonly variable?: string }>;
-  /** `relates $r as parent` — `as` is the role the related role is, or specialises (by name, or `relation:role`). */
+  /** `relates $r as parent` — `as` is the role the related role is, or specializes (by name, or `relation:role`). */
   relates: Array<{ readonly role?: string; readonly variable?: string; readonly as?: string; readonly asVariable?: string }>;
   /** `$x value integer` — an attribute type holding that value type, its own or inherited. */
   values?: string[];
@@ -222,7 +222,7 @@ export function solveTypes(
   refuse: Refuse,
 ): Array<Record<string, Binding>> {
   const labels = universe(facts);
-  // Role types have parents too: `fathership:father` is below `parentship:parent` once it specialises
+  // Role types have parents too: `fathership:father` is below `parentship:parent` once it specializes
   // it, so `sub` and `as` walk one graph (define.feature L635, match.feature L3546).
   facts = { ...facts, parents: new Map([...facts.parents, ...facts.specialises]) };
   // Every constraint's names are checked before any is solved, so a contradiction in one cannot
@@ -314,7 +314,7 @@ function solveOne(
   }
   for (const relates of constraint.relates) {
     if (kind !== 'relation') return [];
-    // `relates $r as parent` keeps the related roles that are `parent`, or specialise it, at any depth.
+    // `relates $r as parent` keeps the related roles that are `parent`, or specialize it, at any depth.
     const chain = (role: string): string[] => [role, ...ancestorsOf(role, facts)];
     const matchesAs = (role: string): boolean =>
       relates.as === undefined || chain(role).some((r) => (relates.as as string).includes(':') ? r === relates.as : r.split(':')[1] === relates.as);
@@ -325,7 +325,7 @@ function solveOne(
       results = bindEach(results, relates.variable, related);
     }
     if (relates.asVariable !== undefined) {
-      // `relates $r as $p` — `$p` is each role the related one is or specialises.
+      // `relates $r as $p` — `$p` is each role the related one is or specializes.
       results = results.flatMap((row) => {
         const bound = typeof row[relates.variable ?? ''] === 'string' ? [row[relates.variable as string] as string] : related.filter((r) => relates.role === undefined || r.split(':')[1] === relates.role);
         return bindEach([row], relates.asVariable as string, bound.flatMap(chain));

@@ -5,7 +5,7 @@ import { validate } from './parse.js';
  * `RESERVED` is what TypeDB reserves — not what this repository once assumed.
  *
  * 🔴 The list was hand-written and over-reserved by twelve words. `name` was among them, and every
- * Background in the behaviour spec defines `attribute name` — so the validator refused all 1,632
+ * Background in the behavior spec defines `attribute name` — so the validator refused all 1,632
  * of them after the grammar learned to parse them (Phase 01 of TypeDBLite Conformance). Each word
  * below was probed on `typedb/typedb:3.10.4` on 2026-09-11 as `define attribute <word>, value
  * string;` on a scratch database: the reserved ones answer `[DEX31] The reserved keyword "…"

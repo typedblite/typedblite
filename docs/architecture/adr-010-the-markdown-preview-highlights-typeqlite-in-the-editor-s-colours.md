@@ -6,15 +6,15 @@ decision-owners: [Founder, TypeDBLite maintainers]
 extends: [adr-008]
 ---
 
-# ADR-010: The Markdown preview highlights TypeQLite code blocks as the editor does, in the theme's colours
+# ADR-010: The Markdown preview highlights TypeQLite code blocks as the editor does, in the theme's colors
 
 - **Status:** Accepted on 2026-11-13. The founder chose to highlight code blocks in VS Code's
-  Markdown preview, in the active theme's colours, and to leave GitHub plain. **Amended on
+  Markdown preview, in the active theme's colors, and to leave GitHub plain. **Amended on
   2026-11-13** with D7, after the preview was found never to reach the theme in a remote window.
 - **Date:** 2026-11-13
 - **Decision owners:** Founder; TypeDBLite maintainers
 - **Extends:** [ADR-008](adr-008-the-typeqlite-editor-is-a-langium-language-server-in-this-repository.md).
-  The client was only a launcher for the server. It now also colours the Markdown preview, from what
+  The client was only a launcher for the server. It now also colors the Markdown preview, from what
   the server says.
 
 ---
@@ -22,17 +22,17 @@ extends: [adr-008]
 ## Context
 
 The docs hold 27 code blocks fenced as `typeql`. Read anywhere, they are plain text. The question
-was whether they could be highlighted with the colours the editor gives the same text.
+was whether they could be highlighted with the colors the editor gives the same text.
 
 Measured on 2026-11-13, before deciding:
 
 | Fact | Consequence |
 | ---- | ----------- |
-| GitHub's renderer highlights a `ts` fence, and leaves `typeql`, `typeqlite` and `tql` plain. It strips `style` attributes and `<style>` elements | **Nothing in this repository can colour a code block on GitHub.** Only a grammar in `github-linguist` could, and its colours would be GitHub's |
-| The editor's colours are not the extension's. The semantic tokens are kinds (`type`, `property`, `parameter`, `variable`, `keyword`, `string`, `number`), and the TextMate grammar assigns scopes. The active theme maps both to colours | "The editor's colours" means **the active theme's**, which change when the theme does |
-| VS Code has no API for a theme's token colours. An extension sees the theme's kind and its workbench colours only | The client has to read the theme's own files and apply VS Code's rules to them |
-| The Markdown preview activates every extension that contributes `markdown.markdownItPlugins`, and calls the `extendMarkdownIt` it exports. Its engine sets `highlight` before plugins run, and `markdown.preview.refresh` clears its cache and re-renders. Its content security policy allows inline styles, and it does not sanitise the HTML | A plugin can replace a fence's contents with coloured spans, and ask for a re-render |
-| markdown-it renders synchronously. The language server answers asynchronously | A block is drawn plain on its first render, and coloured on the re-render once the answer lands |
+| GitHub's renderer highlights a `ts` fence, and leaves `typeql`, `typeqlite` and `tql` plain. It strips `style` attributes and `<style>` elements | **Nothing in this repository can color a code block on GitHub.** Only a grammar in `github-linguist` could, and its colors would be GitHub's |
+| The editor's colors are not the extension's. The semantic tokens are kinds (`type`, `property`, `parameter`, `variable`, `keyword`, `string`, `number`), and the TextMate grammar assigns scopes. The active theme maps both to colors | "The editor's colors" means **the active theme's**, which change when the theme does |
+| VS Code has no API for a theme's token colors. An extension sees the theme's kind and its workbench colors only | The client has to read the theme's own files and apply VS Code's rules to them |
+| The Markdown preview activates every extension that contributes `markdown.markdownItPlugins`, and calls the `extendMarkdownIt` it exports. Its engine sets `highlight` before plugins run, and `markdown.preview.refresh` clears its cache and re-renders. Its content security policy allows inline styles, and it does not sanitize the HTML | A plugin can replace a fence's contents with colored spans, and ask for a re-render |
+| markdown-it renders synchronously. The language server answers asynchronously | A block is drawn plain on its first render, and colored on the re-render once the answer lands |
 
 ## Decision
 
@@ -44,20 +44,20 @@ extension ships, run by a small tokenizer that refuses any construct it does not
 client knows nothing about TypeQLite: ADR-008's rule holds.
 
 **D2. A document's blocks are their own workspace, never the editor's.** A page's `define` block
-resolves the labels in the query blocks below it. A label the page defines nowhere is not coloured as
-a label, as in an editor workspace with a schema. A page with no schema colours labels by position
-(ADR-008 D6). The open workspace's schema never colours a docs page.
+resolves the labels in the query blocks below it. A label the page defines nowhere is not colored as
+a label, as in an editor workspace with a schema. A page with no schema colors labels by position
+(ADR-008 D6). The open workspace's schema never colors a docs page.
 
-**D3. The colours are the active theme's, resolved by VS Code's rules.** The client finds the
+**D3. The colors are the active theme's, resolved by VS Code's rules.** The client finds the
 theme's file through the `contributes.themes` of the extension that contributes it, follows its
 `include` chain, and applies the user's `editor.semanticTokenColorCustomizations` and
 `editor.tokenColorCustomizations`. The rules it restates (semantic selector scoring, the fallback
 from a semantic type to TextMate scopes, TextMate specificity and inheritance, and what turns
 semantic highlighting on) are listed in `apps/vscode/src/markdown/theme.ts` and pinned by its
-tests. A theme change or a colour setting change re-renders open previews.
+tests. A theme change or a color setting change re-renders open previews.
 
-**D4. When the theme cannot be read, the preview falls back to its own colours.** That covers a theme
-whose token colours are in a `.tmTheme` (plist) file, and one that no installed extension
+**D4. When the theme cannot be read, the preview falls back to its own colors.** That covers a theme
+whose token colors are in a `.tmTheme` (plist) file, and one that no installed extension
 contributes. The blocks then get the preview's highlight.js classes, and the reason goes to the
 TypeQLite output channel.
 
@@ -65,13 +65,13 @@ TypeQLite output channel.
 `typeqlite`, and `tql` is the file extension.
 
 **D6. GitHub stays plain.** A `github-linguist` grammar is **deferred**. It would bring
-pattern-based highlighting only, in GitHub's colours.
+pattern-based highlighting only, in GitHub's colors.
 
 **D7. In a remote window, a second extension reads the theme: the TypeQLite Theme Bridge.** Measured on
 2026-11-13, in a WSL window: every preview render logged that no installed extension contributes the
-active theme, so the preview always fell back to its own colours (D4). The cause is where VS Code
+active theme, so the preview always fell back to its own colors (D4). The cause is where VS Code
 runs things. The Markdown preview's plugins, and so this extension and its language server, run in
-the **remote** extension host. Colour themes, the built-in ones included, are UI extensions in the
+the **remote** extension host. Color themes, the built-in ones included, are UI extensions in the
 **local** one: the WSL server ships none. An extension sees only its own host's extensions, and the
 e2e suite, which runs VS Code locally, could not see the gap.
 
@@ -80,7 +80,7 @@ UI extension (`extensionKind: ["ui"]`) with one command, `typeqlite.themeFiles`.
 it returns that theme's files, read by the same code the main extension uses. Commands cross between
 extension hosts, and VS Code's remote-extension guide recommends this split. The main extension looks
 in its own host first, and asks the bridge only when the theme is not there. **The user's
-customisations are still applied by the main extension**, because settings for the remote machine
+customizations are still applied by the main extension**, because settings for the remote machine
 apply only in the remote host.
 
 The bridge is a separate `.vsix` that the user installs in the local VS Code. It cannot be required
@@ -100,16 +100,16 @@ log names the bridge to install.
 ### Negative / Constraints
 
 - 🔴 **D3 reads files VS Code does not promise to keep in that shape.** If VS Code changes how themes
-  are stored, or how it resolves their colours, the preview drifts from the editor without failing.
-  The e2e case pins the colours of two built-in themes, to catch that on a VS Code upgrade.
-- **The first render of a changed block is plain.** The coloured render follows once the server
+  are stored, or how it resolves their colors, the preview drifts from the editor without failing.
+  The e2e case pins the colors of two built-in themes, to catch that on a VS Code upgrade.
+- **The first render of a changed block is plain.** The colored render follows once the server
   answers, usually within a frame or two.
 - **D7 adds a second package**, and a remote-window user who does not install it gets the preview's
-  own colours. The e2e suite installs both packages and drives the bridge's command, but it runs
+  own colors. The e2e suite installs both packages and drives the bridge's command, but it runs
   VS Code locally, where the bridge is never needed. A remote window is checked by hand.
 - **Opening a Markdown preview starts the language server**, because the preview activates the
   extension.
-- **Font styles are drawn, and nothing else.** The theme's colour, italic, bold, underline and
+- **Font styles are drawn, and nothing else.** The theme's color, italic, bold, underline and
   strikethrough reach the preview. The preview's own code font and background stay as they are.
 
 ## References

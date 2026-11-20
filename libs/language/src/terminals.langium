@@ -1,7 +1,7 @@
 // TypeQLite terminals.
 //
 // Deliberately NOT reusing the parent monorepo's scripting-language terminals.langium: that file is built around
-// PascalCase/HYPHENATED_NAME identifiers for a modelling language written by humans in prose
+// PascalCase/HYPHENATED_NAME identifiers for a modeling language written by humans in prose
 // style. TypeQLite identifiers are lowercase-hyphenated (`project-id`, `membership-key`), variables
 // are `$`-prefixed, and comments are `#` — three incompatible lexical decisions.
 
@@ -41,7 +41,7 @@ terminal IID returns string: /0x[0-9a-fA-F]+/;
 // would lex as the integer `2026` and the rest would be a parse error nobody could read.
 //
 // **Seconds precision, an OPTIONAL fractional part, no timezone.** This repository's callers emit
-// `d.toISOString().replace('Z', '').slice(0, 19)`; the behaviour spec's `fetch.feature` inserts
+// `d.toISOString().replace('Z', '').slice(0, 19)`; the behavior spec's `fetch.feature` inserts
 // `2020-01-01T13:13:13.999`, and that caller arrived 2026-09-11. ⚠️ `attr.value` is compared as
 // text, so `…:13` and `…:13.000` are two texts for one instant and will never match each other —
 // a caller mixing spellings gets what it wrote. Minutes-only (`2026-09-03T10:00`) is TypeDB's too,

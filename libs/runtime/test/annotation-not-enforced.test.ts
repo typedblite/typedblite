@@ -9,7 +9,7 @@ import { DiagnosticCode } from '../src/diagnostics.js';
  * 🔴 Until 2026-09-11 `define` REFUSED `@card` and `@unique` as "parsed but not implemented", on
  * the rule that unsupported TypeQLite never silently succeeds. The rule stands; the refusal was the
  * wrong side of it — a documentation store's schema could not be applied, and every Background in TypeDB's
- * behaviour spec was turned away (ADR-005, Phase 01). Founder decision: accept, and report. So the
+ * behavior spec was turned away (ADR-005, Phase 01). Founder decision: accept, and report. So the
  * language layer emits the diagnostic below error severity, and this interpreter forwards it as a
  * FACT in the report of the call that applied it — ADR-004's returned report, where a reader who
  * looks sees *"`@card` is parsed and not enforced"*, and one who does not is not lied to by a

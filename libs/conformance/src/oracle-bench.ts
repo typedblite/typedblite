@@ -18,7 +18,7 @@ import { TypeDBServer } from './typedb-oracle.js';
  * - **One open read transaction.** TypeDB's reads go through a single read transaction, reopened after
  *   writes (it is a snapshot), so no transaction is opened and closed per query.
  * - **Count-only reads.** Every read is also run as `reduce $answers = count`, which ships one number, so no
- *   rows are serialised or transferred, and the size of the answer drops out of the transport.
+ *   rows are serialized or transferred, and the size of the answer drops out of the transport.
  * - **A floor per engine.** A lookup that finds nothing is timed on each engine, on the store of the size
  *   being measured, and subtracted: "above floor" is what a query costs beyond a trivial one. A cost under
  *   `NOISE_MS` is indistinguishable from the floor and is shown as `~0`.

@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS schema_ordered (
   subject TEXT PRIMARY KEY
 );
 
--- relates father as parent: the role a relation's own role SPECIALISES, by name; the relation above it
+-- relates father as parent: the role a relation's own role SPECIALIZES, by name; the relation above it
 -- that declares that name is resolved on load (define.feature L635). Additive, like the tables above.
 CREATE TABLE IF NOT EXISTS schema_specialises (
   relation    TEXT NOT NULL,
@@ -216,7 +216,7 @@ export function generateSchema(file: TypeQLiteFile): SchemaSql {
   const plays: Array<[string, string]> = [];
   /** `owns name[]`, `relates parent[]` — their subjects. */
   const ordered: string[] = [];
-  /** `relates father as parent` — [relation, role, the role it specialises]. */
+  /** `relates father as parent` — [relation, role, the role it specializes]. */
   const specialises: Array<[string, string, string]> = [];
   /** `define fun …` — [name, its definition as written]; `define struct …` — [name, its fields as JSON]. */
   const functions: Array<[string, string]> = [];

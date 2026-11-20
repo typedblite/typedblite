@@ -13,7 +13,7 @@ import {
 } from './generated/ast.js';
 
 /**
- * Where each annotation may sit: the places TypeDB 3 admits it, as its behaviour specification states row by row.
+ * Where each annotation may sit: the places TypeDB 3 admits it, as its behavior specification states row by row.
  *
  * The subjects are syntactic: the AST says whether an annotation follows the type's name, its `sub`, its `value`, or
  * a trait. A re-open (`player @abstract;`) does not say which kind of type it names, so it admits the union of the

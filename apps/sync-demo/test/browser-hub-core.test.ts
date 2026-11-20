@@ -245,7 +245,7 @@ describe('the change stream', () => {
     cancel();
   });
 
-  it('stops a stream when it is cancelled: no timer, no more frames, and cancelling twice is harmless', () => {
+  it('stops a stream when it is canceled: no timer, no more frames, and cancelling twice is harmless', () => {
     const { core, db } = newHub();
     const { got, cancel } = ask(core, { path: '/changes', headers: AUTH });
     expect(core.openStreams).toBe(1);

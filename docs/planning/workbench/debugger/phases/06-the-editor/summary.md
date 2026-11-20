@@ -39,9 +39,9 @@ VS Code against the packaged extension.
 - `src/debug/register.ts` is excluded from the unit coverage floor by name, with its reason (it calls `vscode.debug`,
   which exists only in the extension host); the e2e runs it.
 - The gate, from a clean tree: all 14 steps passed on the second run. The first failed one spec of the sync demo's
-  in-browser hub suite (`colours the hub's list the same way…`), which reads a chip's colour once without waiting for
+  in-browser hub suite (`colors the hub's list the same way…`), which reads a chip's color once without waiting for
   the hub to re-render; rerun alone it passed once and failed once. Nothing this feature changed reaches the sync
-  demo's page. Left as found: it is the sync demo's spec, and its neighbours already wait with `until`.
+  demo's page. Left as found: it is the sync demo's spec, and its neighbors already wait with `until`.
 
 ## The feature
 

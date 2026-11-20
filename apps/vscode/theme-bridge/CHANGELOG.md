@@ -8,5 +8,5 @@ TypeDBLite npm packages. The format follows [Keep a Changelog](https://keepachan
 The first release. Nothing has been published to a marketplace yet.
 
 ### Added
-- Reads your colour theme's files where your local VS Code keeps them, so the TypeQLite extension can colour
+- Reads your color theme's files where your local VS Code keeps them, so the TypeQLite extension can color
   TypeQLite code blocks in the Markdown preview in your theme in a remote window (WSL, SSH, a container).

@@ -1,5 +1,5 @@
 define
-#! Someone the organisation knows about.
+#! Someone the organization knows about.
 entity nav-person @doc("A human being"),
   owns nav-name,
   plays nav-employment:nav-employee;

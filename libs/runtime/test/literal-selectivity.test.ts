@@ -1,7 +1,7 @@
 /**
  * Several `has` literals on one variable: the most selective drives, the others are probed.
  *
- * 🔴 Each literal used to be its own `t.iid IN (owners of the value)`, all materialised, so one value
+ * 🔴 Each literal used to be its own `t.iid IN (owners of the value)`, all materialized, so one value
  * owned by thousands of things set the cost of a match another literal pinned to a single row
  * (docs/development/performance.md, finding 5). `candidateQuery` now counts each value's owners (up
  * to 256), drives from the fewest, and probes the rest with `EXISTS`.

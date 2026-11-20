@@ -96,7 +96,7 @@ never because it is hard:
 
 ```yaml
 - pattern: "connection has {int} databases"
-  reason: TypeDBLite has no connection or database catalogue; one interpreter is one database
+  reason: TypeDBLite has no connection or database catalog; one interpreter is one database
 ```
 
 ⚠️ **The list is expected to be short and to shrink.** A scenario moving from fail to

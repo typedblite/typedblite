@@ -15,7 +15,7 @@ import { createTypeQLiteServices } from '../src/typeqlite-module.js';
  * The race is a matter of timing in the server (about three runs in ten for five rapid `didOpen`s).
  * This spec cancels at exactly that point, so it fails every time without the fix.
  */
-describe('diagnostics are published from a cancelled build', () => {
+describe('diagnostics are published from a canceled build', () => {
   it('runs the Validated listener for a document that was validated before the cancel', async () => {
     const { shared, TypeQLite } = createTypeQLiteServices({ ...NodeFileSystem });
     const { LangiumDocumentFactory, LangiumDocuments, DocumentBuilder } = shared.workspace;

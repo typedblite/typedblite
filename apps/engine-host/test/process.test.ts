@@ -37,7 +37,7 @@ async function eventually<T>(attempt: () => Promise<T>, timeoutMs = 15_000): Pro
 }
 
 describe('the host as a process', () => {
-  it('refuses an unrecognised mode flag by name, exit 2, and does not wait for anything', () => {
+  it('refuses an unrecognized mode flag by name, exit 2, and does not wait for anything', () => {
     const result = host('--repel');
     expect(result.status).toBe(2);
     expect(`${result.stdout}${result.stderr}`).toContain('--repel');

@@ -233,7 +233,7 @@ export class ChangeStreamClient {
         this.retryTimer = setTimeout(() => void connect(), retryMs * attempt);
         return;
       }
-      // The stream ended without an error — the hub closed it. Reconnect unless cancelled.
+      // The stream ended without an error — the hub closed it. Reconnect unless canceled.
       if (!this.stopped) {
         this.retryTimer = setTimeout(() => void connect(), retryMs);
       }

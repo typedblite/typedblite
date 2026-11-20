@@ -1,7 +1,7 @@
 /*
  * The in-browser hub page. Scoped to `.bh` and reading only `--bh-*` custom properties, so the site can map them
- * onto Starlight's colours (apps/website/src/pages/sync-demo.astro) and the standalone page can define its own.
- * The one exception is the colour of each device, `--device-a/b/c`, which `devices.css` defines for every page that names one.
+ * onto Starlight's colors (apps/website/src/pages/sync-demo.astro) and the standalone page can define its own.
+ * The one exception is the color of each device, `--device-a/b/c`, which `devices.css` defines for every page that names one.
  */
 .bh { font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: var(--bh-ink); }
 .bh * { box-sizing: border-box; }

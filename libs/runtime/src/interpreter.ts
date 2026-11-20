@@ -380,7 +380,7 @@ interface SchemaModel extends SchemaFacts {
   readonly plays: Set<string>;
   /** The ordered capabilities — `owns name[]`, `relates parent[]` — by subject, from `schema_ordered`. */
   readonly ordered: Set<string>;
-  /** `relates father as parent` — `relation:role` to the specialised `relation:role`, from `schema_specialises`. */
+  /** `relates father as parent` — `relation:role` to the specialized `relation:role`, from `schema_specialises`. */
   readonly specialises: Map<string, string>;
   /** `define fun …`, by name, from `schema_function`. */
   readonly functions: Set<string>;
@@ -446,7 +446,7 @@ export interface TypeDBLiteOptions {
   /**
    * The function that opens the SQLite connection, `node:sqlite` by default. Pass another binding (a WASM SQLite in a
    * worker) to run the interpreter where Node's built-ins do not exist; see `sqlite-database.ts` for
-   * what a binding must honour.
+   * what a binding must honor.
    */
   openDatabase?: SqliteOpener;
 }
@@ -547,7 +547,7 @@ interface ThingConstraint {
     value: string;
     range?: Range;
     /**
-     * `has measure 60` where `measure` is abstract with no value type: the literal spelt per
+     * `has measure 60` where `measure` is abstract with no value type: the literal spelled per
      * concrete subtype that can read it — `height` as `60`, `weight` as `60.0` — because
      * `attr.value` is compared as text in each subtype's own spelling (review, round 16).
      */
@@ -745,7 +745,7 @@ export class TypeDBLiteInterpreter {
     // "concurrent" writers never contended and this was invisible.
     //
     // Replication is a multi-process design by definition — a hub and its spokes, and the
-    // Phase 01 durability suite — so waiting is the correct behaviour, not an optimisation.
+    // Phase 01 durability suite — so waiting is the correct behavior, not an optimization.
     this.db.exec(`PRAGMA busy_timeout = ${Number(busyTimeoutMs)}`);
     // 🔴 SQLite's `LIKE` folds ASCII case by default, and TypeQLite labels are case-sensitive:
     // `undefine foo;` deleted `Foo`'s annotation rows (Phase 04 review, round 2). No reader in
@@ -822,7 +822,7 @@ export class TypeDBLiteInterpreter {
     // The PRAGMA does not merely answer a different mode when it cannot switch — it **throws**:
     // `database is locked`, if another connection holds a read open at that moment. Left
     // uncaught, a *contended* database could not be opened at all, and the engine would be less
-    // available than before WAL was added to make it more so. Failing to optimise the journal is
+    // available than before WAL was added to make it more so. Failing to optimize the journal is
     // not a reason to refuse the store.
     let mode: string | undefined;
     try {
@@ -1103,7 +1103,7 @@ export class TypeDBLiteInterpreter {
 
   /**
    * `schema_ordered` and `schema_specialises` into the model — none before the tables existed, which
-   * is none declared. A specialised role is resolved to the relation above that declares it, so the
+   * is none declared. A specialized role is resolved to the relation above that declares it, so the
    * model holds role TYPES (`parentship:parent`), not names.
    */
   private loadOrdered(): void {
@@ -1123,7 +1123,7 @@ export class TypeDBLiteInterpreter {
         if (declaring !== undefined) this.schema.specialises.set(roleRef(relation, String(row.role)), roleRef(declaring, String(row.specialises)));
       }
     } catch {
-      // Before `schema_specialises`: no role was ever specialised.
+      // Before `schema_specialises`: no role was ever specialized.
     }
     this.loadFunctionsAndStructs();
   }
@@ -1343,7 +1343,7 @@ export class TypeDBLiteInterpreter {
     // a `define` that changed nothing is today indistinguishable from one that did. That is the
     // fact worth reporting, not the success.
     const applied = declared - alreadyPresent;
-    // After the in-memory roles and parents above: a specialisation resolves through them.
+    // After the in-memory roles and parents above: a specialization resolves through them.
     this.loadOrdered();
     this.diagnostics.fact(
       DiagnosticCode.schemaApplied,
@@ -2433,7 +2433,7 @@ export class TypeDBLiteInterpreter {
   /**
    * A written statement with its type and role VARIABLES replaced by what this row bound them to —
    * `insert $x isa $p;` with `$p label person` writes a person (insert.feature L2140). A role is
-   * written by its name; a role labelled through a relation that does not declare it (an alias,
+   * written by its name; a role labeled through a relation that does not declare it (an alias,
    * `part-time-employment:employee`, L2203) names no role there, and is refused.
    */
   private concreteWrite(pattern: Pattern, row: Record<string, Binding>): Pattern {
@@ -2571,7 +2571,7 @@ export class TypeDBLiteInterpreter {
             // TypeDB's annotation check of the update, read off 3.10.4: each type the stream lets the
             // relation be relates a live, concrete role the player's types can play — or, when none
             // does, type inference finds nothing (update.feature L2106: an abstract `friend`, or one
-            // `best-friendship` specialised away); when some do, the others are "not compatible"
+            // `best-friendship` specialized away); when some do, the others are "not compatible"
             // (L2786: `$f has ref $_` may be a person, which relates nothing).
             // A role no relation declares is "not found" before anything is inferred (update.feature L1536).
             if (entry.role !== undefined && ![...this.schema.roles.values()].some((roles) => roles.has(entry.role as string))) {
@@ -2582,7 +2582,7 @@ export class TypeDBLiteInterpreter {
               if (!this.schema.relations.has(relation) && !this.typeFamily(relation, 'inherited').some((t) => this.schema.relations.has(t))) return [];
               const names = entry.role !== undefined ? [entry.role] : [...new Set(this.typeFamily(relation, 'inherited').flatMap((t) => [...(this.schema.roles.get(t) ?? [])]))];
               return names.flatMap((name) => {
-                const declared = this.unspecialisedRole(relation, name);
+                const declared = this.unspecializedRole(relation, name);
                 if (declared === undefined || !declared.live) return [];
                 const [declarer, roleName] = [declared.role.slice(0, declared.role.lastIndexOf(':')), name];
                 if (this.schema.annotations.get(relatesSubject(declarer, roleName))?.has('abstract')) return [];
@@ -3324,7 +3324,7 @@ export class TypeDBLiteInterpreter {
           (constraint.iids ??= []).push(property.iid);
         } else if (isHasProperty(property)) {
           if (property.attribute === undefined) {
-            // `has $a` — an attribute of any type (163 uses in the behaviour spec).
+            // `has $a` — an attribute of any type (163 uses in the behavior spec).
             if (property.valueVariable) constraint.bindings.push({ variable: property.valueVariable, range: rangeOf(property) });
             continue;
           }
@@ -3539,11 +3539,11 @@ export class TypeDBLiteInterpreter {
 
   /**
    * The role `name` as `relation` reaches it — declared by it or an ancestor (`role`, as
-   * `relation:role` of the declarer) — and whether it is still LIVE there: not specialised away by
+   * `relation:role` of the declarer) — and whether it is still LIVE there: not specialized away by
    * `relation` or any type between it and the declarer (`relates intern as employee`). `undefined`
    * when nothing above `relation` declares it.
    */
-  private unspecialisedRole(relation: string, name: string): { role: string; live: boolean } | undefined {
+  private unspecializedRole(relation: string, name: string): { role: string; live: boolean } | undefined {
     const chain = this.typeFamily(relation, 'inherited');
     const declarer = chain.find((t) => this.schema.roles.get(t)?.has(name));
     if (declarer === undefined) return undefined;
@@ -3830,7 +3830,7 @@ export class TypeDBLiteInterpreter {
    * empty answer. Empty answers are routine (an optional attribute most rows lack is read by its own
    * query), so that was a full read of the type on ordinary reads: 27 ms at 125,000 entities
    * (docs/development/performance.md). `COUNT(*)` still visits the rows, in C, without
-   * materialising them.
+   * materializing them.
    */
   private candidateCount(constraint: ThingConstraint): number {
     const { sql, params } = this.candidateQuery(constraint);
@@ -3864,7 +3864,7 @@ export class TypeDBLiteInterpreter {
     // in the schema and nowhere else.
     //
     // 🔴 **One literal drives; the rest are probed.** Each literal used to be its own `t.iid IN
-    // (owners of the value)`, and SQLite materialises every such list — so `has project-id "x", has
+    // (owners of the value)`, and SQLite materializes every such list — so `has project-id "x", has
     // revision "r1"` read every owner of `r1` (thousands) to intersect with the one owner of `x`:
     // 5 ms where 0.017 ms suffices (docs/development/performance.md, finding 5). SQLite cannot tell
     // which list is short without `ANALYZE` statistics, so `literalOrder` asks: a count of each
@@ -4305,19 +4305,19 @@ export class TypeDBLiteInterpreter {
           // TypeDB's annotation check of the write, read off 3.10.4 (delete.feature L511, L793, L909,
           // L947): no relation/player type pair that fits is "unable to find compatible types"; a
           // relation type the match allows that cannot hold the role — `$e isa employment` may be an
-          // `internship`, which specialised `employee` into `intern` — is "Left type … not compatible".
+          // `internship`, which specialized `employee` into `intern` — is "Left type … not compatible".
           const typesOf = (variable: string): string[] | undefined => {
             const isas = matchConstraints.find((c) => c.variable === variable)?.isas.filter((isa) => isa.type !== undefined) ?? [];
             if (isas.length === 0) return undefined;
             return [...new Set(isas.flatMap((isa) => (isa.exact ? [isa.type as string] : this.subtypesOf(isa.type as string))))].filter((t) => !this.schema.abstracts.has(t));
           };
           // The match narrows them: `$e isa employment, links (intern: $p)` is an internship — a type
-          // must reach every role the match links on it, a specialised one included (L538).
+          // must reach every role the match links on it, a specialized one included (L538).
           const matchedRoles = (matchConstraints.find((c) => c.variable === deletion.owner)?.roles ?? []).flatMap((r) => (r.role === undefined ? [] : [r.role]));
-          const relationTypes = typesOf(deletion.owner as string)?.filter((type) => matchedRoles.every((role) => this.unspecialisedRole(type, role) !== undefined));
+          const relationTypes = typesOf(deletion.owner as string)?.filter((type) => matchedRoles.every((role) => this.unspecializedRole(type, role) !== undefined));
           for (const entry of deletion.players?.entries ?? []) {
             if (entry.role === undefined || relationTypes === undefined) continue;
-            const roles = relationTypes.map((type) => ({ type, role: this.unspecialisedRole(type, entry.role as string) }));
+            const roles = relationTypes.map((type) => ({ type, role: this.unspecializedRole(type, entry.role as string) }));
             const playerTypes = typesOf(entry.player);
             if (playerTypes !== undefined) {
               const fits = roles.some(({ role }) => role?.live === true && playerTypes.some((p) => this.typeFamily(p, 'inherited').some((t) => this.schema.plays.has(playsSubject(t, role.role)))));
@@ -4495,15 +4495,15 @@ export class TypeDBLiteInterpreter {
 
   /** A value of type `from` may be written to `attribute`: the same type, or an integer to a double or decimal. */
   private checkValueFits(variable: string, from: string, attribute: string, at: Range | undefined): void {
-    const normalise = (t: string): string => (t === 'long' ? 'integer' : t);
+    const normalize = (t: string): string => (t === 'long' ? 'integer' : t);
     const declared = this.valueTypeOfAttribute(attribute);
     if (declared === undefined) return;
-    const to = normalise(declared);
+    const to = normalize(declared);
     // A date is a datetime at midnight — `let $x = 2020-01-01; insert $a isa published-date == $x;`
     // (insert.feature L1288).
-    const fits = normalise(from) === to || (normalise(from) === 'integer' && (to === 'double' || to === 'decimal')) || (normalise(from) === 'date' && to === 'datetime');
+    const fits = normalize(from) === to || (normalize(from) === 'integer' && (to === 'double' || to === 'decimal')) || (normalize(from) === 'date' && to === 'datetime');
     if (!fits) {
-      this.refuse(DiagnosticCode.valueTypeConflict, `'${variable}' is a ${normalise(from)} and '${attribute}' holds a ${to}; the value cannot be written.`, at);
+      this.refuse(DiagnosticCode.valueTypeConflict, `'${variable}' is a ${normalize(from)} and '${attribute}' holds a ${to}; the value cannot be written.`, at);
     }
   }
 
@@ -4590,7 +4590,7 @@ export class TypeDBLiteInterpreter {
     // 🔴 Two passes: a relation whose other players are all bound first, exactly as before nesting
     // existed, and only then one reached through a nested seed. Taking the first relation in written
     // order that could seed either way chose a nested seed over a later direct one: `$c` drawn from
-    // the 50 two-hop neighbours of `$a` instead of its one direct partner (review of finding 6). A
+    // the 50 two-hop neighbors of `$a` instead of its one direct partner (review of finding 6). A
     // nested seed may only add a seed where there was none, never replace a better one.
     for (const nesting of [false, true]) {
       for (const relation of relations) {
@@ -4656,7 +4656,7 @@ export class TypeDBLiteInterpreter {
   }
 
   /**
-   * A role in `links (…)` matches the role and every role that specialises it, at any depth:
+   * A role in `links (…)` matches the role and every role that specializes it, at any depth:
    * `(spouse: $x)` finds a `husband` of a `hetero-marriage` (match.feature L1484). `role_player`
    * holds role NAMES, so the family is a set of names; the relation's own `isa` keeps it honest.
    */
@@ -4841,7 +4841,7 @@ export class TypeDBLiteInterpreter {
       relation.roles.forEach((role, index) => {
         next[role.player] = Number(row[`p${index}`]);
       });
-      // A role variable binds the role TYPE, labelled by the relation that declares it — an inherited
+      // A role variable binds the role TYPE, labeled by the relation that declares it — an inherited
       // role is `employment:employee` on a `part-time-employment` too — and filters when bound already.
       for (const [index, role] of relation.roles.entries()) {
         if (role.roleVariable === undefined) continue;
@@ -6401,7 +6401,7 @@ function literalText(node: unknown): string {
   if (isDateLiteral(node)) return node.value;
   if (isDoubleLiteral(node)) return `${node.negative ? '-' : ''}${node.value}`;
   if (isBooleanLiteral(node)) return node.value;
-  // `P1Y2M3DT4H5M6.789S` — spelt once by `canonicalValue`, so `P66W` and `P462D` are one attribute.
+  // `P1Y2M3DT4H5M6.789S` — spelled once by `canonicalValue`, so `P66W` and `P462D` are one attribute.
   if (isDurationLiteral(node)) return node.value;
   throw new Error(
     `TypeDBLite: unhandled literal kind '${String((node as { $type?: string })?.$type)}' — ` +

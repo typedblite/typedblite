@@ -39,7 +39,7 @@ import {
   isUndefineFrom,
   isUndefineOwns,
   isUndefineRelates,
-  isUndefineSpecialise,
+  isUndefineSpecialize,
   isUndefineSub,
   isUndefineType,
   type RelatesTrait,
@@ -342,7 +342,7 @@ function sitesOf(document: LangiumDocument, node: AstNode): LabelSite[] {
   if (isUndefineFrom(node) || isUndefineType(node) || isRedefineType(node)) {
     return site('type', node.type, 'type');
   }
-  if (isUndefineRelates(node) || isUndefineSpecialise(node)) {
+  if (isUndefineRelates(node) || isUndefineSpecialize(node)) {
     const from = node.$container;
     return site('role', node.role, 'role', { relation: isUndefineFrom(from) ? from.type : undefined });
   }

@@ -14,7 +14,7 @@ const CORPUS: Array<[string, string]> = [
   ['task-log-queries.typeqlite', join(EXAMPLES, 'task-log-queries.typeqlite')],
 ];
 
-describe('the formatter normalises', () => {
+describe('the formatter normalizes', () => {
   /**
    * 🔴 This is the test that means something.
    *

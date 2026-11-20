@@ -7,7 +7,7 @@
 # The vendored TypeDB specification is TypeDB Ltd's, and must stay exactly as upstream has it.
 libs/conformance/spec/** -text
 
-# Binary files: never normalised.
+# Binary files: never normalized.
 *.png binary
 *.ico binary
 *.vsix binary

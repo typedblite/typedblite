@@ -3,7 +3,7 @@ grammar TypeQLite
 import './terminals';
 
 // TypeQLite 3.x — the subset actually used by its first production application and a documentation store, and since 2026-09-11 what
-// TypeDB's own behaviour specification needs to get past its Backgrounds.
+// TypeDB's own behavior specification needs to get past its Backgrounds.
 //
 // Scope was measured, not guessed (2026-08-29): every TypeQLite string in
 // two parts of its first production application, and
@@ -50,7 +50,7 @@ StructField:
 //
 // 🔴 The comma after the label is OPTIONAL. TypeDB 3.10.4 accepts `entity person, owns ref` and
 // `entity person owns ref` alike (verified on the live server 2026-09-11); this grammar required
-// the comma, and every Background in the behaviour spec is written without it —
+// the comma, and every Background in the behavior spec is written without it —
 // `d-20260911-the-typeql-grammar-requires-a-comma`. Between traits the comma stays required.
 // The same holds before `sub`: `relation person, sub base @doc("…")` (metadata.feature L228), as
 // `AttributeDef` already admitted.
@@ -115,7 +115,7 @@ TypeExtensionDef:
 //
 // Phase 04 of the conformance feature (ADR-005). 🔴 `undefine` is NOT `define` with a different
 // keyword: TypeDB's grammar admits only the targeted forms — a bare type name, and `<what> from
-// <type> [<capability>]` — and the behaviour spec calls every define-like form a PARSING failure
+// <type> [<capability>]` — and the behavior spec calls every define-like form a PARSING failure
 // (`undefine entity person;`, `undefine person owns name;`, `undefine name value string;` —
 // undefine.feature L42). So this rule has no kind keyword and no trait list, on purpose.
 //
@@ -143,9 +143,9 @@ UndefineTarget:
     | {infer UndefinePlays} 'plays' role=RoleName
     | {infer UndefineRelates} 'relates' role=ID (ordered?='[' ']')?
     | {infer UndefineValue} 'value' valueType=ValueType
-    | {infer UndefineSpecialise} 'as' role=ID;
+    | {infer UndefineSpecialize} 'as' role=ID;
 
-// The capability an annotation or a specialisation is removed from: `… from person owns name`.
+// The capability an annotation or a specialization is removed from: `… from person owns name`.
 Capability:
       {infer CapabilityOwns} 'owns' attribute=ID (ordered?='[' ']')?
     | {infer CapabilityPlays} 'plays' role=RoleName
@@ -208,7 +208,7 @@ OwnsTrait:
 
 // `name`, not `role`, so the role is a *named element* other references can resolve to.
 // `relates parent[]` — an ordered role, as `owns name[]` is an ordered ownership.
-// `relates father as parent` — a role SPECIALISING an inherited one: `fathership:father` is a sub-role
+// `relates father as parent` — a role SPECIALIZING an inherited one: `fathership:father` is a sub-role
 // of `parentship:parent` (define.feature L635).
 RelatesTrait:
     'relates' name=ID (ordered?='[' ']')? ('as' specialises=ID)? annotations+=Annotation*;
@@ -281,7 +281,7 @@ MetaAnnotation:
 
 // The value types TypeDB 3 has, plus any other name: `value rgba`, `value bool` parse — TypeDB's
 // grammar admits a struct name here — and the validator refuses one it does not know, so the
-// refusal is `define`'s and not the parser's, as the behaviour spec expects (`; fails`).
+// refusal is `define`'s and not the parser's, as the behavior spec expects (`; fails`).
 ValueType returns string:
     'string' | 'integer' | 'long' | 'double' | 'decimal' | 'boolean' | 'datetime-tz' | 'datetime'
     | 'date' | 'duration' | ID;
@@ -653,12 +653,12 @@ IsaProperty:
 //
 // Each names a type or a type variable; a ThingPattern carrying one is a TYPE pattern, and the
 // interpreter refuses a head that mixes `has`/`links` with these.
-// `$t label person`, `$r label marriage:spouse` — a role type is labelled through its relation
+// `$t label person`, `$r label marriage:spouse` — a role type is labeled through its relation
 // (metadata.feature L73), as the solver's universe already names it.
 LabelProperty:
     'label' label=ScopedLabel;
 
-// `$x sub parenthood:parent` — a role type, under the roles that specialise it (define.feature L635).
+// `$x sub parenthood:parent` — a role type, under the roles that specialize it (define.feature L635).
 SubProperty:
     (direct?='sub!' | 'sub') (type=ScopedLabel | typeVariable=VAR);
 
@@ -669,13 +669,13 @@ OwnsProperty:
 PlaysProperty:
     'plays' (role=RoleName | roleVariable=VAR);
 
-// `$x relates $_ as child` — a role that is, or specialises, one named `child`; `as parentship:child`
+// `$x relates $_ as child` — a role that is, or specializes, one named `child`; `as parentship:child`
 // names the one role (match.feature L3546). `as` is to roles what `sub` is to types.
 RelatesProperty:
     'relates' (role=ID | roleVariable=VAR) ('as' (specialises=ScopedLabel | specialisesVariable=VAR))?;
 
 // The value is a literal when constraining, a variable when binding for output.
-// `has $a` — any attribute, of whatever type (163 uses in the behaviour spec).
+// `has $a` — any attribute, of whatever type (163 uses in the behavior spec).
 // `has age > 5`, `has name == $n` — a comparison on the owned value (a write takes `==` as the value).
 HasProperty:
     'has' (
@@ -706,7 +706,7 @@ RolePlayer:
 // emit `has is-latest true` and `has created-at 2026-09-03T10:00:00`. Neither parsed.
 //
 // **The date and double literals arrived the same way, 2026-09-11.** `fetch.feature`'s Background
-// inserts `has end-date 2021-01-01` and `has karma 123.4567891`; the behaviour spec is the caller.
+// inserts `has end-date 2021-01-01` and `has karma 123.4567891`; the behavior spec is the caller.
 //
 // **Signed here, unsigned in an expression (Phase 06).** The numeric terminals carry no sign, so
 // that `10-1` is a subtraction; a `has age -5` or `@range(-5..5)` takes its `-` as the literal's

@@ -55,7 +55,7 @@ export class SyncValidationRegistry extends ValidationRegistry {
         return check.call(thisObj, node, accept, cancelToken);
       } catch (error) {
         // Cancellation is control flow, not a validation problem — Langium rethrows it and so must
-        // this, or a cancelled run would be reported to the author as an error in their document.
+        // this, or a canceled run would be reported to the author as an error in their document.
         if (isOperationCancelled(error)) throw error;
         const detail = error instanceof Error ? error.message : String(error);
         accept('error', `An error occurred during validation: ${detail}`, { node });

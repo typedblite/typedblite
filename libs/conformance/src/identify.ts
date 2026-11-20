@@ -52,7 +52,7 @@ const unquote = (literal: string): string =>
     ? literal.slice(1, -1)
     : literal;
 
-const normaliseValueType = (type: string): string => (type === 'long' ? 'integer' : type);
+const normalizeValueType = (type: string): string => (type === 'long' ? 'integer' : type);
 
 /** A decimal's canonical text — sign, integer part, fraction without trailing zeros — or undefined. */
 const decimalOf = (text: string): string | undefined => {
@@ -154,7 +154,7 @@ export const identifierMatches = (
       const valueType = valueTypeOf?.(cell.type);
       return valueType === undefined || valueType === 'string'
         ? unquote(cell.asString()) === unquote(identifier.literal)
-        : valueMatches(normaliseValueType(valueType), identifier.literal, cell.asString());
+        : valueMatches(normalizeValueType(valueType), identifier.literal, cell.asString());
     }
     case 'value':
       // 🔴 A VALUE cell carries its value type, and the identifier's must be it — an integer `752`
@@ -162,7 +162,7 @@ export const identifierMatches = (
       // round 6: `^` answered integers where the pin says doubles, and the card did not move). An
       // attribute cell's `type` is its attribute type, which this file cannot resolve to a value
       // type; there the text comparison is what there is.
-      if (cell.isValue() && normaliseValueType(cell.type) !== normaliseValueType(identifier.type)) return false;
+      if (cell.isValue() && normalizeValueType(cell.type) !== normalizeValueType(identifier.type)) return false;
       return !cell.isThing() && !cell.isType() && valueMatches(identifier.type, identifier.literal, cell.asString());
     case 'label':
       return cell.isType() && cell.label === identifier.literal;

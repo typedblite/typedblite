@@ -3,7 +3,7 @@
  * what the server answers (ADR-010).
  *
  * The server says what each piece of text IS, in the two layers an editor draws: the TextMate
- * grammar's scopes, and the semantic tokens on top of them. It says nothing about colour. Colour is
+ * grammar's scopes, and the semantic tokens on top of them. It says nothing about color. Color is
  * the theme's, and only the client can see the theme.
  */
 export const HIGHLIGHT_BLOCKS = 'typeqlite/highlightBlocks';

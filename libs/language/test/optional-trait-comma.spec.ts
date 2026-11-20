@@ -4,7 +4,7 @@ import { parse } from './parse.js';
 /**
  * The comma after a type or attribute label is optional — as it is on TypeDB.
  *
- * 🔴 This grammar required it, and every Background in TypeDB's own behaviour spec is written
+ * 🔴 This grammar required it, and every Background in TypeDB's own behavior spec is written
  * without it: `entity person plays employment:employee, owns name @card(0..);` and `attribute ref
  * value integer;`. Both forms were verified `answerType: ok` on `typedb/typedb:3.10.4` on
  * 2026-09-11, on a scratch database. Between traits the comma stays required.
