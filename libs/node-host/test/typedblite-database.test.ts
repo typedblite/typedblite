@@ -2,7 +2,8 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import * as runtime from '@typedblite/runtime';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   openSchemaDatabase,
@@ -178,7 +179,29 @@ describe('openSchemaDatabase', () => {
 });
 
 describe('openSchemaDatabase when the schema is refused', () => {
-  it('closes the handle before rethrowing, so a failed open leaks no connection', async () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('closes an engine it created before rethrowing, so a failed open leaks no connection', async () => {
+    const close = vi.spyOn(runtime.SqliteEngine.prototype, 'close');
+
+    await expect(openSchemaDatabase({ name: 'bad' }, 'define this is not typeqlite;')).rejects.toThrow();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('still reports the schema error when closing the engine it created fails too', async () => {
+    const close = vi.spyOn(runtime.SqliteEngine.prototype, 'close').mockRejectedValue(new Error('close failed'));
+
+    const failure = await openSchemaDatabase({ name: 'bad' }, 'define this is not typeqlite;').catch(
+      (error: unknown) => error,
+    );
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).not.toMatch(/close failed/);
+  });
+
+  it("leaves an engine the caller passed in open, because it is the caller's to retry with", async () => {
     const refusal = new Error('schema refused');
     let closed = 0;
     const engine: EmbeddedDatabase = {
@@ -195,23 +218,21 @@ describe('openSchemaDatabase when the schema is refused', () => {
 
     await expect(openSchemaDatabase({ name: 'bad', engine }, 'define nonsense;')).rejects.toBe(refusal);
 
-    expect(closed).toBe(1);
+    expect(closed).toBe(0);
   });
 
-  it('still reports the schema error when closing fails too', async () => {
-    const refusal = new Error('schema refused');
-    const engine: EmbeddedDatabase = {
-      define: async () => {
-        throw refusal;
-      },
-      execute: async () => ({ diagnostics: [] }),
-      query: async () => ({ rows: [] }),
-      persist: async () => undefined,
-      close: async () => {
-        throw new Error('close failed');
-      },
-    };
+  it('lets a caller retry on the real engine it passed in, after a refused schema', async () => {
+    const engine = new runtime.SqliteEngine(':memory:');
 
-    await expect(openSchemaDatabase({ name: 'bad', engine }, 'define nonsense;')).rejects.toBe(refusal);
+    await expect(openSchemaDatabase({ name: 'kept', engine }, 'define this is not typeqlite;')).rejects.toThrow();
+    const { database } = await openSchemaDatabase(
+      { name: 'kept', engine },
+      'define attribute code, value string; entity item, owns code @key;',
+    );
+    await database.execute('insert $i isa item, has code "after-retry";');
+    const { rows } = await database.query('match $i isa item, has code $c; select $c;');
+
+    expect(requiredRowString(rows[0], 'c')).toBe('after-retry');
+    await database.close();
   });
 });

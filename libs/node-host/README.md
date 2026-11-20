@@ -30,7 +30,8 @@ await database.close();
   engine port (`EmbeddedDatabase`, five methods and an optional `transaction`). The default engine is the runtime's
   `SqliteEngine`; `open({ engine })` takes any other.
 - **`openSchemaDatabase`**: open, create the directory if asked, apply the schema, and return the handle with the
-  schema's report (`StoreOpenResult`).
+  schema's report (`StoreOpenResult`). If the schema is refused, an engine it created is closed before the error is
+  rethrown; an engine you passed in is left open for you.
 - **Row readers**: `rowString`, `rowNumber`, `requiredRowString`, `requiredRowNumber`.
 - **TypeQLite literals**: `typeQLiteValue`, `escapeTypeQLite`, `typeQLiteDatetime`, and `TypeQLiteValueError` for a
   value with no literal.
@@ -51,7 +52,7 @@ await database.close();
   and no timeout is enforced.
 - **Diagnostics are returned.** `define` and `execute` answer `{ diagnostics }`, typed from the runtime's
   `ExecutionReport['diagnostics']`. A refusal is still a thrown error.
-- **A CommonJS host can `require` it.** It is ESM, and Node loads it from `require` (Node 22.12 and later). The
+- **A CommonJS host can `require` it.** It is ESM, and Node loads it from `require` (Node 22.16 and later, as `engines` says). The
   engine is loaded with a dynamic `import()` when a database is first opened, from where this package is
   installed. If a host's build has rewritten that `import()` into a `require`, it falls back to resolving the
   installed runtime from this module's directory.

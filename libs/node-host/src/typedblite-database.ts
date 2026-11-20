@@ -1,10 +1,11 @@
 import type { ExecutionReport } from '@typedblite/runtime';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { installedRuntimeEntry } from './installed-runtime-entry.js';
+import { moduleDirectoryFrom } from './module-directory.js';
 
 /** The engine package's exports that a host reaches for at run time. */
 export interface TypeDbLiteRuntime {
@@ -38,16 +39,11 @@ export interface TypeDbLiteRuntime {
 }
 
 /**
- * The directory of this module, for resolving the installed engine from it.
- *
- * @privateRemarks
- * 🔴 `__dirname` first, when there is one. A bundler that inlines this module into a CommonJS bundle provides the
- * bundle's directory there, which is where the installed engine is found; it also rewrites `import.meta.url` to the
- * path of the source it bundled from (a build machine's path) or to nothing. Natively, as ESM, there is no
- * `__dirname`, and `typeof` reads it without a `ReferenceError`.
+ * The directory of this module, for resolving the installed engine from it. The choice between `__dirname` and
+ * `import.meta.url` is {@link moduleDirectoryFrom}'s, where it is tested.
  */
 function thisModuleDirectory(): string {
-  return typeof __dirname === 'string' ? __dirname : dirname(fileURLToPath(import.meta.url));
+  return moduleDirectoryFrom(() => __dirname, import.meta.url);
 }
 
 /**
@@ -495,6 +491,13 @@ export interface OpenSchemaDatabaseOptions {
 /**
  * Open a schema'd store: open, create the directory if asked, apply the schema, and return the handle with the
  * schema's report. Every store opener would otherwise repeat this sequence by hand, and drop the report.
+ *
+ * If the schema is refused, the error is rethrown. An engine this call created is closed first; an engine passed in
+ * as `options.engine` is left open, because it belongs to the caller.
+ *
+ * @privateRemarks
+ * The schema error is rethrown only once closing settles. An engine whose `close` never settles would hold it back;
+ * that is the engine's bug, and is not raced with a timeout here.
  */
 export async function openSchemaDatabase(options: OpenSchemaDatabaseOptions, schema: string): Promise<StoreOpenResult> {
   if (options.ensureDirectory && options.storagePath) {
@@ -505,13 +508,16 @@ export async function openSchemaDatabase(options: OpenSchemaDatabaseOptions, sch
     ...(options.storagePath ? { storagePath: options.storagePath } : {}),
     ...(options.engine ? { engine: options.engine } : {}),
   });
-  // 🔴 Close on a refused schema: the caller gets only the error, so the handle (and, for a file store, its
-  // connection and lock files) would stay open until exit, and a host that retries would hold two.
+  // 🔴 On a refused schema, close the engine **only if this call created it**. The caller gets only the error, so
+  // an engine made here would otherwise stay open until exit (for a file store, its connection and lock files), and
+  // a host that retries would hold two. An engine the caller passed in is the caller's: closing it would break a
+  // caller that keeps it and retries.
+  const ownsEngine = options.engine === undefined;
   try {
     const report = await database.define(schema);
     return { database, report };
   } catch (error) {
-    await database.close().catch(() => undefined);
+    if (ownsEngine) await database.close().catch(() => undefined);
     throw error;
   }
 }

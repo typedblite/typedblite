@@ -61,9 +61,10 @@ const { openSchemaDatabase, requiredRowString, loadTypeDbLiteRuntime } = require
 /**
  * The loader's fallback: the native `import('@typedblite/runtime')` is made to fail by a resolve hook (a stand-in
  * for a build that rewrote it), and the engine must then be found from this module's own directory, as the
- * README promises. Runs the build output in a real Node process, in both module systems, so each branch of
- * `thisModuleDirectory()` (`__dirname`, then `import.meta.url`) is taken. The hook records that it fired, so a
- * pass cannot come from the native import quietly succeeding.
+ * README promises. Runs the build output in a real Node process, loaded by `require` and by `import`. This package
+ * is ESM either way, so both take the `import.meta.url` arm; the `__dirname` arm a CommonJS bundle takes is unit
+ * tested in module-directory.test.ts. The hook records that it fired, so a pass cannot come from the native import
+ * quietly succeeding.
  */
 describe('the loader fallback when the native engine import fails', () => {
   let host: string;
@@ -105,9 +106,9 @@ export async function resolve(specifier, context, next) {
 `;
 
   it.each([
-    ['CommonJS (__dirname)', 'main.cjs', `require('@typedblite/node-host')`],
-    ['native ESM (import.meta.url)', 'main.mjs', `await import('@typedblite/node-host')`],
-  ])('finds the installed engine from this module\'s directory in %s', (_name, file, load) => {
+    ['a CommonJS host that requires it', 'main.cjs', `require('@typedblite/node-host')`],
+    ['an ESM host that imports it', 'main.mjs', `await import('@typedblite/node-host')`],
+  ])('finds the installed engine from this module\'s directory for %s', (_name, file, load) => {
     writeFileSync(join(host, file), body.replace('LOAD', load));
 
     const output = execFileSync(process.execPath, ['--import', join(host, 'register.mjs'), join(host, file)], {
