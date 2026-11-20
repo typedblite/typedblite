@@ -94,5 +94,8 @@ const describeValue = (value: unknown): string => {
  */
 export function typeQLiteDatetime(value: Date): string {
   if (Number.isNaN(value.getTime())) throw new TypeQLiteValueError(value);
-  return value.toISOString().replace('Z', '').slice(0, 19);
+  // 🔴 Strip the fraction and the zone by shape, not by length: outside the years 0000-9999 `toISOString` writes a
+  // six-digit signed year (`+010000-...`), so cutting at a fixed 19 characters drops the seconds and stores a
+  // different instant than the one given.
+  return value.toISOString().replace(/\.\d{3}Z$/, '');
 }

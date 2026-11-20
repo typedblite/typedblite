@@ -176,3 +176,42 @@ describe('openSchemaDatabase', () => {
     }
   });
 });
+
+describe('openSchemaDatabase when the schema is refused', () => {
+  it('closes the handle before rethrowing, so a failed open leaks no connection', async () => {
+    const refusal = new Error('schema refused');
+    let closed = 0;
+    const engine: EmbeddedDatabase = {
+      define: async () => {
+        throw refusal;
+      },
+      execute: async () => ({ diagnostics: [] }),
+      query: async () => ({ rows: [] }),
+      persist: async () => undefined,
+      close: async () => {
+        closed += 1;
+      },
+    };
+
+    await expect(openSchemaDatabase({ name: 'bad', engine }, 'define nonsense;')).rejects.toBe(refusal);
+
+    expect(closed).toBe(1);
+  });
+
+  it('still reports the schema error when closing fails too', async () => {
+    const refusal = new Error('schema refused');
+    const engine: EmbeddedDatabase = {
+      define: async () => {
+        throw refusal;
+      },
+      execute: async () => ({ diagnostics: [] }),
+      query: async () => ({ rows: [] }),
+      persist: async () => undefined,
+      close: async () => {
+        throw new Error('close failed');
+      },
+    };
+
+    await expect(openSchemaDatabase({ name: 'bad', engine }, 'define nonsense;')).rejects.toBe(refusal);
+  });
+});

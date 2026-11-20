@@ -69,6 +69,16 @@ describe('typeQLiteValue', () => {
 });
 
 describe('typeQLiteDatetime', () => {
+  it.each([
+    ['+010000-01-01T00:00:59Z', '+010000-01-01T00:00:59'],
+    ['-000001-06-01T12:34:56Z', '-000001-06-01T12:34:56'],
+    ['+275760-09-13T00:00:00Z', '+275760-09-13T00:00:00'],
+    ['0000-01-01T00:00:07Z', '0000-01-01T00:00:07'],
+    ['9999-12-31T23:59:59.999Z', '9999-12-31T23:59:59'],
+  ])('keeps the seconds of %s, wherever the year falls', (iso, expected) => {
+    expect(typeQLiteDatetime(new Date(iso))).toBe(expected);
+  });
+
   it('renders seconds precision, unquoted, with no zone', () => {
     expect(typeQLiteDatetime(new Date('2026-09-03T10:00:00.500Z'))).toBe(
       '2026-09-03T10:00:00',

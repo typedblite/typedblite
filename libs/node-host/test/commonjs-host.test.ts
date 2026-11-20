@@ -57,3 +57,65 @@ const { openSchemaDatabase, requiredRowString, loadTypeDbLiteRuntime } = require
     expect(JSON.parse(output.trim())).toEqual({ code: 'from-commonjs', diagnostics: true, engine: 'function' });
   });
 });
+
+/**
+ * The loader's fallback: the native `import('@typedblite/runtime')` is made to fail by a resolve hook (a stand-in
+ * for a build that rewrote it), and the engine must then be found from this module's own directory, as the
+ * README promises. Runs the build output in a real Node process, in both module systems, so each branch of
+ * `thisModuleDirectory()` (`__dirname`, then `import.meta.url`) is taken. The hook records that it fired, so a
+ * pass cannot come from the native import quietly succeeding.
+ */
+describe('the loader fallback when the native engine import fails', () => {
+  let host: string;
+
+  beforeEach(() => {
+    host = mkdtempSync(join(tmpdir(), 'node-host-fallback-'));
+    mkdirSync(join(host, 'node_modules', '@typedblite'), { recursive: true });
+    symlinkSync(PACKAGE, join(host, 'node_modules', '@typedblite', 'node-host'), 'dir');
+    writeFileSync(join(host, 'package.json'), JSON.stringify({ name: 'fallback-host', private: true }));
+    writeFileSync(
+      join(host, 'block.mjs'),
+      `
+import { writeFileSync } from 'node:fs';
+export async function resolve(specifier, context, next) {
+  if (specifier === '@typedblite/runtime') {
+    writeFileSync(${JSON.stringify(join(host, 'blocked'))}, 'blocked');
+    throw new Error('blocked by the test: native import of the engine');
+  }
+  return next(specifier, context);
+}
+`,
+    );
+    writeFileSync(
+      join(host, 'register.mjs'),
+      `import { register } from 'node:module';\nregister('./block.mjs', import.meta.url);\n`,
+    );
+  });
+  afterEach(() => rmSync(host, { recursive: true, force: true }));
+
+  const body = `
+(async () => {
+  const { openSchemaDatabase, requiredRowString } = LOAD;
+  const { database } = await openSchemaDatabase({ name: 'fb' }, 'define attribute code, value string; entity item, owns code @key;');
+  await database.execute('insert $i isa item, has code "via-fallback";');
+  const { rows } = await database.query('match $i isa item, has code $c; select $c;');
+  console.log(requiredRowString(rows[0], 'c'));
+  await database.close();
+})().catch((error) => { console.error(error); process.exit(1); });
+`;
+
+  it.each([
+    ['CommonJS (__dirname)', 'main.cjs', `require('@typedblite/node-host')`],
+    ['native ESM (import.meta.url)', 'main.mjs', `await import('@typedblite/node-host')`],
+  ])('finds the installed engine from this module\'s directory in %s', (_name, file, load) => {
+    writeFileSync(join(host, file), body.replace('LOAD', load));
+
+    const output = execFileSync(process.execPath, ['--import', join(host, 'register.mjs'), join(host, file)], {
+      cwd: host,
+      encoding: 'utf8',
+    });
+
+    expect(output.trim()).toBe('via-fallback');
+    expect(existsSync(join(host, 'blocked'))).toBe(true);
+  });
+});

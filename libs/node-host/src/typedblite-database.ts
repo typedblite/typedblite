@@ -505,8 +505,15 @@ export async function openSchemaDatabase(options: OpenSchemaDatabaseOptions, sch
     ...(options.storagePath ? { storagePath: options.storagePath } : {}),
     ...(options.engine ? { engine: options.engine } : {}),
   });
-  const report = await database.define(schema);
-  return { database, report };
+  // 🔴 Close on a refused schema: the caller gets only the error, so the handle (and, for a file store, its
+  // connection and lock files) would stay open until exit, and a host that retries would hold two.
+  try {
+    const report = await database.define(schema);
+    return { database, report };
+  } catch (error) {
+    await database.close().catch(() => undefined);
+    throw error;
+  }
 }
 
 /**
