@@ -1,12 +1,13 @@
 # TypeDBLite — Open Source Launch Plan
 
-Status: in progress · Written 2026-11-14 · Basis: a read of the repository at `main` (`5aac641`); [where to resume](#where-to-resume) is current as of `d3c7c78`
+Status: in progress · Written 2026-11-14 · Current as of 2026-11-25, `main` at `e3de77e` ([where to resume](#where-to-resume))
 
 This plan takes TypeDBLite from "a strong repository" to "a project strangers can install, trust, and
 contribute to." It is organized as gates, not dates: each phase has exit criteria, and the launch
 happens when the gates are green. A suggested calendar is at the end.
 
 - [Where to resume](#where-to-resume)
+- [Free hosting and CI for open source](#free-hosting-and-ci-for-open-source)
 - [1. Where we are](#1-where-we-are)
 - [2. Goals and non-goals](#2-goals-and-non-goals)
 - [3. Positioning and audience](#3-positioning-and-audience)
@@ -25,166 +26,107 @@ happens when the gates are green. A suggested calendar is at the end.
 
 ## Where to resume
 
-*As of 2026-11-15 (end of day): the work lives in the fresh repository `typedblite/typedblite`, private until launch,
-with its history rewritten to drop the private names. Its pull requests restart at #1; #1 to #4 are merged and none
-is open. The pre-rewrite history is kept privately (the old repository, which holds PRs #1 to #64), and every hash
-cited below is from the rewritten history.* Read this first; everything it points to is below.
+*As of 2026-11-25. The work is in `typedblite/typedblite`, **private until launch**, with its history rewritten to
+drop the private names. Its pull requests restart at #1; #1 to #74 are merged. The pre-rewrite history is kept
+privately in the old repository.* Read this first; everything it points to is below.
 
-🔴 **GitHub Actions is OFF (2026-11-14), so nothing on GitHub checks a change. Run `npm run gate` locally.**
-GitHub refused to start any job on `main`'s run after #40 merged: *"The job was not started because recent account
-payments have failed or your spending limit needs to be increased."* Every job ran two seconds with no steps; the same
-code had passed on #40's own run 20 minutes earlier, so it was billing, not code. At the maintainer's request the
-workflows were then disabled: CI, Labels and PR title are `disabled_manually` (`gh workflow enable <id>` turns one
-back on). GitHub will not let the **Dependabot update job** be disabled by API (HTTP 422), so it is paused in the
-repo instead: `open-pull-requests-limit: 0` on both ecosystems in `dependabot.yml`, so it opens no PR. Two of its
-earlier PRs (#30, #32) are still open. Security updates are a separate setting, and are not enabled.
-Everything else in this plan that says "CI" or "the PR-title check" describes the workflows as they are written, and
-is **not running**. What that costs:
-- **The gate runs on one OS and one Node.** CI covered Node 22.16, 22 and 24 on Linux, and Node 24 on Windows and
-  macOS. Node 22.16 has caught a failure that Node 24 hid, and Windows caught real bugs (#38, #39).
-- **The PR-title check and label sync do not run.** Conventional Commit titles are on the author and the reviewer.
-- **Branch protection is moot** until the repository is public (it returns 403 on this plan), and CI is off anyway.
+**Nothing is released:** no tags, nothing on npm, no extension on Open VSX. **The website is live** at
+`typedblite.dev`, with the guides, the API reference, the playground and the sync demo.
 
-To go back: fix billing, `gh workflow enable` the three workflows, restore the Dependabot limits in `dependabot.yml`, and read the first run on
-`main` before trusting it. The decisions that wait on CI results (making `coverage` blocking, adding
-`sync-demo:test-browser` to CI) wait on that too.
+🔴 **`npm ci` fails for anyone without the maintainer's local registry.** The seven `@devx-micro/app-*` packages
+(0.2.1) that the engine host and the extension use (ADR-011) are not on npmjs.org (each returned 404 on 2026-11-25), while the
+lockfile points there. This blocks outside contributors, CI on any hosted runner, and both release workflows. Publish
+them to npmjs.org (then run `npm install` to refresh their lockfile entries and a clean `npm ci` with the default
+registry), or remove the dependency.
 
-**Merged to `main`:**
-- **Before 2026-11-14** (#22, #33): CI, the community files (`SECURITY.md`, `CHANGELOG.md`, `CODEOWNERS`, Dependabot,
-  issue forms, PR template), `.gitattributes`, and the fixes CI found (a lockfile pointing at a local registry,
-  `langium-cli` on Node 24.22+, the Node 22.16 minimum, a Windows build command, a fixed-wait test, and a Langium
-  race that dropped a document's diagnostics).
-- **2026-11-14 to 15** (#18 to #21, #37 to #48): the logo and the extension's icon (#18, #20); the Markdown
-  preview's highlighting in the theme's colors (#19) and, in remote windows, the Theme Bridge (#37); TypeQLite
-  keywords scoped by kind, and fences highlighted in the Markdown editor (#21); the CLI running on Windows and
-  through its npm `bin` link (#38); the runtime's crash and index tests fixed on Windows (#39); every project above
-  the 80% coverage floor, decision 9 (#40); **`npm run gate`** (#41); Dependabot paused (#42); the hub security
-  review and a manual secret scan (#43); the Known limitations page (#44); the hub hardened (#45); the README
-  restructured (#46); and **the browser playground** (#47), now **Monaco with the real language server over LSP**
-  (#48), served by `npm run playground`.
+🔴 **CI is not running.** The workflows are enabled, but GitHub has started no job since 2026-11-17 04:22 UTC:
+*"recent account payments have failed or your spending limit needs to be increased"*. `npm run gate` is the only
+check since then.
 
-- **2026-11-15** (#49 to #61): **packaging** (#50: `files` lists, the CLI renamed `typedblite`, `check-packages`,
-  `clean-room`, Nx release, `release.yml`, the compatibility policy, Releasing); the production consumer and other private projects no longer
-  named anywhere (#51, #58); **the API reviewed and its reference generated** (#52:
-  explicit exports pinned by a test, `check-api`, `docs:api`); Nx 24 (#53) and Vitest 5 (#54); **a pushed revision
-  checked against its content** (#55, PL-6, ADR-003 amended and accepted); both extensions ready to publish (#56:
-  `release-extension.yml`); a draft of "When to use TypeDBLite, and when not" (#57); the plan refreshed (#59);
-  **every private name out of the tree** (#58, #60: the downstream application, one of its features, a sibling
-  repository and its stores, the third-party WASM package, and the monorepo's ADR numbers); and **original
-  fixtures** (#61): a project tracker (`tracker`, `people`, `sprint`, `documents` in `test-fixtures/schemas/`)
-  replaces the adapted schemas and example queries, the `real-stores` benchmark is gone, the load test generates
-  its own data, a relation-read performance fix it found is in (empty answers no longer read every relation of
-  a type), and the performance guide is rewritten on the generated data.
+**Last CI evidence.** CI ran from 2026-11-15 to 2026-11-17. `main` at 2026-11-16 03:05 UTC passed all 13 jobs: Linux
+(Node 22.16.0, 22 and 24), Windows, macOS, the clean room on each, conformance, WASM and browser, VS Code e2e and
+coverage. One later `main` run failed in two jobs at checkout (`repository not found`), not in the code. The engine
+host, notebook, debugger and Node host merged after the last run, so **CI has seen none of them**. `release.yml` and
+`release-extension.yml` have never run.
 
-- **2026-11-15, after the move** (`typedblite/typedblite` #1 to #4; the old repository's #62 to #64 did the
-  handoff, the `@swc/core` and `playwright-core` bumps that replace Dependabot #30, and the URL change): **the
-  five-minute tour** (#1, `docs/guides/five-minute-tour.tql.md`, run as written from the tarballs by `npm run tour`, a gate
-  step; #2 matches a title with `has title == $t`); **a value read as an attribute is refused** (#3: found by running
-  the tour's TypeQL on a live TypeDB; `given $t: string; … has title $t` matched nothing and said so only in an
-  `empty-match` fact, and TypeDB refuses it, so TypeDBLite now does too: a behavior change in the changelog); and
-  **`oracle-bench`** (#4: the load test's `growth` and `relations` workloads on TypeDBLite and on a live TypeDB, with
-  the network taken out; no results are kept in the repository).
+**Landed since the move** (details in the changelog and each pull request): the five-minute tour, now a notebook
+(#1, #2, #60); a value read as an attribute refused (#3); `oracle-bench` (#4); the website and API reference
+(#6, #11 to #21, #24 to #37); the in-browser sync demo (#39 to #45); the engine host and the published
+`@typedblite/session` (#46 to #52); TypeQLite notebooks (#53 to #62); the debugger (#63 to #70);
+`@typedblite/node-host`, private (#72); `npm run deploy:vsx` (#73, #74).
 
-**State of the checks (from the last runs on GitHub, before Actions went off):** every gate was green, including
-**Windows on two complete runs** and `coverage`. Windows is blocking in `ci.yml` (`experimental: false`); macOS is not.
-Nothing has run on GitHub since #40 of the old repository, so CI has seen none of the work since, and `release.yml`, `release-extension.yml` and CI's `clean-room` job have never run, on either repository. Their evidence is `npm run gate` (12 steps, Linux, Node 24), which passed on every change in the new repository.
+**What is left, in order.** Several steps are hard to undo once something is public or published.
 
-**Merging:** merge commits only, never squash or rebase, so each commit keeps its own history (the maintainer's rule,
-2026-11-14). PRs #22 and #33 were squashed before that rule; their original commits are still on GitHub at
-`refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head` (`a7557e1`), and are not on any branch.
-
-**Known and left alone:**
-- **No Dependabot PR is open in the new repository, and it is paused there too** (`open-pull-requests-limit: 0`).
-  In the old one, #30 is closed (its `@swc/core` and `playwright-core` bumps were taken in #63; its `@types/vscode`
-  bump must not land while the extension declares `engines.vscode ^1.91`, which `vsce` refuses to package) and #32
-  (Capacitor 8) waits there until the Android build can be run: it did not carry over, so re-raise it when
-  Dependabot is turned back on.
-- **The history was rewritten** into the fresh repository (2026-11-15): 221 commits and one remapping commit, 0 hits
-  for any private name in diffs, messages or any stored file, `gitleaks` clean, the full gate green on a fresh clone.
-  Thirteen retired paths were dropped (the private fixtures, the real-store bench and the old results data) and 16
-  ordered rules replaced the names. The older component names (`document-store`, `graph-store`, `iam`,
-  `workflow-engine`, `mvp`) are still in history on purpose: the maintainer has not asked for them to go. The
-  launch plan itself had listed the removed names, so the new `main`'s tree differs from the old one in those two
-  lines. `55b783a`, cited in `docs/development/performance.md`, is not a commit in this repository (a stale
-  citation, left).
-- **`apps/playground` and the API reference are built and not hosted.** `npm run playground` and `npm run docs:api`. The site that will host them, with the guides, is `apps/website` (`npm run site`; [The website](../../development/website.md)), also not hosted.
-- **`gitleaks` 8.30.1 found no leaks** in the 152 reachable commits on 2026-11-15 (S9). Run it again on the rewritten
-  history before the repository goes public.
-- **A pushed revision is checked against its content** (PL-6, #55; its ADR-003 amendment was accepted on 2026-11-15).
-  A peer that may write can still make its write win.
-- **The coverage job is not blocking**, and `sync-demo:test-browser` (which runs code excluded from coverage) is not
-  in CI. Both wait on Actions.
-
-**What is left, in the order to do it.** The engineering is essentially done; what remains is accounts, outside
-parties and decisions, nearly all the maintainer's. The order matters because several steps are hard to undo once
-something is public or published.
-
-1. **Start now, in parallel: the long waits.**
-   - Send the written confirmation to TypeDB Ltd (B1). The draft is deliberately not in this repository. Get a
-     one-line written reply before any announcement, and settle [PL-1](#parking-lot). It blocks going public.
+1. **Unblock the build.** Resolve the `@devx-micro` packages (above).
+2. **Start the long waits, in parallel.**
+   - Send the written confirmation to TypeDB Ltd (B1; the draft is deliberately not in this repository), get a
+     one-line reply, and settle [PL-1](#parking-lot). It blocks going public.
    - Start the Open VSX namespace `typedblite`: it needs the Eclipse publisher agreement and a verification request
      ([Releasing](../../development/releasing.md#the-vs-code-extensions)).
-2. **Before anything is public or published.**
-   - **Done 2026-11-15: the fresh repository `typedblite/typedblite`**, created private, holds the rewritten history
-     and is made public at launch. The old repository stays private as the archive, with PR and issue history.
-     Re-run `gitleaks` on the repository the day it goes public.
-   - The repository URL moved to `https://github.com/typedblite/typedblite` in `tools/publishable.mjs` and the
-     manifests (held by `npm run check-packages`), the READMEs and the extension manifests. npm trusted publishing
-     and provenance record that URL.
-   - Fix GitHub billing and re-enable the workflows (the notice at the top). It unblocks CI on three platforms,
-     provenance, both release workflows and hosting.
-3. **Accounts** ([Releasing](../../development/releasing.md#one-time-setup)): claim the unscoped `typedblite` and
-   `typeqlite` on npm (both free on 2026-11-15); 2FA on the `@typedblite` org and a second owner; take `private` off
-   `apps/cli`; the Marketplace publisher `typedblite`; the `npm` and `marketplaces` GitHub environments and their
-   tokens.
-4. **The first release candidate.** Read the first CI run on `main` and fix what macOS, Windows and Node 22.16 turn
-   up (then make `coverage` blocking and add `sync-demo:test-browser` to CI). Publish `0.1.0-rc.1` under `next` with
-   provenance, run the clean room against the published packages on three platforms, and publish the extensions.
-5. **Docs that need published packages:** run the five-minute tour again against the registry (it is written and
-   tested from the tarballs; `npm run tour` swaps two commands for them, and the guide is not linked from the README
-   until then); hosting the playground and the API reference at
-   `typedblite.dev` (Cloudflare, live 2026-11-17); the demo GIF and badges; "TypeDB vs TypeDBLite", which TypeDB Ltd
-   should have the chance to read.
-6. **Governance, before going public:** `CODE_OF_CONDUCT.md` (Insights, Community Standards, Add: the official
-   Contributor Covenant text, which the tooling here cannot fetch); DCO or CLA (decision 4); who answers issues and
-   who is the second reviewer (8); the launch window (7); and a review of the
-   [compatibility policy](../../guides/compatibility.md) and the ["Why not X" draft](../../guides/why-not-x.md),
-   which is not linked from the README until then.
-7. **Go public**, then set branch protection and the repository settings, which return 403 until then: the required
-   checks listed in 1.2 (Windows included), Discussions, private vulnerability reporting, secret scanning with push
-   protection, Dependabot alerts. Then the private beta (Phase 4) and the launch (Phase 5).
+3. **Get CI back** (decision 10): fix GitHub billing. Then read the first run on `main`, turn Dependabot back on
+   (`open-pull-requests-limit` is still 0 in `dependabot.yml`; re-raise the old repository's Capacitor 8 update),
+   decide whether `coverage` and macOS become blocking, and add `sync-demo:test-browser`.
+4. **Accounts** ([Releasing](../../development/releasing.md#one-time-setup)): claim the unscoped `typedblite` and
+   `typeqlite` on npm (both still unpublished on 2026-11-25); 2FA on the `@typedblite` org and a second owner; take
+   `private` off `apps/cli`; the Marketplace publisher `typedblite`; the `npm` and `marketplaces` GitHub environments
+   and their tokens (none exist yet). Releasing still counts three libraries; there are now four, plus the CLI.
+5. **Governance:** `CODE_OF_CONDUCT.md` (the official Contributor Covenant text); DCO or CLA (decision 4);
+   `GOVERNANCE.md` and `ROADMAP.md`; who answers issues and who reviews (8); the launch window (7); review the
+   [compatibility policy](../../guides/compatibility.md) and the ["Why not X" draft](../../guides/why-not-x.md).
+6. **First release candidate:** publish `0.1.0-rc.1` under `next`, run the clean room against the published packages
+   on three platforms, publish the extensions, and run the five-minute tour against the registry.
+7. **Content:** "TypeDB vs TypeDBLite" (TypeDB Ltd should read it first), demo GIF, badges, blog post, release
+   notes, good first issues. At release, remove the "not on npm" and "not public yet" notices (README, website) and
+   restore the website's GitHub links (hidden in #34).
+8. **Go public.** First run `gitleaks` again (clean on 2026-11-25) and finish PL-1. Then set branch protection,
+   Discussions, private vulnerability reporting, secret scanning with push protection, Dependabot alerts, and the
+   repository's website link and topics (both empty). Then Phase 4 and Phase 5.
 
-Decided already: the production consumer is not named (5, S3); Windows is fixed and blocking; the coverage policy
-(decision 9); the Node minimum (22.16); ADR-003's amendment (accepted).
+Decided already: the production consumer is not named (5, S3); Windows is blocking; the coverage policy (decision 9);
+the Node minimum (22.16); ADR-003's amendment (accepted).
 
-Engineering that is open and not blocking: **full scans and long relation traversals are several times slower than
-TypeDB's** (`npm exec nx -- run typedblite-conformance:oracle-bench` shows it against the same live server; keyed
-and anchored access is at or near the noise floor). The next step would be to profile those two shapes before
-changing anything: the cost looks like per-row overhead. No comparison results are kept in the repository, because
-TypeDB Ltd should read a comparison before it is published. TypeDB 3.10.4 has no `EXPLAIN` (no TypeQL keyword; the
-HTTP API's `query` field is the parsed structure, not a plan), so TypeDBLite's trace and `no-candidates` facts have no
-counterpart there.
+**Merging:** merge commits only, never squash or rebase (the maintainer's rule, 2026-11-14).
 
-Parked, and not blocking the flip to public: PL-2 to PL-5 in the [parking lot](#parking-lot).
+**Open, not blocking:** full scans and long relation traversals are several times slower than TypeDB's
+(`npm exec nx -- run typedblite-conformance:oracle-bench`); profile them before changing anything. No comparison
+results are kept in the repository, because TypeDB Ltd should read a comparison before it is published. PL-2 to PL-5.
 
-**Before the repository goes public:** the repository is **private** (maintainer, 2026-11-14), and this plan names the
-TypeDB Ltd conversation. That is parked as [PL-1](#parking-lot), and the "flip the repo to public" step in Phase 4 is
-blocked on it.
+**History notes:** the older component names (`document-store`, `graph-store`, `iam`, `workflow-engine`, `mvp`) are
+still in history on purpose. `55b783a`, cited in `docs/development/performance.md`, is not a commit in this
+repository.
 
-**Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run gate` (about two
-minutes; it needs Playwright's Chromium, `npx playwright-core install chromium`, and a display, or `-- --quick`).
-Useful to know:
-- **`npm install` of a new package can write local-registry URLs into `package-lock.json`** if your npm is pointed
-  at a local proxy (`localhost:4873`). Rewrite them to `https://registry.npmjs.org/` after checking each integrity
-  hash against `npm view <pkg> dist.integrity --registry https://registry.npmjs.org/`, and check
-  `grep -c localhost package-lock.json` prints 0.
+**Resuming locally:** Node 22.16 or later, then `git checkout main && git pull && npm ci && npm run gate` (it needs
+Playwright's Chromium, `npx playwright-core install chromium`, and a display, or `-- --quick`). Useful to know:
+- **`npm install` can write local-registry URLs into `package-lock.json`** if npm is pointed at a local proxy. Rewrite
+  them to `https://registry.npmjs.org/` after checking each integrity hash, and check `grep -c localhost
+  package-lock.json` prints 0. A URL rewritten for a package that is not on npmjs.org still fails for others.
 - **In TypeQL 3, a `match` after an `insert` is the next stage of the same pipeline.** Separate statements with `end;`.
 - `CI=true` turns on the coverage floor. Run with `CI=` to match the blocking gate.
-- A workflow run shows "success" even when an experimental job (Windows, coverage, WASM and browser, e2e, macOS)
-  fails. Read the jobs, not the run.
-- A push cancels CI that is still running on the same ref, so push once the run you care about has finished.
-- `apps/vscode` and the language server share `libs/language`; the Langium override in
-  `TypeQLiteDocumentBuilder.notifyDocumentPhase` must be re-checked on any Langium upgrade.
+- A workflow run shows "success" even when an experimental job fails. Read the jobs, not the run.
+- A push cancels CI that is still running on the same ref.
+- The Langium override in `TypeQLiteDocumentBuilder.notifyDocumentPhase` must be re-checked on any Langium upgrade.
+
+---
+
+## Free hosting and CI for open source
+
+Checked on each provider's own pages on 2026-11-25, except where noted. Terms change; re-check before relying on one.
+
+| Service | Free for this project | Limits and catches |
+| --- | --- | --- |
+| [GitHub Actions](https://docs.github.com/en/billing/concepts/product-billing/github-actions) | Standard hosted runners in **public** repositories, including Windows and macOS | Larger runners are billed. Private repositories get a quota. The page does not say whether a failed payment blocks public-repository jobs |
+| [GitHub Packages](https://docs.github.com/en/billing/concepts/product-billing/github-packages) | Public packages | Its npm registry [needs a token even to install a public package](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry): not a substitute for npmjs.org |
+| npmjs.org | Public packages (not re-checked: npm's pricing page refused the fetch) | [Trusted publishing](https://docs.npmjs.com/trusted-publishers/) works from GitHub Actions, GitLab CI and CircleCI hosted runners; provenance needs a public repository |
+| [GitLab for Open Source](https://docs.gitlab.com/subscriptions/community_programs/) | Ultimate and 50,000 compute minutes a month | Application; OSI license on every project in a public namespace; renews every three months |
+| [GitLab Free](https://about.gitlab.com/pricing/) | 400 compute minutes a month | Hosted runners need a card on file |
+| [CircleCI open source](https://circleci.com/open-source/) | Up to 400,000 credits a month (Linux, Arm, Docker) and 30,000 (macOS, Windows) | Eligibility steps not stated on the page |
+| [Codeberg CI](https://docs.codeberg.org/ci/) | Woodpecker for free software | Manual approval; provided as-is; modest use |
+| [Azure Pipelines](https://learn.microsoft.com/en-us/azure/devops/pipelines/licensing/concurrent-jobs) | No: new public projects can no longer be created | |
+| [Cloudflare Workers static assets](https://developers.cloudflare.com/workers/platform/pricing/) | Static asset requests (the website today) | Requests served by Workers Caching are billed |
+
+**Recommendation:** stay on GitHub and npmjs.org. The workflows, trusted publishing and the repository URL are already
+set up for them, and Actions costs nothing for these runners once the repository is public. Until then, fix billing,
+or keep relying on `npm run gate`. Moving CI elsewhere would mean rewriting the workflows.
 
 ---
 
@@ -201,10 +143,9 @@ Useful to know:
 | Honest engineering record | Ten ADRs, a documented load test with before/after numbers, declared deviations with owners |
 | Clean licensing posture | MPL-2.0, matching TypeDB; upstream attribution and trademark notice already in the README |
 
-**Not yet release-shaped.** Everything at version `0.0.1`; no git tags or releases; no CI workflow files
-(`.github/workflows/` does not exist); the CLI, VS Code extension and conformance package are
-`"private": true`; no `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, or issue/PR templates. Details
-in [section 4](#4-readiness-audit).
+**Not yet released.** Everything at version `0.0.1`; no git tags or releases; the CLI and the VS Code extension are
+still `"private": true`; no `CODE_OF_CONDUCT.md`. The rest is in [Where to resume](#where-to-resume) and
+[section 4](#4-readiness-audit).
 
 ## 2. Goals and non-goals
 
@@ -247,7 +188,7 @@ runs in Node and the browser, and passes 99.2% of TypeDB's own behavior spec.*
 
 ## 4. Readiness audit
 
-Findings from reading the repository. **Verified** = confirmed in the files. **To check** = I did not
+Findings from the first read of the repository (2026-11-14), with their status updated since. **Verified** = confirmed in the files. **To check** = I did not
 confirm it and it needs someone to.
 
 ### 4.1 Blockers (must be resolved before announcing)
@@ -255,21 +196,22 @@ confirm it and it needs someone to.
 | # | Finding | Status | Action |
 | --- | --- | --- | --- |
 | B1 | **The name contains TypeDB™.** The README handles attribution well, but a project name that includes another company's mark is the single largest launch risk | **Verbal blessing received** from TypeDB Ltd's CEO (video call, 2026-11) | **Get it in writing.** Send a short follow-up email restating what was agreed (open-source release under the name TypeDBLite, the `@typedblite` scope and `typedblite.dev`, MPL-2.0, the independence statement) and ask for a one-line confirmation reply. Keep the reply with the project records. Read the published trademark policy once to check that the agreement and the policy don't conflict. A verbal OK is good faith; a written one is what survives a change of staff or a rebrand |
-| B2 | **No CI.** `.github/workflows/` was absent, so contributors' PRs would get no checks | Verified | **Workflows written (Phase 1); not yet run on GitHub.** Running the gate also found a broken lockfile and failing coverage thresholds (1.1) |
-| B3 | **Nothing is published.** No tags, no releases, no npm packages, CLI is private | Verified | Phase 2 |
+| B2 | **No CI.** `.github/workflows/` was absent, so contributors' PRs would get no checks | **Written; ran green; stopped by billing 2026-11-17** | See [Where to resume](#where-to-resume) |
+| B3 | **Nothing is published.** No tags, no releases, no npm packages, CLI is private | Verified, still true 2026-11-25 | Phase 2 |
 | B4 | **npm and domain names.** `@typedblite` (npm org) and `typedblite.dev` are **registered (2026-11-14)**. Still to confirm: the unscoped `typedblite` (the CLI's name) and `typeqlite`, which the scope does not cover: **both still free on 2026-11-15**. The `typedblite` GitHub org is held too (2026-11-15) | Partly done | Check both unscoped names on npm and claim them (publish a placeholder or `0.0.0` under the org if free). Note that the domain, like the name, contains TypeDB™, so B1 covers it too |
 | B5 | **`node:sqlite` vs `engines`.** `engines` said Node `>=22.12`. Measured: 22.12 has **no** `node:sqlite`; 22.13 to 22.15 have it **without FTS5**, which the engine requires; **22.16.0 is the first that works** (full gate passes there, cache skipped) | **Resolved** | `engines`, the READMEs, CONTRIBUTING and the getting-started guide now say 22.16; 22.16.0 is a blocking CI job. Node still marks `node:sqlite` experimental, which prints a warning on first use: say so in the docs |
 | B6 | **Hub security.** The hub exposes an SSE stream and a POST endpoint. I did not check authentication, binding defaults, or input limits | **Reviewed 2026-11-14: documented, not yet fixed** | Done: the replication guide has a "Security" section with each finding, verified against a live hub. Five of the eight are now fixed in the handler (PL-6); authentication and TLS are the mounting server's job; **a pushed revision is now checked against its content (PL-6, ADR-003 amended 2026-11-15)**, though a peer that may write can still make its write win. Binding is `127.0.0.1` only |
-| B7 | **No `SECURITY.md`** (private reporting channel) | Verified | **Written.** Enable GitHub private vulnerability reporting and create the `security@` alias |
+| B7 | **No `SECURITY.md`** (private reporting channel) | **Written; `security@` alias forwards** | Enable GitHub private vulnerability reporting |
+| B8 | **A clean `npm ci` fails:** `@devx-micro/app-*` is not on npmjs.org | **Open (found 2026-11-25)** | Publish the seven packages or remove the dependency |
 
 ### 4.2 Should fix before launch
 
 | # | Finding | Action |
 | --- | --- | --- |
-| S1 | No `CODE_OF_CONDUCT.md`, issue templates, PR template, `CHANGELOG.md` | Add. Contributor Covenant 2.1; issue forms for *bug*, *TypeDB-divergence*, *feature (name the caller)* |
+| S1 | No `CODE_OF_CONDUCT.md` (the issue and PR templates and `CHANGELOG.md` are written) | Add Contributor Covenant 2.1 |
 | S2 | **Doc drift.** `docs/memories/project-overview.md` says revision parity is "proven against CouchDB 3.4.3 oracle"; `AGENTS.md` says that oracle was removed (2026-09) and nothing re-checks parity | Fix the overview. A public claim contradicted by the maintainers' own notes is exactly what an early reader finds |
 | S3 | Public docs named the engine's one production consumer (performance doc and bench data) | **Decided 2026-11-15: neutralise.** Every reference to it by name was removed; the docs say "a production application" or "a downstream application". Check that no private data ships in `performance-results/` or snapshots |
-| S4 | README is long and opens with a thanks table | Restructure (see 5.3) |
+| S4 | README is long and opens with a thanks table | **Done** (#46 of the old repository) |
 | S5 | `.claude/`, `AGENTS.md`, `.github/agents|prompts|skills` ship in the public tree | Fine to keep, and a plus for agent-assisted contributors. Confirm nothing in them is private (paths, tokens, internal URLs) |
 | S6 | Sync demo has Electron and Android toolchains: heavy for a newcomer | Keep it, but give a browser-only "run it in one command" path and a recorded GIF |
 | S7 | Performance "Still open" list (no cost model, one writer, no change-log retention) | Promote to the public roadmap and known-limitations page rather than leaving it in a results doc |
@@ -325,12 +267,12 @@ Each phase lists its **exit criteria**. Don't start the next phase's public step
 - [ ] Secure the npm org: 2FA required for all members, no shared logins, a second owner as a recovery
       path (a single owner is a single point of failure for the whole project).
 - [ ] Claim the unscoped `typedblite` and `typeqlite` npm names, the VS Code Marketplace publisher, and
-      the Open VSX namespace. Consider a GitHub organization, so the repo isn't tied to a personal account.
+      the Open VSX namespace. *(The GitHub organization is done: `typedblite`.)*
 - [ ] Domain hygiene: auto-renew on, registrar 2FA, registrar lock, and a multi-year registration.
       `.dev` is HSTS-preloaded, so everything on it must serve valid HTTPS from day one.
 - [ ] Confirm copyright holder line and MPL-2.0 headers: new files carry the notice as the project
       decides; vendored spec files keep their original headers (already the case).
-- [ ] Run a secret and PII scan over the full history (S9). Check `.claude/` and `.github/` content (S5).
+- [x] Run a secret and PII scan over the full history (S9; repeat before the flip). Check `.claude/` and `.github/` content (S5).
 - [ ] Choose a contribution model: **DCO** (sign-off) recommended over a CLA for an MPL-2.0 project.
 
 **Exit:** written answer or clear path on the name; reservations held; history clean.
@@ -477,7 +419,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
 
 | Artifact | Channel | Notes |
 | --- | --- | --- |
-| `@typedblite/runtime`, `@typedblite/language`, `@typedblite/content-revision` | npm | Publish with **provenance** (`--provenance` from GitHub Actions OIDC); include `exports`, types, a README per package, and a `files` allowlist; verify with `npm pack --dry-run` |
+| `@typedblite/runtime`, `@typedblite/language`, `@typedblite/content-revision`, `@typedblite/session` | npm | Publish with **provenance** (`--provenance` from GitHub Actions OIDC); include `exports`, types, a README per package, and a `files` allowlist; verify with `npm pack --dry-run` |
 | `typedblite` (the CLI; was `typedblite-cli`) | npm (remove `private`) | Goal: `npx typedblite --exec '…'` works with zero clone. Needs the unscoped name |
 | `typeqlite` VS Code extension | Marketplace **and** Open VSX | Already packages as a `.vsix`; add a `README`, changelog, gallery banner, categories, keywords. **Done 2026-11-15** except publishing |
 | `typedblite-conformance`, `sync-demo` | Repo only | Stay private; they're evidence and demo, not products |
@@ -526,7 +468,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       guide (which starts from a clone). *Written 2026-11-15, `docs/guides/five-minute-tour.tql.md`, and run as written
       from the tarballs by `npm run tour` (a gate step); not linked from the README until the packages are on npm,
       then run it again against the registry.*
-- [ ] A **Known limitations & roadmap** page assembled from: `@range/@values/...` not enforced, `@card`
+- [ ] A **Known limitations & roadmap** page *(limitations page done; roadmap not)* assembled from: `@range/@values/...` not enforced, `@card`
       only partly enforced, the 14 non-passing scenarios, and the performance "Still open" list.
 - [ ] "TypeDB vs TypeDBLite" page: what's the same, what differs, when to use which. Written to be
       fair to TypeDB; ask TypeDB Ltd to read it (Phase 0 contact).
@@ -544,7 +486,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       (`npm run deploy:site`, `apps/website/cloudflare.config.ts`; [The website](../../development/website.md)). The GitHub
       Pages plan was dropped: its workflow `site.yml` never ran and was removed, and so were the `CNAME` and `.nojekyll`
       files. Left: removing the "not on npm yet" notices at launch.
-- [ ] Mail on the domain: a `security@` and a `hello@` alias (forwarding is enough) so `SECURITY.md` and
+- [x] Mail on the domain: a `security@` and a `hello@` alias (forwarding is enough) so `SECURITY.md` and
       the press kit don't depend on a personal address. Add SPF/DKIM/DMARC if the aliases will send.
 - [ ] Use the domain in package metadata (`homepage`), the VS Code extension manifest, the README badges,
       and the repo's website field.
@@ -744,7 +686,7 @@ These change the plan; the recommendations are what the plan assumes.
 7. **Launch window.** Early December versus January. *Recommendation: January 2027.*
 8. **Capacity.** Who answers issues in launch week, and who is the second reviewer?
 9. **Coverage policy.** Four projects are below the 80% floor (1.1). Raise tests, exempt `sync-demo`, or lower
-   the floor? *Recommendation: exempt `sync-demo`, and raise the other three, which are within about
+   the floor? *Original recommendation: exempt `sync-demo`, and raise the other three, which are within about
    8 points; keep the floor at 80%.*
    **Decided 2026-11-14: raise the tests, and keep the floor at 80%.** Code that runs only inside a host
    the unit runner lacks is excluded by name, each entry saying where it IS run. No project is exempt.
@@ -758,6 +700,10 @@ These change the plan; the recommendations are what the plan assumes.
 
    ⚠️ `sync-demo:test-browser`, which runs that excluded client, Electron and driver code, is not in CI.
 
+10. **Where CI runs until launch.** Fix GitHub billing, or rely on `npm run gate` until the repository is public.
+    See [Free hosting and CI](#free-hosting-and-ci-for-open-source). *Recommendation: fix billing, so the release
+    candidate is not the first time CI sees the engine host, notebook and debugger.*
+
 ---
 
 ## Parking lot
@@ -768,9 +714,9 @@ Things deliberately set aside, each with the moment it must be revisited. An ite
 | --- | --- | --- | --- | --- |
 | PL-1 | Revisit what this plan says about the TypeDB Ltd conversation | The repository is made public, and in any case before the announcement | Flip to public | Open |
 | PL-2 | Report the Langium race upstream, and drop our workaround once it is fixed | A Langium upgrade | Nothing | Open |
-| PL-3 | Keep the original commits of PRs #22 and #33 on a branch or tag | Soon: needs the maintainer's OK to push | Nothing | Open |
+| PL-3 | Keep the original commits of PRs #22 and #33 (old repository) on a branch or tag | The old repository is deleted | Deleting the old repository | Open |
 | PL-4 | Decide whether to add a commit-message check | Branch protection is enabled, or the first outside pull request | Nothing | Open |
-| PL-5 | Confirm CI on `main` is stable, including the Node 22 gate | The announcement | Announcement | Open |
+| PL-5 | Confirm CI on `main` is stable, including the Node 22 gate | The announcement | Announcement | Open: CI stopped 2026-11-17 |
 | PL-6 | Harden `createChangeStreamHandler`. **Mostly done 2026-11-14:** a content-type check (415), a body-size limit (413), a cap on open streams (503), an atomic batch, and no echoing of internal errors. **Written 2026-11-15:** checking a pushed revision against its content, with tests and an ADR-003 amendment, accepted 2026-11-15. Authentication and TLS stay the mounting server's job | The sync story is promoted | Promoting sync | Done |
 
 ### PL-1. What the plan says about the TypeDB Ltd conversation
@@ -815,7 +761,9 @@ Both were squash-merged before the rule that pull requests are merged with merge
 (15 and 2) are on no branch; they exist only at GitHub's `refs/pull/22/head` (`904fb2b`) and `refs/pull/33/head`
 (`a7557e1`).
 
-**To do:** push a branch or tag for each (for example `archive/pr-22`, `archive/pr-33`) so they stay reachable
+Both pull requests are in the old, private repository.
+
+**To do:** there, push a branch or tag for each (for example `archive/pr-22`, `archive/pr-33`) so they stay reachable
 whatever GitHub does with PR refs. That is non-destructive. It needs the maintainer's OK, because it creates refs
 beyond the working branch. `main` is not rewritten.
 
@@ -838,6 +786,7 @@ three clean runs on pull requests did not prove it before. The push runs on `mai
 ---
 
 *Verification notes.* Facts in this plan about the repository (versions, missing files, conformance
-numbers, package visibility, documents' contents) were read directly from it on 2026-11-14. Items marked
+numbers, package visibility, documents' contents) were read directly from it on 2026-11-14; Where to resume and the
+free-tier table were checked on 2026-11-25. Items marked
 "To check" were not verified. External facts (marketplace and community-site rules, TypeDB Ltd's trademark
 policy, Node release details) were not looked up and must be confirmed before acting.
