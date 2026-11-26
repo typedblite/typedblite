@@ -1,8 +1,11 @@
 # @typedblite/node-host
 
 TypeDBLite's **Node host adapter**: the database handle an application opens its TypeQLite stores through, in Node.
-It is private and not published: a host consumes it through a `file:` dependency on this directory, as it consumes
-the runtime.
+It is published to npm with the other TypeDBLite packages, at the same version.
+
+```bash
+npm install @typedblite/node-host
+```
 
 ```ts
 import { openSchemaDatabase, requiredRowString } from '@typedblite/node-host';

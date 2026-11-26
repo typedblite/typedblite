@@ -27,7 +27,9 @@ import { moduleDirectoryFrom } from './module-directory.js';
  * runtime adds it. `runtime-type.test.ts` fails to compile if the real module stops satisfying this shape.
  */
 export interface TypeDbLiteRuntime {
+  /** The default engine class: a store at `location`, or in memory. */
   readonly SqliteEngine: new (location?: string, options?: TypeDBLiteOptions) => EmbeddedDatabase;
+  /** The replicator class, which syncs a change log with a hub. */
   readonly TypeDBLiteReplicator: new (
     log: unknown,
     hubUrl: string,
@@ -37,6 +39,7 @@ export interface TypeDbLiteRuntime {
     replicateOnce(options: ReplicationOptions): ReturnType<TypeDBLiteReplicator['replicateOnce']>;
     replicateContinuously(options: ReplicationOptions, events?: ReplicationEvents): ReplicationSession;
   };
+  /** Builds the HTTP handler that serves a change log as a stream. */
   readonly createChangeStreamHandler: (
     log: unknown,
     options?: ChangeStreamOptions & { readonly path?: string },
@@ -152,7 +155,9 @@ export interface WriteOutcome {
  * read it.
  */
 export interface StoreOpenResult {
+  /** The open database. */
   readonly database: TypeDBLiteDatabase;
+  /** What applying the schema reported. */
   readonly report: WriteOutcome;
 }
 
@@ -163,6 +168,7 @@ export interface TypeDBLiteRow {
 
 /** What a read answered. */
 export interface TypeDBLiteQueryResult {
+  /** The matched rows. */
   readonly rows: readonly TypeDBLiteRow[];
 }
 

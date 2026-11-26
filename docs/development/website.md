@@ -16,7 +16,7 @@ edited where it always was and the site and GitHub cannot disagree. The generate
 | ------- | ----- | ------ |
 | Guides | `/guide/…` | `docs/guides/*.md` (not the draft `why-not-x.md`), `CONFORMANCE.md` |
 | Tools | `/tools/…` | the READMEs of `apps/cli`, `apps/vscode`, `apps/playground`, `apps/sync-demo` |
-| Packages | `/packages/…` | the READMEs of the four libraries |
+| Packages | `/packages/…` | the READMEs of the libraries |
 | Project | `/project/…` | `CONTRIBUTING.md`, `docs/development/*.md`, `CHANGELOG.md`, `SECURITY.md`, the brand page |
 | Decisions | `/decisions/…` | every `docs/architecture/adr-*.md`, found by listing the folder |
 

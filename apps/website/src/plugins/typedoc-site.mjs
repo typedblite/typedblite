@@ -19,7 +19,7 @@ const MEDIA_LINK = /\]\((?:\.\.\/)*_media\/(adr-[\w-]+)\.md(#[^)]*)?\)/g;
 // A guide is linked the same way (`../../../docs/guides/replication-and-search.md`), and is a page at /guide/<name>/.
 const GUIDE_LINK = /\]\((?:\.\.\/)*_media\/((?!adr-)[\w-]+)\.md(#[^)]*)?\)/g;
 
-const OVERVIEW = `Everything the four packages export, generated from their source and checked on every build. A name that is not listed
+const OVERVIEW = `Everything these packages export, generated from their source and checked on every build. A name that is not listed
 here is not public, whatever the package contains. To learn how the pieces fit, start with
 [Embedding the runtime](/guide/embedding-the-runtime/), then come here for the detail; the engine's entry point is
 [TypeDBLiteInterpreter](/api/typedblite/runtime/classes/typedbliteinterpreter/).`;

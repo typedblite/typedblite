@@ -10,6 +10,6 @@
     "skipLibCheck": true,
     "importHelpers": false
   },
-  "include": ["libs/runtime/src/**/*.ts", "libs/language/src/**/*.ts", "libs/content-revision/src/**/*.ts", "libs/session/src/**/*.ts"],
+  "include": ["libs/runtime/src/**/*.ts", "libs/language/src/**/*.ts", "libs/content-revision/src/**/*.ts", "libs/session/src/**/*.ts", "libs/node-host/src/**/*.ts"],
   "exclude": ["**/*.spec.ts", "**/*.test.ts"]
 }
