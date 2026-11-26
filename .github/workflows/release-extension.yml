@@ -80,7 +80,7 @@ jobs:
       - run: npm run build
       # Packages both extensions, then installs both into a downloaded VS Code and runs the cases against the
       # installed copies. Electron needs a display.
-      - run: xvfb-run --auto-servernum npm exec nx -- run typedblite-vscode:e2e
+      - run: xvfb-run --auto-servernum npm exec nx -- run typeqlite-vscode:e2e
 
       # Pre-release is a property written into the .vsix when it is packaged; publishing a built .vsix cannot add it.
       # The e2e above has already built the bundles and notices, so this only packages them again.
