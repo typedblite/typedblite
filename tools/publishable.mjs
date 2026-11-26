@@ -6,6 +6,7 @@ export const PUBLISHABLE = [
   { project: 'typeqlite-language', dir: 'libs/language' },
   { project: 'typedblite-runtime', dir: 'libs/runtime' },
   { project: 'typedblite-session', dir: 'libs/session' },
+  { project: 'typedblite-node-host', dir: 'libs/node-host' },
   { project: 'typedblite', dir: 'apps/cli' },
 ];
 

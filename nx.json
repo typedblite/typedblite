@@ -19,6 +19,7 @@
       "typeqlite-language",
       "typedblite-runtime",
       "typedblite-session",
+      "typedblite-node-host",
       "typedblite"
     ],
     "projectsRelationship": "fixed",

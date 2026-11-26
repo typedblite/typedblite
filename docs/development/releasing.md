@@ -11,7 +11,7 @@ How the npm packages are versioned, checked and published. The promises a versio
 
 | Artifact | Where | Version |
 | --- | --- | --- |
-| `@typedblite/content-revision`, `@typedblite/language`, `@typedblite/runtime`, `@typedblite/session` | npm | One version for all five, released together |
+| `@typedblite/content-revision`, `@typedblite/language`, `@typedblite/runtime`, `@typedblite/session`, `@typedblite/node-host` | npm | One version for all six, released together |
 | `typedblite` (the CLI, `apps/cli`) | npm | The same version |
 | The TypeDBLite VS Code extension (`typedblite-workbench`), and the TypeQLite Theme Bridge (`typeqlite-theme`) | VS Code Marketplace and Open VSX | One version for both: [below](#the-vs-code-extensions) |
 | `typedblite-conformance`, the playground, the sync demo | Not published | `private: true` |
@@ -20,7 +20,7 @@ The list of published packages is [`tools/publishable.mjs`](../../tools/publisha
 in `nx.json` must name the same projects, and `npm run check-packages` fails if it doesn't.
 
 **The tool is Nx release** (`nx release`), not Changesets. The workspace already runs on Nx, so it adds no
-dependency. It versions the five packages as one fixed group, rewrites their dependencies on each other,
+dependency. It versions the six packages as one fixed group, rewrites their dependencies on each other,
 updates the lockfile, and publishes in dependency order. Its config is the `release` block in `nx.json`.
 The changelog stays hand-written ([CHANGELOG.md](../../CHANGELOG.md), Keep a Changelog), so Nx's changelog
 generation is off.
@@ -45,10 +45,10 @@ release workflow:
   than the one being released; or a private workspace package depends on a published one at anything but
   `"*"`. It also checks `nx.json`: the release projects, and that publishing goes to
   `https://registry.npmjs.org/`.
-- **`npm run clean-room`** ([`tools/clean-room.mjs`](../../tools/clean-room.mjs)) packs the five tarballs and
+- **`npm run clean-room`** ([`tools/clean-room.mjs`](../../tools/clean-room.mjs)) packs the six tarballs and
   installs them in an empty directory outside the repository, with their dependencies from the registry, and
   then: runs the CLI through its `bin` link against a file database; runs the runtime on `node:sqlite` with the
-  language and content-revision packages; runs it on WASM SQLite in Node; type-checks the published
+  language and content-revision packages; runs it on WASM SQLite in Node; runs a transaction through `node-host`; type-checks the published
   declarations with `tsc` and `skipLibCheck: false`; and bundles the `browser` export condition for a browser,
   failing if it reaches a `node:` module. `-- --keep` leaves the directory for a look.
 
@@ -60,15 +60,15 @@ Each check of both scripts has been seen to fail on a broken package (a missing 
 Only the maintainer can do these, once, before the first release:
 
 1. **Claim the unscoped `typedblite` name on npm** for the CLI (`npx typedblite` needs it), and `typeqlite`
-   to protect it. The `@typedblite` org already covers the three libraries. Require 2FA for every member of
+   to protect it. The `@typedblite` org already covers the five libraries. Require 2FA for every member of
    the org, and add a second owner.
 2. **Take `"private": true` off `apps/cli/package.json`.** It is there so that nothing can publish the CLI
-   until its name is held. `nx release publish` skips a private package and says so, and the dry run shows
-   three packages until then.
+   until its name is held. `nx release publish` skips a private package and says so, and the dry run leaves
+   it out until then.
 3. **The GitHub environment `npm`** (Settings → Environments) has the maintainer as a required reviewer, so that a
    pushed tag waits for approval before anything is published. *Created 2026-11-26.*
 4. **The first publish of each package needs a token**, because npm only lets a package that exists have a
-   trusted publisher. Create a granular access token limited to the five packages (and the org, to create
+   trusted publisher. Create a granular access token limited to the six packages (and the org, to create
    them), with a short expiry. Save it as the repository secret `NPM_TOKEN`.
 5. **After the first publish, switch to trusted publishing.** On npmjs.com, for each package: Settings →
    Trusted publishing → GitHub Actions, repository `typedblite/typedblite`, workflow `release.yml`, environment `npm`. Then delete the `NPM_TOKEN` secret,
@@ -83,7 +83,7 @@ Only the maintainer can do these, once, before the first release:
    npm exec nx -- release version 0.1.0-rc.1
    ```
 
-   That builds, runs `check-packages`, sets the version in the five manifests and their dependencies on each
+   That builds, runs `check-packages`, sets the version in the six manifests and their dependencies on each
    other, updates the lockfile, and commits `chore(release): v0.1.0-rc.1`. It does **not** tag. Run
    `npm run gate`, and open a pull request.
 2. **Merge it** (a merge commit, as always).

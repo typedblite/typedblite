@@ -37,6 +37,7 @@ export const PAGES = [
   ['libs/runtime/README.md', 'packages/runtime', '@typedblite/runtime'],
   ['libs/language/README.md', 'packages/language', '@typedblite/language'],
   ['libs/content-revision/README.md', 'packages/content-revision', '@typedblite/content-revision'],
+  ['libs/node-host/README.md', 'packages/node-host', '@typedblite/node-host'],
   ['libs/conformance/README.md', 'packages/conformance', 'typedblite-conformance'],
 
   ['CONTRIBUTING.md', 'project/contributing', 'Contributing'],

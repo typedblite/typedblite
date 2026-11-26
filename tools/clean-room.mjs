@@ -6,8 +6,9 @@
 //   1. the `typedblite` CLI, through its npm `bin` link, keeping data in a file between runs;
 //   2. the runtime on `node:sqlite`, with the language and content-revision packages and the TextMate grammar;
 //   3. the runtime on WASM SQLite (`@typedblite/runtime/wasm`), in Node;
-//   4. the published declarations, type-checked by `tsc` without `skipLibCheck`;
-//   5. the `browser` export condition, bundled for a browser, reaching no `node:` module.
+//   4. `@typedblite/node-host`: a schema'd database and a transaction;
+//   5. the published declarations, type-checked by `tsc` without `skipLibCheck`;
+//   6. the `browser` export condition, bundled for a browser, reaching no `node:` module.
 //
 // This is the Linux leg of the plan's clean-room test; macOS and Windows wait on CI. It does NOT test published
 // packages (none exist yet), the README's words, or the VS Code extension.
@@ -171,6 +172,24 @@ assert.equal(rows[0]?.n.asString(), 'Alice');
     run('node', ['--no-warnings', 'wasm.mjs'], app);
   });
 
+  check('the node-host adapter, with a transaction on a database', () => {
+    writeFileSync(
+      join(app, 'host.mjs'),
+      `import assert from 'node:assert/strict';
+import { openSchemaDatabase, requiredRowString } from '@typedblite/node-host';
+
+const { database } = await openSchemaDatabase({ name: 'clean-room' }, 'define attribute code, value string; entity item, owns code @key;');
+await database.transaction(async (tx) => {
+  await tx.execute('insert $i isa item, has code "a";');
+});
+const { rows } = await database.query('match $i isa item, has code $c; select $c;');
+assert.deepEqual(rows.map((row) => requiredRowString(row, 'c')), ['a']);
+await database.close();
+`,
+    );
+    run('node', ['--no-warnings', 'host.mjs'], app);
+  });
+
   check('the declarations, type-checked by tsc without skipLibCheck', () => {
     writeFileSync(
       join(app, 'tsconfig.json'),
@@ -182,13 +201,14 @@ assert.equal(rows[0]?.n.asString(), 'Alice');
 import { initWasmSqlite, openWasmSqlite } from '@typedblite/runtime/wasm';
 import { createTypeQLiteServices, validateSync, type TypeQLiteFile } from '@typedblite/language';
 import * as revision from '@typedblite/content-revision';
+import { TypeDBLiteDatabase } from '@typedblite/node-host';
 
 const db: TypeDBLiteInterpreter = new TypeDBLiteInterpreter(':memory:', undefined, { openDatabase: openWasmSqlite });
 const name: string | undefined = db.query('match $p isa person, has name $n; select $n;').rows[0]?.n.asString();
 const binding: SqliteDatabase | undefined = undefined;
 const services = createTypeQLiteServices;
 const file: TypeQLiteFile | undefined = undefined;
-export { name, binding, services, file, validateSync, initWasmSqlite, DiagnosticCode, revision };
+export { TypeDBLiteDatabase, name, binding, services, file, validateSync, initWasmSqlite, DiagnosticCode, revision };
 `,
     );
     run('node', [join(app, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.json'], app, 'tsc');
