@@ -20,6 +20,6 @@
     "markdown-it": "~14.3.3",
     "monaco-editor": "^0.57.0",
     "playwright-core": "1.65.1",
-    "vscode-jsonrpc": "~9.0.0"
+    "vscode-jsonrpc": "~10.0.1"
   }
 }

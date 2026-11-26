@@ -340,6 +340,6 @@
     "@vscode/vsce": "~4.1.1",
     "esbuild": "~0.28.1",
     "markdown-it": "~14.3.3",
-    "vscode-jsonrpc": "~9.0.0"
+    "vscode-jsonrpc": "~10.0.1"
   }
 }
