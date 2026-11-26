@@ -138,7 +138,12 @@ describe('the browser notebook in Chromium', () => {
     await runCellOnPage(page, 1);
     await page.getByRole('button', { name: 'Restart' }).click();
     await page.waitForFunction(() => /^Restarted/.test((window as unknown as { typedbliteNotebook: Hook }).typedbliteNotebook.status() ?? ''));
+    // The page goes back to how it opened: no answer from the old store stays on it.
+    expect(await page.locator('.nb-outputs > *').count()).toBe(0);
+    expect(await page.locator('.nb-label').allInnerTexts()).toEqual(Array(9).fill('[ ]'));
+    expect(await page.locator('.nb-cell[data-state="idle"]').count()).toBe(9);
     const shown = await runCellOnPage(page, 2);
+    expect(await page.locator('.nb-cell[data-cell="2"] .nb-label').innerText(), 'the run count starts again').toBe('[1]');
     expect(shown.find((block) => block.kind === 'refusal')?.plain).toContain('no schema has been applied');
     await page.context().close();
   }, 60_000);

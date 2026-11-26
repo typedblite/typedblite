@@ -167,10 +167,21 @@ export function mountNotebook(root: HTMLElement, data: NotebookData, createWorke
     cells.push({ index, editor, root: section, run, label, outputs });
   });
 
+  /** The cells as the page opened them: no answers, no run numbers. What the reader typed in them stays. */
+  const clearResults = (): void => {
+    executions = 0;
+    for (const cell of cells) {
+      cell.outputs.replaceChildren();
+      cell.label.textContent = '[ ]';
+      cell.root.dataset['state'] = 'idle';
+    }
+  };
+
   runAll.addEventListener('click', () => void runCells(cells.map((cell) => cell.index)));
   stop.addEventListener('click', () => kernel.stop());
   restart.addEventListener('click', () => {
     void sessions.restart('try').then((done) => {
+      clearResults();
       status.textContent = done === 'restarted' ? 'Restarted: the notebook has an empty store.' : 'Nothing to restart yet: no cell has run.';
     });
   });
