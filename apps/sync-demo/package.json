@@ -9,7 +9,7 @@
     "@typedblite/runtime": "*"
   },
   "devDependencies": {
-    "@capacitor/android": "7.6.10",
+    "@capacitor/android": "8.6.2",
     "@capacitor/cli": "7.6.10",
     "@capacitor/core": "7.6.10",
     "@sqlite.org/sqlite-wasm": "3.54.1-build1",
