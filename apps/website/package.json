@@ -10,13 +10,13 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/nunito": "^5.3.0",
     "@typedblite/language": "*",
-    "astro": "^7.4.12",
-    "astro-expressive-code": "^0.44.3",
+    "astro": "^7.4.13",
+    "astro-expressive-code": "^0.44.4",
     "langium": "~4.4.2",
     "mermaid": "^12.3.0",
-    "playwright-core": "1.65.0",
+    "playwright-core": "1.65.1",
     "sharp": "^0.35.5",
-    "starlight-typedoc": "^0.23.2",
+    "starlight-typedoc": "^0.23.3",
     "typedoc-plugin-markdown": "^4.14.1"
   }
 }
