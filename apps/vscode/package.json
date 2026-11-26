@@ -334,7 +334,7 @@
   },
   "devDependencies": {
     "@types/markdown-it": "~14.1.2",
-    "@types/vscode": "~1.91.0",
+    "@types/vscode": "~1.146.0",
     "@vscode/debugadapter-testsupport": "1.68.0",
     "@vscode/test-electron": "~3.1.0",
     "@vscode/vsce": "~3.9.2",
