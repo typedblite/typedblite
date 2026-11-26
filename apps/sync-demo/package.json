@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@capacitor/android": "7.6.10",
-    "@capacitor/cli": "7.6.10",
+    "@capacitor/cli": "8.6.2",
     "@capacitor/core": "7.6.10",
     "@sqlite.org/sqlite-wasm": "3.54.1-build1",
     "electron": "45.4.1",
