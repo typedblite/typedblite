@@ -103,7 +103,7 @@ jobs:
         env:
           CI: "true"
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage/
@@ -124,7 +124,7 @@ jobs:
       - run: npm run build
       - name: Run the report card
         run: npm exec nx -- run typedblite-conformance:report 2>&1 | tee conformance-report.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: conformance-report
           path: conformance-report.txt
