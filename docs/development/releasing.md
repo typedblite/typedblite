@@ -176,8 +176,8 @@ the extension's folder, so they break. A shipped README or changelog links with 
 
    ```bash
    git switch main && git pull --ff-only
-   git tag -a typeqlite-v0.3.2 -m typeqlite-v0.3.2
-   git push origin typeqlite-v0.3.2
+   git tag -a typedblite-v0.3.2 -m typedblite-v0.3.2
+   git push origin typedblite-v0.3.2
    ```
 
 3. **Approve the run.** [`release-extension.yml`](../../.github/workflows/release-extension.yml) checks the tag
@@ -186,7 +186,7 @@ the extension's folder, so they break. A shipped README or changelog links with 
    is set) and creates the GitHub Release with both attached.
 
 **Pre-releases.** A version is always plain `x.y.z`, because the Marketplace refuses a suffix such as `-rc.1`. To
-publish one as a pre-release, end the tag in `-pre` (`typeqlite-v0.3.2-pre`). A version published as a pre-release is
+publish one as a pre-release, end the tag in `-pre` (`typedblite-v0.3.2-pre`). A version published as a pre-release is
 used up: the stable release takes a higher number.
 
 **By hand, to Open VSX only:** `npm run deploy:vsx` packages both extensions and publishes both
