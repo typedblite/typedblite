@@ -13,11 +13,12 @@ TypeQLite output channel says why.
 
 ## Install
 
-Install it in the **local** VS Code, beside the TypeDBLite extension. Build both from the TypeDBLite repository:
+Install it in the **local** VS Code, beside the TypeDBLite extension. It is published on
+[Open VSX](https://open-vsx.org/extension/typedblite/typeqlite-theme). To build both from the TypeDBLite repository instead:
 
 ```bash
 npm exec nx -- run typeqlite-vscode:package
-code --install-extension apps/vscode/dist/typeqlite-theme-0.0.1.vsix
+code --install-extension apps/vscode/dist/typeqlite-theme-0.3.1.vsix
 ```
 
 ## License

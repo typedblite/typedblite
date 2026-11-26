@@ -271,7 +271,8 @@ Each phase lists its **exit criteria**. Don't start the next phase's public step
 - [ ] Confirm copyright holder line and MPL-2.0 headers: new files carry the notice as the project
       decides; vendored spec files keep their original headers (already the case).
 - [x] Run a secret and PII scan over the full history (S9; repeat before the flip). Check `.claude/` and `.github/` content (S5).
-- [ ] Choose a contribution model: **DCO** (sign-off) recommended over a CLA for an MPL-2.0 project.
+- [x] Choose a contribution model: **DCO** (sign-off), not a CLA. *Done 2026-11-26: [`DCO`](../../../DCO) and
+      [CONTRIBUTING](../../../CONTRIBUTING.md#sign-your-commits-dco).*
 
 **Exit:** written answer or clear path on the name; reservations held; history clean.
 
@@ -677,7 +678,7 @@ These change the plan; the recommendations are what the plan assumes.
    both marketplaces; leave conformance and sync-demo in the repo. *Recommendation: as in Phase 2.*
 3. **Is the repository already public?** *Resolved: it is private (maintainer, 2026-11-14).* Nothing in it is public
    yet. Clear the [parking lot](#parking-lot) before that changes.
-4. **Contribution model.** DCO (recommended) or CLA.
+4. **Contribution model.** DCO (recommended) or CLA. *Decided 2026-11-26: DCO.*
 5. **The production consumer as a named case study** (S3). *Decided 2026-11-15 by the maintainer: no. Every
    reference to it by name is removed, and the docs call it "a production application".*
 6. **Minimum Node version** after the B5 check.

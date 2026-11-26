@@ -17,6 +17,7 @@
 
 ## Checklist
 
+- [ ] Every commit is signed off (`git commit -s`, the [DCO](../DCO))
 - [ ] The gate passes from a clean tree
 - [ ] Documentation is updated in this pull request (language guide, `CONFORMANCE.md`, package README)
 - [ ] The title follows [Conventional Commits](https://www.conventionalcommits.org), scoped to the package
