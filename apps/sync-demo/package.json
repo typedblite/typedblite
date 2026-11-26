@@ -13,7 +13,7 @@
     "@capacitor/cli": "7.6.10",
     "@capacitor/core": "7.6.10",
     "@sqlite.org/sqlite-wasm": "3.54.1-build1",
-    "electron": "42.11.18",
+    "electron": "45.4.1",
     "esbuild": "0.28.2",
     "playwright-core": "1.65.1"
   }
