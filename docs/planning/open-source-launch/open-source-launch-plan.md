@@ -37,15 +37,10 @@ privately in the old repository.* Read this first; everything it points to is be
 are on npmjs.org and pinned at 0.4.1. With them, `npm ci` from an empty cache succeeded and `npm run gate` passed in
 full on Node 24.19.0, Linux.
 
-🔴 **CI is not running.** The workflows are enabled, but GitHub has started no job since 2026-11-17 04:22 UTC:
-*"recent account payments have failed or your spending limit needs to be increased"*. `npm run gate` is the only
-check since then.
-
-**Last CI evidence.** CI ran from 2026-11-15 to 2026-11-17. `main` at 2026-11-16 03:05 UTC passed all 13 jobs: Linux
-(Node 22.16.0, 22 and 24), Windows, macOS, the clean room on each, conformance, WASM and browser, VS Code e2e and
-coverage. One later `main` run failed in two jobs at checkout (`repository not found`), not in the code. The engine
-host, notebook, debugger and Node host merged after the last run, so **CI has seen none of them**. `release.yml` and
-`release-extension.yml` have never run.
+**CI runs again (2026-11-26).** The repository is public and Actions is enabled. The first runs found failures on
+Node 22, macOS and Windows in code merged while it was off (#81 fixed them), and `main` then passed. The `npm` and
+`marketplaces` environments exist with a required reviewer. `release.yml` and `release-extension.yml` have never run.
+One intermittent failure is known: a `write EPIPE` at the end of the extension's notebook server test.
 
 **Landed since the move** (details in the changelog and each pull request): the five-minute tour, now a notebook
 (#1, #2, #60); a value read as an attribute refused (#3); `oracle-bench` (#4); the website and API reference
@@ -61,9 +56,8 @@ host, notebook, debugger and Node host merged after the last run, so **CI has se
      one-line reply, and settle [PL-1](#parking-lot). It blocks going public.
    - Start the Open VSX namespace `typedblite`: it needs the Eclipse publisher agreement and a verification request
      ([Releasing](../../development/releasing.md#the-vs-code-extensions)).
-3. **Get CI back** (decision 10): fix GitHub billing. Then read the first run on `main`, turn Dependabot back on
-   (`open-pull-requests-limit` is still 0 in `dependabot.yml`; re-raise the old repository's Capacitor 8 update),
-   decide whether `coverage` and macOS become blocking, and add `sync-demo:test-browser`.
+3. ~~**Get CI back**~~ (decision 10). Done 2026-11-26. Left: re-raise the old repository's Capacitor 8 update, decide
+   whether `coverage` and macOS become blocking, and add `sync-demo:test-browser`.
 4. **Accounts** ([Releasing](../../development/releasing.md#one-time-setup)): claim the unscoped `typedblite` and
    `typeqlite` on npm (both still unpublished on 2026-11-25); 2FA on the `@typedblite` org and a second owner; take
    `private` off `apps/cli`; the Marketplace publisher `typedblite`; the `npm` and `marketplaces` GitHub environments
@@ -194,7 +188,7 @@ confirm it and it needs someone to.
 | # | Finding | Status | Action |
 | --- | --- | --- | --- |
 | B1 | **The name contains TypeDB™.** The README handles attribution well, but a project name that includes another company's mark is the single largest launch risk | **Verbal blessing received** from TypeDB Ltd's CEO (video call, 2026-11) | **Get it in writing.** Send a short follow-up email restating what was agreed (open-source release under the name TypeDBLite, the `@typedblite` scope and `typedblite.dev`, MPL-2.0, the independence statement) and ask for a one-line confirmation reply. Keep the reply with the project records. Read the published trademark policy once to check that the agreement and the policy don't conflict. A verbal OK is good faith; a written one is what survives a change of staff or a rebrand |
-| B2 | **No CI.** `.github/workflows/` was absent, so contributors' PRs would get no checks | **Written; ran green; stopped by billing 2026-11-17** | See [Where to resume](#where-to-resume) |
+| B2 | **No CI.** `.github/workflows/` was absent, so contributors' PRs would get no checks | **Closed 2026-11-26:** running again, and green | See [Where to resume](#where-to-resume) |
 | B3 | **Nothing is published.** No tags, no releases, no npm packages, CLI is private | Verified, still true 2026-11-25 | Phase 2 |
 | B4 | **npm and domain names.** `@typedblite` (npm org) and `typedblite.dev` are **registered (2026-11-14)**. Still to confirm: the unscoped `typedblite` (the CLI's name) and `typeqlite`, which the scope does not cover: **both still free on 2026-11-15**. The `typedblite` GitHub org is held too (2026-11-15) | Partly done | Check both unscoped names on npm and claim them (publish a placeholder or `0.0.0` under the org if free). Note that the domain, like the name, contains TypeDB™, so B1 covers it too |
 | B5 | **`node:sqlite` vs `engines`.** `engines` said Node `>=22.12`. Measured: 22.12 has **no** `node:sqlite`; 22.13 to 22.15 have it **without FTS5**, which the engine requires; **22.16.0 is the first that works** (full gate passes there, cache skipped) | **Resolved** | `engines`, the READMEs, CONTRIBUTING and the getting-started guide now say 22.16; 22.16.0 is a blocking CI job. Node still marks `node:sqlite` experimental, which prints a warning on first use: say so in the docs |

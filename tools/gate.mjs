@@ -1,4 +1,4 @@
-// The gate, run locally: `npm run gate`. GitHub Actions is off for now, so this is the only check.
+// The gate, run locally: `npm run gate`. CI (.github/workflows/ci.yml) runs most of it on more platforms, not all of it.
 //
 //   npm run gate               everything below
 //   npm run gate -- --quick    the first six steps only: no e2e, WASM, browser or clean-room steps
@@ -95,7 +95,7 @@ const steps = [
 ];
 
 console.log(`TypeDBLite gate${quick ? ' (quick)' : ''} on Node ${process.versions.node}, ${process.platform}`);
-console.log('CI used to run Node 22.16, 22 and 24 on Linux, and Node 24 on Windows and macOS. This runs the one Node you have.\n');
+console.log('CI runs Node 22.16, 22 and 24 on Linux, and Node 24 on Windows and macOS. This runs the one Node you have.\n');
 
 const results = [];
 let failed;

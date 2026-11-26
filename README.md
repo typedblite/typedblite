@@ -206,7 +206,7 @@ npm exec nx -- run typedblite-runtime:build
 npm exec nx -- run typedblite-runtime:test
 ```
 
-Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-session`, `typedblite-node-host`, `engine-host`, `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode`, `sync-demo` and `playground`. Set `CI=true` to collect coverage into `coverage/`. **`npm run gate`** runs the whole check, from a clean tree: build, type-check, the tests with the 80% coverage floor, and the WASM, browser and VS Code suites. GitHub Actions is off for now, so it is the check before a pull request. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
+Nx project names: `typeqlite-language`, `content-revision`, `typedblite-runtime`, `typedblite-session`, `typedblite-node-host`, `engine-host`, `typedblite-conformance`, `typedblite` (the CLI), `typeqlite-vscode`, `sync-demo` and `playground`. Set `CI=true` to collect coverage into `coverage/`. **`npm run gate`** runs the whole check, from a clean tree: build, type-check, the tests with the 80% coverage floor, and the WASM, browser and VS Code suites. Run it before a pull request; CI then runs most of it on Linux, Windows and macOS. [Contributing](CONTRIBUTING.md) and [Testing](docs/development/testing.md) cover the rest.
 
 ## Test fixtures
 

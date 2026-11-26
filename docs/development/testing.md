@@ -72,9 +72,9 @@ and used; see [Releasing](releasing.md#the-checks-a-package-must-pass)), and the
 task is replayed from a cache. The last seven are skipped by `--quick`. The browser suites need Playwright's
 Chromium, the e2e a display, and the clean room the npm registry, for the packages' dependencies.
 
-**GitHub Actions is off for now**, so this is the only check. It covers the one Node and OS you run it on;
-CI used to cover Node 22.16, 22 and 24 on Linux and Node 24 on Windows and macOS. For a change that touches
-paths, child processes, file handles or Node-version behavior, try it on another if you can.
+CI runs on every pull request and push to `main` (`.github/workflows/ci.yml`): Node 22.16, 22 and 24 on Linux and
+Node 24 on Windows and macOS. It does not run the playground, sync-demo and website checks or the five-minute tour from
+the tarballs, so run the gate too. The gate covers only the one Node and OS you run it on.
 
 🔴 **Why clean.** `build` is `tsc -b`, which is incremental. A library whose sources did not change
 is not rebuilt, so the packages that depend on it are checked against stale type declarations, even

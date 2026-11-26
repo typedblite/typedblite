@@ -139,7 +139,7 @@ they are listed here.
   label-aware providers are constructed with.
 - **Packaging and release.** A [compatibility policy](docs/guides/compatibility.md) for the first release and
   after; Nx release, configured to version the four npm packages as one group; a release workflow that
-  publishes a tag with provenance (written while Actions is off, so it has never run); and
+  publishes a tag with provenance (it has not run yet); and
   [Releasing](docs/development/releasing.md), the process. Two checks join the gate: `npm run check-packages`,
   which reads what `npm publish` would ship and fails on a missing entry point, a test file, a missing LICENSE
   and more, and `npm run clean-room`, which installs the tarballs in an empty directory and uses the CLI, the
@@ -161,6 +161,6 @@ they are listed here.
   hosted yet.
 - `npm run gate`: the whole check in one command, from a clean tree: build, type-check, tests with the 80%
   coverage floor, the WASM suite, the browser suite and the VS Code e2e (`-- --quick` skips the last three).
-  GitHub Actions is off for now, so this is how a change is checked.
+  It is the local counterpart of CI.
 - Community files: `SECURITY.md`, issue forms, a pull request template, `CODEOWNERS`, Dependabot
   configuration, and continuous integration.

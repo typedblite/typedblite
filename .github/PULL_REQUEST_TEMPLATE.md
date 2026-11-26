@@ -4,8 +4,7 @@
 
 ## How it was tested
 
-<!-- The tests you added, and the result of the gate (GitHub Actions is off for now, so this is the
-     only check): npm run gate -->
+<!-- The tests you added, and the result of the gate, which runs steps CI does not: npm run gate -->
 
 ## Conformance
 
