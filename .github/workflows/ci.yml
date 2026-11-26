@@ -171,3 +171,45 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: xvfb-run --auto-servernum npm exec nx -- run typeqlite-vscode:e2e
+
+  # The sync demo's browser tests: the PWA, the in-browser hub, the story driver and the Electron desktop app.
+  # Non-blocking until it has been seen stable on a hosted runner.
+  sync-demo:
+    name: sync demo (browser and Electron)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright-core install --with-deps chromium
+      # Ubuntu 24.04 stops an unprivileged process creating a user namespace, which Electron's sandbox needs.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: xvfb-run --auto-servernum npm exec nx -- run sync-demo:test-browser
+        env:
+          CI: ""
+
+  # The sync demo's Android app builds. It is not run: that needs an emulator.
+  # The runner has the Android SDK already (ANDROID_HOME, which mobile/env.sh respects).
+  android:
+    name: android build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - run: npm exec nx -- run sync-demo:android-apk

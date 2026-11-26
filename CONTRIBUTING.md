@@ -35,9 +35,10 @@ You need **Node.js 22.16 or later** (the project is developed on Node 24) and **
 Windows all work: the gate has passed on Linux (Node 22.16, 22 and 24), Windows and macOS (Node 24).
 
 > **CI runs on every pull request** and every push to `main`: build, type-check and tests on Linux (Node 22.16, 22 and
-> 24), Windows and macOS, the clean-room install, the conformance report, and the WASM, browser, coverage and VS Code
-> e2e jobs. **Run `npm run gate` before you open one** and put its result in the description: it also runs the
-> playground, sync-demo and website checks and the five-minute tour from the packed tarballs, which CI does not.
+> 24), Windows and macOS, the clean-room install, the conformance report, the WASM, browser, coverage and VS Code
+> e2e jobs, the sync demo's browser and Electron tests, and its Android build. **Run `npm run gate` before you open one**
+> and put its result in the description: it also runs the playground and website checks and the five-minute tour from
+> the packed tarballs, which CI does not.
 
 ```bash
 git clone https://github.com/typedblite/typedblite.git
