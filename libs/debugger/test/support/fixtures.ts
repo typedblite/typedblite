@@ -1,6 +1,10 @@
+import { join, resolve } from 'node:path';
+
 import type { Files } from '../../src/program.js';
 
-export const WORK = '/work';
+// The paths as the debugger resolves them: on Windows `/work` has a drive and backslashes.
+export const WORK = resolve('/work');
+export const inWork = (name: string): string => join(WORK, name);
 export const SCHEMA = 'define attribute name, value string; attribute age, value integer; entity person, owns name, owns age;';
 export const SEED = 'insert $c isa person, has name "Cid", has age 45;';
 /** Three statements: two inserts, and a read with a comment inside it (lines are counted from 0 here). */
@@ -29,7 +33,7 @@ export function filesOf(entries: Record<string, string>): Files & { read: string
 }
 
 export const standardFiles = (program = PROGRAM, seed = SEED) =>
-  filesOf({ [`${WORK}/schema.tql`]: SCHEMA, [`${WORK}/seed.tql`]: seed, [`${WORK}/program.tql`]: program });
+  filesOf({ [inWork('schema.tql')]: SCHEMA, [inWork('seed.tql')]: seed, [inWork('program.tql')]: program });
 
 /**
  * Three people, for a step that keeps some and drops others: one `insert` each, because the shared splitter ends an

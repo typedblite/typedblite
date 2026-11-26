@@ -14,7 +14,7 @@ How the npm packages are versioned, checked and published. The promises a versio
 | --- | --- | --- |
 | `@typedblite/content-revision`, `@typedblite/language`, `@typedblite/runtime`, `@typedblite/session` | npm | One version for all five, released together |
 | `typedblite` (the CLI, `apps/cli`) | npm | The same version |
-| The TypeDBLite VS Code extension (`typeqlite`), and the TypeQLite Theme Bridge (`typeqlite-theme`) | VS Code Marketplace and Open VSX | Each its own version: [below](#the-vs-code-extensions) |
+| The TypeDBLite VS Code extension (`typeqlite`), and the TypeQLite Theme Bridge (`typeqlite-theme`) | VS Code Marketplace and Open VSX | One version for both: [below](#the-vs-code-extensions) |
 | `typedblite-conformance`, the playground, the sync demo | Not published | `private: true` |
 
 The list of published packages is [`tools/publishable.mjs`](../../tools/publishable.mjs). `release.projects`
@@ -116,9 +116,12 @@ no provenance, and the plan says to publish with it. Whether to wait is the main
 ## The VS Code extensions
 
 Two extensions, published by `typedblite`: **TypeDBLite** (`apps/vscode`) and the **TypeQLite Theme Bridge**
-(`apps/vscode/theme-bridge`), which a remote window needs to color Markdown previews. Each has its own version in
-its `package.json` and its own `CHANGELOG.md`, and is released by its own tag. They are not versioned with the npm
-packages.
+(`apps/vscode/theme-bridge`), which a remote window needs to color Markdown previews. The two share one version, set in
+both `package.json` files, and a manifest test holds them to it. Each has its own `CHANGELOG.md` and is released by its
+own tag. They are not versioned with the npm packages.
+
+The TypeDBLite extension's first published version is 0.3.1: the editor, notebooks and the debugger are its three
+features so far. 1.0.0 is the release that adds the Live Data Graph Explorer, which makes it feature complete.
 
 `npm exec nx -- run typeqlite-vscode:package` builds both, as `apps/vscode/dist/<name>-<version>.vsix`, named by
 `vsce` from each manifest. `typeqlite-vscode:e2e` packages them, installs both into a downloaded VS Code and runs its
@@ -143,14 +146,23 @@ once the repository is public.
 
 ### Making a release
 
-1. **On a branch:** set the version in the extension's `package.json`, rename `## [Unreleased]` in its
-   `CHANGELOG.md` to `## [<version>] - YYYY-MM-DD`, run `npm run gate`, and open a pull request.
-2. **Merge it, then tag the merge commit on `main`:** `typeqlite-v<version>` for TypeQLite, or
-   `typeqlite-theme-v<version>` for the Theme Bridge, and push the tag.
+1. **On a branch:** set the version in both extensions' `package.json`, rename `## [Unreleased]` in each
+   `CHANGELOG.md` to `## [<version>] - YYYY-MM-DD` (saying so if one of them did not change), run `npm run gate`, and
+   open a pull request.
+2. **Merge it, then tag the merge commit on `main`:** `typeqlite-v<version>` for the TypeDBLite extension, or
+   `typeqlite-theme-v<version>` for the Theme Bridge, and push the tags.
 3. **Approve the run.** [`release-extension.yml`](../../.github/workflows/release-extension.yml) checks the tag
    against the manifest and the changelog, builds, packages, runs the e2e under `xvfb-run`, then waits for approval
-   on `marketplaces`. It publishes the `.vsix` to both marketplaces (a version with a `-` as a pre-release) and
+   on `marketplaces`. It publishes the `.vsix` to both marketplaces and
    creates the GitHub Release with the `.vsix` attached.
+
+**Pre-releases.** A version is always plain `x.y.z`, because the Marketplace refuses a suffix such as `-rc.1`. To
+publish one as a pre-release, end the tag in `-pre` (`typeqlite-v0.3.2-pre`). A version published as a pre-release is
+used up: the stable release takes a higher number.
+
+**By hand, to Open VSX only:** `npm run deploy:vsx` packages both extensions and publishes both
+([`tools/deploy-vsx.mjs`](../../tools/deploy-vsx.mjs)), reading the token from `OVSX_PAT`. It takes `-- --pre-release`
+and `-- --dry-run`.
 
 **Checked by hand (2026-11-15):** both extensions package with their marketplace metadata (keywords, gallery banner,
 `homepage`, `bugs`, a changelog), and with both versions set to `0.0.2` the `package` and `e2e` targets built,

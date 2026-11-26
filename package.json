@@ -19,7 +19,7 @@
     "site": "nx run website:serve",
     "demo:browser": "nx run sync-demo:browser-hub",
     "deploy:site": "nx run website:check && cd apps/website && npx --yes cf@latest deploy ./dist",
-    "deploy:vsx": "nx run typeqlite-vscode:package && npx --yes ovsx@1.3.0 publish apps/vscode/dist/typeqlite-$(node -p \"require('./apps/vscode/package.json').version\").vsix",
+    "deploy:vsx": "nx run typeqlite-vscode:package && node tools/deploy-vsx.mjs",
     "check-packages": "node tools/check-packages.mjs",
     "clean-room": "node tools/clean-room.mjs",
     "tour": "node tools/tour.mjs",

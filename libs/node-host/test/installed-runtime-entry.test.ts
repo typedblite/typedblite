@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -28,7 +28,8 @@ describe('installedRuntimeEntry', () => {
   };
 
   beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'runtime-entry-'));
+    // Node resolves to the real path, and macOS's temporary directory is behind a symlink (/var -> /private/var).
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'runtime-entry-')));
   });
   afterEach(() => rmSync(root, { recursive: true, force: true }));
 
@@ -52,7 +53,7 @@ describe('installedRuntimeEntry', () => {
     installRuntime('prefix/node_modules/@typedblite/runtime');
     installRuntime('prefix/node_modules/@example/app/node_modules/@typedblite/runtime');
     expect(installedRuntimeEntry(join(root, 'prefix/node_modules/@example/app'))).toContain(
-      '@example/app/node_modules/@typedblite/runtime',
+      join('@example/app/node_modules/@typedblite/runtime'),
     );
   });
 

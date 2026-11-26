@@ -92,6 +92,14 @@ export function parseTour(markdown) {
   return { steps, problems };
 }
 
+/**
+ * What a command printed, without the warning Node 22 adds for `node:sqlite`, which Node 24 does not: the tour prints one
+ * set of outputs for both, and says that Node 22 warns. Only that warning is dropped, and its one line of advice.
+ */
+export function withoutSqliteWarning(printed) {
+  return printed.replace(/^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature.*\r?\n(\(Use `node --trace-warnings.*\r?\n)?/gm, '');
+}
+
 /** The headings of the tour, in order, for the structure checks: [{ level, text, line }]. */
 export function headingsOf(markdown) {
   const out = [];

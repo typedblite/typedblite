@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PUBLISHABLE } from './publishable.mjs';
-import { parseTour } from './tour-doc.mjs';
+import { parseTour, withoutSqliteWarning } from './tour-doc.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const GUIDE = join(ROOT, 'docs/guides/five-minute-tour.tql.md');
@@ -122,7 +122,7 @@ try {
     } else if (block.kind === 'run') {
       const expected = block.exit;
       const result = run('bash', ['-c', `{\n${swap(block.body)}\n} 2>&1`], project, env, 600_000);
-      const printed = result.stdout ?? '';
+      const printed = withoutSqliteWarning(result.stdout ?? '');
       const ok = !result.error && result.status === expected;
       console.log(`  ran ${where} (exit ${result.status}, expected ${expected}) ... ${ok ? 'ok' : 'FAILED'}`);
       if (!ok) {

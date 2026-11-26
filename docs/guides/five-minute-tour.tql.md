@@ -3,15 +3,18 @@
 You will keep a reading list in one file. You will define it and ask it questions in a **notebook**, then use the same file from
 the **command line** and from a **Node program**.
 
-> **Status.** The npm packages and the VS Code extension are not published yet. This tour is written for the first release, and
+> **Status.** The npm packages are not published yet. This tour is written for the first release, and
 > it is tested: every cell, command and file below is run, and every answer shown is checked against what runs (see
 > [How this tour is tested](#how-this-tour-is-tested)). Until the release, build from source with
-> [Getting started](getting-started.md), and install the extension from the `.vsix` that build makes
-> ([the extension's README](../../apps/vscode/README.md#install)).
+> [Getting started](getting-started.md). The extension is already published:
+> [how to install it](../../apps/vscode/README.md#install).
 
 You need **Node.js 22.16 or later**, and **VS Code** with the TypeDBLite extension for the notebook. Nothing else: no native
 toolchain, no Docker, no database server. No VS Code? Read the notebook steps as a transcript: each cell is followed by what it
 prints, and `npx typedblite --exec '<statement>'` runs the same statements.
+
+On Node.js 22 the commands also print an `ExperimentalWarning` about SQLite. It is harmless, and the outputs below leave it
+out.
 
 ## 1. Open this tour as a notebook
 

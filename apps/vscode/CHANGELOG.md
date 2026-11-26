@@ -5,7 +5,9 @@ packages. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
-The first release. Nothing has been published to a marketplace yet.
+## [0.3.1] - 2026-11-26
+
+The first published release, with the editor, notebooks and the debugger. Earlier versions were never published.
 
 ### Added
 - Diagnostics as you type: parse errors, and every rule the TypeDBLite engine enforces at parse time.
