@@ -1,5 +1,5 @@
 {
-  "name": "typeqlite",
+  "name": "typedblite-workbench",
   "displayName": "TypeDBLite",
   "description": "TypeQLite editor, notebooks and debugger for TypeDBLite, the embedded graph database",
   "icon": "images/icon.png",

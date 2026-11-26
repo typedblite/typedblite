@@ -20,7 +20,7 @@ TypeDBLite is a TypeScript implementation of the [TypeDB](https://typedb.com) gr
 | `libs/debugger/` | `@typedblite/debugger` (private) | The TypeQLite debug adapter (ADR-014): DAP over recordings of each statement, made by the engine host's `session.debug` in a `:memory:` session |
 | `libs/node-host/` | `@typedblite/node-host` (private) | The Node host adapter: the database handle repositories are written against, consumed through a `file:` dependency |
 | `apps/cli/` | `typedblite` | The CLI: REPL and file runner |
-| `apps/vscode/` | `typeqlite` (private) | VS Code extension: the TypeQLite editor, a Langium language server (ADR-008); it also bundles and starts the engine host, and provides TypeQLite notebooks (ADR-012) and the TypeQLite debugger (ADR-014) |
+| `apps/vscode/` | `typedblite-workbench` (private) | VS Code extension: the TypeQLite editor, a Langium language server (ADR-008); it also bundles and starts the engine host, and provides TypeQLite notebooks (ADR-012) and the TypeQLite debugger (ADR-014) |
 | `apps/engine-host/` | `@typedblite/engine-host` (private) | The workbench's NestJS CQRS host that runs statements in sessions, over the CLI, REPL, sidecar, HTTP and MCP (ADR-011) |
 | `apps/sync-demo/` | `typedblite-sync-demo` (private) | Offline-first sync demo: PWA, Electron and Android devices and a TypeDBLite hub (ADR-009) |
 

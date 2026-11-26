@@ -13,7 +13,7 @@ How the npm packages are versioned, checked and published. The promises a versio
 | --- | --- | --- |
 | `@typedblite/content-revision`, `@typedblite/language`, `@typedblite/runtime`, `@typedblite/session` | npm | One version for all five, released together |
 | `typedblite` (the CLI, `apps/cli`) | npm | The same version |
-| The TypeDBLite VS Code extension (`typeqlite`), and the TypeQLite Theme Bridge (`typeqlite-theme`) | VS Code Marketplace and Open VSX | One version for both: [below](#the-vs-code-extensions) |
+| The TypeDBLite VS Code extension (`typedblite-workbench`), and the TypeQLite Theme Bridge (`typeqlite-theme`) | VS Code Marketplace and Open VSX | One version for both: [below](#the-vs-code-extensions) |
 | `typedblite-conformance`, the playground, the sync demo | Not published | `private: true` |
 
 The list of published packages is [`tools/publishable.mjs`](../../tools/publishable.mjs). `release.projects`
@@ -143,7 +143,7 @@ Only the maintainer can do these, once:
    ```
 
    Revoke the token afterwards.
-3. **A trusted publisher for each of the two extensions**, `typeqlite` and `typeqlite-theme`, at
+3. **A trusted publisher for each of the two extensions**, `typedblite-workbench` and `typeqlite-theme`, at
    [open-vsx.org/user-settings/trusted-publishers](https://open-vsx.org/user-settings/trusted-publishers), as a
    namespace owner ([the guide](https://github.com/eclipse-openvsx/openvsx/wiki/Trusted-Publishing)). Choose GitHub
    Actions, with these values:

@@ -94,7 +94,7 @@ jobs:
       - name: Collect what will be published
         run: |
           version="${{ steps.release.outputs.version }}"
-          cp "apps/vscode/dist/typeqlite-$version.vsix" "apps/vscode/dist/typeqlite-theme-$version.vsix" "$RUNNER_TEMP/release/"
+          cp "apps/vscode/dist/typedblite-workbench-$version.vsix" "apps/vscode/dist/typeqlite-theme-$version.vsix" "$RUNNER_TEMP/release/"
       - uses: actions/upload-artifact@v4
         with:
           name: release
@@ -128,14 +128,14 @@ jobs:
       # is skipped, so a run that stopped halfway can be run again.
       - name: Publish to Open VSX
         run: |
-          for vsix in "typeqlite-theme-$VERSION.vsix" "typeqlite-$VERSION.vsix"; do
+          for vsix in "typeqlite-theme-$VERSION.vsix" "typedblite-workbench-$VERSION.vsix"; do
             npx --yes ovsx@1.3.0 publish "$vsix" --trusted-publishing --skip-duplicate
           done
 
       - name: Publish to the Visual Studio Marketplace
         if: env.HAS_VSCE_PAT == 'true'
         run: |
-          for vsix in "typeqlite-theme-$VERSION.vsix" "typeqlite-$VERSION.vsix"; do
+          for vsix in "typeqlite-theme-$VERSION.vsix" "typedblite-workbench-$VERSION.vsix"; do
             npx --yes @vscode/vsce@3.9.2 publish --packagePath "$vsix" --skip-duplicate
           done
         env:

@@ -181,11 +181,11 @@ try {
 ## Edit TypeQLite with the VS Code extension
 
 The repository includes the TypeDBLite VS Code extension, which edits `.tql` and `.typeqlite` files. It is published on
-[Open VSX](https://open-vsx.org/extension/typedblite/typeqlite). To build and install it from the repository instead:
+[Open VSX](https://open-vsx.org/extension/typedblite/typedblite-workbench). To build and install it from the repository instead:
 
 ```bash
 npm exec nx -- run typeqlite-vscode:package
-code --install-extension apps/vscode/dist/typeqlite-0.3.1.vsix
+code --install-extension apps/vscode/dist/typedblite-workbench-0.3.1.vsix
 ```
 
 ## Next steps
