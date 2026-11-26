@@ -5,6 +5,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # The types must not be newer than `engines.vscode` in apps/vscode (^1.91.0): packaging refuses it.
+      - dependency-name: "@types/vscode"
+      # A NestJS major moves the engine host and `@devx-micro/app-*` together, by hand.
+      - dependency-name: "@nestjs/*"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
     labels: [dependencies]

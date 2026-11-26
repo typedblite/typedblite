@@ -65,9 +65,14 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  const exited = server.exitCode === null ? new Promise((done) => server.once('exit', done)) : Promise.resolve();
   await connection.sendRequest('shutdown').catch(() => undefined);
-  void connection.sendNotification('exit');
+  // 🔴 Await the write before the kill. Left unawaited, it can reach a dead server's pipe after the last test, and the
+  // unhandled `write EPIPE` fails a run in which every test passed.
+  await connection.sendNotification('exit').catch(() => undefined);
+  connection.dispose();
   server.kill();
+  await exited;
 });
 
 describe('the server and notebooks', () => {
