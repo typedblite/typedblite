@@ -13,9 +13,9 @@ export const REPO_URL = 'https://github.com/typedblite/typedblite';
  * Whether the GitHub repository is public. While it is not, every link to it would 404 for a visitor, so the site
  * leaves them out: the header icon, the "Edit page" links, the footer's license link, the links the guides make to
  * a source file (the text stays, the link goes) and the landing page's "View on GitHub" button (a frontmatter
- * action, so that one is put back by hand: see docs/development/website.md). Set this to `true` at the first release.
+ * action, so that one is changed by hand: see docs/development/website.md).
  */
-export const REPO_PUBLIC = false;
+export const REPO_PUBLIC = true;
 export const BRANCH = 'main';
 
 /** @type {Array<[source: string, route: string, label?: string]>} */

@@ -139,15 +139,11 @@ cd apps/website && npx cf@latest deploy ./dist
 The site was first planned for GitHub Pages; that workflow (`site.yml`) never ran and has been removed, along with the
 `CNAME` and `.nojekyll` files the build used to write for it. The domain is set by `cloudflare.config.ts`.
 
-While the repository is private the site links to none of it: `REPO_PUBLIC` in `apps/website/scripts/content-map.mjs` is
-`false`, so there is no GitHub icon in the header, no "Edit page" links, no "View on GitHub" button, the footer's license
-and the API reference's "Defined in" and the guides' links to source files are plain text, and `check-site.mjs` fails
-the build if a link to the repository gets in. (The `git clone` commands in the guides stay: they are code.)
+The repository is public, so the site links to it: `REPO_PUBLIC` in `apps/website/scripts/content-map.mjs` is `true`.
+Set to `false`, it removes every link to the repository, and `check-site.mjs` fails the build if one gets in.
 
-At the first release (the packages on npm, and the repository public):
+At the first release of the npm packages:
 
-1. Set `REPO_PUBLIC` to `true`, and put the "View on GitHub" action back in the landing page's frontmatter
-   (`link: https://github.com/typedblite/typedblite`, `icon: external`, `variant: minimal`).
-2. Read the landing page's "Pre-release" notice, the README's "Not on npm" bullet and the guides' "not on npm yet" notes,
-   and remove them. Until then they are true: the landing page and the README also say the repository is not public yet.
-3. Redeploy with `npm run deploy:site`.
+1. Read the landing page's "Pre-release" notice, the README's "Not on npm" bullet and the guides' "not on npm yet" notes,
+   and remove them.
+2. Redeploy with `npm run deploy:site`.
