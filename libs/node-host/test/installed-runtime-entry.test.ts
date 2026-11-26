@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -28,7 +28,8 @@ describe('installedRuntimeEntry', () => {
   };
 
   beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'runtime-entry-'));
+    // Node resolves to the real path, and macOS's temporary directory is behind a symlink (/var -> /private/var).
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'runtime-entry-')));
   });
   afterEach(() => rmSync(root, { recursive: true, force: true }));
 

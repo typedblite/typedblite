@@ -16,7 +16,10 @@ import { fileURLToPath } from 'node:url';
  */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const generated = (name: string): string => resolve(root, 'src/generated', name);
-const grammarLines = readFileSync(resolve(root, 'src/typeqlite.langium'), 'utf8').split('\n');
+// 🔴 `langium generate` writes the platform's line endings, and every pattern below is matched against a whole line. With
+// the `\r` of CRLF left on, nothing matches and nothing says so: on Windows the reference lost every description.
+const read = (path: string): string => readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+const grammarLines = read(resolve(root, 'src/typeqlite.langium')).split('\n');
 
 /** The text of the grammar that defines a node type: its rule, or its `{infer …}` alternative. `''` for a fragment's. */
 function grammarFor(type: string): string {
@@ -231,13 +234,13 @@ function documentFixed(text: string): string {
 }
 
 const astFile = generated('ast.ts');
-const ast = readFileSync(astFile, 'utf8');
+const ast = read(astFile);
 if (!ast.includes('export class TypeQLiteAstReflection')) throw new Error('document-generated: ast.ts is not the file Langium used to write');
 const documentedAst = documentAst(ast);
 writeFileSync(astFile, documentedAst);
 for (const name of ['module.ts', 'grammar.ts']) {
   const file = generated(name);
-  writeFileSync(file, documentFixed(readFileSync(file, 'utf8')));
+  writeFileSync(file, documentFixed(read(file)));
 }
 const count = (documentedAst.match(/^\/\*\* /gm) ?? []).length;
 console.log(`Documented ${count} generated declarations in ast.ts, and those in module.ts and grammar.ts`);

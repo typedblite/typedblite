@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileS
 import { join } from 'node:path';
 
 // @ts-expect-error -- a plain ES module with no declarations: the one parser every player of the tour shares.
-import { parseTour } from '../../../../tools/tour-doc.mjs';
+import { parseTour, withoutSqliteWarning } from '../../../../tools/tour-doc.mjs';
 
 /**
  * Plays the five-minute tour as a reader would, top to bottom, in ONE timeline (`docs/guides/five-minute-tour.tql.md`).
@@ -123,7 +123,7 @@ export async function playTour(markdown: string, kernel: Kernel, work: string, r
     } else if (step.kind === 'run') {
       const result = spawnSync('bash', ['-c', `{\n${shell.swap(step['body'] as string)}\n} 2>&1`], { cwd: shell.project, env: shell.env, encoding: 'utf8', timeout: 180_000 });
       commands += 1;
-      const printed = result.stdout ?? '';
+      const printed = withoutSqliteWarning(result.stdout ?? '') as string;
       if (result.error || result.status !== step['exit']) {
         failures.push(`The command at line ${step.line} exited ${result.status}, and the tour says ${step['exit']}.\n${step['body']}\n--- it printed\n${printed}`);
       }
