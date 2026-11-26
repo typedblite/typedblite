@@ -31,7 +31,8 @@ affiliated with, sponsored by, or endorsed by TypeDB Ltd.
 
 TypeDBLite is an embedded library, not a server, and it is not TypeDB. Some of what is not there:
 
-- **Not on npm or a marketplace yet,** and this GitHub repository is not public yet. You build it from source (below).
+- **Not on npm yet.** You build it from source (below). The VS Code
+  extension is on [Open VSX](https://open-vsx.org/extension/typedblite/typeqlite).
 - **Some annotations are accepted and not enforced** on writes, such as `@card` bounds, `@range` and
   `@values`. Nothing is silently dropped, and the language guide lists them.
 - **One writer at a time,** because SQLite allows one.

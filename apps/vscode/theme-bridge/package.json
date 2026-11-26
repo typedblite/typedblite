@@ -3,7 +3,7 @@
   "displayName": "TypeQLite Theme Bridge",
   "description": "Lets the TypeDBLite extension color Markdown previews in your color theme in remote windows: WSL, SSH and containers",
   "icon": "images/icon.png",
-  "version": "0.0.1",
+  "version": "0.3.1",
   "license": "MPL-2.0",
   "publisher": "typedblite",
   "private": true,

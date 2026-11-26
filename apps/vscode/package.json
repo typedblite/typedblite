@@ -3,7 +3,7 @@
   "displayName": "TypeDBLite",
   "description": "TypeQLite editor, notebooks and debugger for TypeDBLite, the embedded graph database",
   "icon": "images/icon.png",
-  "version": "0.0.1",
+  "version": "0.3.1",
   "license": "MPL-2.0",
   "publisher": "typedblite",
   "private": true,

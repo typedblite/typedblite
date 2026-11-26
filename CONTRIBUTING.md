@@ -12,6 +12,7 @@ changes are made, and what a pull request needs before it can be merged.
 - [Decisions](#decisions)
 - [Larger features](#larger-features)
 - [Reporting bugs](#reporting-bugs)
+- [Sign your commits (DCO)](#sign-your-commits-dco)
 - [License](#license)
 
 ## Ways to contribute
@@ -189,6 +190,25 @@ Open an issue with:
 
 Please report security vulnerabilities privately, through GitHub's private vulnerability reporting
 for this repository, not in a public issue.
+
+## Sign your commits (DCO)
+
+Every commit in a pull request is signed off, to certify the [Developer Certificate of Origin](DCO): that you wrote
+the change, or otherwise have the right to submit it under the project's license. There is no contributor license
+agreement.
+
+```bash
+git commit -s                        # adds: Signed-off-by: Your Name <you@example.com>
+```
+
+The name and email are your Git `user.name` and `user.email`, and the sign-off must match the commit's author. To sign
+off commits you have already made:
+
+```bash
+git rebase --signoff main && git push --force-with-lease
+```
+
+Merge commits need no sign-off.
 
 ## License
 

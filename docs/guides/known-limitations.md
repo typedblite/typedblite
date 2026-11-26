@@ -106,7 +106,8 @@ entities and 21,000 tasks:
   `node:sqlite`.
 - **Linux, macOS and Windows.** The test gate has passed on all three. GitHub Actions is currently off, so
   nothing re-checks that on every change; run `npm run gate` yourself.
-- **The VS Code extension** is built from source and is not yet on a marketplace. In a remote window (WSL,
+- **The VS Code extension** is on Open VSX, not yet on the Visual Studio Marketplace, so VS Code itself installs
+  it from a downloaded `.vsix`. In a remote window (WSL,
   SSH, a container), coloring Markdown previews in your theme needs the optional TypeQLite Theme Bridge,
   installed in your local VS Code.
 
