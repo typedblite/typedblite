@@ -177,7 +177,7 @@ The operations are the host's: see [its README](../engine-host/README.md).
 
 ## Install
 
-The extension is published on [Open VSX](https://open-vsx.org/extension/typedblite/typeqlite). An editor that
+The extension is published on [Open VSX](https://open-vsx.org/extension/typedblite/typedblite-workbench). An editor that
 installs from Open VSX, such as VSCodium, finds it by searching for **TypeDBLite**. In VS Code itself, download the
 `.vsix` from that page and run **Extensions: Install from VSIX…**.
 
@@ -186,7 +186,7 @@ To build and package it instead, from the repository root:
 ```bash
 npm install
 npm exec nx -- run typeqlite-vscode:package
-code --install-extension apps/vscode/dist/typeqlite-0.3.1.vsix
+code --install-extension apps/vscode/dist/typedblite-workbench-0.3.1.vsix
 ```
 
 `package` also builds `apps/vscode/dist/typeqlite-theme-0.3.1.vsix`, the **TypeQLite Theme Bridge**.

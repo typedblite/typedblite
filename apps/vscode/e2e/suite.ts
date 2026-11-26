@@ -75,7 +75,7 @@ const cases: Record<string, () => Promise<void>> = {
   async 'the extension activates on a TypeQLite document'() {
     const document = await open('valid.tql');
     assert.equal(document.languageId, 'typeqlite', '.tql is claimed (ADR-008 D4)');
-    const extension = vscode.extensions.getExtension('typedblite.typeqlite');
+    const extension = vscode.extensions.getExtension('typedblite.typedblite-workbench');
     assert.ok(extension, 'the extension is installed under its ADR-008 D1 id');
     // The copy under test is the one the runner chose: the installed `.vsix` under `nx e2e`.
     assert.equal(extension.extensionPath, process.env['TYPEQLITE_E2E_EXTENSION']);
@@ -443,7 +443,7 @@ const cases: Record<string, () => Promise<void>> = {
   },
 
   async 'the engine host starts over the sidecar from the installed extension, and a session works through it'() {
-    const extension = vscode.extensions.getExtension<{ host: { call<T>(operation: string, input?: Record<string, unknown>): Promise<T> } }>('typedblite.typeqlite');
+    const extension = vscode.extensions.getExtension<{ host: { call<T>(operation: string, input?: Record<string, unknown>): Promise<T> } }>('typedblite.typedblite-workbench');
     assert.ok(extension, 'the extension is installed');
     const api = await extension.activate();
     // The host is the bundle inside the installed `.vsix`, run by the `node` on PATH: nothing of the repository.

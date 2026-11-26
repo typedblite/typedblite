@@ -43,7 +43,8 @@ Measured on 2026-11-12, before deciding:
 **D1. The extension lives at `apps/vscode/`.** Its Nx project is `typeqlite-vscode`. Its npm
 package is private and named `typeqlite`, because VS Code builds the id from `publisher.name`. Its
 extension id is `typedblite.typeqlite`, with the display name *TypeQLite*
-(renamed *TypeDBLite* on 2026-11-25, before first publication; the id is unchanged).
+(renamed *TypeDBLite* on 2026-11-25; and on 2026-11-26, still before first publication, the package was
+renamed `typedblite-workbench`, so the id is `typedblite.typedblite-workbench`).
 That id cannot be mistaken for the downstream extension's id. It depends on
 `@typedblite/language` only, never on the runtime: `vscode → language`.
 

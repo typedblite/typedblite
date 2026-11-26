@@ -84,7 +84,7 @@ describe('the manifest agrees with langium-config.json', () => {
   });
 
   it('is the extension ADR-008 D1 names: VS Code builds the id from publisher.name', () => {
-    expect(`${manifest.publisher}.${manifest.name}`).toBe('typedblite.typeqlite');
+    expect(`${manifest.publisher}.${manifest.name}`).toBe('typedblite.typedblite-workbench');
   });
 
   it('contributes a markdown-it plugin, so the Markdown preview activates it and asks for one (ADR-010)', () => {

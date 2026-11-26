@@ -33,7 +33,7 @@ flowchart LR
 | `@typedblite/runtime` | `typedblite-runtime` | The engine: interpreter, storage, change log, replication, full-text search. **The only package that touches SQLite** |
 | `typedblite-conformance` | `typedblite-conformance` | Runs TypeDB's behavior specification against the runtime |
 | `typedblite` | `typedblite` | The `typedblite` CLI: REPL, file runner and one-shot executor |
-| `typeqlite` | `typeqlite-vscode` | The VS Code extension: a Langium language server over the language library |
+| `typedblite-workbench` | `typeqlite-vscode` | The VS Code extension: a Langium language server over the language library |
 | `typedblite-sync-demo` | `sync-demo` | The offline-first sync demo: browser, desktop and Android devices and a TypeDBLite hub. Uses only the runtime's public API |
 
 The split follows [ADR-002](../architecture/adr-002-typeql-engine-as-a-port.md), Decision 4. A

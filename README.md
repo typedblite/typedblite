@@ -32,7 +32,7 @@ affiliated with, sponsored by, or endorsed by TypeDB Ltd.
 TypeDBLite is an embedded library, not a server, and it is not TypeDB. Some of what is not there:
 
 - **Not on npm yet.** You build it from source (below). The VS Code
-  extension is on [Open VSX](https://open-vsx.org/extension/typedblite/typeqlite).
+  extension is on [Open VSX](https://open-vsx.org/extension/typedblite/typedblite-workbench).
 - **Some annotations are accepted and not enforced** on writes, such as `@card` bounds, `@range` and
   `@values`. Nothing is silently dropped, and the language guide lists them.
 - **One writer at a time,** because SQLite allows one.
@@ -66,7 +66,7 @@ Package and install the editor:
 
 ```bash
 npm exec nx -- run typeqlite-vscode:package
-code --install-extension apps/vscode/dist/typeqlite-0.0.1.vsix
+code --install-extension apps/vscode/dist/typedblite-workbench-0.3.1.vsix
 ```
 
 Run a `.typeqlite` file against a file-backed database:
@@ -93,7 +93,7 @@ Or try it in a browser, with three examples to start from: `npm run playground`,
 | [`@typedblite/engine-host`](apps/engine-host/) (private) | The workbench's engine host: a NestJS CQRS app that runs statements in sessions, for the graph explorer, debugger and notebook (ADR-011). In progress: the core, and the CLI, REPL, sidecar, HTTP and MCP transports (HTTP loopback only, MCP read-only by default). |
 | [`typedblite-sync-demo`](apps/sync-demo/) | Offline-first sync, shown end to end: a browser, a desktop app and an Android phone, each with its own TypeDBLite store, replicating through a TypeDBLite hub. Cut any link or stop the hub, and watch them converge. |
 | [`typedblite-playground`](apps/playground/) | Try TypeQLite in a browser with nothing to install: the engine on WASM SQLite in a Web Worker, three examples, and a link that carries the whole program. `npm exec nx -- run playground:serve` |
-| [`typeqlite` (VS Code extension)](apps/vscode/) | The TypeQLite editor: diagnostics, cross-file navigation, hover, completion, rename, quick fixes, formatting and semantic highlighting, from a Langium language server that runs the language library unchanged (ADR-008). It also provides **TypeQLite notebooks**: a Markdown file whose `typeql` fences are cells that run on the engine host, against a store of the user's choice (ADR-012), and the **TypeQLite debugger**: step through a file's statements, stages and `match` steps, and break where its rows run out, in a fresh in-memory store (ADR-014). |
+| [`typedblite-workbench` (VS Code extension)](apps/vscode/) | The TypeQLite editor: diagnostics, cross-file navigation, hover, completion, rename, quick fixes, formatting and semantic highlighting, from a Langium language server that runs the language library unchanged (ADR-008). It also provides **TypeQLite notebooks**: a Markdown file whose `typeql` fences are cells that run on the engine host, against a store of the user's choice (ADR-012), and the **TypeQLite debugger**: step through a file's statements, stages and `match` steps, and break where its rows run out, in a fresh in-memory store (ADR-014). |
 
 ## Documentation
 
