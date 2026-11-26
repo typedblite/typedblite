@@ -180,7 +180,7 @@ try {
 
 ## Edit TypeQLite with the VS Code extension
 
-The repository includes a TypeQLite editor for `.tql` and `.typeqlite` files. To build and install
+The repository includes the TypeDBLite VS Code extension, which edits `.tql` and `.typeqlite` files. To build and install
 it:
 
 ```bash

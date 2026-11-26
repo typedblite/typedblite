@@ -4,7 +4,7 @@
 #
 # Publishes a VS Code extension to the Visual Studio Marketplace and Open VSX for a tag, then creates the GitHub
 # Release with the .vsix attached:
-#   typeqlite-v<version>        the TypeQLite extension (apps/vscode)
+#   typeqlite-v<version>        the TypeDBLite extension (apps/vscode)
 #   typeqlite-theme-v<version>  the TypeQLite Theme Bridge (apps/vscode/theme-bridge)
 # Each is versioned on its own, in its own package.json and CHANGELOG.md. The npm packages are release.yml's.
 name: Release extension

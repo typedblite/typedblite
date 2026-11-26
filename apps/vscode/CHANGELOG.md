@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the TypeQLite extension. The extension is versioned separately from the TypeDBLite npm
+All notable changes to the TypeDBLite extension. The extension is versioned separately from the TypeDBLite npm
 packages. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]

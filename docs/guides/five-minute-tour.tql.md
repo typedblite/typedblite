@@ -9,7 +9,7 @@ the **command line** and from a **Node program**.
 > [Getting started](getting-started.md), and install the extension from the `.vsix` that build makes
 > ([the extension's README](../../apps/vscode/README.md#install)).
 
-You need **Node.js 22.16 or later**, and **VS Code** with the TypeQLite extension for the notebook. Nothing else: no native
+You need **Node.js 22.16 or later**, and **VS Code** with the TypeDBLite extension for the notebook. Nothing else: no native
 toolchain, no Docker, no database server. No VS Code? Read the notebook steps as a transcript: each cell is followed by what it
 prints, and `npx typedblite --exec '<statement>'` runs the same statements.
 

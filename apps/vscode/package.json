@@ -1,7 +1,7 @@
 {
   "name": "typeqlite",
-  "displayName": "TypeQLite",
-  "description": "TypeQLite language support from TypeDBLite: diagnostics, formatting and semantic highlighting",
+  "displayName": "TypeDBLite",
+  "description": "TypeQLite editor, notebooks and debugger for TypeDBLite, the embedded graph database",
   "icon": "images/icon.png",
   "version": "0.0.1",
   "license": "MPL-2.0",

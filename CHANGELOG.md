@@ -125,7 +125,7 @@ they are listed here.
   made `npm ci` fail for everyone but the machine that committed it.
 
 ### Added
-- **Publishing the VS Code extensions**, written and not yet run: `release-extension.yml` publishes TypeQLite (tag
+- **Publishing the VS Code extensions**, written and not yet run: `release-extension.yml` publishes the TypeDBLite extension (tag
   `typeqlite-v<version>`) or the Theme Bridge (`typeqlite-theme-v<version>`) to the Visual Studio Marketplace and
   Open VSX after the e2e and an approval, and [Releasing](docs/development/releasing.md#the-vs-code-extensions) has
   the one-time setup. The Theme Bridge gains a changelog and the marketplace metadata the extension has.
