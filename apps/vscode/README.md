@@ -62,7 +62,7 @@ The engine never sees this warning. It is produced by the editor alone.
 ## Notebooks
 
 A **TypeQLite notebook** is a Markdown file: each fenced `typeql` block is a code cell, and the text between them is
-a Markdown cell ([ADR-012](../../docs/architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md)).
+a Markdown cell ([ADR-012](https://github.com/typedblite/typedblite/blob/main/docs/architecture/adr-012-the-notebook-is-a-markdown-file-run-on-the-engine-host.md)).
 
 - **`*.tql.md`** opens as a notebook. **Any other `.md` file** stays a Markdown file, and opens as a notebook only
   when you choose **Open With… → TypeQLite Notebook (any Markdown file)**, so the guides open and read as notebooks
@@ -118,7 +118,7 @@ memory**, kept from cell to cell: a schema defined in one cell is there for the 
 ## Debugging
 
 Run a `.tql` or `.typeqlite` file under the debugger, and watch where its rows go
-([ADR-014](../../docs/architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)).
+([ADR-014](https://github.com/typedblite/typedblite/blob/main/docs/architecture/adr-014-the-debugger-replays-a-recording-of-each-statement-from-the-engine-host.md)).
 Press **F5** in a TypeQLite file with no `launch.json`, or add a **TypeQLite** configuration:
 
 ```jsonc
@@ -157,7 +157,7 @@ Not yet: evaluating expressions in the Debug Console, changing a value, and debu
 ## The engine host
 
 The extension ships the TypeDBLite **engine host**, a separate process that runs TypeQLite statements in sessions
-([ADR-011](../../docs/architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md)). It
+([ADR-011](https://github.com/typedblite/typedblite/blob/main/docs/architecture/adr-011-the-workbench-runs-typeqlite-in-a-separate-engine-host-process.md)). It
 is a bundle inside the `.vsix` (`out/host/sidecar.cjs`), and the extension **never imports it**: it runs it with a
 `node` and sends it operations over the sidecar (JSON lines on stdio).
 
@@ -173,7 +173,7 @@ is a bundle inside the `.vsix` (`out/host/sidecar.cjs`), and the extension **nev
 - **Its sessions live in its process.** If the process dies, the next request starts a new one, and a session id from
   before answers `SESSION_NOT_FOUND`: reopen it. Changing `typedblite.host.node` ends the running host.
 
-The operations are the host's: see [its README](../engine-host/README.md).
+The operations are the host's: see [its README](https://github.com/typedblite/typedblite/blob/main/apps/engine-host/README.md).
 
 ## Install
 
@@ -186,13 +186,13 @@ To build and package it instead, from the repository root:
 ```bash
 npm install
 npm exec nx -- run typeqlite-vscode:package
-code --install-extension apps/vscode/dist/typedblite-workbench-0.3.1.vsix
+code --install-extension apps/vscode/dist/typedblite-workbench-0.3.2.vsix
 ```
 
-`package` also builds `apps/vscode/dist/typeqlite-theme-0.3.1.vsix`, the **TypeQLite Theme Bridge**.
+`package` also builds `apps/vscode/dist/typeqlite-theme-0.3.2.vsix`, the **TypeQLite Theme Bridge**.
 You need it only in remote windows, and it belongs in the **local** VS Code: run the `code` command
 of your local VS Code, not the one in the remote terminal. See
-[its README](theme-bridge/README.md).
+[its README](https://github.com/typedblite/typedblite/blob/main/apps/vscode/theme-bridge/README.md).
 
 ## Develop
 

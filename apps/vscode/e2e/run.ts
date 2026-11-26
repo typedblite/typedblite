@@ -11,7 +11,7 @@ import {
 /**
  * Launch a real VS Code with this extension and run `suite.cjs` in its extension host (ADR-008 D7).
  *
- * Given a `.vsix` (`node e2e/out/run.cjs dist/typedblite-workbench-0.3.1.vsix`), the downloaded VS Code's own CLI
+ * Given a `.vsix` (`node e2e/out/run.cjs dist/typedblite-workbench-0.3.2.vsix`), the downloaded VS Code's own CLI
  * installs it into a fresh extensions folder, and the cases run against **the installed copy**: the
  * artifact a user would install, not the source folder. Any further packages (the Theme Bridge's) are
  * installed beside it. `--packaged`, which is what `nx e2e` passes, means both packages the `package` target

@@ -87,6 +87,16 @@ describe('the manifest agrees with langium-config.json', () => {
     expect(`${manifest.publisher}.${manifest.name}`).toBe('typedblite.typedblite-workbench');
   });
 
+  // `vsce` resolves a relative link from the repository's root, not from the extension's folder, so on a marketplace
+  // listing it leads nowhere (0.3.1 shipped five).
+  it('ships no relative link in a README or changelog that a listing shows', () => {
+    for (const file of ['README.md', 'CHANGELOG.md', 'theme-bridge/README.md', 'theme-bridge/CHANGELOG.md']) {
+      const text = readFileSync(resolve(APP, file), 'utf8');
+      const relative = [...text.matchAll(/\]\(([^)\s]+)/g)].map((match) => match[1]!).filter((target) => !/^(https?:|mailto:|#)/.test(target));
+      expect(relative, file).toEqual([]);
+    }
+  });
+
   it('contributes a markdown-it plugin, so the Markdown preview activates it and asks for one (ADR-010)', () => {
     expect(manifest.contributes['markdown.markdownItPlugins']).toBe(true);
   });

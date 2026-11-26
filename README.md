@@ -66,7 +66,7 @@ Package and install the editor:
 
 ```bash
 npm exec nx -- run typeqlite-vscode:package
-code --install-extension apps/vscode/dist/typedblite-workbench-0.3.1.vsix
+code --install-extension apps/vscode/dist/typedblite-workbench-0.3.2.vsix
 ```
 
 Run a `.typeqlite` file against a file-backed database:
