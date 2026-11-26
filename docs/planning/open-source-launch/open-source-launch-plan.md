@@ -33,11 +33,9 @@ privately in the old repository.* Read this first; everything it points to is be
 **Nothing is released:** no tags, nothing on npm, no extension on Open VSX. **The website is live** at
 `typedblite.dev`, with the guides, the API reference, the playground and the sync demo.
 
-🔴 **`npm ci` fails for anyone without the maintainer's local registry.** The seven `@devx-micro/app-*` packages
-(0.2.1) that the engine host and the extension use (ADR-011) are not on npmjs.org (each returned 404 on 2026-11-25), while the
-lockfile points there. This blocks outside contributors, CI on any hosted runner, and both release workflows. Publish
-them to npmjs.org (then run `npm install` to refresh their lockfile entries and a clean `npm ci` with the default
-registry), or remove the dependency.
+**A clean `npm ci` works from the public registry (2026-11-25).** The seven `@devx-micro/app-*` packages (ADR-011)
+are on npmjs.org and pinned at 0.4.1. With them, `npm ci` from an empty cache succeeded and `npm run gate` passed in
+full on Node 24.19.0, Linux.
 
 🔴 **CI is not running.** The workflows are enabled, but GitHub has started no job since 2026-11-17 04:22 UTC:
 *"recent account payments have failed or your spending limit needs to be increased"*. `npm run gate` is the only
@@ -57,7 +55,7 @@ host, notebook, debugger and Node host merged after the last run, so **CI has se
 
 **What is left, in order.** Several steps are hard to undo once something is public or published.
 
-1. **Unblock the build.** Resolve the `@devx-micro` packages (above).
+1. ~~**Unblock the build.**~~ Done 2026-11-25: the `@devx-micro` packages are published (above).
 2. **Start the long waits, in parallel.**
    - Send the written confirmation to TypeDB Ltd (B1; the draft is deliberately not in this repository), get a
      one-line reply, and settle [PL-1](#parking-lot). It blocks going public.
@@ -202,7 +200,7 @@ confirm it and it needs someone to.
 | B5 | **`node:sqlite` vs `engines`.** `engines` said Node `>=22.12`. Measured: 22.12 has **no** `node:sqlite`; 22.13 to 22.15 have it **without FTS5**, which the engine requires; **22.16.0 is the first that works** (full gate passes there, cache skipped) | **Resolved** | `engines`, the READMEs, CONTRIBUTING and the getting-started guide now say 22.16; 22.16.0 is a blocking CI job. Node still marks `node:sqlite` experimental, which prints a warning on first use: say so in the docs |
 | B6 | **Hub security.** The hub exposes an SSE stream and a POST endpoint. I did not check authentication, binding defaults, or input limits | **Reviewed 2026-11-14: documented, not yet fixed** | Done: the replication guide has a "Security" section with each finding, verified against a live hub. Five of the eight are now fixed in the handler (PL-6); authentication and TLS are the mounting server's job; **a pushed revision is now checked against its content (PL-6, ADR-003 amended 2026-11-15)**, though a peer that may write can still make its write win. Binding is `127.0.0.1` only |
 | B7 | **No `SECURITY.md`** (private reporting channel) | **Written; `security@` alias forwards** | Enable GitHub private vulnerability reporting |
-| B8 | **A clean `npm ci` fails:** `@devx-micro/app-*` is not on npmjs.org | **Open (found 2026-11-25)** | Publish the seven packages or remove the dependency |
+| B8 | **A clean `npm ci` fails:** `@devx-micro/app-*` is not on npmjs.org | **Closed 2026-11-25** (found the same day) | Published to npmjs.org; pinned at 0.4.1 |
 
 ### 4.2 Should fix before launch
 

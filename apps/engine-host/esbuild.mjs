@@ -1,4 +1,5 @@
 // @ts-check
+import { writeFileSync } from 'node:fs';
 import * as esbuild from 'esbuild';
 
 /**
@@ -16,7 +17,7 @@ import * as esbuild from 'esbuild';
  */
 const minify = !process.argv.includes('--no-minify');
 
-await esbuild.build({
+const { metafile } = await esbuild.build({
   entryPoints: { sidecar: 'src/sidecar.ts' },
   outdir: 'dist',
   outExtension: { '.js': '.cjs' },
@@ -30,4 +31,7 @@ await esbuild.build({
   sourcemap: !minify,
   minify,
   logLevel: 'warning',
+  metafile: true,
 });
+// What went into the bundle, for the extension's third-party notices (tools/third-party-notices.mjs).
+writeFileSync('dist/meta.json', JSON.stringify(metafile));

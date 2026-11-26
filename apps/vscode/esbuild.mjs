@@ -1,4 +1,5 @@
 // @ts-check
+import { mkdirSync, writeFileSync } from 'node:fs';
 import * as esbuild from 'esbuild';
 
 /**
@@ -15,7 +16,7 @@ import * as esbuild from 'esbuild';
  */
 const minify = process.argv.includes('--minify');
 
-await esbuild.build({
+const { metafile } = await esbuild.build({
   entryPoints: {
     extension: 'src/extension.ts',
     'language-server/main': 'src/language-server/main.ts',
@@ -30,7 +31,11 @@ await esbuild.build({
   sourcemap: !minify,
   minify,
   logLevel: 'warning',
+  metafile: true,
 });
+// What went into the bundles, for the third-party notices. In `dist/`, which the `.vsix` excludes.
+mkdirSync('dist', { recursive: true });
+writeFileSync('dist/meta.json', JSON.stringify(metafile));
 
 // The TypeQLite Theme Bridge, a second extension that runs where the color themes are (ADR-010 D7).
 await esbuild.build({

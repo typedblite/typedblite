@@ -111,6 +111,7 @@
           "node esbuild.mjs --minify",
           "mkdir -p dist",
           "cp ../../LICENSE LICENSE",
+          "node ../../tools/third-party-notices.mjs ThirdPartyNotices.txt dist/meta.json ../engine-host/dist/meta.json",
           "vsce package --no-dependencies --out dist/",
           "node ../../tools/copy-file.mjs ../../LICENSE theme-bridge/LICENSE",
           "cd theme-bridge && vsce package --no-dependencies --out ../dist/"
