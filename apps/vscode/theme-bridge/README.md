@@ -1,19 +1,19 @@
 # TypeQLite Theme Bridge
 
-A helper for the **TypeQLite** extension. You need it only if you use VS Code in a **remote window**:
+A helper for the **TypeDBLite** extension. You need it only if you use VS Code in a **remote window**:
 WSL, SSH, or a dev container.
 
-TypeQLite colors the TypeQLite code blocks in the Markdown preview with your color theme. In a
-remote window, though, TypeQLite runs on the remote machine, and your color themes stay in the local
+The TypeDBLite extension colors the TypeQLite code blocks in the Markdown preview with your color theme. In a
+remote window, though, the TypeDBLite extension runs on the remote machine, and your color themes stay in the local
 VS Code, out of its reach. This extension runs in the local VS Code, reads the active theme's files
-there, and hands them to TypeQLite when it asks. It does nothing else and has no settings.
+there, and hands them to the TypeDBLite extension when it asks. It does nothing else and has no settings.
 
 Without it, a remote window's preview shows TypeQLite in the preview's own colors, and the
 TypeQLite output channel says why.
 
 ## Install
 
-Install it in the **local** VS Code, beside TypeQLite. Build both from the TypeDBLite repository:
+Install it in the **local** VS Code, beside the TypeDBLite extension. Build both from the TypeDBLite repository:
 
 ```bash
 npm exec nx -- run typeqlite-vscode:package

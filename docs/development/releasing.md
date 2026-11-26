@@ -14,7 +14,7 @@ How the npm packages are versioned, checked and published. The promises a versio
 | --- | --- | --- |
 | `@typedblite/content-revision`, `@typedblite/language`, `@typedblite/runtime`, `@typedblite/session` | npm | One version for all five, released together |
 | `typedblite` (the CLI, `apps/cli`) | npm | The same version |
-| The `typeqlite` VS Code extension, and the TypeQLite Theme Bridge (`typeqlite-theme`) | VS Code Marketplace and Open VSX | Each its own version: [below](#the-vs-code-extensions) |
+| The TypeDBLite VS Code extension (`typeqlite`), and the TypeQLite Theme Bridge (`typeqlite-theme`) | VS Code Marketplace and Open VSX | Each its own version: [below](#the-vs-code-extensions) |
 | `typedblite-conformance`, the playground, the sync demo | Not published | `private: true` |
 
 The list of published packages is [`tools/publishable.mjs`](../../tools/publishable.mjs). `release.projects`
@@ -115,7 +115,7 @@ no provenance, and the plan says to publish with it. Whether to wait is the main
 
 ## The VS Code extensions
 
-Two extensions, published by `typedblite`: **TypeQLite** (`apps/vscode`) and the **TypeQLite Theme Bridge**
+Two extensions, published by `typedblite`: **TypeDBLite** (`apps/vscode`) and the **TypeQLite Theme Bridge**
 (`apps/vscode/theme-bridge`), which a remote window needs to color Markdown previews. Each has its own version in
 its `package.json` and its own `CHANGELOG.md`, and is released by its own tag. They are not versioned with the npm
 packages.
