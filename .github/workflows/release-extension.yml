@@ -1,4 +1,4 @@
-# 🔴 NEVER RUN. GitHub Actions has been off since 2026-11-14 (billing), and this workflow was written after that.
+# 🔴 NEVER RUN. No release tag has been pushed since this workflow was written.
 # Its local steps were run by hand (docs/development/releasing.md says which); the publishing steps, the
 # marketplaces' tokens and the workflow itself have not been. Read its first run before trusting it.
 #

@@ -3,10 +3,9 @@
 How the npm packages are versioned, checked and published. The promises a version makes to users are in
 [Versions and compatibility](../guides/compatibility.md). This page is how a maintainer keeps them.
 
-> **Status: nothing has been released, and the release workflow has never run.** GitHub Actions has been
-> off since 2026-11-14 (billing). Everything on this page that runs locally has been run (see
-> [What has been checked](#what-has-been-checked)). The workflow, the OIDC exchange with npm, and provenance
-> have not.
+> **Status: nothing has been released, and neither release workflow has run.** Everything on this page that runs
+> locally has been run (see [What has been checked](#what-has-been-checked)). The workflows, the OIDC exchange with
+> npm, and provenance have not.
 
 ## What is released, and with what
 
@@ -66,8 +65,8 @@ Only the maintainer can do these, once, before the first release:
 2. **Take `"private": true` off `apps/cli/package.json`.** It is there so that nothing can publish the CLI
    until its name is held. `nx release publish` skips a private package and says so, and the dry run shows
    three packages until then.
-3. **Create a GitHub environment named `npm`** (Settings → Environments) with yourself as a required
-   reviewer, so that a pushed tag waits for your approval before anything is published.
+3. **The GitHub environment `npm`** (Settings → Environments) has the maintainer as a required reviewer, so that a
+   pushed tag waits for approval before anything is published. *Created 2026-11-26.*
 4. **The first publish of each package needs a token**, because npm only lets a package that exists have a
    trusted publisher. Create a granular access token limited to the five packages (and the org, to create
    them), with a short expiry. Save it as the repository secret `NPM_TOKEN`.
@@ -109,7 +108,7 @@ npm exec nx -- release version 0.1.0-rc.1 --dry-run   # the version changes, and
 npm exec nx -- release publish --dry-run --tag next   # each tarball, and where it would go
 ```
 
-**While Actions is off,** there is no provenance, because provenance is signed by the CI run. A package can
+**Without CI** there is no provenance, because provenance is signed by the CI run. A package can
 be published from a laptop (`npm login`, then `npm exec nx -- release publish --tag next`), but it would have
 no provenance, and the plan says to publish with it. Whether to wait is the maintainer's call.
 
@@ -139,7 +138,8 @@ Only the maintainer can do these, once:
    Eclipse account and sign the Eclipse Foundation Open VSX Publisher Agreement, then create an access token. Create
    the namespace with `npx ovsx@1.3.0 create-namespace typedblite -p <token>`, and ask for it to be verified (an issue
    on the open-vsx.org repository), so that it shows as the official publisher. Save the token as `OVSX_PAT`.
-3. **A GitHub environment named `marketplaces`**, holding both secrets, with yourself as a required reviewer.
+3. **The GitHub environment `marketplaces`** has the maintainer as a required reviewer (*created 2026-11-26*). Add
+   both secrets to it.
 
 Both marketplaces show the README, and rewrite its relative links to the repository on GitHub, so the links work
 once the repository is public.

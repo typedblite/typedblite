@@ -104,8 +104,8 @@ entities and 21,000 tasks:
 - **In a browser,** TypeDBLite runs on a synchronous WASM SQLite inside a Web Worker
   ([ADR-009](../architecture/adr-009-typedblite-runs-in-the-browser-on-wasm-sqlite.md)). It is slower than
   `node:sqlite`.
-- **Linux, macOS and Windows.** The test gate has passed on all three. GitHub Actions is currently off, so
-  nothing re-checks that on every change; run `npm run gate` yourself.
+- **Linux, macOS and Windows.** CI runs the build and the tests on all three for every
+  change. A failure on macOS does not yet fail the run.
 - **The VS Code extension** is on Open VSX, not yet on the Visual Studio Marketplace, so VS Code itself installs
   it from a downloaded `.vsix`. In a remote window (WSL,
   SSH, a container), coloring Markdown previews in your theme needs the optional TypeQLite Theme Bridge,

@@ -34,10 +34,10 @@ is named.
 You need **Node.js 22.16 or later** (the project is developed on Node 24) and **npm**. Linux, macOS and
 Windows all work: the gate has passed on Linux (Node 22.16, 22 and 24), Windows and macOS (Node 24).
 
-> **GitHub Actions is off for now** (the account's billing needs attention), so nothing on GitHub checks a
-> pull request. **Run `npm run gate` before you open one** and put its result in the description. It runs the
-> one Node and OS you have, so a change that touches paths, child processes, file handles or Node-version
-> behavior is worth trying on another if you can. The workflows are written and will be turned back on.
+> **CI runs on every pull request** and every push to `main`: build, type-check and tests on Linux (Node 22.16, 22 and
+> 24), Windows and macOS, the clean-room install, the conformance report, and the WASM, browser, coverage and VS Code
+> e2e jobs. **Run `npm run gate` before you open one** and put its result in the description: it also runs the
+> playground, sync-demo and website checks and the five-minute tour from the packed tarballs, which CI does not.
 
 ```bash
 git clone https://github.com/typedblite/typedblite.git
