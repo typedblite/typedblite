@@ -5,6 +5,7 @@ e2e/out
 *.vsix
 dist
 /LICENSE
+/ThirdPartyNotices.txt
 images
 theme-bridge/out
 theme-bridge/images

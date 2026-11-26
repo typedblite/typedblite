@@ -41,7 +41,6 @@
   },
   "main": "./out/extension.cjs",
   "activationEvents": [
-    "onLanguage:typeqlite",
     "onNotebook:typeqlite-notebook",
     "onNotebook:typeqlite-notebook-markdown",
     "onDebugResolve:typeqlite",
@@ -324,7 +323,7 @@
     "dependencies": false
   },
   "dependencies": {
-    "@devx-micro/app-sidecar": "0.2.1",
+    "@devx-micro/app-sidecar": "0.4.1",
     "@typedblite/debugger": "*",
     "@typedblite/language": "*",
     "@typedblite/notebook": "*",

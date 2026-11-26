@@ -34,9 +34,9 @@ describe('the manifest agrees with langium-config.json', () => {
     expect([...contributed.extensions].sort()).toEqual([...language.fileExtensions].sort());
   });
 
-  it('activates on that language, on opening either notebook type, and when a TypeQLite debug session starts', () => {
+  // VS Code generates `onLanguage:` for a contributed language (since 1.74), so the manifest does not list it.
+  it('activates on opening either notebook type, and when a TypeQLite debug session starts', () => {
     expect(manifest.activationEvents).toEqual([
-      `onLanguage:${language.id}`,
       `onNotebook:${NOTEBOOK_TYPE}`,
       `onNotebook:${NOTEBOOK_TYPE_MARKDOWN}`,
       `onDebugResolve:${DEBUG_TYPE}`,
