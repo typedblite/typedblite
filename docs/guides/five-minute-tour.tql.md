@@ -13,6 +13,9 @@ You need **Node.js 22.16 or later**, and **VS Code** with the TypeDBLite extensi
 toolchain, no Docker, no database server. No VS Code? Read the notebook steps as a transcript: each cell is followed by what it
 prints, and `npx typedblite --exec '<statement>'` runs the same statements.
 
+On Node.js 22 the commands also print an `ExperimentalWarning` about SQLite. It is harmless, and the outputs below leave it
+out.
+
 ## 1. Open this tour as a notebook
 
 Make an empty folder called `readlist`, save this file in it as `five-minute-tour.tql.md`, and open the folder in VS Code. A
