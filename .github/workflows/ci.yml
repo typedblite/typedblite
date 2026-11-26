@@ -155,6 +155,10 @@ jobs:
       - run: npm exec nx -- run typedblite-runtime:test-browser
         env:
           CI: ""
+      # The playground, which the website serves, in the same Chromium.
+      - run: npm exec nx -- run playground:test-browser
+        env:
+          CI: ""
 
   # The editor needs a display. Experimental until it has been seen stable on a hosted runner.
   vscode-e2e:

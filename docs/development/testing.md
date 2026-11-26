@@ -73,9 +73,10 @@ task is replayed from a cache. The last seven are skipped by `--quick`. The brow
 Chromium, the e2e a display, and the clean room the npm registry, for the packages' dependencies.
 
 CI runs on every pull request and push to `main` (`.github/workflows/ci.yml`): Node 22.16, 22 and 24 on Linux and
-Node 24 on Windows and macOS. It also runs the sync demo's browser and Electron tests and builds its Android app and runs
-it on an emulator, which the gate does not (the gate runs only the in-browser hub). It does not run the playground and website checks or the
-five-minute tour from the tarballs, so run the gate too. The gate covers only the one Node and OS you run it on.
+Node 24 on Windows and macOS. It also runs the playground's browser test, and the sync demo's browser and Electron tests,
+and builds the demo's Android app and runs it on an emulator. The gate runs only the in-browser hub of the sync demo. CI
+does not run the website check or the five-minute tour from the tarballs, so run the gate too. The gate covers only the
+one Node and OS you run it on.
 
 🔴 **Why clean.** `build` is `tsc -b`, which is incremental. A library whose sources did not change
 is not rebuilt, so the packages that depend on it are checked against stale type declarations, even
