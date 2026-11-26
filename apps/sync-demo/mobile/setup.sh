@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup for the Android device: a JDK 21, the Android SDK, platform 35 (Capacitor 7 compiles
+# One-time setup for the Android device: a JDK 21, the Android SDK, platform 36 (Capacitor 8 compiles
 # against it), an emulator image, the AVD, and the Capacitor native project. Idempotent.
 #
 # The emulator needs KVM:  sudo chmod 666 /dev/kvm   (until the next reboot or WSL restart), or
@@ -31,7 +31,7 @@ IMAGE="system-images;android-${ANDROID_API};google_apis;x86_64"
 yes | "$SM" --licenses >/dev/null || true
 # API 34 by default for the emulator: the API 35 x86_64 image has failed to download here
 # ("unknown archive"), and that failure aborts the whole sdkmanager call.
-"$SM" --install "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" "$IMAGE"
+"$SM" --install "platform-tools" "emulator" "platforms;android-36" "build-tools;36.0.0" "$IMAGE"
 
 if ! "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" list avd -c | grep -qx "$AVD"; then
   echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n "$AVD" -k "$IMAGE" -d pixel_7
