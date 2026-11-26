@@ -164,8 +164,8 @@ Only the maintainer can do these, once:
    access token with the **Marketplace (Manage)** scope, with a short expiry. Save it in the `marketplaces`
    environment as `VSCE_PAT`. Without it the workflow publishes to Open VSX only.
 
-Both marketplaces show the README, and rewrite its relative links to the repository on GitHub, so the links work
-once the repository is public.
+Both marketplaces show the README, and the packaging resolves its relative links from the repository's root, not from
+the extension's folder, so they break. A shipped README or changelog links with full URLs, and a manifest test checks it.
 
 ### Making a release
 

@@ -185,7 +185,7 @@ The repository includes the TypeDBLite VS Code extension, which edits `.tql` and
 
 ```bash
 npm exec nx -- run typeqlite-vscode:package
-code --install-extension apps/vscode/dist/typedblite-workbench-0.3.1.vsix
+code --install-extension apps/vscode/dist/typedblite-workbench-0.3.2.vsix
 ```
 
 ## Next steps

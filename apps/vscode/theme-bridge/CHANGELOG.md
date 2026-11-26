@@ -5,6 +5,10 @@ separately from the TypeDBLite npm packages. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-26
+
+No change to the Theme Bridge: its version follows the TypeDBLite extension's.
+
 ## [0.3.1] - 2026-11-26
 
 The first published release. The version is the TypeDBLite extension's; earlier versions were never published.

@@ -5,6 +5,12 @@ packages. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-26
+
+### Fixed
+- Links in the extension's README on Open VSX, to the architecture records, the engine host and the Theme Bridge, led
+  to pages that do not exist.
+
 ## [0.3.1] - 2026-11-26
 
 The first published release, with the editor, notebooks and the debugger. Earlier versions were never published.

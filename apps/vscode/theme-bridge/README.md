@@ -18,7 +18,7 @@ Install it in the **local** VS Code, beside the TypeDBLite extension. It is publ
 
 ```bash
 npm exec nx -- run typeqlite-vscode:package
-code --install-extension apps/vscode/dist/typeqlite-theme-0.3.1.vsix
+code --install-extension apps/vscode/dist/typeqlite-theme-0.3.2.vsix
 ```
 
 ## License
