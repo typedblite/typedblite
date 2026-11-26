@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DebugProgram, LaunchError, type OutputCategory } from '../src/program.js';
 import { InProcessHost } from './support/in-process-host.js';
-import { PEOPLE, SCHEMA, standardFiles, WORK } from './support/fixtures.js';
+import { PEOPLE, SCHEMA, standardFiles, inWork } from './support/fixtures.js';
 
 const SCHEMA_WITH_FUNCTION = `${SCHEMA}\nfun adult_ages() -> { integer }:\n  match $p isa person, has age $a; $a >= 18;\n  return { $a };`;
 
@@ -10,7 +10,7 @@ const launch = async (program?: string, extra: Record<string, unknown> = {}, see
   const host = new InProcessHost();
   const output: Array<[string, OutputCategory]> = [];
   const debug = await DebugProgram.launch(
-    { program: `${WORK}/program.tql`, schema: ['schema.tql'], seed: ['seed.tql'], ...extra },
+    { program: inWork('program.tql'), schema: ['schema.tql'], seed: ['seed.tql'], ...extra },
     host,
     standardFiles(program, seed),
     (text, category) => output.push([text, category]),
@@ -22,8 +22,8 @@ describe('a launch', () => {
   it('opens a :memory: session, runs the schema then the seed, and locates the program`s statements', async () => {
     const { host, debug, text } = await launch();
     expect(host.calls.filter((c) => c.operation === 'session.open')).toEqual([{ operation: 'session.open', input: { location: ':memory:' } }]);
-    expect(text()).toContain('Ran the schema file /work/schema.tql: 1 statement(s).');
-    expect(text()).toContain('Ran the seed file /work/seed.tql: 1 statement(s).');
+    expect(text()).toContain(`Ran the schema file ${inWork('schema.tql')}: 1 statement(s).`);
+    expect(text()).toContain(`Ran the seed file ${inWork('seed.tql')}: 1 statement(s).`);
     expect(debug.statements.map((s) => [s.line, s.character])).toEqual([[1, 0], [2, 0], [4, 0]]);
     // The comment inside the read is kept: what runs is what was written.
     expect(debug.statements[2]!.text).toBe('match $p isa person, has name $n;\n  # only the names\nselect $n;');
@@ -33,16 +33,16 @@ describe('a launch', () => {
     const host = new InProcessHost();
     const files = standardFiles();
     const failing = { ...files, readFile: async (path: string) => (path.endsWith('seed.tql') ? 'insert $x isa person;\ninsert $y isa nobody;' : files.readFile(path)) };
-    const launched = DebugProgram.launch({ program: `${WORK}/program.tql`, schema: ['schema.tql'], seed: ['seed.tql'] }, host, failing, () => undefined);
+    const launched = DebugProgram.launch({ program: inWork('program.tql'), schema: ['schema.tql'], seed: ['seed.tql'] }, host, failing, () => undefined);
     await expect(launched).rejects.toBeInstanceOf(LaunchError);
-    await expect(launched).rejects.toThrow(/^The seed file \/work\/seed.tql was refused at line 2: Unknown type 'nobody'/);
+    await expect(launched).rejects.toThrow(`The seed file ${inWork('seed.tql')} was refused at line 2: Unknown type 'nobody'`);
     expect(host.operations().at(-1)).toBe('session.close');
     expect([...host.sessions.values()].every((session) => session.closed)).toBe(true);
   });
 
   it('fails when a file cannot be read, before opening anything', async () => {
     const host = new InProcessHost();
-    await expect(DebugProgram.launch({ program: `${WORK}/missing.tql` }, host, standardFiles(), () => undefined)).rejects.toThrow(/Cannot read \/work\/missing.tql/);
+    await expect(DebugProgram.launch({ program: inWork('missing.tql') }, host, standardFiles(), () => undefined)).rejects.toThrow(`Cannot read ${inWork('missing.tql')}`);
     expect(host.calls).toEqual([]);
   });
 });
@@ -279,7 +279,7 @@ describe('inside a match (Phase 04)', () => {
     const host = new InProcessHost();
     const files = standardFiles('match let $g in adult_ages(); $g > 40;\nselect $g;', PEOPLE);
     const schema = { ...files, readFile: async (path: string) => (path.endsWith('schema.tql') ? `${SCHEMA_WITH_FUNCTION}` : files.readFile(path)) };
-    const debug = await DebugProgram.launch({ program: `${WORK}/program.tql`, schema: ['schema.tql'], seed: ['seed.tql'] }, host, schema, () => undefined);
+    const debug = await DebugProgram.launch({ program: inWork('program.tql'), schema: ['schema.tql'], seed: ['seed.tql'] }, host, schema, () => undefined);
     const frames = await stepInTo(debug, /^\$a >= 18/);
     expect(frames.map((f) => [f.name.split(' · ')[0], f.placed])).toEqual([
       ['$a >= 18', false],

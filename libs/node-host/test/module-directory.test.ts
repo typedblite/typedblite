@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { moduleDirectoryFrom } from '../src/module-directory.js';
 
 const bundleDir = join('/', 'srv', 'app', 'dist');
-const sourceUrl = pathToFileURL(join('/', 'build-machine', 'src', 'typedblite-database.js')).href;
+// `resolve`, so that on Windows the directory has the drive that a file URL gives it.
+const sourceDir = resolve('/', 'build-machine', 'src');
+const sourceUrl = pathToFileURL(join(sourceDir, 'typedblite-database.js')).href;
 
 describe('moduleDirectoryFrom', () => {
   it("prefers a CommonJS bundle's __dirname over the import.meta.url a bundler rewrote", () => {
@@ -23,12 +25,12 @@ describe('moduleDirectoryFrom', () => {
       throw new ReferenceError('__dirname is not defined in ES module scope');
     };
 
-    expect(moduleDirectoryFrom(esm, sourceUrl)).toBe(join('/', 'build-machine', 'src'));
+    expect(moduleDirectoryFrom(esm, sourceUrl)).toBe(sourceDir);
   });
 
   it('falls back to import.meta.url when __dirname is not a usable string', () => {
     for (const value of [undefined, '', 42]) {
-      expect(moduleDirectoryFrom(() => value, sourceUrl)).toBe(join('/', 'build-machine', 'src'));
+      expect(moduleDirectoryFrom(() => value, sourceUrl)).toBe(sourceDir);
     }
   });
 

@@ -53,7 +53,7 @@ describe('installedRuntimeEntry', () => {
     installRuntime('prefix/node_modules/@typedblite/runtime');
     installRuntime('prefix/node_modules/@example/app/node_modules/@typedblite/runtime');
     expect(installedRuntimeEntry(join(root, 'prefix/node_modules/@example/app'))).toContain(
-      '@example/app/node_modules/@typedblite/runtime',
+      join('@example/app/node_modules/@typedblite/runtime'),
     );
   });
 
