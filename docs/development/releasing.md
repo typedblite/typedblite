@@ -75,9 +75,20 @@ Only the maintainer can do these, once, before the first release:
    gh secret set NPM_TOKEN --env npm --repo typedblite/typedblite
    ```
 
-5. **After the first publish, switch to trusted publishing.** On npmjs.com, for each package: Settings →
-   Trusted publishing → GitHub Actions, repository `typedblite/typedblite`, workflow `release.yml`, environment `npm`. Then delete the `NPM_TOKEN` secret,
-   revoke the token, and set each package to require 2FA and disallow tokens.
+5. **After the first publish, switch to trusted publishing.** npm allows a trusted publisher only for a package that
+   exists. It takes npm 11.15 or later, `npm login` and a two-factor code (a token that bypasses two-factor
+   authentication is not accepted):
+
+   ```bash
+   for p in @typedblite/content-revision @typedblite/language @typedblite/runtime \
+            @typedblite/session @typedblite/node-host typedblite; do
+     npm trust github "$p" --file release.yml --repo typedblite/typedblite --env npm --allow-publish
+   done
+   ```
+
+   🔴 npm says a new trusted publisher **expires unless a publish uses it within 2 days**, so make the next release
+   promptly. Once one has published: delete the `NPM_TOKEN` secret, revoke the token, and set each package to
+   require two-factor authentication and disallow tokens.
 
 ## Making a release
 
