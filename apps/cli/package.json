@@ -3,7 +3,6 @@
   "description": "The TypeDBLite command line: a TypeQLite REPL, file runner and one-shot executor over SQLite",
   "version": "0.0.1",
   "license": "MPL-2.0",
-  "private": true,
   "keywords": [
     "typedblite",
     "typeqlite",

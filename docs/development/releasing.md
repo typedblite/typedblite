@@ -62,14 +62,19 @@ Only the maintainer can do these, once, before the first release:
 1. **Claim the unscoped `typedblite` name on npm** for the CLI (`npx typedblite` needs it), and `typeqlite`
    to protect it. The `@typedblite` org already covers the five libraries. Require 2FA for every member of
    the org, and add a second owner.
-2. **Take `"private": true` off `apps/cli/package.json`.** It is there so that nothing can publish the CLI
-   until its name is held. `nx release publish` skips a private package and says so, and the dry run leaves
-   it out until then.
+2. **The CLI is publishable:** `apps/cli/package.json` has no `"private": true`. *Done with 0.1.0-rc.1.*
 3. **The GitHub environment `npm`** (Settings → Environments) has the maintainer as a required reviewer, so that a
    pushed tag waits for approval before anything is published. *Created 2026-11-26.*
 4. **The first publish of each package needs a token**, because npm only lets a package that exists have a
-   trusted publisher. Create a granular access token limited to the six packages (and the org, to create
-   them), with a short expiry. Save it as the repository secret `NPM_TOKEN`.
+   trusted publisher. Create a granular access token with read and write access to **all packages** (the unscoped
+   `typedblite` does not exist yet, so a token cannot be limited to it) and to the `@typedblite` org, with
+   "bypass two-factor authentication" and a short expiry. Save it as the secret `NPM_TOKEN` of the `npm`
+   environment, so only an approved run can read it:
+
+   ```bash
+   gh secret set NPM_TOKEN --env npm --repo typedblite/typedblite
+   ```
+
 5. **After the first publish, switch to trusted publishing.** On npmjs.com, for each package: Settings →
    Trusted publishing → GitHub Actions, repository `typedblite/typedblite`, workflow `release.yml`, environment `npm`. Then delete the `NPM_TOKEN` secret,
    revoke the token, and set each package to require 2FA and disallow tokens.
