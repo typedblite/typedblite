@@ -4,8 +4,8 @@
 # (apps/vscode/theme-bridge), to Open VSX, then creates the GitHub Release with both .vsix files attached. They
 # share one version, so one tag releases both:
 #
-#   typeqlite-v<version>        a release
-#   typeqlite-v<version>-pre    that version as a pre-release
+#   typedblite-v<version>        a release
+#   typedblite-v<version>-pre    that version as a pre-release
 #
 # <version> is the manifests', always plain x.y.z: a marketplace refuses a suffix. The npm packages are release.yml's.
 #
@@ -18,7 +18,7 @@ name: Release extension
 
 on:
   push:
-    tags: ["typeqlite-v*"]
+    tags: ["typedblite-v*"]
   pull_request:
     paths: [.github/workflows/release-extension.yml]
 
@@ -60,8 +60,8 @@ jobs:
           # A pull request has no tag: it checks everything else.
           if [ "$GITHUB_EVENT_NAME" = push ]; then
             case "$GITHUB_REF_NAME" in
-              "typeqlite-v$version")     ;;
-              "typeqlite-v$version-pre") prerelease=true ;;
+              "typedblite-v$version")     ;;
+              "typedblite-v$version-pre") prerelease=true ;;
               *) echo "::error::tag $GITHUB_REF_NAME does not match version $version"; exit 1 ;;
             esac
           fi
@@ -80,7 +80,7 @@ jobs:
       - run: npm run build
       # Packages both extensions, then installs both into a downloaded VS Code and runs the cases against the
       # installed copies. Electron needs a display.
-      - run: xvfb-run --auto-servernum npm exec nx -- run typeqlite-vscode:e2e
+      - run: xvfb-run --auto-servernum npm exec nx -- run typedblite-vscode:e2e
 
       # Pre-release is a property written into the .vsix when it is packaged; publishing a built .vsix cannot add it.
       # The e2e above has already built the bundles and notices, so this only packages them again.
