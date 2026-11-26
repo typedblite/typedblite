@@ -339,7 +339,7 @@
     "@vscode/test-electron": "~3.1.0",
     "@vscode/vsce": "~4.1.1",
     "esbuild": "~0.28.1",
-    "markdown-it": "~14.3.3",
+    "markdown-it": "~15.0.3",
     "vscode-jsonrpc": "~9.0.0"
   }
 }
