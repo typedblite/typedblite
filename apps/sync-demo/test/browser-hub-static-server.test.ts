@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { startStaticServer, type StaticServer } from '../src/browser-hub/static-server.js';
 
@@ -21,7 +21,7 @@ beforeAll(async () => {
   writeFileSync(join(root, 'inside/deep/file name.txt'), 'spaced');
   for (const [name, body] of Object.entries({ 'a.js': 'js', 'a.css': 'css', 'a.wasm': 'wasm', 'a.map': '{}', 'a.json': '{}', 'a.svg': '<svg/>', 'a.bin': 'bin' })) writeFileSync(join(root, name), body);
   // A neighbor of the folder, which a `..` must not reach.
-  writeFileSync(join(root, '..', `${root.split('/').pop()}-secret.txt`), 'TOP-SECRET-CONTENT');
+  writeFileSync(join(root, '..', `${basename(root)}-secret.txt`), 'TOP-SECRET-CONTENT');
   plain = await startStaticServer(root);
   mounted = await startStaticServer(root, { prefix: '/sync-demo' });
 });
@@ -99,7 +99,7 @@ describe('refusing', () => {
   });
 
   it('does not serve a file outside its folder, however the path is spelled', async () => {
-    const secret = `/../${root.split('/').pop()}-secret.txt`;
+    const secret = `/../${basename(root)}-secret.txt`;
     // `fetch` normalizes `..` away, so send it raw.
     const raw = (path: string): Promise<{ status: number; body: string }> =>
       new Promise((resolve, reject) => {
@@ -111,7 +111,7 @@ describe('refusing', () => {
         req.on('error', reject);
         req.end();
       });
-    for (const path of [secret, `/%2e%2e/${root.split('/').pop()}-secret.txt`, '/..%2f' + root.split('/').pop() + '-secret.txt']) {
+    for (const path of [secret, `/%2e%2e/${basename(root)}-secret.txt`, '/..%2f' + basename(root) + '-secret.txt']) {
       const { status, body } = await raw(path);
       expect(body).not.toContain('TOP-SECRET-CONTENT');
       expect([403, 404]).toContain(status);

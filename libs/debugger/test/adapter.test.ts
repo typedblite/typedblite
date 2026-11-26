@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { InProcessHost } from './support/in-process-host.js';
 import { connect } from './support/dap.js';
-import { PEOPLE, SCHEMA, standardFiles, WORK } from './support/fixtures.js';
+import { PEOPLE, SCHEMA, standardFiles, inWork } from './support/fixtures.js';
 
 let close: (() => Promise<void>) | undefined;
 afterEach(async () => {
@@ -11,7 +11,7 @@ afterEach(async () => {
   close = undefined;
 });
 
-const LAUNCH = { program: `${WORK}/program.tql`, schema: ['schema.tql'], seed: ['seed.tql'] };
+const LAUNCH = { program: inWork('program.tql'), schema: ['schema.tql'], seed: ['seed.tql'] };
 
 async function open(program?: string, seed?: string, schema?: string): Promise<{ client: DebugClient; host: InProcessHost }> {
   const host = new InProcessHost();
@@ -39,7 +39,7 @@ describe('the TypeQLite debug adapter over DAP', () => {
     await Promise.all([client.nextRequest({ threadId: 1 }), client.assertStoppedLocation('step', { line: 3 })]);
     await Promise.all([client.nextRequest({ threadId: 1 }), client.assertStoppedLocation('step', { line: 5 })]);
     const frame = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames[0]!;
-    expect(frame).toMatchObject({ name: 'match $p isa person, has name $n;', source: { name: 'program.tql', path: '/work/program.tql' }, column: 1 });
+    expect(frame).toMatchObject({ name: 'match $p isa person, has name $n;', source: { name: 'program.tql', path: inWork('program.tql') }, column: 1 });
   });
 
   it('shows a statement`s status and text, before and after it runs', async () => {
@@ -64,7 +64,7 @@ describe('the TypeQLite debug adapter over DAP', () => {
     client.on('output', (event) => printed.push(event.body.output));
     await Promise.all([client.configurationSequence(), client.launch(LAUNCH), client.waitForEvent('terminated')]);
     expect((await exited).body.exitCode).toBe(0);
-    expect(printed[0]).toBe('Ran the schema file /work/schema.tql: 1 statement(s).\n');
+    expect(printed[0]).toBe(`Ran the schema file ${inWork('schema.tql')}: 1 statement(s).\n`);
     expect(printed.find((text) => text.startsWith('Line 5: match $p isa person, has name $n;'))).toMatch(/Cid\s*\nAnn\s*\nBob/);
   });
 
@@ -88,7 +88,7 @@ describe('the TypeQLite debug adapter over DAP', () => {
 
   it('fails a launch whose seed is refused, saying where', async () => {
     const { client } = await open();
-    await Promise.all([client.configurationSequence(), expect(client.launch({ ...LAUNCH, seed: ['missing.tql'] })).rejects.toThrow(/Cannot read \/work\/missing.tql/)]);
+    await Promise.all([client.configurationSequence(), expect(client.launch({ ...LAUNCH, seed: ['missing.tql'] })).rejects.toThrow(`Cannot read ${inWork('missing.tql')}`)]);
   });
 
   it('closes the host session on disconnect', async () => {
@@ -130,7 +130,7 @@ describe('stages and rows over DAP (Phase 03)', () => {
     const changed: Array<[number | undefined, boolean]> = [];
     client.on('breakpoint', (event) => changed.push([event.body.breakpoint.line, event.body.breakpoint.verified]));
     await client.initializeRequest();
-    const set = await client.setBreakpointsRequest({ source: { path: `${WORK}/program.tql` }, breakpoints: [{ line: 7 }, { line: 4 }] });
+    const set = await client.setBreakpointsRequest({ source: { path: inWork('program.tql') }, breakpoints: [{ line: 7 }, { line: 4 }] });
     expect(set.body.breakpoints.map((b) => [b.line, b.verified, b.message])).toEqual([
       [7, false, 'Checked when the program starts.'],
       [4, false, 'Checked when the program starts.'],
@@ -150,7 +150,7 @@ describe('stages and rows over DAP (Phase 03)', () => {
   it('a breakpoint in another file does not hold', async () => {
     const { client } = await open();
     await Promise.all([client.configurationSequence(), client.launch({ ...LAUNCH, stopOnEntry: true }), client.waitForEvent('stopped')]);
-    const set = await client.setBreakpointsRequest({ source: { path: `${WORK}/schema.tql` }, breakpoints: [{ line: 1 }] });
+    const set = await client.setBreakpointsRequest({ source: { path: inWork('schema.tql') }, breakpoints: [{ line: 1 }] });
     expect(set.body.breakpoints[0]).toMatchObject({ verified: false, message: 'Only the launched program stops: this file is not it.' });
   });
 });
@@ -176,7 +176,7 @@ describe('inside a match over DAP (Phase 04)', () => {
     const frames = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames;
     expect(frames[0]).toMatchObject({ name: 'thing $p · 1 → 3 row(s)', presentationHint: 'subtle' });
     expect(frames[0]!.source).toBeUndefined();
-    expect(frames[2]).toMatchObject({ name: 'adult_ages() · 1 call(s)', source: { path: '/work/program.tql' } });
+    expect(frames[2]).toMatchObject({ name: 'adult_ages() · 1 call(s)', source: { path: inWork('program.tql') } });
     // Out of the function, and of the step that called it: on to the next stage, on its own line.
     await Promise.all([client.stepOutRequest({ threadId: 1 }), client.assertStoppedLocation('step', { line: 2 })]);
     expect((await client.stackTraceRequest({ threadId: 1 })).body.stackFrames[0]!.name).toBe('select · 1 → 1 row(s)');
@@ -210,7 +210,7 @@ describe('breakpoints that matter over DAP (Phase 05)', () => {
   it('a conditional breakpoint, and step back to the step before it', async () => {
     const { client } = await open(EMPTIED, PEOPLE);
     await client.initializeRequest();
-    await client.setBreakpointsRequest({ source: { path: `${WORK}/program.tql` }, breakpoints: [{ line: 2, condition: 'rowsOut == 0' }, { line: 3, condition: 'rowsOut == 0' }] });
+    await client.setBreakpointsRequest({ source: { path: inWork('program.tql') }, breakpoints: [{ line: 2, condition: 'rowsOut == 0' }, { line: 3, condition: 'rowsOut == 0' }] });
     await Promise.all([client.configurationDoneRequest(), client.launchRequest({ ...LAUNCH } as never), client.assertStoppedLocation('breakpoint', { line: 3 })]);
     await Promise.all([client.stepBackRequest({ threadId: 1 }), client.assertStoppedLocation('step', { line: 2 })]);
     const [top] = (await client.stackTraceRequest({ threadId: 1 })).body.stackFrames;

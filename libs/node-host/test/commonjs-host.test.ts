@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -114,7 +114,8 @@ export async function resolve(specifier, context, next) {
   ])('finds the installed engine from this module\'s directory for %s', (_name, file, load) => {
     writeFileSync(join(host, file), body.replace('LOAD', load));
 
-    const output = execFileSync(process.execPath, ['--import', join(host, 'register.mjs'), join(host, file)], {
+    const output = execFileSync(process.execPath, // `--import` takes a specifier: on Windows `C:\...` reads as a URL with the scheme `c:`.
+      ['--import', pathToFileURL(join(host, 'register.mjs')).href, join(host, file)], {
       cwd: host,
       encoding: 'utf8',
     });
