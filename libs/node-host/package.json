@@ -1,7 +1,7 @@
 {
   "name": "@typedblite/node-host",
   "description": "TypeDBLite's Node host adapter: a database handle over a pluggable engine, with callback transactions, schema'd store opening, result-row readers, TypeQLite value literals, and loading the installed engine from a CommonJS host",
-  "version": "0.0.1",
+  "version": "0.1.0-rc.1",
   "license": "MPL-2.0",
   "keywords": [
     "typedblite",
@@ -35,7 +35,7 @@
     }
   },
   "dependencies": {
-    "@typedblite/runtime": "0.0.1"
+    "@typedblite/runtime": "0.1.0-rc.1"
   },
   "publishConfig": {
     "access": "public"

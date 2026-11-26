@@ -1,7 +1,7 @@
 {
   "name": "@typedblite/runtime",
   "description": "The TypeDBLite engine: TypeQLite on SQLite, with a change log, replication and full-text search",
-  "version": "0.0.1",
+  "version": "0.1.0-rc.1",
   "license": "MPL-2.0",
   "keywords": [
     "typedblite",
@@ -54,8 +54,8 @@
     }
   },
   "dependencies": {
-    "@typedblite/content-revision": "0.0.1",
-    "@typedblite/language": "0.0.1",
+    "@typedblite/content-revision": "0.1.0-rc.1",
+    "@typedblite/language": "0.1.0-rc.1",
     "langium": "~4.4.2",
     "vscode-languageserver": "~10.1.0"
   },
