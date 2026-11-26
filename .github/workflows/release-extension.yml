@@ -1,63 +1,79 @@
-# 🔴 NEVER RUN. No release tag has been pushed since this workflow was written.
-# Its local steps were run by hand (docs/development/releasing.md says which); the publishing steps, the
-# marketplaces' tokens and the workflow itself have not been. Read its first run before trusting it.
+# 🔴 The publish job has NEVER RUN. The build job runs on any pull request that changes this file.
 #
-# Publishes a VS Code extension to the Visual Studio Marketplace and Open VSX for a tag, then creates the GitHub
-# Release with the .vsix attached:
-#   typeqlite-v<version>        the TypeDBLite extension (apps/vscode)
-#   typeqlite-theme-v<version>  the TypeQLite Theme Bridge (apps/vscode/theme-bridge)
-# <version> is the manifest's, always plain x.y.z: the Marketplace refuses a suffix. A tag ending in -pre
-# (typeqlite-v0.3.2-pre) publishes that version as a pre-release.
-# The two share one version, set in each package.json, and each has its own CHANGELOG.md. The npm packages are release.yml's.
+# Publishes both VS Code extensions, TypeDBLite (apps/vscode) and the TypeQLite Theme Bridge
+# (apps/vscode/theme-bridge), to Open VSX, then creates the GitHub Release with both .vsix files attached. They
+# share one version, so one tag releases both:
+#
+#   typeqlite-v<version>        a release
+#   typeqlite-v<version>-pre    that version as a pre-release
+#
+# <version> is the manifests', always plain x.y.z: a marketplace refuses a suffix. The npm packages are release.yml's.
+#
+# Open VSX is published by Trusted Publishing: the job exchanges GitHub's OIDC ID token for a short-lived one, so
+# there is no stored token. open-vsx.org holds one trusted publisher per extension, naming this repository, THIS
+# FILE NAME and the `marketplaces` environment; renaming either breaks publishing. See docs/development/releasing.md.
+#
+# The Visual Studio Marketplace is published too once the `marketplaces` environment has a VSCE_PAT secret.
 name: Release extension
 
 on:
   push:
-    tags: ["typeqlite-v*", "typeqlite-theme-v*"]
+    tags: ["typeqlite-v*"]
+  pull_request:
+    paths: [.github/workflows/release-extension.yml]
 
 permissions:
-  contents: write # the GitHub Release
+  contents: read
 
 concurrency:
-  group: release-extension
+  group: release-extension-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  # Builds and tests with no publishing rights: this is where dependencies' install scripts run.
+  build:
+    name: build and test
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # A protected environment: set "required reviewers" on it, so a pushed tag waits for the maintainer to approve
-    # the publish. It holds the two marketplace tokens.
-    environment: marketplaces
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: npm
 
-      - name: Which extension, and check the tag, the version and the release notes agree
+      - name: Check the tag, the versions and the release notes agree
         id: release
         shell: bash
         run: |
-          case "$GITHUB_REF_NAME" in
-            typeqlite-theme-v*) dir=apps/vscode/theme-bridge; prefix=typeqlite-theme-v ;;
-            typeqlite-v*)       dir=apps/vscode;              prefix=typeqlite-v ;;
-            *) echo "::error::unexpected tag $GITHUB_REF_NAME"; exit 1 ;;
-          esac
-          name="$(node -p "require('./$dir/package.json').name")"
-          version="$(node -p "require('./$dir/package.json').version")"
+          version="$(node -p "require('./apps/vscode/package.json').version")"
+          bridge="$(node -p "require('./apps/vscode/theme-bridge/package.json').version")"
           if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::$dir/package.json's version $version is not x.y.z; a pre-release is marked by the tag's -pre"; exit 1
+            echo "::error::version $version is not x.y.z; a pre-release is marked by the tag's -pre"; exit 1
           fi
-          case "$GITHUB_REF_NAME" in
-            "$prefix$version")     prerelease=false ;;
-            "$prefix$version-pre") prerelease=true ;;
-            *) echo "::error::tag $GITHUB_REF_NAME does not match $dir/package.json's version $version"; exit 1 ;;
-          esac
-          node tools/release-notes.mjs --changelog "$dir/CHANGELOG.md" "$version" > "$RUNNER_TEMP/notes.md"
-          echo "dir=$dir" >> "$GITHUB_OUTPUT"
-          echo "vsix=apps/vscode/dist/$name-$version.vsix" >> "$GITHUB_OUTPUT"
+          if [ "$bridge" != "$version" ]; then
+            echo "::error::the Theme Bridge is at $bridge and the extension at $version"; exit 1
+          fi
+          prerelease=false
+          # A pull request has no tag: it checks everything else.
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            case "$GITHUB_REF_NAME" in
+              "typeqlite-v$version")     ;;
+              "typeqlite-v$version-pre") prerelease=true ;;
+              *) echo "::error::tag $GITHUB_REF_NAME does not match version $version"; exit 1 ;;
+            esac
+          fi
+          mkdir -p "$RUNNER_TEMP/release"
+          {
+            echo "## TypeDBLite"
+            node tools/release-notes.mjs --changelog apps/vscode/CHANGELOG.md "$version"
+            echo
+            echo "## TypeQLite Theme Bridge"
+            node tools/release-notes.mjs --changelog apps/vscode/theme-bridge/CHANGELOG.md "$version"
+          } > "$RUNNER_TEMP/release/notes.md"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - run: npm ci
@@ -68,23 +84,68 @@ jobs:
 
       # Pre-release is a property written into the .vsix when it is packaged; publishing a built .vsix cannot add it.
       # The e2e above has already built the bundles and notices, so this only packages them again.
-      - name: Package as a pre-release
+      - name: Package as pre-releases
         if: steps.release.outputs.prerelease == 'true'
-        working-directory: ${{ steps.release.outputs.dir }}
-        run: npx vsce package --no-dependencies --pre-release --out "$GITHUB_WORKSPACE/apps/vscode/dist/"
+        run: |
+          for dir in apps/vscode apps/vscode/theme-bridge; do
+            (cd "$dir" && npx vsce package --no-dependencies --pre-release --out "$GITHUB_WORKSPACE/apps/vscode/dist/")
+          done
+
+      - name: Collect what will be published
+        run: |
+          version="${{ steps.release.outputs.version }}"
+          cp "apps/vscode/dist/typeqlite-$version.vsix" "apps/vscode/dist/typeqlite-theme-$version.vsix" "$RUNNER_TEMP/release/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Waits for the maintainer's approval, and is the environment the trusted publishers name.
+    environment: marketplaces
+    permissions:
+      contents: write # the GitHub Release
+      id-token: write # Open VSX Trusted Publishing
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      PRERELEASE: ${{ needs.build.outputs.prerelease }}
+      HAS_VSCE_PAT: ${{ secrets.VSCE_PAT != '' }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      # The Theme Bridge first: the extension's README sends remote-window users to it. A version already published
+      # is skipped, so a run that stopped halfway can be run again.
+      - name: Publish to Open VSX
+        run: |
+          for vsix in "typeqlite-theme-$VERSION.vsix" "typeqlite-$VERSION.vsix"; do
+            npx --yes ovsx@1.3.0 publish "$vsix" --trusted-publishing --skip-duplicate
+          done
 
       - name: Publish to the Visual Studio Marketplace
-        working-directory: apps/vscode
-        run: npx vsce publish --packagePath "../../${{ steps.release.outputs.vsix }}"
+        if: env.HAS_VSCE_PAT == 'true'
+        run: |
+          for vsix in "typeqlite-theme-$VERSION.vsix" "typeqlite-$VERSION.vsix"; do
+            npx --yes @vscode/vsce@3.9.2 publish --packagePath "$vsix" --skip-duplicate
+          done
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
-      - name: Publish to Open VSX
-        run: npx --yes ovsx@1.3.0 publish "${{ steps.release.outputs.vsix }}"
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
-
       - name: Create the GitHub Release
-        run: gh release create "$GITHUB_REF_NAME" "${{ steps.release.outputs.vsix }}" ${{ steps.release.outputs.prerelease == 'true' && '--prerelease' || '' }} --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" ./*.vsix "${flags[@]}" --verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
