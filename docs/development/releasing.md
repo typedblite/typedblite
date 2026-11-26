@@ -116,8 +116,8 @@ no provenance, and the plan says to publish with it. Whether to wait is the main
 
 Two extensions, published by `typedblite`: **TypeDBLite** (`apps/vscode`) and the **TypeQLite Theme Bridge**
 (`apps/vscode/theme-bridge`), which a remote window needs to color Markdown previews. The two share one version, set in
-both `package.json` files, and a manifest test holds them to it. Each has its own `CHANGELOG.md` and is released by its
-own tag. They are not versioned with the npm packages.
+both `package.json` files, and a manifest test holds them to it. Each has its own `CHANGELOG.md`, and one tag releases
+both. They are not versioned with the npm packages.
 
 The TypeDBLite extension's first published version is 0.3.1: the editor, notebooks and the debugger are its three
 features so far. 1.0.0 is the release that adds the Live Data Graph Explorer, which makes it feature complete.
@@ -130,16 +130,39 @@ cases against the installed copies, so it is the check that what would be publis
 
 Only the maintainer can do these, once:
 
-1. **The Visual Studio Marketplace publisher `typedblite`.** Create it at
-   [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage), signed in with a Microsoft
-   account. Create an Azure DevOps personal access token with the **Marketplace (Manage)** scope, for all accessible
-   organizations, with a short expiry. Save it as the secret `VSCE_PAT`.
-2. **The Open VSX namespace `typedblite`.** Sign in to [open-vsx.org](https://open-vsx.org) with GitHub, link an
-   Eclipse account and sign the Eclipse Foundation Open VSX Publisher Agreement, then create an access token. Create
-   the namespace with `npx ovsx@1.3.0 create-namespace typedblite -p <token>`, and ask for it to be verified (an issue
-   on the open-vsx.org repository), so that it shows as the official publisher. Save the token as `OVSX_PAT`.
-3. **The GitHub environment `marketplaces`** has the maintainer as a required reviewer (*created 2026-11-26*). Add
-   both secrets to it.
+1. **The Open VSX namespace `typedblite`.** Sign in to [open-vsx.org](https://open-vsx.org) with GitHub, link an
+   Eclipse account and sign the Eclipse Foundation Open VSX Publisher Agreement. *The namespace is verified.*
+2. **The first publish of each extension, by hand, with an access token.** Open VSX registers a trusted publisher only
+   for an extension that already has a published version. Create a token at
+   [open-vsx.org/user-settings/tokens](https://open-vsx.org/user-settings/tokens), then, from an up-to-date `main`:
+
+   ```bash
+   read -rs OVSX_PAT && export OVSX_PAT
+   npm run deploy:vsx
+   unset OVSX_PAT
+   ```
+
+   Revoke the token afterwards.
+3. **A trusted publisher for each of the two extensions**, `typeqlite` and `typeqlite-theme`, at
+   [open-vsx.org/user-settings/trusted-publishers](https://open-vsx.org/user-settings/trusted-publishers), as a
+   namespace owner ([the guide](https://github.com/eclipse-openvsx/openvsx/wiki/Trusted-Publishing)). Choose GitHub
+   Actions, with these values:
+
+   | Field | Value |
+   | --- | --- |
+   | Organization or user | `typedblite` |
+   | Repository | `typedblite` |
+   | Workflow filename | `release-extension.yml` |
+   | Environment | `marketplaces` |
+
+   A registration cannot be edited: delete it and make it again. The environment is what limits who can publish,
+   because the registration trusts the workflow file on any branch or tag.
+4. **The GitHub environment `marketplaces`** has the maintainer as a required reviewer (*created 2026-11-26*). Open
+   VSX needs no secret in it.
+5. **Optionally, the Visual Studio Marketplace.** Create the publisher `typedblite` at
+   [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage) and an Azure DevOps personal
+   access token with the **Marketplace (Manage)** scope, with a short expiry. Save it in the `marketplaces`
+   environment as `VSCE_PAT`. Without it the workflow publishes to Open VSX only.
 
 Both marketplaces show the README, and rewrite its relative links to the repository on GitHub, so the links work
 once the repository is public.
@@ -149,12 +172,18 @@ once the repository is public.
 1. **On a branch:** set the version in both extensions' `package.json`, rename `## [Unreleased]` in each
    `CHANGELOG.md` to `## [<version>] - YYYY-MM-DD` (saying so if one of them did not change), run `npm run gate`, and
    open a pull request.
-2. **Merge it, then tag the merge commit on `main`:** `typeqlite-v<version>` for the TypeDBLite extension, or
-   `typeqlite-theme-v<version>` for the Theme Bridge, and push the tags.
+2. **Merge it, then tag the merge commit on `main`**, and push the tag:
+
+   ```bash
+   git switch main && git pull --ff-only
+   git tag -a typeqlite-v0.3.2 -m typeqlite-v0.3.2
+   git push origin typeqlite-v0.3.2
+   ```
+
 3. **Approve the run.** [`release-extension.yml`](../../.github/workflows/release-extension.yml) checks the tag
-   against the manifest and the changelog, builds, packages, runs the e2e under `xvfb-run`, then waits for approval
-   on `marketplaces`. It publishes the `.vsix` to both marketplaces and
-   creates the GitHub Release with the `.vsix` attached.
+   against both manifests and changelogs, builds, packages and runs the e2e under `xvfb-run`, then waits for approval
+   on `marketplaces`. It publishes both `.vsix` files to Open VSX (and to the Visual Studio Marketplace, if `VSCE_PAT`
+   is set) and creates the GitHub Release with both attached.
 
 **Pre-releases.** A version is always plain `x.y.z`, because the Marketplace refuses a suffix such as `-rc.1`. To
 publish one as a pre-release, end the tag in `-pre` (`typeqlite-v0.3.2-pre`). A version published as a pre-release is
@@ -168,7 +197,7 @@ and `-- --dry-run`.
 `homepage`, `bugs`, a changelog), and with both versions set to `0.0.2` the `package` and `e2e` targets built,
 installed and passed (19 cases) with no other edit. Then back to `0.0.1`. The release-notes step reads each
 extension's changelog. The `vsce` and `ovsx` options the workflow uses were checked against `vsce publish --help`
-and `ovsx` 1.3.0's source. **Not checked:** the workflow, the tokens, and a real publish.
+and `ovsx` 1.3.0's source. **Not checked:** the publish job, Trusted Publishing and a real publish.
 
 ## What has been checked
 
