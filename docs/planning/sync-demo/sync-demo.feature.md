@@ -165,7 +165,8 @@ or the emulator's reversed port. The demo needs no account, no cloud service and
 - [x] `nx run sync-demo:demo -- --auto --fresh` runs the whole story with the PWA and Electron, and
       with Android when an emulator is available. Every step's convergence check passes. *Run
       headless, and as `test-browser/story.test.ts`. ⚠️ No emulator was available in this session (no
-      KVM), so the Android path is built (the APK) but has not been run (Phases 06–07).*
+      KVM), so the Android path is built (the APK) but has not been run (Phases 06–07).* *Since
+      2026-11-26 CI runs the story with the phone on an emulator (`mobile/ci-story.sh`).*
 - [x] The demo's README covers setup from a cold machine, running, the story, and troubleshooting.
       The root README and the replication guide link to it. *Phase 08.*
 - [x] `AGENTS.md`, the project overview memory, and `CONTRIBUTING.md`'s project table name the new

@@ -213,3 +213,40 @@ jobs:
           java-version: "21"
       - run: npm ci
       - run: npm exec nx -- run sync-demo:android-apk
+
+  # The Android app run on an emulator, as the phone in the sync demo's story (apps/sync-demo/mobile/ci-story.sh).
+  android-emulator:
+    name: android emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - run: npm exec nx -- run sync-demo:build
+      - run: npm exec nx -- run sync-demo:android-apk
+      - run: npx playwright-core install --with-deps chromium
+      # The emulator needs KVM, and Electron's sandbox needs user namespaces (see the sync demo job).
+      - run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      # Pinned to a commit: a third-party action (v2.38.0). The API level and image match mobile/env.sh and setup.sh.
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          emulator-options: -no-window -no-snapshot-save -no-boot-anim -no-audio -gpu swiftshader_indirect
+          working-directory: apps/sync-demo
+          script: xvfb-run --auto-servernum bash mobile/ci-story.sh
