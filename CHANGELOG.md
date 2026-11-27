@@ -7,6 +7,8 @@ they are listed here.
 
 ## [Unreleased]
 
+## [0.1.0-rc.1] - 2026-11-26
+
 ### Added
 - **`@typedblite/session`, a fifth published package**: a session over the engine (`Session`: run, begin, commit, rollback, restart, close, schema) and the statement classifier the CLI used to hold (`classifyStatement`, `splitStatements`). A statement's refusal is returned as data, with a `reason` to branch on (`engine`, `no-schema`, `locked`, `closed`, `transaction`). The `typedblite` CLI now runs through it, with its behavior unchanged. It has no dependency but `@typedblite/runtime`.
 - **The TypeQLite engine host** (`apps/engine-host`, private; ADR-011): a NestJS CQRS app that runs statements in sessions, over five transports from one declaration of its twelve operations: CLI, REPL, sidecar, HTTP and MCP. HTTP and HTTP MCP answer loopback only (peer, `Host` and `Origin`); MCP serves a read tier unless `--mcp-write`. The extension bundles it and starts it as a process, with a `node` it checks first (`typedblite.host.node`), and features reach it through the command `typedblite.host.request`.

@@ -1,7 +1,7 @@
 {
   "name": "@typedblite/language",
   "description": "TypeQLite grammar, AST, language services and SQLite generator",
-  "version": "0.0.1",
+  "version": "0.1.0-rc.1",
   "license": "MPL-2.0",
   "keywords": [
     "typedblite",

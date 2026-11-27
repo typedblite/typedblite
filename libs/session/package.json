@@ -1,7 +1,7 @@
 {
   "name": "@typedblite/session",
   "description": "A TypeQLite session over TypeDBLite: one open store with a lifetime, transactions, a restart, and the statement classifier the CLI and the engine host share",
-  "version": "0.0.1",
+  "version": "0.1.0-rc.1",
   "license": "MPL-2.0",
   "keywords": [
     "typedblite",
@@ -35,7 +35,7 @@
     }
   },
   "dependencies": {
-    "@typedblite/runtime": "0.0.1"
+    "@typedblite/runtime": "0.1.0-rc.1"
   },
   "publishConfig": {
     "access": "public"

@@ -4,14 +4,14 @@ The TypeDBLite command line: an interactive REPL, a file runner, and a one-shot 
 
 ## Installation
 
-**Not on npm yet.** Once the first release is out, it runs with nothing to install, or installs globally:
+It is a release candidate, published under npm's `next` tag. It runs with nothing to install, or installs globally:
 
 ```bash
-npx typedblite --exec 'define entity person, owns name @key; attribute name, value string;'
-npm install -g typedblite
+npx typedblite@next --exec 'define entity person, owns name @key; attribute name, value string;'
+npm install -g typedblite@next
 ```
 
-It needs Node.js 22.16 or later. Until then, build it from source:
+It needs Node.js 22.16 or later. Or build it from source:
 
 ```bash
 npm run build   # or: npm exec nx -- run typedblite:build
