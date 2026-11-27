@@ -733,6 +733,8 @@ export function bindingsOf(patterns: readonly Pattern[]): MatchBindings {
   for (const pattern of patterns) {
     if (isAnonRelationPattern(pattern)) {
       players(pattern.players);
+      // `(...) isa inclusion, has discount $d` binds `$d` as any other `has` does, though the relation has no name.
+      for (const property of pattern.properties) if (property.valueVariable) selectable.add(property.valueVariable);
       continue;
     }
     if (isKindPattern(pattern)) {

@@ -4122,8 +4122,8 @@ export class TypeDBLiteInterpreter {
       // `$r isa $t (employee: $x)` — the relation's type through a type variable (review, round 1);
       // every `isa` on it a filter or a binding, as for a thing (round 3).
       const withTypes = (combination: Record<string, Binding>): ThingConstraint => ({ ...relation, isas: resolveIsas(relation.isas, combination) });
-      // An anonymous relation that was pushed down has no remaining variables to bind.
-      if (filtered.has(relation) && relation.variable.startsWith('__anon')) continue;
+      // An anonymous relation that was pushed down has no remaining variables to bind, unless a `has` reads from it.
+      if (filtered.has(relation) && isTestOnly(relation)) continue;
       // Bind any remaining role players and named relation variable. A relation already pushed
       // down was only checked, not expanded; named relations still need their ids.
       hook?.stepStart({ name: `relation ${relation.variable}`, kind: 'relation', ranges: relationRanges(relation) }, combinations.length);
@@ -4171,6 +4171,12 @@ export class TypeDBLiteInterpreter {
         });
         hook?.stepEnd(combinations);
       }
+    }
+    // An unnamed relation was carried only so its `has` could read from it. Nothing may name it, so rows that differ
+    // in which relation they came from, and in nothing else, are one answer.
+    const carried = relations.filter((relation) => relation.variable.startsWith('__anon') && !isTestOnly(relation));
+    if (carried.length > 0) {
+      combinations = distinct(combinations.map((combination) => without(combination, carried.map((relation) => relation.variable))));
     }
     // `let`s and comparisons whose inputs the concepts already bind run BEFORE the nested blocks, so a
     // block can read them (`let $x = 1; { $x < 5; } or { … };` — variables.feature L126); the rest
@@ -4813,7 +4819,8 @@ export class TypeDBLiteInterpreter {
     // the relation itself, so two links between the same pair are two ways of satisfying one
     // indistinguishable condition, and TypeQLite answers it once. Selecting `t.iid` regardless made
     // them distinct rows and doubled every downstream combination.
-    const named = !relation.variable.startsWith('__anon');
+    // An unnamed relation with a `has` to read is told apart until that is read; `combine` then forgets which it was.
+    const named = !isTestOnly(relation);
     const roleVariables = relation.roles.some((role) => role.roleVariable !== undefined);
     const columns = [
       ...(named ? ['t.iid'] : []),
@@ -4854,8 +4861,8 @@ export class TypeDBLiteInterpreter {
         next[role.roleVariable] = label;
       }
       // A named relation variable binds too, so `$r isa task-dependency (...)` is usable later.
-      // The anonymous form has no name anybody wrote, so nothing should be able to select it — and
-      // `iid` is not in the row for it either, which is what keeps the answer from doubling.
+      // The anonymous form has no name anybody wrote, so nothing should be able to select it — and,
+      // unless a `has` reads from it, `iid` is not in the row, which is what keeps the answer from doubling.
       if (!named) return [next];
       const iid = Number(row['iid']);
       const extended = { ...next, [relation.variable]: iid };
@@ -5990,6 +5997,25 @@ function resolveEveryMatch(
     }
   }
   return bindings;
+}
+
+/** A relation nobody named and nothing reads from: it only has to exist. */
+const isTestOnly = (relation: ThingConstraint): boolean => relation.variable.startsWith('__anon') && relation.bindings.length === 0;
+
+const without = <T>(record: Record<string, T>, keys: readonly string[]): Record<string, T> =>
+  Object.fromEntries(Object.entries(record).filter(([key]) => !keys.includes(key)));
+
+/** The first of each set of rows that bind the same things to the same variables. */
+function distinct(combinations: Array<Record<string, Binding>>): Array<Record<string, Binding>> {
+  const seen = new Map<string, Record<string, Binding>>();
+  for (const combination of combinations) {
+    const key = JSON.stringify(
+      Object.keys(combination).sort().map((name) => [name, combination[name] ?? null]),
+      (_, value: unknown) => (typeof value === 'bigint' ? `${value}n` : value),
+    );
+    if (!seen.has(key)) seen.set(key, combination);
+  }
+  return [...seen.values()];
 }
 
 /** What an anonymous `$_` becomes — `$_#N`, which no query can write, so it collides with nothing. */
