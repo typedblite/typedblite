@@ -80,6 +80,16 @@ they are listed here.
   the build and every test passed there on two complete runs.
 
 ### Fixed
+- **A `has` after a relation with no variable binds its value** (#119). `inclusion (promotion: $p, item: $i), has
+  discount $d` and `(…) isa inclusion, has discount $d` left `$d` unbound: `fetch` answered `null` with no
+  diagnostic, `select` said the `match` never bound it, and arithmetic on it was refused. The relation stays unnamed,
+  so relations that bind the same answers are still one answer. A comparison such as `has discount > 0.5` on such a
+  relation is still refused by name. Queries that already answered can answer differently:
+  - A `$d` bound earlier is now matched. Before, the `has` accepted any relation with some value, which could
+    also affect a write.
+  - `count`, `sum` and a `select` that drops `$d` see one row for each distinct set of bindings, so relations with
+    different values now count separately, and relations with identical values count **once**. Name the relation
+    (`$r isa inclusion …`) to count each one. TypeDB 3.10.4 answers the same.
 - **The language server no longer mixes up the semantic tokens of a notebook's cells.** A notebook asks for the tokens of every cell at once, and each cell is a document; Langium's provider kept the document it was working on in a field, so overlapping requests wrote one another's tokens into a response, and a cell could come back with another cell's tokens in front of its own (Monaco warned they ran past the end of the line). `TypeQLiteSemanticTokenProvider` now answers one request at a time.
 - A value read as an attribute is refused, as TypeDB refuses it. `given $t: string; match $b isa book, has title $t;`
   matched nothing and said so only in an `empty-match` fact; it now throws `typedblite.mixed-pattern` ("The variable
