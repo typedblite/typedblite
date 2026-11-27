@@ -142,8 +142,9 @@ The site was first planned for GitHub Pages; that workflow (`site.yml`) never ra
 The repository is public, so the site links to it: `REPO_PUBLIC` in `apps/website/scripts/content-map.mjs` is `true`.
 Set to `false`, it removes every link to the repository, and `check-site.mjs` fails the build if one gets in.
 
-At the first release of the npm packages:
+At the stable `0.1.0` release of the npm packages:
 
-1. Read the landing page's "Pre-release" notice, the README's "Not on npm" bullet and the guides' "not on npm yet" notes,
-   and remove them.
+1. Remove the landing page's "Pre-release" notice, the README's "A release candidate" bullet and the guides' release
+   candidate notes, and drop `@next` from the install commands. `apps/vscode/test/tour-structure.test.ts` expects the
+   tour's note.
 2. Redeploy with `npm run deploy:site`.

@@ -31,7 +31,7 @@ affiliated with, sponsored by, or endorsed by TypeDB Ltd.
 
 TypeDBLite is an embedded library, not a server, and it is not TypeDB. Some of what is not there:
 
-- **Not on npm yet.** You build it from source (below). The VS Code
+- **A release candidate.** The npm packages are at `0.1.0-rc.1`, under the `next` tag. The VS Code
   extension is on [Open VSX](https://open-vsx.org/extension/typedblite/typedblite-workbench).
 - **Some annotations are accepted and not enforced** on writes, such as `@card` bounds, `@range` and
   `@values`. Nothing is silently dropped, and the language guide lists them.
@@ -43,7 +43,21 @@ The full list, with the source of each item, is in [Known limitations](docs/guid
 
 ## Install and first query
 
-TypeDBLite is built from source for now. You need Node.js 22.16 or later.
+You need Node.js 22.16 or later. Run a statement with nothing to install:
+
+```bash
+npx typedblite@next --exec 'define entity person, owns name; attribute name, value string;'
+```
+
+Or add the engine to your project:
+
+```bash
+npm install @typedblite/runtime@next
+```
+
+### From source
+
+The rest of this section runs from a clone of the repository.
 
 ```bash
 npm install

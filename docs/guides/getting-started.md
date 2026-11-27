@@ -3,6 +3,9 @@
 This guide takes you from a fresh clone to running a schema and queries, first from the command
 line and then from your own code. It takes about ten minutes.
 
+The packages are also on npm, as the release candidate `0.1.0-rc.1` under the `next` tag: see
+[Installing from npm](#installing-from-npm) to install them instead of building.
+
 ## Prerequisites
 
 - **Node.js 22.16 or later.** TypeDBLite uses `node:sqlite`, which is built into Node, and needs its
@@ -152,13 +155,15 @@ Each value in a row is a `TypeDBLiteValue`, a concept such as an entity, a relat
 or a computed value. Call `asString()`, `asInteger()` or `asDouble()` to read an attribute or value
 cell. See [Embedding the runtime](embedding-the-runtime.md#reading-results).
 
-**Nothing is on npm yet.** Once the first release is out, the runtime installs with:
+### Installing from npm
+
+The runtime installs with:
 
 ```bash
-npm install @typedblite/runtime
+npm install @typedblite/runtime@next
 ```
 
-Until then, build from source and depend on the workspace packages. What a version number will promise is in
+What a version number promises is in
 [Versions and compatibility](compatibility.md).
 
 ## When something is refused
@@ -190,8 +195,8 @@ code --install-extension apps/vscode/dist/typedblite-workbench-0.3.2.vsix
 
 ## Next steps
 
-- [Five-minute tour](five-minute-tour.tql.md): a notebook, the command line and a small program on one SQLite file, from an empty folder (for after
-  the first release, when it installs from npm).
+- [Five-minute tour](five-minute-tour.tql.md): a notebook, the command line and a small program on one SQLite file, from an empty folder (it
+  installs from npm).
 - [Embedding the runtime](embedding-the-runtime.md): the whole engine API.
 - [The TypeQLite language](typeqlite-language.md): everything you can write.
 - [Replication and search](replication-and-search.md): syncing stores, and full-text search.

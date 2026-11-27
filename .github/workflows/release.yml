@@ -1,6 +1,6 @@
-# 🔴 NEVER RUN. No release tag has been pushed since this workflow was written.
-# Its steps were run by hand on Linux (docs/development/releasing.md says which); the workflow itself, the OIDC
-# exchange and provenance have not been. Read its first run before trusting it.
+# First run for v0.1.0-rc.1 (2026-11-27): all six packages published with provenance, with an NPM_TOKEN that
+# bypasses two-factor authentication. Publishing by OIDC (trusted publishing, no token) has not been run.
+# npm took several minutes to serve the new packages after the job had succeeded.
 #
 # Publishes the npm packages for a version tag, with provenance, then creates the GitHub Release.
 # Make the tag with `nx release version <version>` (it commits and tags `v<version>`), then push the tag.

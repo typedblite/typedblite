@@ -15,9 +15,8 @@
 //   <!-- tour:expect -->           skipped here. `apps/vscode/test/tour-journey.test.ts` holds every printed answer to what runs
 //                                  on the notebook's own engine, and the VS Code e2e does it in the editor
 //
-// Two commands are swapped, because nothing is on npm yet: `npx typedblite` runs the CLI installed from its
-// tarball, and `npm install @typedblite/runtime` installs the tarballs of the runtime and what it needs. Once
-// the packages are published, the first swap can go; the second is what the registry does.
+// Two commands are swapped, so that what runs is this tree and not what is on npm: `npx typedblite` runs the CLI installed from its
+// tarball, and `npm install @typedblite/runtime` installs the tarballs of the runtime and what it needs.
 //
 // It needs bash, so it does not run on Windows. It does NOT test published packages, or macOS.
 import { spawnSync } from 'node:child_process';

@@ -3,9 +3,9 @@
 How the npm packages are versioned, checked and published. The promises a version makes to users are in
 [Versions and compatibility](../guides/compatibility.md). This page is how a maintainer keeps them.
 
-> **Status: nothing has been released, and neither release workflow has run.** Everything on this page that runs
-> locally has been run (see [What has been checked](#what-has-been-checked)). The workflows, the OIDC exchange with
-> npm, and provenance have not.
+> **Status: `0.1.0-rc.1` is on npm** (2026-11-27), all six packages, published by the release workflow with
+> provenance. Trusted publishing (publishing by OIDC, with no token) has not been run. See
+> [What has been checked](#what-has-been-checked).
 
 ## What is released, and with what
 
@@ -57,10 +57,10 @@ Each check of both scripts has been seen to fail on a broken package (a missing 
 
 ## One-time setup
 
-Only the maintainer can do these, once, before the first release:
+Only the maintainer can do these, once:
 
-1. **Claim the unscoped `typedblite` name on npm** for the CLI (`npx typedblite` needs it), and `typeqlite`
-   to protect it. The `@typedblite` org already covers the five libraries. Require 2FA for every member of
+1. **Claim the unscoped names on npm:** `typedblite` for the CLI (*done with 0.1.0-rc.1*), and `typeqlite`
+   to protect it (*still unclaimed on 2026-11-27*). The `@typedblite` org already covers the five libraries. Require 2FA for every member of
    the org, and add a second owner.
 2. **The CLI is publishable:** `apps/cli/package.json` has no `"private": true`. *Done with 0.1.0-rc.1.*
 3. **The GitHub environment `npm`** (Settings → Environments) has the maintainer as a required reviewer, so that a
@@ -69,13 +69,17 @@ Only the maintainer can do these, once, before the first release:
    trusted publisher. Create a granular access token with read and write access to **all packages** (the unscoped
    `typedblite` does not exist yet, so a token cannot be limited to it) and to the `@typedblite` org, with
    "bypass two-factor authentication" and a short expiry. Save it as the secret `NPM_TOKEN` of the `npm`
-   environment, so only an approved run can read it:
+   environment, so only an approved run can read it. *Done for 0.1.0-rc.1.*
+
+   🔴 Without "bypass two-factor authentication", the publish step fails with "This operation requires a one-time
+   password". `npm token list --json` shows each token's `bypass_2fa`.
+
 
    ```bash
    gh secret set NPM_TOKEN --env npm --repo typedblite/typedblite
    ```
 
-5. **After the first publish, switch to trusted publishing.** npm allows a trusted publisher only for a package that
+5. **Switch to trusted publishing** (*still to do*). npm allows a trusted publisher only for a package that
    exists. It takes npm 11.15 or later, `npm login` and a two-factor code (a token that bypasses two-factor
    authentication is not accepted):
 
@@ -116,6 +120,11 @@ Only the maintainer can do these, once, before the first release:
    `check-packages` and `clean-room`. Then it waits for approval on the `npm` environment, publishes with
    provenance (a version with a `-` goes to the `next` dist-tag, anything else to `latest`), and creates the
    GitHub Release from the changelog section.
+
+🔴 **A successful run does not mean the packages can be installed yet.** With 0.1.0-rc.1, new packages answered 404
+for several minutes, `typedblite` showed a `0.0.0-stage` placeholder, and `@typedblite/runtime`'s tarball arrived
+last. Wait until `npm install typedblite@<version>` works in an empty directory before announcing, and do not re-run
+the job or unpublish in the meantime.
 
 To see what a release would do without doing it:
 
@@ -213,7 +222,7 @@ and `-- --dry-run`.
 `homepage`, `bugs`, a changelog), and with both versions set to `0.0.2` the `package` and `e2e` targets built,
 installed and passed (19 cases) with no other edit. Then back to `0.0.1`. The release-notes step reads each
 extension's changelog. The `vsce` and `ovsx` options the workflow uses were checked against `vsce publish --help`
-and `ovsx` 1.3.0's source. **Not checked:** the publish job, Trusted Publishing and a real publish.
+and `ovsx` 1.3.0's source. **Since then:** `release-extension.yml` published 0.3.2 (2026-11-26).
 
 ## What has been checked
 
@@ -227,5 +236,9 @@ Run by hand on Linux, Node 24.19, on 2026-11-15:
   `https://registry.npmjs.org/` with the `next` tag.
 - The workflow's version, release-notes, npm-version and dist-tag logic, run as shell.
 
-**Not checked:** the workflow on GitHub, OIDC and provenance, a real publish, the clean room on Node 22.16
-(not installed here), macOS and Windows. CI's `clean-room` job covers the last three once Actions is on.
+**The first release (2026-11-27):** `release.yml` published `0.1.0-rc.1` of all six packages with provenance and
+created the GitHub Release. `npm install typedblite@next` from the registry, then `--exec` of a `define`, worked on
+Windows. CI's `clean-room` job runs the packed tarballs on Linux (Node 24 and 22.16.0), and on macOS and Windows
+without failing the run.
+
+**Not checked:** publishing by OIDC, and the clean room against the published packages.

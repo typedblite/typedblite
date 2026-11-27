@@ -1,4 +1,5 @@
-# 🔴 The publish job has NEVER RUN. The build job runs on any pull request that changes this file.
+# The publish job first ran for typedblite-v0.3.2 (2026-11-26). The build job also runs on any pull request that
+# changes this file.
 #
 # Publishes both VS Code extensions, TypeDBLite (apps/vscode) and the TypeQLite Theme Bridge
 # (apps/vscode/theme-bridge), to Open VSX, then creates the GitHub Release with both .vsix files attached. They

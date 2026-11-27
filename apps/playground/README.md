@@ -93,7 +93,7 @@ off. `test/language-server.test.ts` runs the server alone over the real protocol
 
 ## Not done
 
-- **Hosting.** `.build/` is static files and can be served from any path. The website (`apps/website`) hosts the playground at `/playground/`, in its own layout, and has not been published yet.
+- **Hosting.** `.build/` is static files and can be served from any path. The website (`apps/website`) hosts the playground at `/playground/`, in its own layout.
   Build it with `node build.mjs --minify`: a first visit is about 2.1 MB gzipped (Monaco is 1.1 MB of it, the
   run worker 0.3 MB, the SQLite engine 0.4 MB, the language server 0.2 MB).
 - **A real-browser test of Stop.** The timeout and stop logic is tested with a fake worker, because a query that

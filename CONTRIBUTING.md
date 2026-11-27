@@ -60,6 +60,7 @@ npm exec nx -- run <project>:<target>
 | `typeqlite-language` | `libs/language` | `build`, `test`, `typecheck`, `langium-generate` |
 | `content-revision` | `libs/content-revision` | `build`, `test`, `typecheck` |
 | `typedblite-runtime` | `libs/runtime` | `build`, `test` |
+| `typedblite-session` | `libs/session` | `build`, `test`, `typecheck` |
 | `typedblite-node-host` | `libs/node-host` | `build`, `test`, `typecheck` |
 | `typedblite-conformance` | `libs/conformance` | `build`, `test`, `typecheck`, `report` |
 | `typedblite` (CLI) | `apps/cli` | `build`, `test`, `typecheck` |
