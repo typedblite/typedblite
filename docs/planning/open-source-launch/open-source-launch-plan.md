@@ -41,6 +41,7 @@ full on Node 24.19.0, Linux.
 **CI runs again (2026-11-26).** The repository is public and Actions is enabled. The first runs found failures on
 Node 22, macOS and Windows in code merged while it was off (#81 fixed them), and `main` then passed. The `npm` and
 `marketplaces` environments exist with a required reviewer. `release.yml` and `release-extension.yml` have both published.
+**Since 2026-11-27 every workflow is started by hand** ([CONTRIBUTING.md](../../../CONTRIBUTING.md)).
 One intermittent failure is known: a `write EPIPE` at the end of the extension's notebook server test.
 
 **Landed since the move** (details in the changelog and each pull request): the five-minute tour, now a notebook

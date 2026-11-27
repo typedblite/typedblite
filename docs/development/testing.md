@@ -72,7 +72,7 @@ and used; see [Releasing](releasing.md#the-checks-a-package-must-pass)), and the
 task is replayed from a cache. The last seven are skipped by `--quick`. The browser suites need Playwright's
 Chromium, the e2e a display, and the clean room the npm registry, for the packages' dependencies.
 
-CI runs on every pull request and push to `main` (`.github/workflows/ci.yml`): Node 22.16, 22 and 24 on Linux and
+CI is started by hand (`gh workflow run ci.yml --ref <branch>`, `.github/workflows/ci.yml`) and runs Node 22.16, 22 and 24 on Linux and
 Node 24 on Windows and macOS. It also runs the playground's browser test, and the sync demo's browser and Electron tests,
 and builds the demo's Android app and runs it on an emulator. The gate runs only the in-browser hub of the sync demo. CI
 does not run the website check or the five-minute tour from the tarballs, so run the gate too. The gate covers only the

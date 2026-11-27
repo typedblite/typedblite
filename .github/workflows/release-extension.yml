@@ -1,5 +1,7 @@
-# The publish job first ran for typedblite-v0.3.2 (2026-11-26). The build job also runs on any pull request that
-# changes this file.
+# The publish job first ran for typedblite-v0.3.2 (2026-11-26). Run by hand:
+#
+#   gh workflow run release-extension.yml --ref <tag>      publishes
+#   gh workflow run release-extension.yml --ref <branch>   builds and tests only
 #
 # Publishes both VS Code extensions, TypeDBLite (apps/vscode) and the TypeQLite Theme Bridge
 # (apps/vscode/theme-bridge), to Open VSX, then creates the GitHub Release with both .vsix files attached. They
@@ -18,10 +20,7 @@
 name: Release extension
 
 on:
-  push:
-    tags: ["typedblite-v*"]
-  pull_request:
-    paths: [.github/workflows/release-extension.yml]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -58,8 +57,8 @@ jobs:
             echo "::error::the Theme Bridge is at $bridge and the extension at $version"; exit 1
           fi
           prerelease=false
-          # A pull request has no tag: it checks everything else.
-          if [ "$GITHUB_EVENT_NAME" = push ]; then
+          # A branch has no tag to check: it checks everything else.
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
             case "$GITHUB_REF_NAME" in
               "typedblite-v$version")     ;;
               "typedblite-v$version-pre") prerelease=true ;;
@@ -105,7 +104,7 @@ jobs:
   publish:
     name: publish
     needs: build
-    if: github.event_name == 'push'
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Waits for the maintainer's approval, and is the environment the trusted publishers name.

@@ -2,14 +2,13 @@
 # bypasses two-factor authentication. Publishing by OIDC (trusted publishing, no token) has not been run.
 # npm took several minutes to serve the new packages after the job had succeeded.
 #
-# Publishes the npm packages for a version tag, with provenance, then creates the GitHub Release.
-# Make the tag with `nx release version <version>` (it commits and tags `v<version>`), then push the tag.
+# Publishes the npm packages for a version tag, with provenance, then creates the GitHub Release. Run by hand, on the
+# tag: `gh workflow run release.yml --ref v<version>`. Pushing a tag publishes nothing.
 # A prerelease (a version with a `-`, such as 0.1.0-rc.1) goes to the `next` dist-tag; anything else to `latest`.
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write # the GitHub Release
@@ -23,7 +22,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # A protected environment: set "required reviewers" on it, so a pushed tag waits for the maintainer to
+    # A protected environment: set "required reviewers" on it, so a run waits for the maintainer to
     # approve the publish. npm's trusted-publisher entry can also be pinned to it.
     environment: npm
     steps:
@@ -38,6 +37,9 @@ jobs:
         id: release
         shell: bash
         run: |
+          if [ "$GITHUB_REF_TYPE" != tag ]; then
+            echo "::error::run this on a version tag, not the $GITHUB_REF_TYPE $GITHUB_REF_NAME"; exit 1
+          fi
           version="$(node -p "require('./libs/runtime/package.json').version")"
           if [ "$GITHUB_REF_NAME" != "v$version" ]; then
             echo "::error::tag $GITHUB_REF_NAME does not match the packages' version $version"; exit 1

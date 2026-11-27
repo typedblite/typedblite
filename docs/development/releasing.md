@@ -64,7 +64,7 @@ Only the maintainer can do these, once:
    the org, and add a second owner.
 2. **The CLI is publishable:** `apps/cli/package.json` has no `"private": true`. *Done with 0.1.0-rc.1.*
 3. **The GitHub environment `npm`** (Settings → Environments) has the maintainer as a required reviewer, so that a
-   pushed tag waits for approval before anything is published. *Created 2026-11-26.*
+   run waits for approval before anything is published. *Created 2026-11-26.*
 4. **The first publish of each package needs a token**, because npm only lets a package that exists have a
    trusted publisher. Create a granular access token with read and write access to **all packages** (the unscoped
    `typedblite` does not exist yet, so a token cannot be limited to it) and to the `@typedblite` org, with
@@ -107,12 +107,13 @@ Only the maintainer can do these, once:
    other, updates the lockfile, and commits `chore(release): v0.1.0-rc.1`. It does **not** tag. Run
    `npm run gate`, and open a pull request.
 2. **Merge it** (a merge commit, as always).
-3. **Tag the merge commit on `main`, and push the tag:**
+3. **Tag the merge commit on `main`, push the tag, and start the release workflow on it:**
 
    ```bash
    git switch main && git pull --ff-only
    git tag -a v0.1.0-rc.1 -m v0.1.0-rc.1
    git push origin v0.1.0-rc.1
+   gh workflow run release.yml --ref v0.1.0-rc.1
    ```
 
 4. **Approve the run.** [`release.yml`](../../.github/workflows/release.yml) checks that the tag matches the
@@ -197,12 +198,13 @@ the extension's folder, so they break. A shipped README or changelog links with 
 1. **On a branch:** set the version in both extensions' `package.json`, rename `## [Unreleased]` in each
    `CHANGELOG.md` to `## [<version>] - YYYY-MM-DD` (saying so if one of them did not change), run `npm run gate`, and
    open a pull request.
-2. **Merge it, then tag the merge commit on `main`**, and push the tag:
+2. **Merge it, then tag the merge commit on `main`**, push the tag, and start the workflow on it:
 
    ```bash
    git switch main && git pull --ff-only
    git tag -a typedblite-v0.3.2 -m typedblite-v0.3.2
    git push origin typedblite-v0.3.2
+   gh workflow run release-extension.yml --ref typedblite-v0.3.2
    ```
 
 3. **Approve the run.** [`release-extension.yml`](../../.github/workflows/release-extension.yml) checks the tag

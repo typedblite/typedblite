@@ -1,11 +1,9 @@
-# The gate from CONTRIBUTING.md, run on every pull request and every push to main.
+# The gate from CONTRIBUTING.md. Run by hand only, on a branch: `gh workflow run ci.yml --ref <branch>`. The checks
+# it reports on that commit are the ones branch protection requires.
 # The checkout is clean, so this is the "clean tree" gate: build, typecheck, test.
 name: CI
 
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

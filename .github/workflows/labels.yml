@@ -1,10 +1,7 @@
-# Keeps the repository's labels in step with .github/labels.yml.
+# Keeps the repository's labels in step with .github/labels.yml. Run by hand: `gh workflow run labels.yml`.
 name: Labels
 
 on:
-  push:
-    branches: [main]
-    paths: [.github/labels.yml]
   workflow_dispatch:
 
 permissions:
