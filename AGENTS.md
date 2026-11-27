@@ -63,7 +63,7 @@ npm run build
 npm run test
 
 # The whole gate, from a clean tree: build, typecheck, tests with the coverage floor, WASM, browser, e2e.
-# CI runs most of it on every pull request, but not all (CONTRIBUTING.md). `-- --quick` skips the last three.
+# CI runs most of it, but not all, and only when started by hand (CONTRIBUTING.md). `-- --quick` skips the last three.
 npm run gate
 
 # Type-check everything

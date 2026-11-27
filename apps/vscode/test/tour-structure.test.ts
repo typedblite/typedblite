@@ -98,8 +98,8 @@ describe('the tour is a tour', () => {
     expect(flat).toContain(`**Node.js ${needed} or later**`);
   });
 
-  it('says plainly what is not published, and where to get it instead', () => {
-    expect(flat).toMatch(/not published yet/);
+  it('says plainly that the packages are a release candidate, and how to build them instead', () => {
+    expect(flat).toMatch(/release candidate/);
     expect(markdown).toContain('[Getting started](getting-started.md)');
   });
 

@@ -1,6 +1,6 @@
 # TypeDBLite — Open Source Launch Plan
 
-Status: in progress · Written 2026-11-14 · Current as of 2026-11-25, `main` at `e3de77e` ([where to resume](#where-to-resume))
+Status: in progress · Written 2026-11-14 · Current as of 2026-11-27, `main` at `77749db` ([where to resume](#where-to-resume))
 
 This plan takes TypeDBLite from "a strong repository" to "a project strangers can install, trust, and
 contribute to." It is organized as gates, not dates: each phase has exit criteria, and the launch
@@ -26,11 +26,12 @@ happens when the gates are green. A suggested calendar is at the end.
 
 ## Where to resume
 
-*As of 2026-11-25. The work is in `typedblite/typedblite`, **private until launch**, with its history rewritten to
+*As of 2026-11-27. The work is in `typedblite/typedblite`, **now public**, with its history rewritten to
 drop the private names. Its pull requests restart at #1; #1 to #74 are merged. The pre-rewrite history is kept
 privately in the old repository.* Read this first; everything it points to is below.
 
-**Nothing is released:** no tags, nothing on npm, no extension on Open VSX. **The website is live** at
+**First releases are out:** `0.1.0-rc.1` of the six npm packages (2026-11-27, with provenance), and both extensions
+0.3.2 on Open VSX (2026-11-26). **The website is live** at
 `typedblite.dev`, with the guides, the API reference, the playground and the sync demo.
 
 **A clean `npm ci` works from the public registry (2026-11-25).** The seven `@devx-micro/app-*` packages (ADR-011)
@@ -39,7 +40,8 @@ full on Node 24.19.0, Linux.
 
 **CI runs again (2026-11-26).** The repository is public and Actions is enabled. The first runs found failures on
 Node 22, macOS and Windows in code merged while it was off (#81 fixed them), and `main` then passed. The `npm` and
-`marketplaces` environments exist with a required reviewer. `release.yml` and `release-extension.yml` have never run.
+`marketplaces` environments exist with a required reviewer. `release.yml` and `release-extension.yml` have both published.
+**Since 2026-11-27 every workflow is started by hand** ([CONTRIBUTING.md](../../../CONTRIBUTING.md)).
 One intermittent failure is known: a `write EPIPE` at the end of the extension's notebook server test.
 
 **Landed since the move** (details in the changelog and each pull request): the five-minute tour, now a notebook
@@ -51,26 +53,23 @@ One intermittent failure is known: a `write EPIPE` at the end of the extension's
 **What is left, in order.** Several steps are hard to undo once something is public or published.
 
 1. ~~**Unblock the build.**~~ Done 2026-11-25: the `@devx-micro` packages are published (above).
-2. **Start the long waits, in parallel.**
+2. **The long wait.**
    - Send the written confirmation to TypeDB Ltd (B1; the draft is deliberately not in this repository), get a
      one-line reply, and settle [PL-1](#parking-lot). It blocks going public.
-   - Start the Open VSX namespace `typedblite`: it needs the Eclipse publisher agreement and a verification request
-     ([Releasing](../../development/releasing.md#the-vs-code-extensions)).
 3. ~~**Get CI back**~~ (decision 10). Done 2026-11-26. Left: re-raise the old repository's Capacitor 8 update, decide
    whether `coverage` and macOS become blocking, and add `sync-demo:test-browser`.
-4. **Accounts** ([Releasing](../../development/releasing.md#one-time-setup)): claim the unscoped `typedblite` and
-   `typeqlite` on npm (both still unpublished on 2026-11-25); 2FA on the `@typedblite` org and a second owner; take
-   `private` off `apps/cli`; the Marketplace publisher `typedblite`; the `npm` and `marketplaces` GitHub environments
-   and their tokens (none exist yet). Releasing still counts three libraries; there are now four, plus the CLI.
+4. **Accounts** ([Releasing](../../development/releasing.md#one-time-setup)): set up npm trusted publishing, then
+   delete the `NPM_TOKEN` secret and revoke the token; claim `typeqlite` on npm; 2FA on the `@typedblite` org and a
+   second owner; the Visual Studio Marketplace publisher `typedblite` (optional).
 5. **Governance:** `CODE_OF_CONDUCT.md` (the official Contributor Covenant text); DCO or CLA (decision 4);
    `GOVERNANCE.md` and `ROADMAP.md`; who answers issues and who reviews (8); the launch window (7); review the
    [compatibility policy](../../guides/compatibility.md) and the ["Why not X" draft](../../guides/why-not-x.md).
-6. **First release candidate:** publish `0.1.0-rc.1` under `next`, run the clean room against the published packages
-   on three platforms, publish the extensions, and run the five-minute tour against the registry.
+6. **First release candidate:** published. Left: run the clean room against the published packages on three
+   platforms, and run the five-minute tour against the registry.
 7. **Content:** "TypeDB vs TypeDBLite" (TypeDB Ltd should read it first), demo GIF, badges, blog post, release
-   notes, good first issues. At release, remove the "not on npm" and "not public yet" notices (README, website) and
-   restore the website's GitHub links (hidden in #34).
-8. **Go public.** First run `gitleaks` again (clean on 2026-11-25) and finish PL-1. Then set branch protection,
+   notes, good first issues. At `0.1.0`, remove the release candidate notices
+   ([Website](../../development/website.md)).
+8. **After going public** (the repository is public). Confirm PL-1 and a `gitleaks` run, and check branch protection,
    Discussions, private vulnerability reporting, secret scanning with push protection, Dependabot alerts, and the
    repository's website link and topics (both empty). Then Phase 4 and Phase 5.
 
@@ -135,8 +134,8 @@ or keep relying on `npm run gate`. Moving CI elsewhere would mean rewriting the 
 | Honest engineering record | Ten ADRs, a documented load test with before/after numbers, declared deviations with owners |
 | Clean licensing posture | MPL-2.0, matching TypeDB; upstream attribution and trademark notice already in the README |
 
-**Not yet released.** Everything at version `0.0.1`; no git tags or releases; the CLI and the VS Code extension are
-still `"private": true`; no `CODE_OF_CONDUCT.md`. The rest is in [Where to resume](#where-to-resume) and
+**Released as a candidate.** The npm packages are at `0.1.0-rc.1` and the extensions at 0.3.2. There is no
+`CODE_OF_CONDUCT.md`. The rest is in [Where to resume](#where-to-resume) and
 [section 4](#4-readiness-audit).
 
 ## 2. Goals and non-goals
@@ -189,7 +188,7 @@ confirm it and it needs someone to.
 | --- | --- | --- | --- |
 | B1 | **The name contains TypeDB™.** The README handles attribution well, but a project name that includes another company's mark is the single largest launch risk | **Verbal blessing received** from TypeDB Ltd's CEO (video call, 2026-11) | **Get it in writing.** Send a short follow-up email restating what was agreed (open-source release under the name TypeDBLite, the `@typedblite` scope and `typedblite.dev`, MPL-2.0, the independence statement) and ask for a one-line confirmation reply. Keep the reply with the project records. Read the published trademark policy once to check that the agreement and the policy don't conflict. A verbal OK is good faith; a written one is what survives a change of staff or a rebrand |
 | B2 | **No CI.** `.github/workflows/` was absent, so contributors' PRs would get no checks | **Closed 2026-11-26:** running again, and green | See [Where to resume](#where-to-resume) |
-| B3 | **Nothing is published.** No tags, no releases, no npm packages, CLI is private | Verified, still true 2026-11-25 | Phase 2 |
+| B3 | **Nothing is published.** No tags, no releases, no npm packages, CLI is private | **Closed 2026-11-27:** `0.1.0-rc.1` is on npm | — |
 | B4 | **npm and domain names.** `@typedblite` (npm org) and `typedblite.dev` are **registered (2026-11-14)**. Still to confirm: the unscoped `typedblite` (the CLI's name) and `typeqlite`, which the scope does not cover: **both still free on 2026-11-15**. The `typedblite` GitHub org is held too (2026-11-15) | Partly done | Check both unscoped names on npm and claim them (publish a placeholder or `0.0.0` under the org if free). Note that the domain, like the name, contains TypeDB™, so B1 covers it too |
 | B5 | **`node:sqlite` vs `engines`.** `engines` said Node `>=22.12`. Measured: 22.12 has **no** `node:sqlite`; 22.13 to 22.15 have it **without FTS5**, which the engine requires; **22.16.0 is the first that works** (full gate passes there, cache skipped) | **Resolved** | `engines`, the READMEs, CONTRIBUTING and the getting-started guide now say 22.16; 22.16.0 is a blocking CI job. Node still marks `node:sqlite` experimental, which prints a warning on first use: say so in the docs |
 | B6 | **Hub security.** The hub exposes an SSE stream and a POST endpoint. I did not check authentication, binding defaults, or input limits | **Reviewed 2026-11-14: documented, not yet fixed** | Done: the replication guide has a "Security" section with each finding, verified against a live hub. Five of the eight are now fixed in the handler (PL-6); authentication and TLS are the mounting server's job; **a pushed revision is now checked against its content (PL-6, ADR-003 amended 2026-11-15)**, though a peer that may write can still make its write win. Binding is `127.0.0.1` only |
@@ -427,7 +426,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
       Use Nx release or Changesets; pick one and document it in CONTRIBUTING.
       *Written, not run (2026-11-15): Nx release, chosen because the workspace is already Nx and it adds no
       dependency; `.github/workflows/release.yml`; [Releasing](../../development/releasing.md); CONTRIBUTING's
-      "Releases". The workflow has never run: Actions is off.*
+      "Releases". The workflow published `0.1.0-rc.1` on 2026-11-27.*
 - [ ] A **clean-room install test**: in an empty directory, on a machine without the repo, follow the
       README exactly (npm install, first query, WASM in a Vite app, CLI via `npx`, VSIX install).
       Run this on Linux, macOS and Windows. Most launch-day pain is found here.
@@ -439,7 +438,7 @@ Decide the public surface deliberately (see [section 12](#12-decisions-needed)).
 - [ ] Dry-run the whole pipeline against a **throwaway scope** or `--dry-run` before the real publish.
       *Locally (2026-11-15): `nx release version 0.1.0-rc.1` for real without the commit, then back, and
       `nx release publish --dry-run --tag next`. The workflow's run is still to do.*
-- [ ] Publish `0.1.0-rc.1` under the `next` dist-tag for the private beta.
+- [x] Publish `0.1.0-rc.1` under the `next` dist-tag. *2026-11-27.*
 
 **Exit:** the clean-room test passes on all three platforms from published artifacts, not from a clone.
 

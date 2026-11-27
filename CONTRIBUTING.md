@@ -34,7 +34,9 @@ is named.
 You need **Node.js 22.16 or later** (the project is developed on Node 24) and **npm**. Linux, macOS and
 Windows all work: the gate has passed on Linux (Node 22.16, 22 and 24), Windows and macOS (Node 24).
 
-> **CI runs on every pull request** and every push to `main`: build, type-check and tests on Linux (Node 22.16, 22 and
+> **CI runs only when a maintainer starts it.** No workflow runs by itself. `main` requires its checks, so before a
+> merge a maintainer runs `gh workflow run ci.yml --ref <branch>` and `gh workflow run pr-title.yml --ref <branch>`
+> (the branch must be in this repository, so a fork's branch is pushed here first). CI covers: build, type-check and tests on Linux (Node 22.16, 22 and
 > 24), Windows and macOS, the clean-room install, the conformance report, the WASM, browser, coverage and VS Code
 > e2e jobs, the playground's browser test, the sync demo's browser and Electron tests, and its Android app on an
 > emulator. **Run `npm run gate` before you open one** and put its result in the description: it also runs the website
@@ -60,6 +62,7 @@ npm exec nx -- run <project>:<target>
 | `typeqlite-language` | `libs/language` | `build`, `test`, `typecheck`, `langium-generate` |
 | `content-revision` | `libs/content-revision` | `build`, `test`, `typecheck` |
 | `typedblite-runtime` | `libs/runtime` | `build`, `test` |
+| `typedblite-session` | `libs/session` | `build`, `test`, `typecheck` |
 | `typedblite-node-host` | `libs/node-host` | `build`, `test`, `typecheck` |
 | `typedblite-conformance` | `libs/conformance` | `build`, `test`, `typecheck`, `report` |
 | `typedblite` (CLI) | `apps/cli` | `build`, `test`, `typecheck` |

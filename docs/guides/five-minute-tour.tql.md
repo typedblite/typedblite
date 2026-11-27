@@ -3,10 +3,9 @@
 You will keep a reading list in one file. You will define it and ask it questions in a **notebook**, then use the same file from
 the **command line** and from a **Node program**.
 
-> **Status.** The npm packages are not published yet. This tour is written for the first release, and
-> it is tested: every cell, command and file below is run, and every answer shown is checked against what runs (see
-> [How this tour is tested](#how-this-tour-is-tested)). Until the release, build from source with
-> [Getting started](getting-started.md). The extension is already published:
+> **Status.** The npm packages are a release candidate, `0.1.0-rc.1`. This tour is tested: every cell, command and file below is run, and every answer shown is checked against what runs (see
+> [How this tour is tested](#how-this-tour-is-tested)). To build from source instead, see
+> [Getting started](getting-started.md). To install the extension, see
 > [how to install it](../../apps/vscode/README.md#install).
 
 You need **Node.js 22.16 or later**, and **VS Code** with the TypeDBLite extension for the notebook. Nothing else: no native

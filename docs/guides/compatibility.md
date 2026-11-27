@@ -3,13 +3,13 @@
 What a TypeDBLite version number promises: which changes can break your code or your data, and where
 to read about them before you upgrade.
 
-> **Status: proposed, not yet published.** No version of TypeDBLite is on npm yet. This policy takes effect
-> with the first release, `0.1.0`.
+> **Status: proposed.** The first release candidate, `0.1.0-rc.1`, is on npm. This policy takes effect with
+> `0.1.0`.
 
 ## The packages are versioned together
 
-`@typedblite/runtime`, `@typedblite/language`, `@typedblite/content-revision` and the `typedblite` CLI are
-released together, at one version number, and each depends on the others at exactly that version. Install
+`@typedblite/runtime`, `@typedblite/language`, `@typedblite/content-revision`, `@typedblite/session`,
+`@typedblite/node-host` and the `typedblite` CLI are released together, at one version number, and each depends on the others at exactly that version. Install
 them at the same version. The VS Code extension is versioned separately, on its own marketplace.
 
 ## Semantic Versioning, before and after 1.0
@@ -28,7 +28,8 @@ TypeDBLite follows [Semantic Versioning](https://semver.org).
 **From 1.0:** a breaking change needs a new major version.
 
 A **prerelease** (`0.1.0-rc.1`) is published under npm's `next` tag, so `npm install @typedblite/runtime`
-never installs one by accident. Ask for it by version, or by `@next`.
+does not pick one up once there is a stable release. Ask for it by version, or by `@next`. Until `0.1.0`, npm's
+`latest` tag also points to `0.1.0-rc.1`, because npm gives a package's first version that tag.
 
 ## What counts as a breaking change
 
