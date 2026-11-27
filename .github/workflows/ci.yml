@@ -1,5 +1,7 @@
 # The gate from CONTRIBUTING.md. Run by hand only, on a branch: `gh workflow run ci.yml --ref <branch>`. The checks
 # it reports on that commit are the ones branch protection requires.
+# GitHub does not count a manual run's own checks on a pull request, so the `report` job repeats the gate, clean-room
+# and conformance results as commit statuses under the same names.
 # The checkout is clean, so this is the "clean tree" gate: build, typecheck, test.
 name: CI
 
@@ -252,3 +254,30 @@ jobs:
           emulator-options: -no-window -no-snapshot-save -no-boot-anim -no-audio -gpu swiftshader_indirect
           working-directory: apps/sync-demo
           script: xvfb-run --auto-servernum bash mobile/ci-story.sh
+
+  # The results branch protection reads. This job checks out nothing and runs no code from the repository, so the
+  # permission to write statuses is never beside an install script.
+  report:
+    name: report to branch protection
+    needs: [gate, clean-room, conformance-report]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      statuses: write
+    steps:
+      # The jobs are read from the run because `needs` gives one result for a whole matrix, not one for each leg.
+      - name: Post a commit status for each gate, clean-room and conformance job
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name | test("^(gate [(]|clean room [(]|conformance report$)")) | [.name, .conclusion] | @tsv' > jobs.tsv
+          test -s jobs.tsv
+          while IFS=$'\t' read -r name conclusion; do
+            case "$conclusion" in success) state=success ;; failure) state=failure ;; *) state=error ;; esac
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --silent \
+              -f state="$state" -f context="$name" -f target_url="$RUN_URL" -f description="Manual CI run: $conclusion"
+          done < jobs.tsv

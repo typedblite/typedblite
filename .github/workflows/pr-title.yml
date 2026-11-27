@@ -7,6 +7,7 @@
 #
 # Run by hand on the pull request's branch: `gh workflow run pr-title.yml --ref <branch>`. It reads the title of the
 # open pull request from that branch. Run it again after changing the title.
+# The result is also posted as a commit status: GitHub does not count a manual run's own check on a pull request.
 name: PR title
 
 on:
@@ -14,6 +15,7 @@ on:
 
 permissions:
   pull-requests: read
+  statuses: write
 
 jobs:
   # The job's name is the check that branch protection requires.
@@ -32,3 +34,14 @@ jobs:
           if ! [[ "$title" =~ $pattern ]]; then
             echo "::error::the title is not a Conventional Commit: <type>(<optional scope>): <subject>"; exit 1
           fi
+
+      - name: Report to branch protection
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          case "$JOB_STATUS" in success) state=success ;; failure) state=failure ;; *) state=error ;; esac
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" --silent \
+            -f state="$state" -f context=conventional-commit -f target_url="$RUN_URL"
